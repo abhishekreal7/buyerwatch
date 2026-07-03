@@ -12,6 +12,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+RUN npm run build:worker
+
 # Railway provides environment variables natively, so we don't need dotenv
-# We run the worker using tsx
-CMD ["npx", "tsx", "worker/index.ts"]
+# Run the compiled worker
+CMD ["node", "dist/worker/index.js"]

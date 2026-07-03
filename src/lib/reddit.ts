@@ -31,7 +31,7 @@ async function getRedditToken(): Promise<string> {
     throw new Error(`Reddit auth failed: ${response.statusText}`)
   }
 
-  const data = await response.json()
+  const data = await response.json() as any
   cachedToken = data.access_token
   // Expire 1 minute before actual expiry to be safe
   tokenExpiry = Date.now() + (data.expires_in - 60) * 1000
@@ -75,8 +75,8 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     throw new Error(`Reddit fetch failed: ${response.statusText}`)
   }
   
-  const data = await response.json()
-  const posts = data?.data?.children?.map((child: any) => child.data) || []
+  const json = await response.json() as any
+  const posts = json.data?.children?.map((child: any) => child.data) || []
   
   return posts.map((post: any): NormalizedPost => ({
     platform: 'reddit',

@@ -17,8 +17,8 @@ function getHourBucket() {
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   
-  // Basic security to ensure only Vercel Cron or admin hits this
-  if (process.env.NODE_ENV === 'production' && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Strict security to ensure only Vercel Cron or admin hits this
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
