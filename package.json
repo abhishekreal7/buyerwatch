@@ -9,9 +9,22 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "next": "16.2.9",
+    "@anthropic-ai/sdk": "^0.110.0",
+    "@atproto/api": "^0.20.25",
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.0",
+    "bullmq": "^5.79.2",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "framer-motion": "^12.42.2",
+    "ioredis": "^5.11.1",
+    "lucide-react": "^1.23.0",
+    "multiformats": "^14.0.4",
+    "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -19,7 +32,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

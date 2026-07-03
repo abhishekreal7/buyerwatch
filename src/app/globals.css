@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --surface: #111111;
+  --surface-elevated: #1C1C1E;
+  
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  
+  --primary: #0A84FF;
+  --success: #30D158;
+  --warning: #FF9F0A;
+  --destructive: #FF453A;
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: #98989D;
+  --text-tertiary: #48484A;
+
+  --font-display: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+  --font-sans: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  
+  --color-primary: var(--primary);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  
+  --radius-xl: 12px;
+  --radius-2xl: 20px;
+  
+  --shadow-apple: 0 0 0 1px rgba(255,255,255,0.05), 0 4px 24px rgba(0,0,0,0.4);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Base Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+}
+
+/* Apple-style Glass Morphism utility class */
+.glass {
+  background-color: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
