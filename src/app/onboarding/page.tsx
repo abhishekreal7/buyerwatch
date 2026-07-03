@@ -13,7 +13,7 @@ export default async function OnboardingPage() {
   // Check if they already finished onboarding
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, business_name')
+    .select('id, business_name, plan')
     .eq('id', user.id)
     .single()
 
@@ -23,7 +23,7 @@ export default async function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pt-16 items-center px-4">
-      <OnboardingWizard />
+      <OnboardingWizard plan={profile?.plan || 'free'} />
     </div>
   )
 }

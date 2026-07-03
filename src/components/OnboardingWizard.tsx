@@ -16,7 +16,7 @@ const BUSINESS_TYPES = [
   { id: 'other', label: 'Other', icon: HelpCircle },
 ]
 
-export default function OnboardingWizard() {
+export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
 
@@ -32,8 +32,9 @@ export default function OnboardingWizard() {
 
   const [redditTargets, setRedditTargets] = useState<string[]>([])
   const [blueskyTargets, setBlueskyTargets] = useState<string[]>([])
+  const [xTargets, setXTargets] = useState<string[]>([])
   const [targetInput, setTargetInput] = useState('')
-  const [activeTab, setActiveTab] = useState<'reddit' | 'bluesky'>('reddit')
+  const [activeTab, setActiveTab] = useState<'reddit' | 'bluesky' | 'x'>('reddit')
 
   const [writingStyle, setWritingStyle] = useState('')
   const [redditUsername, setRedditUsername] = useState('')
@@ -55,6 +56,10 @@ export default function OnboardingWizard() {
       if (k.platforms.includes('bluesky')) {
         const targets = blueskyTargets.length > 0 ? blueskyTargets : [k.term]
         targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'bluesky', target: t }))
+      }
+      if (k.platforms.includes('x') && plan === 'business') {
+        const targets = xTargets.length > 0 ? xTargets : [k.term]
+        targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'x', target: t }))
       }
     }
 
@@ -97,13 +102,16 @@ export default function OnboardingWizard() {
       setRedditTargets([...redditTargets, targetInput.trim().toLowerCase()])
     } else if (activeTab === 'bluesky' && !blueskyTargets.includes(targetInput.trim().toLowerCase())) {
       setBlueskyTargets([...blueskyTargets, targetInput.trim().toLowerCase()])
+    } else if (activeTab === 'x' && !xTargets.includes(targetInput.trim().toLowerCase())) {
+      setXTargets([...xTargets, targetInput.trim().toLowerCase()])
     }
     setTargetInput('')
   }
 
-  const removeTarget = (target: string, platform: 'reddit' | 'bluesky') => {
+  const removeTarget = (target: string, platform: 'reddit' | 'bluesky' | 'x') => {
     if (platform === 'reddit') setRedditTargets(redditTargets.filter(t => t !== target))
     if (platform === 'bluesky') setBlueskyTargets(blueskyTargets.filter(t => t !== target))
+    if (platform === 'x') setXTargets(xTargets.filter(t => t !== target))
   }
 
   return (
@@ -208,7 +216,14 @@ export default function OnboardingWizard() {
                         onClick={() => toggleKeywordPlatform(i, 'bluesky')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${kw.platforms.includes('bluesky') ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'border-border text-text-secondary hover:border-border-hover'}`}
                       >Bluesky</button>
-                      <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-tertiary opacity-50 cursor-not-allowed">X (Coming Soon)</button>
+                      <button 
+                        disabled={plan !== 'business'}
+                        onClick={() => toggleKeywordPlatform(i, 'x')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${kw.platforms.includes('x') ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'border-border text-text-secondary hover:border-border-hover'} ${plan !== 'business' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={plan !== 'business' ? 'Requires Business plan' : ''}
+                      >
+                        X (Twitter) {plan !== 'business' && '🔒'}
+                      </button>
                       <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-tertiary opacity-50 cursor-not-allowed">Threads (Coming Soon)</button>
                     </div>
                   </div>
@@ -240,7 +255,20 @@ export default function OnboardingWizard() {
                     onClick={() => setActiveTab('bluesky')}
                     className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'bluesky' ? 'border-[#0A84FF] text-[#0A84FF]' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
                   >Bluesky Targets</button>
+                  <button 
+                    disabled={plan !== 'business'}
+                    onClick={() => setActiveTab('x')}
+                    className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'x' ? 'border-[#0A84FF] text-[#0A84FF]' : 'border-transparent text-text-secondary hover:text-text-primary'} ${plan !== 'business' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    X Targets {plan !== 'business' && '🔒'}
+                  </button>
                 </div>
+
+                {activeTab === 'x' && (
+                  <div className="bg-[#0A84FF]/10 text-[#0A84FF] px-4 py-3 rounded-xl text-sm mb-4">
+                    <strong>Note:</strong> X monitoring has a daily cost cap — heavy discovery keywords may be throttled once your plan's daily limit is reached.
+                  </div>
+                )}
 
                 <div className="flex gap-3 mt-4">
                   <div className="relative flex-1">
@@ -274,7 +302,7 @@ export default function OnboardingWizard() {
                         <span className="text-text-tertiary text-sm italic py-2">Monitoring all of Reddit...</span>
                       )}
                     </>
-                  ) : (
+                  ) : activeTab === 'bluesky' ? (
                     <>
                       {blueskyTargets.map(query => (
                         <div key={query} className="flex items-center gap-2 bg-[#0A84FF]/10 text-[#0A84FF] border border-[#0A84FF]/20 px-3 py-1.5 rounded-lg text-sm font-medium">
@@ -285,6 +313,20 @@ export default function OnboardingWizard() {
                         </div>
                       ))}
                       {blueskyTargets.length === 0 && (
+                        <span className="text-text-tertiary text-sm italic py-2">Will use your keywords as search queries...</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {xTargets.map(query => (
+                        <div key={query} className="flex items-center gap-2 bg-[#0A84FF]/10 text-[#0A84FF] border border-[#0A84FF]/20 px-3 py-1.5 rounded-lg text-sm font-medium">
+                          "{query}"
+                          <button onClick={() => removeTarget(query, 'x')} className="hover:text-text-primary transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {xTargets.length === 0 && (
                         <span className="text-text-tertiary text-sm italic py-2">Will use your keywords as search queries...</span>
                       )}
                     </>

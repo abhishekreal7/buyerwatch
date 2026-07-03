@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { redditFetchQueue, blueskyFetchQueue } from '../../../../lib/queues'
+import { redditFetchQueue, blueskyFetchQueue, xFetchQueue } from '../../../../lib/queues'
+import { X_DAILY_SPEND_LIMIT_CENTS } from '../../../../lib/plan-limits'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,6 +61,12 @@ export async function GET(request: Request) {
       
       if (isDue) {
         dueUsers.add(kw.user_id)
+        
+        // Explicitly filter X targets by business tier (or plan limit > 0)
+        if (kw.platform === 'x' && (X_DAILY_SPEND_LIMIT_CENTS[plan] || 0) === 0) {
+          continue // skip x targets for free/pro users
+        }
+
         if (targetsByPlatform[kw.platform]) {
           targetsByPlatform[kw.platform].add(kw.target)
         }
@@ -87,8 +94,14 @@ export async function GET(request: Request) {
       })
     }
 
-    // X, Threads: log skipped count
-    console.log(`Skipped X targets: ${targetsByPlatform.x.size}`)
+    // X
+    for (const target of targetsByPlatform.x) {
+      await xFetchQueue.add('fetch', { target }, {
+        jobId: `x-${target}-${hourBucket}`
+      })
+    }
+
+    // Threads: log skipped count
     console.log(`Skipped Threads targets: ${targetsByPlatform.threads.size}`)
 
     // 4. Update last_polled_at for due users
@@ -114,6 +127,7 @@ export async function GET(request: Request) {
       stats: {
         redditTargets: targetsByPlatform.reddit.size,
         blueskyTargets: targetsByPlatform.bluesky.size,
+        xTargets: targetsByPlatform.x.size,
         usersPolled: userIds.length
       }
     })

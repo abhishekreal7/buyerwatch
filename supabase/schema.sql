@@ -61,6 +61,7 @@ create table usage_logs (
   date date default current_date,
   gemini_calls int default 0,
   claude_calls int default 0,
+  x_spend_cents int default 0,
   primary key (user_id, date)
 );
 
@@ -97,6 +98,29 @@ begin
     if current_count >= p_limit then return false; end if;
     update usage_logs set claude_calls = claude_calls + 1 where user_id = p_user_id and date = current_date;
   end if;
+  return true;
+end;
+$$;
+
+create or replace function increment_x_spend_if_under_limit(
+  p_user_id uuid, p_cost_cents int, p_daily_limit_cents int
+) returns boolean
+language plpgsql
+as $$
+declare current_spend int;
+begin
+  insert into usage_logs (user_id, date) values (p_user_id, current_date)
+    on conflict (user_id, date) do nothing;
+
+  select x_spend_cents into current_spend from usage_logs
+    where user_id = p_user_id and date = current_date for update;
+
+  if current_spend + p_cost_cents > p_daily_limit_cents then
+    return false;
+  end if;
+
+  update usage_logs set x_spend_cents = x_spend_cents + p_cost_cents
+    where user_id = p_user_id and date = current_date;
   return true;
 end;
 $$;

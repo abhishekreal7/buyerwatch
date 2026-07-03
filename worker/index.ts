@@ -2,6 +2,7 @@ import { Worker } from 'bullmq'
 import Redis from 'ioredis'
 import { redditFetchHandler } from './handlers/fetch-reddit'
 import { blueskyFetchHandler } from './handlers/fetch-bluesky'
+import { xFetchHandler } from './handlers/fetch-x'
 import { scorePostHandler } from './handlers/score-post'
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -40,6 +41,17 @@ const fetchBlueskyWorker = new Worker('fetch-bluesky', blueskyFetchHandler, {
   }, // Bluesky API limits are more generous
 })
 fetchBlueskyWorker.on('ready', () => console.log('🎧 fetch-bluesky worker is listening...'))
+
+// X API rate limit is very strict per 15 min window (e.g., 180 requests/15m)
+// 15 min = 900000 ms
+const fetchXWorker = new Worker('fetch-x', xFetchHandler, {
+  connection: redis as any,
+  limiter: {
+    max: 180, 
+    duration: 900000
+  }
+})
+fetchXWorker.on('ready', () => console.log('🎧 fetch-x worker is listening...'))
 
 const scorePostWorker = new Worker('score-post', scorePostHandler, {
   connection: redis as any,
