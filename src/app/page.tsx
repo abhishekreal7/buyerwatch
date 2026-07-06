@@ -593,18 +593,20 @@ export default function LandingPage() {
               <span className="text-xs text-[#0A84FF] font-medium">Active</span>
             </motion.div>
 
-            {/* X / Twitter — coming soon */}
+            {/* X / Twitter — active */}
             <motion.div
               variants={stagger80.item}
-              className="bg-surface rounded-[16px] border border-border px-8 py-6 flex flex-col items-center gap-3 min-w-[140px] cursor-default opacity-50"
+              whileHover={{ y: -2, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 20px rgba(0,0,0,0.06)' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+              className="bg-white rounded-[16px] border border-border shadow-elevation-1 px-8 py-6 flex flex-col items-center gap-3 min-w-[140px] cursor-default"
             >
               {/* X logo */}
               <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="X (Twitter)">
-                <circle cx="18" cy="18" r="18" fill="#e5e5e7" />
-                <path d="M20.23 16.9 26.5 10h-1.5l-5.45 6.2L15.08 10H10l6.58 9.4L10 26h1.5l5.75-6.55L21.92 26H27l-6.77-9.1Zm-2.04 2.32-.67-.94-5.3-7.56h2.28l4.27 6.1.67.94 5.57 7.94h-2.28l-4.54-6.48Z" fill="#6e6e73" />
+                <circle cx="18" cy="18" r="18" fill="#000000" />
+                <path d="M20.23 16.9 26.5 10h-1.5l-5.45 6.2L15.08 10H10l6.58 9.4L10 26h1.5l5.75-6.55L21.92 26H27l-6.77-9.1Zm-2.04 2.32-.67-.94-5.3-7.56h2.28l4.27 6.1.67.94 5.57 7.94h-2.28l-4.54-6.48Z" fill="white" />
               </svg>
-              <span className="text-sm font-semibold text-text-secondary">X</span>
-              <span className="text-xs text-text-tertiary font-medium">Coming soon</span>
+              <span className="text-sm font-semibold text-text-primary">X</span>
+              <span className="text-xs text-[#0A84FF] font-medium">Active</span>
             </motion.div>
 
             {/* Threads — coming soon */}
