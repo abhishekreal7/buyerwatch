@@ -546,9 +546,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── NEW § 4: Platform coverage ───────────────────────────────────── */}
-      <section className="py-24 border-t border-border">
+      <section className="relative py-32 border-t border-border overflow-hidden">
+        {/* Glow effect behind the section */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-r from-[#0A84FF]/5 via-[#0085FF]/5 to-[#FF4500]/5 blur-[100px] pointer-events-none -z-10 rounded-full" />
+        
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14 max-w-xl mx-auto">
+          <div className="text-center mb-16 max-w-xl mx-auto">
             <h2 className="font-display font-bold text-3xl md:text-4xl mb-4 tracking-tight">Works where your customers already are</h2>
             <p className="text-lg text-text-secondary">Active on the platforms that matter most — more coming.</p>
           </div>
@@ -558,69 +561,71 @@ export default function LandingPage() {
             initial="initial"
             whileInView="animate"
             viewport={{ once: true, margin: '-60px' }}
-            className="flex flex-wrap justify-center gap-4"
+            className="flex flex-wrap justify-center gap-5 max-w-4xl mx-auto"
           >
-            {/* Reddit — active */}
+            {/* Reddit */}
             <motion.div
               variants={stagger80.item}
-              whileHover={{ y: -2, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 20px rgba(0,0,0,0.06)' }}
-              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-              className="bg-white rounded-[16px] border border-border shadow-elevation-1 px-8 py-6 flex flex-col items-center gap-3 min-w-[140px] cursor-default"
+              whileHover={{ y: -4, scale: 1.02, boxShadow: '0 12px 32px -8px rgba(255, 69, 0, 0.15)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="relative group bg-white rounded-[24px] border border-black/[0.04] shadow-elevation-2 px-8 py-8 flex flex-col items-center gap-4 min-w-[160px] overflow-hidden cursor-default"
             >
-              {/* Reddit SVG */}
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="Reddit">
-                <circle cx="18" cy="18" r="18" fill="#FF4500" />
-                <path d="M29.5 18c0-1.38-1.12-2.5-2.5-2.5-.67 0-1.27.26-1.72.69C23.53 14.9 21.4 14.3 19 14.2l1.04-4.9 3.38.72c.05.85.74 1.52 1.6 1.52.9 0 1.62-.73 1.62-1.62 0-.9-.72-1.62-1.62-1.62-.65 0-1.21.39-1.48.95l-3.79-.81c-.16-.03-.32.08-.36.24L18.2 13.3c-2.46.08-4.65.68-6.32 1.9A2.49 2.49 0 0 0 9 15.5C7.62 15.5 6.5 16.62 6.5 18c0 .98.56 1.82 1.37 2.24-.03.25-.05.5-.05.76 0 3.85 4.5 6.98 10.05 6.98s10.05-3.13 10.05-6.98c0-.26-.02-.51-.05-.76.82-.42 1.38-1.26 1.38-2.24Zm-16.75 1.25c0-.9.73-1.62 1.62-1.62.9 0 1.63.72 1.63 1.62s-.73 1.63-1.63 1.63c-.89 0-1.62-.73-1.62-1.63Zm9.06 4.33c-1.03 1.03-3 1.1-3.81 1.1-.81 0-2.79-.07-3.82-1.1a.52.52 0 0 1 0-.74.52.52 0 0 1 .74 0c.64.64 2.01.87 3.08.87 1.07 0 2.43-.23 3.07-.87a.52.52 0 0 1 .74 0 .52.52 0 0 1 0 .74Zm-.31-2.7c-.9 0-1.62-.73-1.62-1.63s.72-1.62 1.62-1.62 1.63.72 1.63 1.62-.73 1.63-1.63 1.63Z" fill="white" />
-              </svg>
-              <span className="text-sm font-semibold text-text-primary">Reddit</span>
-              <span className="text-xs text-[#0A84FF] font-medium">Active</span>
+              <div className="absolute inset-0 bg-gradient-to-br from-[#FF4500]/[0.08] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative w-14 h-14 rounded-[14px] bg-[#FF4500]/10 flex items-center justify-center text-[#FF4500] group-hover:scale-110 transition-transform duration-500">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8">
+                  <path d="M22 11.082c0-1.244-1.008-2.253-2.252-2.253-.615 0-1.173.252-1.574.655-1.58-.99-3.712-1.64-6.103-1.722l1.242-5.836 4.05 1.085c.036.784.685 1.412 1.478 1.412 1.157 0 1.433-.925 1.433-1.432s-.68-1.43-1.492-1.43c-.636 0-1.18.397-1.396.958L12.95 4.31a.342.342 0 0 0-.4.24l-1.363 6.4c-2.433.053-4.606.716-6.216 1.716-.402-.405-.96-.658-1.58-.658C2.15 12.008 1.14 13.017 1.14 14.26c0 .944.582 1.75 1.402 2.115-.027.215-.045.434-.045.656 0 3.708 4.265 6.72 9.5 6.72s9.5-3.012 9.5-6.72c0-.223-.018-.444-.046-.66.82-.36 1.402-1.168 1.402-2.115zm-14.74 3.737c0-.85.69-1.54 1.54-1.54.85 0 1.54.69 1.54 1.54s-.69 1.54-1.54 1.54c-.85 0-1.54-.69-1.54-1.54zm7.39 3.513c-1.39 1.39-3.86 1.48-4.93 1.48s-3.54-.09-4.93-1.48a.4.4 0 0 1 0-.568.4.4 0 0 1 .57 0c.98.98 2.76 1.25 4.36 1.25s3.38-.27 4.36-1.25a.4.4 0 0 1 .57 0 .4.4 0 0 1 0 .568zm-.85-1.973c-.85 0-1.54-.69-1.54-1.54s.69-1.54 1.54-1.54 1.54.69 1.54 1.54-.69 1.54-1.54 1.54z"/>
+                </svg>
+              </div>
+              <span className="text-[15px] font-semibold text-text-primary tracking-tight">Reddit</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#0A84FF]/10 text-[#0A84FF]">Active</span>
             </motion.div>
 
-            {/* Bluesky — active */}
+            {/* Bluesky */}
             <motion.div
               variants={stagger80.item}
-              whileHover={{ y: -2, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 20px rgba(0,0,0,0.06)' }}
-              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-              className="bg-white rounded-[16px] border border-border shadow-elevation-1 px-8 py-6 flex flex-col items-center gap-3 min-w-[140px] cursor-default"
+              whileHover={{ y: -4, scale: 1.02, boxShadow: '0 12px 32px -8px rgba(0, 133, 255, 0.15)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="relative group bg-white rounded-[24px] border border-black/[0.04] shadow-elevation-2 px-8 py-8 flex flex-col items-center gap-4 min-w-[160px] overflow-hidden cursor-default"
             >
-              {/* Bluesky butterfly SVG */}
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="Bluesky">
-                <circle cx="18" cy="18" r="18" fill="#0085FF" />
-                <path d="M18 10.5c-3.3 2.48-6 5.5-6 8.25 0 1.66 1.34 3 3 3 .83 0 1.58-.34 2.12-.87.54.53 1.3.87 2.13.87 1.66 0 3-1.34 3-3 0-2.75-2.7-5.77-6-8.25h1.75Z" fill="white" />
-                <path d="M13 21.75c0 1.24 1 2.25 2.25 2.25S17.5 23 17.5 21.75v-1.5h-1.25A2.25 2.25 0 0 0 13 21.75Zm10 0c0 1.24-1 2.25-2.25 2.25S18.5 23 18.5 21.75v-1.5h1.25A2.25 2.25 0 0 1 23 21.75Z" fill="white" />
-              </svg>
-              <span className="text-sm font-semibold text-text-primary">Bluesky</span>
-              <span className="text-xs text-[#0A84FF] font-medium">Active</span>
+              <div className="absolute inset-0 bg-gradient-to-br from-[#0085FF]/[0.08] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative w-14 h-14 rounded-[14px] bg-[#0085FF]/10 flex items-center justify-center text-[#0085FF] group-hover:scale-110 transition-transform duration-500">
+                <svg viewBox="0 0 320 286" fill="currentColor" className="w-8 h-8">
+                  <path d="M69.364 32.153C116.446 72.637 146.994 122.95 159.274 153.226C159.764 154.436 160.236 154.436 160.726 153.226C173.006 122.95 203.554 72.637 250.636 32.153C275.952 10.383 320 -15.548 320 28.529C320 46.104 309.289 110.158 300.99 135.253C287.481 176.106 244.595 186.291 210.643 178.681C260.852 184.979 301.121 211.597 296.887 251.341C291.681 300.199 227.135 281.334 160 216.711C92.865 281.334 28.319 300.199 23.113 251.341C18.879 211.597 59.148 184.979 109.357 178.681C75.405 186.291 32.519 176.106 19.01 135.253C10.711 110.158 0 46.104 0 28.529C0 -15.548 44.048 10.383 69.364 32.153Z"/>
+                </svg>
+              </div>
+              <span className="text-[15px] font-semibold text-text-primary tracking-tight">Bluesky</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#0A84FF]/10 text-[#0A84FF]">Active</span>
             </motion.div>
 
-            {/* X / Twitter — active */}
+            {/* X */}
             <motion.div
               variants={stagger80.item}
-              whileHover={{ y: -2, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 20px rgba(0,0,0,0.06)' }}
-              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-              className="bg-white rounded-[16px] border border-border shadow-elevation-1 px-8 py-6 flex flex-col items-center gap-3 min-w-[140px] cursor-default"
+              whileHover={{ y: -4, scale: 1.02, boxShadow: '0 12px 32px -8px rgba(0, 0, 0, 0.1)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="relative group bg-white rounded-[24px] border border-black/[0.04] shadow-elevation-2 px-8 py-8 flex flex-col items-center gap-4 min-w-[160px] overflow-hidden cursor-default"
             >
-              {/* X logo */}
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="X (Twitter)">
-                <circle cx="18" cy="18" r="18" fill="#000000" />
-                <path d="M20.23 16.9 26.5 10h-1.5l-5.45 6.2L15.08 10H10l6.58 9.4L10 26h1.5l5.75-6.55L21.92 26H27l-6.77-9.1Zm-2.04 2.32-.67-.94-5.3-7.56h2.28l4.27 6.1.67.94 5.57 7.94h-2.28l-4.54-6.48Z" fill="white" />
-              </svg>
-              <span className="text-sm font-semibold text-text-primary">X</span>
-              <span className="text-xs text-[#0A84FF] font-medium">Active</span>
+              <div className="absolute inset-0 bg-gradient-to-br from-black/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative w-14 h-14 rounded-[14px] bg-black/[0.04] flex items-center justify-center text-black group-hover:scale-110 transition-transform duration-500">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+              </div>
+              <span className="text-[15px] font-semibold text-text-primary tracking-tight">X (Twitter)</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#0A84FF]/10 text-[#0A84FF]">Active</span>
             </motion.div>
 
-            {/* Threads — coming soon */}
+            {/* Threads */}
             <motion.div
               variants={stagger80.item}
-              className="bg-surface rounded-[16px] border border-border px-8 py-6 flex flex-col items-center gap-3 min-w-[140px] cursor-default opacity-50"
+              className="bg-surface rounded-[24px] border border-border px-8 py-8 flex flex-col items-center gap-4 min-w-[160px] cursor-not-allowed opacity-60 grayscale"
             >
-              {/* Threads logo */}
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="Threads">
-                <circle cx="18" cy="18" r="18" fill="#e5e5e7" />
-                <path d="M22.6 17.25a6.1 6.1 0 0 0-.27-.12c-.16-2.57-1.54-4.05-3.9-4.06-1.35 0-2.54.57-3.25 1.6l1.25.86c.53-.79 1.36-1.04 2.01-1.04 1.1 0 1.84.56 2.1 1.58-.55-.09-1.14-.1-1.76-.05-1.77.1-2.9 1.11-2.83 2.5.04.71.38 1.32.97 1.72.5.34 1.14.51 1.8.47 1.33-.08 2.27-.75 2.6-1.9.26.52.4 1.17.4 2 0 1.98-1.25 3.19-3.23 3.19-1.73 0-3.22-1.3-3.22-4.49 0-3.52 1.75-5.32 4.79-5.32.77 0 1.47.11 2.07.35l1.08-1.08A7.4 7.4 0 0 0 18 13c-3.8 0-6.25 2.37-6.25 6.5 0 4.6 2.44 6.5 4.97 6.5 2.62 0 4.85-1.72 4.85-4.69 0-1.08-.22-1.97-.66-2.66a4.95 4.95 0 0 0-.31-.4Zm-4.45 2.9c-.77.05-1.6-.3-1.62-.96-.02-.5.46-.98 1.48-1.05.42-.02.82-.03 1.2.01-.14 1.42-.89 1.97-1.06 2Z" fill="#6e6e73" />
-              </svg>
-              <span className="text-sm font-semibold text-text-secondary">Threads</span>
-              <span className="text-xs text-text-tertiary font-medium">Coming soon</span>
+              <div className="w-14 h-14 rounded-[14px] bg-black/[0.03] flex items-center justify-center text-text-tertiary">
+                <svg viewBox="0 0 192 192" fill="currentColor" className="w-7 h-7">
+                  <path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.814C118.893 72.2193 120.854 76.925 121.825 82.8638C114.511 81.6207 106.601 81.2385 98.145 81.7233C74.3247 83.0954 59.0111 96.9879 60.0396 116.292C60.5615 126.084 65.4397 134.508 73.775 140.011C80.8224 144.663 89.899 146.938 99.3323 146.423C111.79 145.74 121.563 140.987 128.381 132.296C133.559 125.696 136.834 117.143 138.28 106.366C144.217 109.949 148.617 114.664 151.047 120.332C155.179 129.967 155.42 145.8 142.501 158.708C131.182 170.016 117.576 174.908 97.0135 175.059C74.2042 174.89 56.9538 167.575 45.7381 153.317C35.2355 139.966 29.8077 120.682 29.6052 96C29.8077 71.3178 35.2355 52.0336 45.7381 38.6827C56.9538 24.4249 74.2039 17.11 97.0132 16.9405C119.988 17.1113 137.539 24.4614 149.184 38.788C154.894 45.8136 159.199 54.6488 162.037 64.9503L178.184 60.6422C174.744 47.9622 169.331 37.0357 161.965 27.974C147.036 9.60668 125.202 0.195148 97.0695 0H96.9569C68.8816 0.19477 47.2921 9.6418 32.7883 28.0793C19.8819 44.4864 13.2244 67.3157 13.0007 95.9325L13 96L13.0007 96.0675C13.2244 124.684 19.8819 147.514 32.7883 163.921C47.2921 182.358 68.8816 191.805 96.9569 192H97.0695C122.03 191.827 139.624 185.292 154.118 170.811C173.008 151.936 172.061 128.646 165.923 114.072C160.71 101.696 153.255 93.6395 141.537 88.9883ZM98.4405 129.507C88.0005 130.095 77.1544 125.409 76.6196 115.372C76.2232 107.93 81.9158 99.626 99.0812 98.6368C101.047 98.5234 102.976 98.468 104.871 98.468C111.106 98.468 116.939 99.0737 122.242 100.233C120.264 124.935 108.662 128.946 98.4405 129.507Z" />
+                </svg>
+              </div>
+              <span className="text-[15px] font-semibold text-text-secondary tracking-tight">Threads</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">Coming soon</span>
             </motion.div>
           </motion.div>
         </div>
