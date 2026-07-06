@@ -37,6 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.xFetchHandler = xFetchHandler;
+const logger_1 = require("../../src/lib/logger");
 const x_1 = require("../../src/lib/x");
 const queues_1 = require("../../src/lib/queues");
 const plan_limits_1 = require("../../src/lib/plan-limits");
@@ -58,7 +59,7 @@ async function xFetchHandler(job) {
             .eq('target', target)
             .eq('is_active', true);
         if (error) {
-            console.error('Supabase error fetching keywords:', error);
+            logger_1.logger.error({ error }, 'Supabase error fetching keywords:');
             return;
         }
         if (!keywordMappings || keywordMappings.length === 0)
@@ -70,7 +71,7 @@ async function xFetchHandler(job) {
                     // Check X spend budget BEFORE enqueueing scoring
                     const canAfford = await checkXSpendBudget(mapping.user_id);
                     if (!canAfford) {
-                        console.log(`[Budget] User ${mapping.user_id} exceeded X spend limit. Skipping post.`);
+                        logger_1.logger.info(`[Budget] User ${mapping.user_id} exceeded X spend limit. Skipping post.`);
                         continue;
                     }
                     // Push to score queue
@@ -86,7 +87,7 @@ async function xFetchHandler(job) {
         }
     }
     catch (error) {
-        console.error(`Failed to fetch X target ${target}:`, error);
+        logger_1.logger.error({ error }, `Failed to fetch X target ${target}:`);
         throw error;
     }
 }
@@ -109,7 +110,7 @@ async function checkXSpendBudget(userId) {
         p_daily_limit_cents: limit,
     });
     if (error) {
-        console.error('Error checking X spend budget:', error);
+        logger_1.logger.error({ error }, 'Error checking X spend budget:');
         return false;
     }
     return data;

@@ -1,3 +1,4 @@
+import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { searchBlueskyPosts } from '../../src/lib/bluesky'
@@ -26,7 +27,7 @@ export async function blueskyFetchHandler(job: Job) {
       .eq('is_active', true) 
 
     if (error) {
-      console.error('Supabase error fetching bluesky keywords:', error)
+      logger.error({ error }, 'Supabase error fetching bluesky keywords:')
       return
     }
 
@@ -37,18 +38,19 @@ export async function blueskyFetchHandler(job: Job) {
 
       for (const mapping of keywordMappings) {
         if (postText.includes(mapping.term.toLowerCase())) {
+          const safeJobId = post.externalId.replace(/:/g, '_');
           await scorePostQueue.add('score', {
             userId: mapping.user_id,
             keywordId: mapping.id,
             post,
           }, {
-            jobId: `score-${mapping.user_id}-${post.externalId}`
+            jobId: `score-${mapping.user_id}-${safeJobId}`
           })
         }
       }
     }
   } catch (error) {
-    console.error(`Failed to fetch bluesky target: ${target}:`, error)
+    logger.error({ error }, `Failed to fetch bluesky target: ${target}:`)
     throw error
   }
 }

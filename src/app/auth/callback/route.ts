@@ -9,6 +9,10 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
     
+    if (error) {
+      console.error('exchangeCodeForSession error:', error.message)
+    }
+    
     if (!error && user) {
       // Check if they have a profile, if not redirect to onboarding
       const { data: profile } = await supabase
@@ -26,5 +30,5 @@ export async function GET(request: Request) {
   }
 
   // URL to redirect to after sign in process completes
-  return NextResponse.redirect(new URL('/dashboard', request.url))
+  return NextResponse.redirect(new URL('/login', request.url))
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { redditFetchQueue, blueskyFetchQueue, xFetchQueue } from '../../../../lib/queues'
 import { X_DAILY_SPEND_LIMIT_CENTS } from '../../../../lib/plan-limits'
+import { logger } from '../../../../lib/logger'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -102,7 +103,7 @@ export async function GET(request: Request) {
     }
 
     // Threads: log skipped count
-    console.log(`Skipped Threads targets: ${targetsByPlatform.threads.size}`)
+    logger.info(`Skipped Threads targets: ${targetsByPlatform.threads.size}`)
 
     // 4. Update last_polled_at for due users
     const userIds = Array.from(dueUsers)
@@ -114,12 +115,12 @@ export async function GET(request: Request) {
       .in('id', userIds)
 
     if (updateError) {
-      console.error('Error updating last_polled_at:', updateError)
+      logger.error({ updateError }, 'Error updating last_polled_at')
     }
 
     // 5. Healthcheck dead-man's switch
     if (process.env.HEALTHCHECK_PING_URL) {
-      fetch(process.env.HEALTHCHECK_PING_URL).catch(e => console.error('Healthcheck ping failed:', e))
+      fetch(process.env.HEALTHCHECK_PING_URL).catch(e => logger.error({ e }, 'Healthcheck ping failed'))
     }
 
     return NextResponse.json({ 
@@ -133,7 +134,7 @@ export async function GET(request: Request) {
     })
 
   } catch (error: any) {
-    console.error('Monitor cron error:', error)
+    logger.error({ error }, 'Monitor cron error')
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

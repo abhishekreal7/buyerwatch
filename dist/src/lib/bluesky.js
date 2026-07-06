@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.searchBlueskyPosts = searchBlueskyPosts;
-const api_1 = require("@atproto/api");
 let agent = null;
 async function getBlueskyAgent() {
     if (agent)
         return agent;
-    agent = new api_1.BskyAgent({ service: 'https://bsky.social' });
+    const { BskyAgent } = await import('@atproto/api');
+    agent = new BskyAgent({ service: 'https://bsky.social' });
     const handle = process.env.BLUESKY_HANDLE;
     const password = process.env.BLUESKY_APP_PASSWORD;
     if (!handle || !password) {

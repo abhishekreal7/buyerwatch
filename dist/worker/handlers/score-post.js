@@ -37,8 +37,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scorePostHandler = scorePostHandler;
+const logger_1 = require("../../src/lib/logger");
 const intent_scorer_1 = require("../../src/lib/intent-scorer");
 const draft_reply_1 = require("../../src/lib/draft-reply");
+const confidence_engine_1 = require("../../src/lib/confidence-engine");
 const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
@@ -60,7 +62,7 @@ async function scorePostHandler(job) {
         // 2. Fetch user profile for context and plan
         const { data: profile } = await supabase_1.supabaseWorker
             .from('profiles')
-            .select('business_name, business_description, business_url, business_type, writing_style, plan')
+            .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold')
             .eq('id', userId)
             .single();
         if (!profile)
@@ -68,30 +70,56 @@ async function scorePostHandler(job) {
         // 3. Atomic Budget Check for Scoring (Gemini)
         const canScore = await checkBudget(userId, profile.plan, 'gemini');
         if (!canScore) {
-            console.log(`[Budget] User ${userId} exceeded gemini limit.`);
+            logger_1.logger.info(`[Budget] User ${userId} exceeded gemini limit.`);
             return; // Silent skip
         }
         // 4. Score intent
         const scoreResult = await (0, intent_scorer_1.scoreIntent)(post, profile);
         // Save thread early if score is low
         if (scoreResult.score < INTENT_THRESHOLD) {
-            await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed');
+            await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed', undefined, scoreResult.flag);
             return;
         }
         // 5. Atomic Budget Check for Drafting (Claude)
         const canDraft = await checkBudget(userId, profile.plan, 'claude');
         if (!canDraft) {
-            console.log(`[Budget] User ${userId} exceeded claude limit.`);
+            logger_1.logger.info(`[Budget] User ${userId} exceeded claude limit.`);
             // Save as needs manual reply
-            await saveThread(userId, keywordId, post, scoreResult.score, 'needs_manual_reply');
+            await saveThread(userId, keywordId, post, scoreResult.score, 'needs_manual_reply', undefined, scoreResult.flag);
             return;
         }
         // 6. Draft Reply
-        const draftText = await (0, draft_reply_1.draftReply)(post, profile, scoreResult.score);
-        await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText);
+        const draftResult = await (0, draft_reply_1.draftReply)(post, profile, scoreResult.score);
+        const draftText = draftResult.text;
+        // 7. Auto-send decision — routed through the single unified gatekeeper.
+        //    All safeguards (disclosure, tone, cold-start, confidence threshold)
+        //    are enforced inside evaluateAutoSend(). DO NOT inline duplicate logic here.
+        const evaluation = await (0, confidence_engine_1.evaluateAutoSend)(userId, post.platform, draftResult, profile, post.author ?? null // targetCommunity: use subreddit/community identifier
+        );
+        if (evaluation.approved) {
+            // All gates cleared — save and enqueue for auto-send
+            const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag);
+            if (thread) {
+                const { sendReplyQueue } = await import('../../src/lib/queues/index.js');
+                await sendReplyQueue.add(`send-${thread.id}`, {
+                    userId,
+                    threadExternalId: post.externalId,
+                    threadId: thread.id,
+                    text: draftText,
+                    platform: post.platform,
+                    triggerType: 'auto'
+                });
+                logger_1.logger.info({ userId, threadId: thread.id, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Enqueued auto-send');
+            }
+        }
+        else {
+            // Any gate failed — route to manual review queue
+            await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag);
+            logger_1.logger.info({ userId, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Routed to manual review');
+        }
     }
     catch (error) {
-        console.error(`Failed to score post ${post.externalId} for user ${userId}:`, error);
+        logger_1.logger.error({ error }, `Failed to score post ${post.externalId} for user ${userId}:`);
         throw error;
     }
 }
@@ -109,12 +137,12 @@ async function checkBudget(userId, plan, service) {
         p_limit: limit,
     });
     if (error) {
-        console.error('Error checking budget:', error);
+        logger_1.logger.error({ error }, 'Error checking budget:');
         return false; // Fail safe: don't spend if RPC fails
     }
     return data;
 }
-async function saveThread(userId, keywordId, post, intentScore, status, draftText) {
+async function saveThread(userId, keywordId, post, intentScore, status, draftText, flag) {
     const { data: thread, error } = await supabase_1.supabaseWorker
         .from('monitored_threads')
         .insert({
@@ -126,12 +154,13 @@ async function saveThread(userId, keywordId, post, intentScore, status, draftTex
         text_content: post.text,
         url: post.url,
         intent_score: intentScore,
-        status: status
+        status: status,
+        flag: flag || null
     })
         .select()
         .single();
     if (error) {
-        console.error('Error inserting monitored_thread:', error);
+        logger_1.logger.error({ error }, 'Error inserting monitored_thread:');
         return;
     }
     if (draftText && thread) {
@@ -143,7 +172,8 @@ async function saveThread(userId, keywordId, post, intentScore, status, draftTex
             draft_text: draftText,
         });
         if (analyticsError) {
-            console.error('Error inserting reply_analytics:', analyticsError);
+            logger_1.logger.error({ analyticsError }, 'Error inserting reply_analytics:');
         }
     }
+    return thread;
 }

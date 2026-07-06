@@ -37,6 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.redditFetchHandler = redditFetchHandler;
+const logger_1 = require("../../src/lib/logger");
 const reddit_1 = require("../../src/lib/reddit");
 const queues_1 = require("../../src/lib/queues");
 const dotenv = __importStar(require("dotenv"));
@@ -45,10 +46,11 @@ dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 async function redditFetchHandler(job) {
     const { target } = job.data; // e.g. "smallbusiness"
-    if (process.env.USE_MOCK_REDDIT === 'true') {
-        console.log(`[Mock] Fetching Reddit for target: r/${target}`);
-        // Mock processing logic could go here, or we just skip if in real worker flow
-        return;
+    if (process.env.REDDIT_API_APPROVED !== 'true') {
+        logger_1.logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode — pending API approval');
+    }
+    else if (process.env.USE_MOCK_REDDIT === 'true') {
+        logger_1.logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode (USE_MOCK_REDDIT=true)');
     }
     try {
         const posts = await (0, reddit_1.fetchSubredditNew)(target);
@@ -63,7 +65,7 @@ async function redditFetchHandler(job) {
             .eq('target', target)
             .eq('is_active', true); // assuming an active flag exists
         if (error) {
-            console.error('Supabase error fetching keywords:', error);
+            logger_1.logger.error({ error }, 'Supabase error fetching keywords:');
             return;
         }
         if (!keywordMappings || keywordMappings.length === 0)
@@ -88,7 +90,7 @@ async function redditFetchHandler(job) {
         }
     }
     catch (error) {
-        console.error(`Failed to fetch reddit target r/${target}:`, error);
+        logger_1.logger.error({ error }, `Failed to fetch reddit target r/${target}:`);
         throw error; // BullMQ will retry based on config
     }
 }

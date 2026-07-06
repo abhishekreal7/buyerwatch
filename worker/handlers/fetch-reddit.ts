@@ -1,3 +1,4 @@
+import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { fetchSubredditNew } from '../../src/lib/reddit'
@@ -12,10 +13,10 @@ import { supabaseWorker as supabase } from '../lib/supabase'
 export async function redditFetchHandler(job: Job) {
   const { target } = job.data // e.g. "smallbusiness"
 
-  if (process.env.USE_MOCK_REDDIT === 'true') {
-    console.log(`[Mock] Fetching Reddit for target: r/${target}`)
-    // Mock processing logic could go here, or we just skip if in real worker flow
-    return
+  if (process.env.REDDIT_API_APPROVED !== 'true') {
+    logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode — pending API approval')
+  } else if (process.env.USE_MOCK_REDDIT === 'true') {
+    logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode (USE_MOCK_REDDIT=true)')
   }
 
   try {
@@ -33,7 +34,7 @@ export async function redditFetchHandler(job: Job) {
       .eq('is_active', true) // assuming an active flag exists
 
     if (error) {
-      console.error('Supabase error fetching keywords:', error)
+      logger.error({ error }, 'Supabase error fetching keywords:')
       return
     }
 
@@ -59,7 +60,7 @@ export async function redditFetchHandler(job: Job) {
       }
     }
   } catch (error) {
-    console.error(`Failed to fetch reddit target r/${target}:`, error)
+    logger.error({ error }, `Failed to fetch reddit target r/${target}:`)
     throw error // BullMQ will retry based on config
   }
 }

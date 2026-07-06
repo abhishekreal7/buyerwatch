@@ -40,6 +40,23 @@ async function getRedditToken(): Promise<string> {
 }
 
 export async function fetchSubredditNew(subreddit: string, limit: number = 25): Promise<NormalizedPost[]> {
+  if (process.env.REDDIT_API_APPROVED !== 'true') {
+    console.warn(`[reddit] API not yet approved — returning mock data for r/${subreddit}`)
+    return [
+      {
+        platform: 'reddit',
+        externalId: `mock-${Date.now()}`,
+        author: 'mock_user',
+        text: 'This is a mock post about needing an email marketing tool.',
+        url: 'https://reddit.com/r/mock/mock_post',
+        createdAt: new Date().toISOString(),
+        sourceTarget: subreddit
+      }
+    ]
+  }
+
+  // The flag USE_MOCK_REDDIT can still be respected strictly if REDDIT_API_APPROVED is true,
+  // but if we are here, we are approved. Just check USE_MOCK_REDDIT just in case.
   if (process.env.USE_MOCK_REDDIT === 'true') {
     return [
       {

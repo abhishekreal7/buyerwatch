@@ -1,11 +1,10 @@
-import { BskyAgent } from '@atproto/api'
 import { NormalizedPost } from './types'
+let agent: any = null
 
-let agent: BskyAgent | null = null
-
-async function getBlueskyAgent(): Promise<BskyAgent> {
+async function getBlueskyAgent(): Promise<any> {
   if (agent) return agent
 
+  const { BskyAgent } = await import('@atproto/api')
   agent = new BskyAgent({ service: 'https://bsky.social' })
   
   const handle = process.env.BLUESKY_HANDLE

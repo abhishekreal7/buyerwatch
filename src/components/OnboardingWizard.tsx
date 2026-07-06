@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { completeOnboardingAction } from '@/app/actions/onboarding'
 import { Monitor, ShoppingBag, Briefcase, User, Edit3, MessageSquare, Package, HelpCircle, Plus, X, Search } from 'lucide-react'
+import { springs, staggers } from '@/lib/motion'
 
 const BUSINESS_TYPES = [
   { id: 'saas', label: 'SaaS', icon: Monitor },
@@ -131,13 +132,13 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
-          className="glass rounded-2xl p-8 md:p-10 shadow-apple"
+          transition={springs.smooth}
+          className="glass rounded-2xl p-8 md:p-10"
         >
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2">What's your business?</h2>
+                <h2 className="text-2xl font-bold mb-2 tracking-tight">What's your business?</h2>
                 <p className="text-text-secondary text-sm">Tell us what you do so we can find the right conversations.</p>
               </div>
 
@@ -170,14 +171,17 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                   <label className="block text-sm font-medium text-text-secondary mb-2">Business Type</label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {BUSINESS_TYPES.map(type => (
-                      <button
+                      <motion.button
                         key={type.id}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={springs.snappy}
                         onClick={() => setBusinessType(type.id)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${businessType === type.id ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'bg-surface-elevated border-border text-text-secondary hover:border-border-hover'}`}
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border ${businessType === type.id ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'bg-surface-elevated border-border text-text-secondary hover:border-border-hover'}`}
                       >
                         <type.icon className="w-5 h-5 mb-2" />
                         <span className="text-xs font-medium">{type.label}</span>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 </div>
@@ -188,13 +192,13 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2">What should we look for?</h2>
+                <h2 className="text-2xl font-bold mb-2 tracking-tight">What should we look for?</h2>
                 <p className="text-text-secondary text-sm">Add keywords that signal someone needs your product.</p>
               </div>
 
               <div className="space-y-4">
                 {keywords.map((kw, i) => (
-                  <div key={i} className="flex flex-col gap-2 p-4 bg-black/20 border border-border rounded-xl">
+                  <div key={i} className="flex flex-col gap-2 p-4 bg-black/5 border border-border rounded-xl">
                     <div className="flex gap-3">
                       <input 
                         value={kw.term} onChange={e => updateKeywordTerm(i, e.target.value)}
@@ -241,7 +245,7 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
           {step === 3 && (
               <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2">Where to look?</h2>
+                <h2 className="text-2xl font-bold mb-2 tracking-tight">Where to look?</h2>
                 <p className="text-text-secondary text-sm">Define specific subreddits or search queries. Leave empty to monitor broadly.</p>
               </div>
 
@@ -339,7 +343,7 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
           {step === 4 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2">Help us sound like you</h2>
+                <h2 className="text-2xl font-bold mb-2 tracking-tight">Help us sound like you</h2>
                 <p className="text-text-secondary text-sm">Describe your communication style so drafts feel authentic.</p>
               </div>
 
@@ -380,18 +384,24 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
         ) : <div />}
 
         {step < 4 ? (
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            transition={springs.snappy}
             onClick={handleNext}
             disabled={step === 1 && !businessName}
-            className="bg-white text-black px-8 py-3 rounded-xl font-medium transition-transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
+            className="bg-[#1D1D1F] text-white px-8 py-3 rounded-xl font-medium disabled:opacity-50"
           >
             Continue
-          </button>
+          </motion.button>
         ) : (
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            transition={springs.snappy}
             onClick={handleSubmit}
             disabled={loading || !writingStyle}
-            className="bg-[#0A84FF] text-text-primary px-8 py-3 rounded-xl font-medium shadow-[0_0_20px_rgba(10,132,255,0.3)] transition-transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+            className="bg-[#0A84FF] text-text-primary px-8 py-3 rounded-xl font-medium shadow-[0_0_20px_rgba(10,132,255,0.3)] disabled:opacity-50 flex items-center gap-2"
           >
             {loading ? (
               <>
@@ -402,7 +412,7 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                 Setting up...
               </>
             ) : 'Start Monitoring →'}
-          </button>
+          </motion.button>
         )}
       </div>
     </div>

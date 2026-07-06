@@ -1,3 +1,4 @@
+import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { fetchXPosts } from '../../src/lib/x'
@@ -27,7 +28,7 @@ export async function xFetchHandler(job: Job) {
       .eq('is_active', true)
 
     if (error) {
-      console.error('Supabase error fetching keywords:', error)
+      logger.error({ error }, 'Supabase error fetching keywords:')
       return
     }
 
@@ -41,7 +42,7 @@ export async function xFetchHandler(job: Job) {
           // Check X spend budget BEFORE enqueueing scoring
           const canAfford = await checkXSpendBudget(mapping.user_id)
           if (!canAfford) {
-            console.log(`[Budget] User ${mapping.user_id} exceeded X spend limit. Skipping post.`)
+            logger.info(`[Budget] User ${mapping.user_id} exceeded X spend limit. Skipping post.`)
             continue
           }
 
@@ -57,7 +58,7 @@ export async function xFetchHandler(job: Job) {
       }
     }
   } catch (error) {
-    console.error(`Failed to fetch X target ${target}:`, error)
+    logger.error({ error }, `Failed to fetch X target ${target}:`)
     throw error
   }
 }
@@ -83,7 +84,7 @@ async function checkXSpendBudget(userId: string) {
   })
 
   if (error) {
-    console.error('Error checking X spend budget:', error)
+    logger.error({ error }, 'Error checking X spend budget:')
     return false
   }
 

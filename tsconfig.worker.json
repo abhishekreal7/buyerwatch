@@ -11,6 +11,7 @@
     "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
     "isolatedModules": false,
+    "jsx": "react-jsx",
     "outDir": "./dist"
   },
   "include": [

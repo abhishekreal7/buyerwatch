@@ -1,7 +1,9 @@
+import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { scoreIntent } from '../../src/lib/intent-scorer'
 import { draftReply } from '../../src/lib/draft-reply'
+import { evaluateAutoSend } from '../../src/lib/confidence-engine'
 import { NormalizedPost } from '../../src/lib/types'
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -30,7 +32,7 @@ export async function scorePostHandler(job: Job) {
     // 2. Fetch user profile for context and plan
     const { data: profile } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, plan')
+      .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold')
       .eq('id', userId)
       .single()
 
@@ -39,7 +41,7 @@ export async function scorePostHandler(job: Job) {
     // 3. Atomic Budget Check for Scoring (Gemini)
     const canScore = await checkBudget(userId, profile.plan, 'gemini')
     if (!canScore) {
-      console.log(`[Budget] User ${userId} exceeded gemini limit.`)
+      logger.info(`[Budget] User ${userId} exceeded gemini limit.`)
       return // Silent skip
     }
 
@@ -48,25 +50,57 @@ export async function scorePostHandler(job: Job) {
     
     // Save thread early if score is low
     if (scoreResult.score < INTENT_THRESHOLD) {
-      await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed')
+      await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed', undefined, scoreResult.flag)
       return
     }
 
     // 5. Atomic Budget Check for Drafting (Claude)
     const canDraft = await checkBudget(userId, profile.plan, 'claude')
     if (!canDraft) {
-      console.log(`[Budget] User ${userId} exceeded claude limit.`)
+      logger.info(`[Budget] User ${userId} exceeded claude limit.`)
       // Save as needs manual reply
-      await saveThread(userId, keywordId, post, scoreResult.score, 'needs_manual_reply')
+      await saveThread(userId, keywordId, post, scoreResult.score, 'needs_manual_reply', undefined, scoreResult.flag)
       return
     }
 
     // 6. Draft Reply
-    const draftText = await draftReply(post, profile, scoreResult.score)
-    await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText)
+    const draftResult = await draftReply(post, profile, scoreResult.score)
+    const draftText = draftResult.text
+
+    // 7. Auto-send decision — routed through the single unified gatekeeper.
+    //    All safeguards (disclosure, tone, cold-start, confidence threshold)
+    //    are enforced inside evaluateAutoSend(). DO NOT inline duplicate logic here.
+    const evaluation = await evaluateAutoSend(
+      userId,
+      post.platform,
+      draftResult,
+      profile,
+      post.author ?? null // targetCommunity: use subreddit/community identifier
+    )
+
+    if (evaluation.approved) {
+      // All gates cleared — save and enqueue for auto-send
+      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag)
+      if (thread) {
+        const { sendReplyQueue } = await import('../../src/lib/queues/index.js')
+        await sendReplyQueue.add(`send-${thread.id}`, {
+          userId,
+          threadExternalId: post.externalId,
+          threadId: thread.id,
+          text: draftText,
+          platform: post.platform,
+          triggerType: 'auto'
+        })
+        logger.info({ userId, threadId: thread.id, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Enqueued auto-send')
+      }
+    } else {
+      // Any gate failed — route to manual review queue
+      await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag)
+      logger.info({ userId, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Routed to manual review')
+    }
 
   } catch (error) {
-    console.error(`Failed to score post ${post.externalId} for user ${userId}:`, error)
+    logger.error({ error }, `Failed to score post ${post.externalId} for user ${userId}:`)
     throw error
   }
 }
@@ -88,21 +122,14 @@ async function checkBudget(userId: string, plan: string, service: 'gemini' | 'cl
   })
 
   if (error) {
-    console.error('Error checking budget:', error)
+    logger.error({ error }, 'Error checking budget:')
     return false // Fail safe: don't spend if RPC fails
   }
 
   return data
 }
 
-async function saveThread(
-  userId: string, 
-  keywordId: string, 
-  post: NormalizedPost, 
-  intentScore: number, 
-  status: string,
-  draftText?: string
-) {
+async function saveThread(userId: string, keywordId: string, post: NormalizedPost, intentScore: number, status: string, draftText?: string, flag?: string) {
   const { data: thread, error } = await supabase
     .from('monitored_threads')
     .insert({
@@ -114,13 +141,14 @@ async function saveThread(
       text_content: post.text,
       url: post.url,
       intent_score: intentScore,
-      status: status
+      status: status,
+      flag: flag || null
     })
     .select()
     .single()
 
   if (error) {
-    console.error('Error inserting monitored_thread:', error)
+    logger.error({ error }, 'Error inserting monitored_thread:')
     return
   }
 
@@ -134,7 +162,9 @@ async function saveThread(
       })
       
     if (analyticsError) {
-      console.error('Error inserting reply_analytics:', analyticsError)
+      logger.error({ analyticsError }, 'Error inserting reply_analytics:')
     }
   }
+
+  return thread
 }

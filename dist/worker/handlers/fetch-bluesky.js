@@ -37,6 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.blueskyFetchHandler = blueskyFetchHandler;
+const logger_1 = require("../../src/lib/logger");
 const bluesky_1 = require("../../src/lib/bluesky");
 const queues_1 = require("../../src/lib/queues");
 const dotenv = __importStar(require("dotenv"));
@@ -57,7 +58,7 @@ async function blueskyFetchHandler(job) {
             .eq('target', target)
             .eq('is_active', true);
         if (error) {
-            console.error('Supabase error fetching bluesky keywords:', error);
+            logger_1.logger.error({ error }, 'Supabase error fetching bluesky keywords:');
             return;
         }
         if (!keywordMappings || keywordMappings.length === 0)
@@ -78,7 +79,7 @@ async function blueskyFetchHandler(job) {
         }
     }
     catch (error) {
-        console.error(`Failed to fetch bluesky target: ${target}:`, error);
+        logger_1.logger.error({ error }, `Failed to fetch bluesky target: ${target}:`);
         throw error;
     }
 }
