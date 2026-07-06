@@ -237,10 +237,13 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
+      {/* ── Myniq Redesign Wrapper ────────────────────────────────────────── */}
+      <div className="bg-[#F4F4F4] rounded-t-[48px] pt-12 mt-[-48px] relative z-20 overflow-hidden">
+        
       {/* Features Section */}
       {/* FIX: removed decorative blue ambient glow blob; removed glass/backdrop-blur from static inline cards;
            removed multi-color icon backgrounds (blue/green/orange → single neutral); normalized to bg-surface cards */}
-      <section id="features" className="py-24 border-t border-border">
+      <section id="features" className="py-24">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16 max-w-3xl mx-auto">
             <h2 className="font-display font-bold text-4xl mb-4 tracking-tight">Everything you need to grow organically</h2>
@@ -774,8 +777,10 @@ export default function LandingPage() {
         </div>
       </section>
 
+      </div> {/* End Myniq Wrapper */}
+
       {/* Footer */}
-      <footer className="border-t border-border py-12 bg-background">
+      <footer className="border-t border-border py-24 bg-background">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between">
           <div className="flex items-center gap-2 font-display font-bold text-xl mb-4 md:mb-0">
             <Target className="w-5 h-5 text-[#0A84FF]" /> Scouto
