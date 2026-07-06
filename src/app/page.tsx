@@ -30,7 +30,7 @@ function DragCompare() {
     if (!containerRef.current) return
     const { left, width } = containerRef.current.getBoundingClientRect()
     const raw = ((clientX - left) / width) * 100
-    setPct(Math.min(85, Math.max(15, raw)))
+    setPct(Math.min(95, Math.max(5, raw)))
   }, [])
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -47,73 +47,68 @@ function DragCompare() {
   return (
     <div
       ref={containerRef}
-      className="relative rounded-[20px] border border-border shadow-elevation-4 overflow-hidden bg-white select-none"
+      className="relative rounded-[20px] border border-border shadow-elevation-4 overflow-hidden bg-white select-none grid"
       style={{ userSelect: 'none' }}
     >
       {/* Left panel — generic AI reply */}
-      <div className="flex">
-        <div className="flex-1 p-7 border-r border-border bg-white min-w-0">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Generic AI</span>
-          </div>
-          <div className="text-sm text-text-secondary leading-relaxed space-y-3">
-            <p>Hi there! I noticed you&apos;re looking for an email marketing tool.</p>
-            <p>Have you tried <strong className="text-text-primary">ProductX</strong>? It&apos;s a great email marketing platform that offers many features at a competitive price. You can try it for free!</p>
-            <p className="text-text-tertiary">Check it out at productx.com 🚀</p>
-          </div>
-          <div className="mt-5 flex items-center gap-2">
-            <span className="text-xs font-medium text-destructive bg-red-50 border border-red-100 px-2 py-1 rounded-md">❌ No disclosure</span>
-            <span className="text-xs font-medium text-text-tertiary bg-surface border border-border px-2 py-1 rounded-md">Generic pitch</span>
-          </div>
+      <div className="w-full h-full p-7 md:p-10 bg-white col-start-1 row-start-1">
+        <div className="flex items-center gap-2 mb-5">
+          <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Generic AI</span>
         </div>
-
-        {/* Right panel — Scouto reply */}
-        <div className="flex-1 p-7 bg-surface min-w-0">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0A84FF]" />
-            <span className="text-xs font-semibold text-[#0A84FF] uppercase tracking-wider">Scouto draft</span>
-          </div>
-          <div className="text-sm text-text-primary leading-relaxed space-y-3">
-            <p>Klaviyo is great but I felt the same pain at scale. A few options worth considering depending on your volume:</p>
-            <p><strong>Omnisend</strong> works well for Shopify and has a generous free tier. <strong>Loops</strong> is worth a look if you&apos;re doing any SaaS-style flows.</p>
-            <p className="text-text-secondary">Full disclosure: I&apos;m building Scouto which does Reddit monitoring (different space entirely), so no dog in this fight — just options that came up when we had the same conversation internally.</p>
-          </div>
-          <div className="mt-5 flex items-center gap-2">
-            <span className="text-xs font-medium text-[#0A84FF] bg-[#0A84FF]/10 border border-[#0A84FF]/20 px-2 py-1 rounded-md">✓ Disclosed</span>
-            <span className="text-xs font-medium text-text-secondary bg-white border border-border px-2 py-1 rounded-md">Genuine help</span>
-          </div>
+        <div className="text-[15px] text-text-secondary leading-relaxed space-y-4">
+          <p>Hi there! I noticed you&apos;re looking for an email marketing tool.</p>
+          <p>Have you tried <strong className="text-text-primary">ProductX</strong>? It&apos;s a great email marketing platform that offers many features at a competitive price. You can try it for free!</p>
+          <p className="text-text-tertiary">Check it out at productx.com 🚀</p>
+        </div>
+        <div className="mt-8 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-destructive bg-red-50 border border-red-100 px-2.5 py-1.5 rounded-md">❌ No disclosure</span>
+          <span className="text-xs font-medium text-text-tertiary bg-surface border border-border px-2.5 py-1.5 rounded-md">Generic pitch</span>
         </div>
       </div>
 
-      {/* Clip overlay — hides the right panel proportionally */}
-      <div
-        className="absolute inset-0 bg-white pointer-events-none"
-        style={{ left: `${pct}%` }}
-      />
+      {/* Right panel — Scouto reply */}
+      <div 
+        className="w-full h-full p-7 md:p-10 bg-[#FAFAFA] border-l border-border col-start-1 row-start-1 pointer-events-none z-10"
+        style={{ clipPath: `inset(0 0 0 ${pct}%)` }}
+      >
+        <div className="flex items-center gap-2 mb-5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#0A84FF]" />
+          <span className="text-xs font-semibold text-[#0A84FF] uppercase tracking-wider">Scouto draft</span>
+        </div>
+        <div className="text-[15px] text-text-primary leading-relaxed space-y-4">
+          <p>Klaviyo is great but I felt the same pain at scale. A few options worth considering depending on your volume:</p>
+          <p><strong>Omnisend</strong> works well for Shopify and has a generous free tier. <strong>Loops</strong> is worth a look if you&apos;re doing any SaaS-style flows.</p>
+          <p className="text-text-secondary">Full disclosure: I&apos;m building Scouto which does Reddit monitoring (different space entirely), so no dog in this fight — just options that came up when we had the same conversation internally.</p>
+        </div>
+        <div className="mt-8 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-[#0A84FF] bg-[#0A84FF]/10 border border-[#0A84FF]/20 px-2.5 py-1.5 rounded-md">✓ Disclosed</span>
+          <span className="text-xs font-medium text-text-secondary bg-white border border-border px-2.5 py-1.5 rounded-md shadow-sm">Genuine help</span>
+        </div>
+      </div>
 
       {/* Drag handle */}
       <div
-        className="absolute top-0 bottom-0 w-1 bg-border cursor-col-resize flex items-center justify-center z-20"
-        style={{ left: `calc(${pct}% - 0.5px)` }}
+        className="absolute top-0 bottom-0 w-0.5 bg-[#0A84FF] cursor-col-resize flex items-center justify-center z-20"
+        style={{ left: `${pct}%` }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         role="separator"
         aria-label="Drag to compare"
       >
-        <div className="w-8 h-8 rounded-full bg-white border border-border shadow-elevation-3 flex items-center justify-center pointer-events-none">
+        <div className="absolute w-8 h-8 rounded-full bg-white border-2 border-[#0A84FF] shadow-elevation-3 flex items-center justify-center pointer-events-none">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M4 5l-2 2 2 2M10 5l2 2-2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary" />
+            <path d="M4 5l-2 2 2 2M10 5l2 2-2 2" stroke="#0A84FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       </div>
 
-      {/* Labels */}
-      <div className="absolute top-4 left-4 pointer-events-none z-10">
-        <span className="text-xs font-semibold text-text-tertiary bg-white/80 backdrop-blur-sm px-2 py-1 rounded-md border border-border">Generic AI</span>
+      {/* Top Labels indicating sides */}
+      <div className="absolute top-4 left-4 pointer-events-none z-20 transition-opacity duration-200" style={{ opacity: pct > 20 ? 1 : 0 }}>
+        <span className="text-[11px] font-bold text-text-tertiary bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full border border-border shadow-sm uppercase tracking-wider">Generic AI</span>
       </div>
-      <div className="absolute top-4 right-4 pointer-events-none z-10">
-        <span className="text-xs font-semibold text-[#0A84FF] bg-white/80 backdrop-blur-sm px-2 py-1 rounded-md border border-[#0A84FF]/20">Scouto</span>
+      <div className="absolute top-4 right-4 pointer-events-none z-20 transition-opacity duration-200" style={{ opacity: pct < 80 ? 1 : 0 }}>
+        <span className="text-[11px] font-bold text-[#0A84FF] bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full border border-[#0A84FF]/20 shadow-sm uppercase tracking-wider">Scouto</span>
       </div>
     </div>
   )
