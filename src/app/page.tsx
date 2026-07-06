@@ -1,10 +1,11 @@
 'use client'
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRef, useState, useCallback } from 'react'
 import { Check, Target, Search, LayoutDashboard, Eye, Shield, Gauge } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
+import EyebrowBadge from '@/components/EyebrowBadge'
 
 /* Stagger variant with 80ms cadence (spec-required for 4-step flow) */
 const stagger80 = {
@@ -118,9 +119,6 @@ function DragCompare() {
 
 
 export default function LandingPage() {
-  // Respect prefers-reduced-motion — disables eyebrow badge animations only
-  const shouldReduceMotion = useReducedMotion()
-
   return (
     <div className="min-h-screen bg-background text-text-primary selection:bg-[#0A84FF]/30">
 
@@ -154,49 +152,7 @@ export default function LandingPage() {
           transition={springs.gentle}
           className="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto"
         >
-          <div className="glass px-4 py-1.5 rounded-full flex items-center gap-2 mb-8 border-border shadow-apple">
-
-            {/* Dot: 3 keyframes, no hold frames, fires immediately every loop */}
-            <motion.span
-              className="w-2 h-2 rounded-full bg-[#0A84FF] flex-shrink-0 inline-block"
-              animate={shouldReduceMotion ? {} : { y: [0, -8, 0] }}
-              transition={shouldReduceMotion ? {} : {
-                duration: 0.7,
-                times: [0, 0.4, 1],
-                ease: [
-                  [0.0, 0.7, 0.3, 1.0],   // explosive off the ground, brakes at peak
-                  [0.55, 0, 1.0, 0.45],   // gravity accelerates into landing
-                ],
-                repeat: Infinity,
-                repeatType: 'loop',
-                repeatDelay: 1.4,
-              }}
-              style={{ willChange: 'transform' }}
-            />
-
-            {/* Star: 4 keyframes, same 2.0s clock, perfectly synced to the dot */}
-            <motion.span
-              className="text-[#0A84FF] inline-flex flex-shrink-0 leading-none"
-              animate={shouldReduceMotion ? {} : { rotate: [0, 360, 372, 360] }}
-              transition={shouldReduceMotion ? {} : {
-                duration: 0.7,
-                times: [0, 0.55, 0.78, 1],
-                ease: [
-                  [0.14, 0, 0.21, 1],       // barely moves, then snaps (AE burst curve)
-                  [0.34, 1.56, 0.64, 1],    // spring overshoot approximation
-                  [0.36, 0, 0.66, -0.56],   // settle back cleanly
-                ],
-                repeat: Infinity,
-                repeatType: 'loop',
-                repeatDelay: 1.4,
-              }}
-              style={{ willChange: 'transform' }}
-            >
-              ✦
-            </motion.span>
-
-            <span className="text-sm font-medium text-[#0A84FF]">Stop waiting for inbound leads</span>
-          </div>
+          <EyebrowBadge />
 
           <h1 className="font-display font-bold text-5xl md:text-7xl tracking-tight leading-[1.05] mb-6">
             Find your customers <br />on Reddit. <br />
