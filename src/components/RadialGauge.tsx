@@ -8,14 +8,14 @@ interface RadialGaugeProps {
 }
 
 export function RadialGauge({ percentage, label }: RadialGaugeProps) {
-  const tickCount = 48
+  const tickCount = 42
   // Go from 180° (left) → 270° (top) → 360° (right) — through the TOP = arch shape
   const startAngle = 180
   const endAngle = 360
   const angleStep = (endAngle - startAngle) / (tickCount - 1)
 
   const radius = 96
-  const tickLen = 18
+  const tickLen = 25
   const cx = 110
   // cy near bottom of SVG so the arch is fully visible above it
   const cy = 128
@@ -55,7 +55,7 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
               x1={x1} y1={y1}
               x2={x2} y2={y2}
               stroke={strokeColor}
-              strokeWidth={4.5}
+              strokeWidth={4.0}
               strokeLinecap="round"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, stroke: strokeColor }}
