@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signUpAction, signInWithGoogleAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { Target } from 'lucide-react'
 import { springs } from '@/lib/motion'
 
 export default function SignupPage() {
@@ -39,13 +40,14 @@ export default function SignupPage() {
         className="w-full max-w-[390px]"
       >
         <div className="text-center mb-8">
-          <Link href="/">
-            <h1 className="text-3xl font-bold tracking-tight text-text-primary mb-2 hover:opacity-80 transition-opacity">Join Scouto</h1>
+          <Link href="/" className="inline-flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity">
+            <Target className="w-8 h-8 text-[#FF6B35]" strokeWidth={2.5} />
+            <h1 className="text-3xl font-bold tracking-tight text-text-primary">Join Scouto</h1>
           </Link>
           <p className="text-text-secondary">Create an account to start monitoring</p>
         </div>
 
-        <div className="bg-white rounded-[24px] py-10 px-8 shadow-elevation-4">
+        <div className="bg-surface rounded-[24px] py-10 px-8 shadow-elevation-4">
           <form action={signInWithGoogleAction} className="mb-6">
             <button
               type="submit"

@@ -231,7 +231,7 @@ export default function DashboardPage() {
     <div className="max-w-[1400px] mx-auto py-8">
 
       {/* Stats Container */}
-      <div className="bg-white rounded-2xl border border-black/5 shadow-sm py-4 mb-6">
+      <div className="bg-surface rounded-2xl border border-black/5 shadow-sm py-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-black/5">
           {/* Threads Found */}
           <div className="flex flex-col items-center justify-center py-2 md:py-0 relative group">
@@ -289,13 +289,13 @@ export default function DashboardPage() {
         <div className="flex items-center bg-[#F8F9FA] p-1 rounded-full border border-black/5">
           <button
             onClick={() => setFilterTab('all')}
-            className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${filterTab === 'all' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+            className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${filterTab === 'all' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
           >
             All
           </button>
           <button
             onClick={() => setFilterTab('high-intent')}
-            className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${filterTab === 'high-intent' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+            className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${filterTab === 'high-intent' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
           >
             High Intent
           </button>
@@ -307,13 +307,13 @@ export default function DashboardPage() {
         {/* Left Column (Feed) */}
         <div className="flex-1 space-y-4">
           {loading && (
-            <div className="rounded-2xl p-8 bg-white border border-black/5 flex items-center justify-center text-text-secondary text-sm">
+            <div className="rounded-2xl p-8 bg-surface border border-black/5 flex items-center justify-center text-text-secondary text-sm">
               Loading threads...
             </div>
           )}
 
           {!loading && filtered.length === 0 && (
-            <div className="rounded-2xl p-10 bg-white border border-black/5 flex flex-col items-center justify-center gap-3 text-center">
+            <div className="rounded-2xl p-10 bg-surface border border-black/5 flex flex-col items-center justify-center gap-3 text-center">
               <p className="text-text-primary font-semibold">No threads yet</p>
               <p className="text-text-secondary text-sm max-w-[280px]">
                 Add keywords in Monitoring Rules and the system will start finding matching threads.
@@ -386,7 +386,7 @@ export default function DashboardPage() {
           })}
           
           {plan === 'free' && stats.threadsFound > 50 && (
-            <div className="rounded-2xl p-6 bg-white border border-black/5 shadow-sm text-center relative overflow-hidden group">
+            <div className="rounded-2xl p-6 bg-surface border border-black/5 shadow-sm text-center relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-white/90 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
                 <div className="bg-black/5 p-3 rounded-full mb-3">
                   <Lock className="w-5 h-5 text-gray-700" />
@@ -416,7 +416,7 @@ export default function DashboardPage() {
         {selectedThread && (
           <div className="w-[540px] shrink-0 border border-black/10 rounded-xl bg-white flex flex-col overflow-hidden shadow-sm sticky top-[100px]" style={{ height: 'calc(100vh - 120px)' }}>
             {/* Header */}
-            <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between bg-white shrink-0">
+            <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between bg-surface shrink-0">
               <h2 className="font-semibold text-gray-900 text-[15px]">Review & Post</h2>
               {selectedThread.url ? (
                 <a href={selectedThread.url} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-blue-600 flex items-center gap-1.5 hover:text-blue-700 transition-colors">
@@ -452,7 +452,7 @@ export default function DashboardPage() {
                   <span className="text-[12px] text-gray-400 font-medium">{selectedThread.draft.length} chars</span>
                 </div>
 
-                <div className="bg-white border border-gray-200/80 rounded-xl p-5 shadow-sm group relative">
+                <div className="bg-surface border border-gray-200/80 rounded-xl p-5 shadow-sm group relative">
                   {selectedThread.draft ? (
                     selectedThread.draft.split('\n\n').map((paragraph, i) => (
                       <p key={i} className="text-[14px] text-gray-800 leading-[1.6] mb-4 last:mb-0">
@@ -467,7 +467,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Footer Actions */}
-            <div className="px-5 py-4 bg-white border-t border-black/5 flex items-center justify-between gap-4 shrink-0">
+            <div className="px-5 py-4 bg-surface border-t border-black/5 flex items-center justify-between gap-4 shrink-0">
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={handleDismiss}

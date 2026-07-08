@@ -26,7 +26,7 @@ function SectionCard({ title, description, children }: {
   title: string; description?: string; children: React.ReactNode
 }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+    <div className="bg-surface border border-gray-100 rounded-2xl overflow-hidden">
       <div className="px-6 pt-6 pb-5 border-b border-gray-50">
         <h3 className="text-[22px] font-[500] tracking-[-0.02em] leading-[1.2] text-[rgba(43,38,33,0.95)]">{title}</h3>
         {description && <p className="text-[14px] font-[400] text-[rgba(43,38,33,0.52)] mt-1.5 leading-snug tracking-[0]">{description}</p>}

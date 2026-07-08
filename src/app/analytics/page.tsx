@@ -402,7 +402,7 @@ export default function AnalyticsPage() {
                 ) : (
                   <div className="space-y-4">
                     {data.needsAttention.map(alert => (
-                      <div key={alert.id} className="bg-white border border-black/[0.06] rounded-[14px] p-4 flex flex-col shadow-sm">
+                      <div key={alert.id} className="bg-surface border border-black/[0.06] rounded-[14px] p-4 flex flex-col shadow-sm">
                         <div className="flex items-center gap-3 mb-3">
                           <AlertTriangle className={`w-4 h-4 ${alert.type === 'error' ? 'text-[#EF4444]' : 'text-[#F59E0B]'}`} strokeWidth={2.5} />
                           <p className="text-[14px] font-semibold text-text-primary">{alert.label}</p>

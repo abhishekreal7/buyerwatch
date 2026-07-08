@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { draftReply } from '@/lib/draft-reply'
+import { NormalizedPost } from '@/lib/types'
 
 export async function POST(req: Request) {
   try {
@@ -39,13 +40,14 @@ export async function POST(req: Request) {
     }
 
     // 2. Map thread to NormalizedPost format for drafting
-    const post = {
+    const post: NormalizedPost = {
       externalId: thread.external_id,
       platform: thread.platform,
       author: thread.author,
       text: thread.text_content,
       url: thread.url,
-      timestamp: thread.created_at,
+      createdAt: thread.created_at || new Date().toISOString(),
+      sourceTarget: thread.keyword_text || thread.subreddit || '',
     }
 
     // 3. Draft reply

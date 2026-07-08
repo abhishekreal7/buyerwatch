@@ -1,50 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  /* ─── Ash-Card Palette (Inverted Background) ────────────────── */
+  /* ─── Myniq-inspired Palette ───────────────────────────── */
   --background: #ffffff;
-  /* page background — pure white */
-  --surface: #f6f6f7;
-  /* ash-gray cards */
-  --surface-secondary: #f0f0f2;
-  /* nested surfaces */
-  --surface-elevated: #f6f6f7;
+  --surface: #f5f5f5;
+  --surface-secondary: #f0f0f0;
+  --surface-elevated: #f8f8f8;
 
   /* Borders */
-  --border: rgba(0, 0, 0, 0.06);
-  --border-hover: rgba(0, 0, 0, 0.10);
+  --border: rgba(0, 0, 0, 0.07);
+  --border-hover: rgba(0, 0, 0, 0.12);
 
   /* Colors */
-  --primary: #1a1613;
-  /* warm near-black charcoal */
-  --primary-hover: #2b2621;
+  --primary: #0A0A0A;
+  --primary-hover: #222222;
   --accent: #0A84FF;
-  /* Luminous Indigo — reserved for status/data, NOT buttons */
-  --accent-hover: #2C27B8;
+  --accent-hover: #006FE6;
   --success: #10B981;
   --warning: #F59E0B;
   --destructive: #EF4444;
 
-  /* Typography — warm-neutral scale matching reference */
-  --text-primary: rgba(20, 18, 16, 0.95);
-  /* warm near-black */
-  --text-secondary: rgba(20, 18, 16, 0.55);
-  /* warm mid-gray */
-  --text-tertiary: rgba(20, 18, 16, 0.38);
-  /* warm light-gray */
+  /* Typography — warm-neutral scale */
+  --text-primary: #0A0A0A;
+  --text-secondary: #6B6B6B;
+  --text-tertiary: #9B9B9B;
 
   /* Smooth Radius Scale */
   --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
   --radius-xl: 20px;
-  --radius-2xl: 24px;
+  --radius-2xl: 28px;
   --radius-full: 9999px;
 
-  /* Typography Stack */
-  --font-display: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Font Stack */
+  --font-display: var(--font-jakarta), var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
 @theme inline {
@@ -62,31 +54,43 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-tertiary: var(--text-tertiary);
 
-  --font-display: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-jakarta), var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
-  /* Soft layered shadows — low-opacity, multi-layer per reference */
-  --shadow-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.02);
-  --shadow-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(0, 0, 0, 0.03);
-  --shadow-elevation-3: 0 2px 4px rgba(0, 0, 0, 0.03), 0 8px 24px rgba(0, 0, 0, 0.04);
+  /* Shadows — low-opacity multi-layer */
+  --shadow-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.03);
+  --shadow-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.05);
+  --shadow-elevation-3: 0 2px 4px rgba(0, 0, 0, 0.04), 0 8px 32px rgba(0, 0, 0, 0.06);
   --shadow-elevation-4: 0 24px 48px rgba(0, 0, 0, 0.10), 0 8px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03), 0 4px 20px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
+/* ─── Base ───────────────────────────────────────────────── */
 body {
   background-color: var(--background);
-  background-image:
-    radial-gradient(at 50% 0%, rgba(58, 54, 216, 0.03) 0%, transparent 75%),
-    radial-gradient(at 100% 100%, rgba(58, 54, 216, 0.02) 0%, transparent 50%);
-  background-attachment: fixed;
   color: var(--text-primary);
-  /* Lead with the explicitly loaded Inter so it resolves everywhere.
-     -apple-system only renders SF Pro on genuine Apple hardware/Safari. */
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "cv02", "cv11";
-  /* Advanced typography features */
+}
+
+/* EyebrowBadge compat tokens */
+.border-border {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.shadow-apple {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 h1,
@@ -95,10 +99,10 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-display);
+  font-family: var(--font-jakarta), var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text-primary);
-  letter-spacing: -0.04em;
-  line-height: 1.2;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   text-wrap: balance;
 }
 
@@ -106,49 +110,123 @@ p {
   letter-spacing: 0.01em;
 }
 
-/* ─── Page Title Typography (shared, app-wide) ──────────────── */
-/*
- * Font stack:
- *   -apple-system / BlinkMacSystemFont → SF Pro Display on macOS/iOS Safari
- *   "SF Pro Display"                   → explicit name for Chromium on macOS
- *   var(--font-inter)                  → Inter via next/font on non-Apple devices
- *                                        preserves tight tracking & optical weight
- *   "Segoe UI"                         → Windows fallback; geometric and clean
- *   system-ui, sans-serif              → ultimate generic fallback
- *
- * Weight 700 (not 800/900): has more character at large display sizes than black.
- * -0.02em tracking: tightens the loose default tracking at 34px.
- * rgba(0,0,0,0.92): Apple never uses true black for headings.
- */
+/* ─── Myniq Gradient Mesh (hero background) ─────────────── */
+/* Signature multi-radial gradient: peach + lavender + orange on white */
+.hero-mesh {
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(ellipse 60% 50% at 10% -5%, rgba(255, 180, 120, 0.35) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 90% -10%, rgba(200, 160, 255, 0.25) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 110%, rgba(255, 220, 180, 0.20) 0%, transparent 60%);
+}
+
+.section-ash {
+  background-color: #f5f5f5;
+}
+
+/* ─── Typography — Display Scale (Myniq-matched) ─────────── */
+.display-xl {
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-weight: 800;
+  font-size: clamp(52px, 6vw, 80px);
+  letter-spacing: -0.04em;
+  line-height: 1.0;
+  color: #0A0A0A;
+}
+
+.display-lg {
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-weight: 800;
+  font-size: clamp(40px, 4.5vw, 56px);
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  color: #0A0A0A;
+}
+
+.display-md {
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 3vw, 40px);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: #0A0A0A;
+}
+
+.body-lg {
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 400;
+  font-size: 17px;
+  color: #6B6B6B;
+  line-height: 1.65;
+  letter-spacing: 0;
+}
+
+.body-md {
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  color: #6B6B6B;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+/* ─── Page Title Typography ──────────────────────────────── */
 .page-title {
-  /* var(--font-inter) is the explicitly loaded next/font Inter — resolves on ALL
-     OS/browser combos. -apple-system is kept as a secondary hint only for
-     Apple devices where SF Pro is genuinely available. */
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  font-weight: 500;
+  font-family: var(--font-jakarta), var(--font-inter), -apple-system, sans-serif;
+  font-weight: 700;
   font-size: 40px;
-  letter-spacing: -0.01em;
-  color: #2b2621;
-  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: #0A0A0A;
+  line-height: 1.15;
   text-wrap: balance;
 }
 
-/*
- * Subtitle: deliberately lower weight (400) and lower opacity (0.56)
- * to create optical contrast against the refined display title above.
- * Body text does not need the tight display tracking — letter-spacing: 0.
- */
 .page-subtitle {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-inter), -apple-system, sans-serif;
   font-weight: 400;
   font-size: 15px;
-  color: rgba(43, 38, 33, 0.6);
+  color: rgba(107, 107, 107, 0.9);
   letter-spacing: 0;
   line-height: 1.5;
   margin-top: 6px;
 }
 
-/* ─── Material Depth Systems ─────────────────────────────────── */
+/* ─── Myniq Eyebrow Badge ───────────────────────────────── */
+.myniq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-full);
+  padding: 6px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+}
+
+.myniq-badge span {
+  font-family: var(--font-inter), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0A0A0A;
+  letter-spacing: 0;
+}
+
+/* ─── Card System ─────────────────────────────────────────── */
+.myniq-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.myniq-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* ─── Material Depth Systems ─────────────────────────────── */
 .surface-ceramic {
   background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.7) 30%, rgba(250, 250, 252, 0.95) 100%);
   box-shadow:
@@ -175,56 +253,55 @@ p {
 }
 
 .surface-glass {
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(255, 255, 255, 0.75);
   backdrop-filter: saturate(200%) blur(24px);
   -webkit-backdrop-filter: saturate(200%) blur(24px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.4), var(--shadow-elevation-2);
 }
 
-/* ─── Signature DNA ─────────────────────────────────────────── */
-.focus-signature:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px var(--accent), 0 4px 12px rgba(58, 54, 216, 0.2);
+/* ─── Myniq Feature Icon ────────────────────────────────── */
+.feature-icon {
+  width: 48px;
+  height: 48px;
+  background: #0A0A0A;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 18px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.selection-glow {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.9) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 0 1px rgba(58, 54, 216, 0.12), 0 8px 24px rgba(58, 54, 216, 0.08), 0 2px 6px rgba(58, 54, 216, 0.06);
-}
-
-/* ─── Tactile Button System ─────────────────────────────────── */
-/*
- * PRIMARY: warm near-black charcoal pill.
- * The accent color (Indigo) is NEVER used as a button fill — it is reserved
- * for status badges, selected borders, data viz, and indicator dots.
- */
+/* ─── Tactile Button System ─────────────────────────────── */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #1a1613;
-  /* warm near-black, not pure black */
+  background: #0A0A0A;
   color: #FFFFFF;
-  font-weight: 500;
-  font-size: 14px;
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 600;
+  font-size: 15px;
   border-radius: var(--radius-full);
-  /* pill */
-  padding: 10px 20px;
+  padding: 12px 24px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.10);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none;
+  cursor: pointer;
 }
 
 .btn-primary:hover {
-  background: #2b2621;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  background: #222222;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transform: translateY(-1px);
 }
 
 .btn-primary:active {
   transform: scale(0.97) translateY(0);
-  background: #141210;
+  background: #141414;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -234,28 +311,29 @@ p {
   justify-content: center;
   gap: 8px;
   background: #FFFFFF;
-  color: rgba(20, 18, 16, 0.85);
-  border: 1px solid rgba(0, 0, 0, 0.10);
+  color: #0A0A0A;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  font-family: var(--font-inter), sans-serif;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 15px;
   border-radius: var(--radius-full);
-  /* pill */
-  padding: 10px 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  padding: 12px 24px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none;
+  cursor: pointer;
 }
 
 .btn-secondary:hover {
-  background: #FAFAF8;
-  border-color: rgba(0, 0, 0, 0.16);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: #FAFAFA;
+  border-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
   transform: translateY(-1px);
 }
 
 .btn-secondary:active {
   transform: scale(0.97) translateY(0);
-  background: #F5F3F0;
+  background: #F5F5F5;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -279,10 +357,16 @@ p {
   transform: scale(0.92);
 }
 
-/* ─── Custom Scrollbars ───────────────────────────────── */
+/* ─── Focus signature ───────────────────────────────────── */
+.focus-signature:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px var(--accent), 0 4px 12px rgba(10, 132, 255, 0.2);
+}
+
+/* ─── Custom Scrollbars ──────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -290,12 +374,12 @@ p {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.12);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.22);
 }
 
 ::-webkit-scrollbar-track {
@@ -311,7 +395,7 @@ p {
   scrollbar-width: none;
 }
 
-/* ─── Utilities ────────────────────────────────────────── */
+/* ─── Platform Badges ────────────────────────────────────── */
 .badge-platform {
   display: inline-flex;
   align-items: center;
@@ -342,45 +426,36 @@ p {
   color: var(--text-secondary);
 }
 
-/* ─── Typography Tier System ─────────────────────────────────── */
-/*
- * Three deliberately distinct tiers — not one uniform heading style.
- * The relationship is the key: Tier 1 >> Tier 2 >> Tier 3 in weight, size, darkness.
- */
-
-/* Tier 1: Hero numbers/stats (big metrics, prices) — maximum emphasis */
+/* ─── Typography Tier System ─────────────────────────────── */
 .stat-hero {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 700;
-  font-size: 48px;
-  letter-spacing: -0.02em;
-  color: rgba(20, 18, 16, 0.95);
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-weight: 800;
+  font-size: 52px;
+  letter-spacing: -0.035em;
+  color: #0A0A0A;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-/* Tier 2: Section/card titles ("Annual profit", "What's Included", "Pro Plan") */
 .section-title {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
   font-weight: 600;
   font-size: 18px;
-  letter-spacing: -0.005em;
-  color: rgba(20, 18, 16, 0.85);
+  letter-spacing: -0.01em;
+  color: #0A0A0A;
   line-height: 1.3;
 }
 
-/* Tier 3: Labels, metadata, body supporting text */
 .label-text {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-inter), sans-serif;
   font-weight: 400;
   font-size: 15px;
-  color: rgba(20, 18, 16, 0.55);
+  color: #6B6B6B;
   letter-spacing: 0;
   line-height: 1.5;
 }
 
-/* ─── List / Divider Pattern ─────────────────────────────────── */
-/* Dotted divider rows — use for feature checklists, included items */
+/* ─── List / Divider Pattern ─────────────────────────────── */
 .list-item {
   display: flex;
   align-items: center;
@@ -393,25 +468,38 @@ p {
   border-bottom: none;
 }
 
-/* ─── KPI Row (Minimalist) ─────────────────────────────────── */
+/* ─── KPI Row ────────────────────────────────────────────── */
 .kpi-number {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 600;
+  font-family: var(--font-jakarta), var(--font-inter), sans-serif;
+  font-weight: 700;
   font-size: 15px;
-  letter-spacing: 0;
-  color: rgba(20, 18, 16, 0.95);
+  letter-spacing: -0.01em;
+  color: #0A0A0A;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+
 .kpi-label {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-inter), sans-serif;
   font-weight: 500;
   font-size: 13px;
-  color: rgba(20, 18, 16, 0.75);
+  color: rgba(10, 10, 10, 0.6);
 }
+
 .kpi-sublabel {
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-inter), sans-serif;
   font-weight: 400;
   font-size: 13px;
-  color: rgba(20, 18, 16, 0.55);
+  color: #9B9B9B;
+}
+
+/* ─── Selection Glow ─────────────────────────────────────── */
+.selection-glow {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.9) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+    0 0 0 1px rgba(10, 132, 255, 0.12),
+    0 8px 24px rgba(10, 132, 255, 0.08),
+    0 2px 6px rgba(10, 132, 255, 0.06);
 }

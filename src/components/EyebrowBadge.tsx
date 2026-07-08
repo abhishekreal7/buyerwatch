@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { motion, useReducedMotion } from 'framer-motion'
 
@@ -11,7 +11,7 @@ const STAR = String.fromCharCode(10022)
 // Static version — pixel-identical to the pre-animation badge, kept intact as fallback
 function StaticBadge() {
   return (
-    <div className="glass px-4 py-1.5 rounded-full flex items-center gap-2 mb-8 border-border shadow-apple">
+    <div className="flex items-center gap-2 mb-8">
       <span className="w-2 h-2 rounded-full bg-[#0A84FF] animate-pulse flex-shrink-0 inline-block" />
       <span className="text-sm font-medium text-[#0A84FF]">{STAR} Stop waiting for inbound leads</span>
     </div>
@@ -31,7 +31,7 @@ function AnimatedBadge() {
   const REST = 1.5     // clear pause before each cycle
 
   return (
-    <div className="glass px-4 py-1.5 rounded-full flex items-center gap-2 mb-8 border-border shadow-apple">
+    <div className="flex items-center gap-2 mb-8">
 
       {/* DOT: +2px dip (anticipation) then -8px throw then gravity fall */}
       <motion.span

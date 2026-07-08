@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signInAction, signInWithGoogleAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { Target } from 'lucide-react'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
@@ -34,13 +35,14 @@ export default function LoginPage() {
         className="w-full max-w-[390px]"
       >
         <div className="text-center mb-8">
-          <Link href="/">
-            <h1 className="text-3xl font-bold tracking-tight text-text-primary mb-2 hover:opacity-80 transition-opacity">Scouto</h1>
+          <Link href="/" className="inline-flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity">
+            <Target className="w-8 h-8 text-[#FF6B35]" strokeWidth={2.5} />
+            <h1 className="text-3xl font-bold tracking-tight text-text-primary">Scouto</h1>
           </Link>
           <p className="text-text-secondary">Log in to your account</p>
         </div>
 
-        <div className="bg-white rounded-[24px] py-10 px-8 shadow-elevation-4">
+        <div className="bg-surface rounded-[24px] py-10 px-8 shadow-elevation-4">
           <form action={signInWithGoogleAction} className="mb-6">
             <button
               type="submit"

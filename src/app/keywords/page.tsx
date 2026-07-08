@@ -83,7 +83,7 @@ function FilterPill({ label, active, onClick }: { label: string; active: boolean
 }
 
 /* ─── Field ──────────────────────────────────────────────────────── */
-const fieldCls = `w-full bg-white border border-black/[0.08] rounded-[10px] px-3.5 py-2.5 text-[13.5px]
+const fieldCls = `w-full bg-surface border border-black/[0.08] rounded-[10px] px-3.5 py-2.5 text-[13.5px]
   text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-black/[0.08]
   focus:border-black/[0.15] hover:border-black/[0.12] transition-all duration-150`.replace(/\s+/g, ' ')
 
@@ -432,7 +432,7 @@ export default function KeywordsPage() {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.94, y: -4 }}
                           transition={{ duration: 0.1 }}
-                          className="absolute right-4 top-12 z-30 bg-white border border-black/[0.09] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.09),0_2px_8px_rgba(0,0,0,0.05)] p-1 w-40"
+                          className="absolute right-4 top-12 z-30 bg-surface border border-black/[0.09] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.09),0_2px_8px_rgba(0,0,0,0.05)] p-1 w-40"
                         >
                           <button
                             onClick={() => handleToggle(kw)}

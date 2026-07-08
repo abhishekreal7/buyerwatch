@@ -168,7 +168,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   onClick={handleToggleAutoSend}
                   disabled={togglingAutoSend}
                   title={autoSend ? 'Auto-send is active — click to pause' : 'Auto-send is paused — click to resume'}
-                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-white border border-black/5 hover:border-black/10 hover:bg-gray-50 transition-all duration-200 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-surface border border-black/5 hover:border-black/10 hover:bg-gray-50 transition-all duration-200 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
                 >
                   <span className={`text-[12.5px] font-medium transition-colors ${autoSend ? 'text-gray-900' : 'text-gray-500'}`}>
                     Auto-send
