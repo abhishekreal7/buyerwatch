@@ -19,7 +19,7 @@ import { StickyFeatureScroll } from '@/components/StickyFeatureScroll'
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 const platformData = [
   { name: 'Reddit', count: 847, color: '#FF6B35' },
-  { name: 'Bluesky', count: 312, color: '#0085FF' }
+  { name: 'LinkedIn', count: 1428, color: '#0A66C2' }
 ]
 
 const analyticsData = [
@@ -99,65 +99,109 @@ const CustomTooltip = ({ active, payload }: any) => {
 }
 
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-const RedditSVG = () => (
-  <svg viewBox="0 0 20 20" fill="none" className="w-full h-full">
-    <circle cx="10" cy="10" r="10" fill="#FF4500"/>
-    <path d="M16.67 10a1.46 1.46 0 0 0-2.47-1 7.12 7.12 0 0 0-3.85-1.23l.65-3.08 2.13.45a1 1 0 1 0 1-.97 1 1 0 0 0-.96.68l-2.38-.5a.14.14 0 0 0-.17.1l-.73 3.44a7.14 7.14 0 0 0-3.89 1.23 1.46 1.46 0 1 0-1.61 2.39 2.87 2.87 0 0 0 0 .38c0 1.94 2.26 3.51 5.05 3.51s5.05-1.57 5.05-3.51a2.87 2.87 0 0 0 0-.38 1.46 1.46 0 0 0 .19-2.51zM7.75 11a1 1 0 1 1 1 1 1 1 0 0 1-1-1zm5.5 2.65a3.39 3.39 0 0 1-3.25.38 3.39 3.39 0 0 1-3.25-.38.14.14 0 0 1 .19-.19 3.12 3.12 0 0 0 3.06.35 3.12 3.12 0 0 0 3.06-.35.14.14 0 0 1 .19.19zm-.19-1.65a1 1 0 1 1 1-1 1 1 0 0 1-1 1z" fill="white"/>
+const LinkedInSVG = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#0A66C2]">
+    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
   </svg>
 )
-const BlueskySVG = () => (
-  <svg viewBox="0 0 600 530" fill="none" className="w-full h-full">
-    <path d="M135.72 44.03C202.216 93.848 273.74 195.17 300 249.49c26.262-54.316 97.782-155.638 164.28-205.46C512.26 8.009 590-19.862 590 68.825c0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.707-7.896-.017-2.936-1.193.516-3.707 7.896-13.714 40.255-67.233 197.356-189.63 71.766-64.444-66.128-34.605-132.256 82.697-152.22-67.108 11.421-142.549-7.449-163.25-81.433C20.156 217.613 10 86.535 10 68.825c0-88.687 77.742-60.816 125.72-24.795z" fill="#0085FF"/>
+const RedditSVG = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#FF4500]">
+    <path d="M24 11.5c0-1.65-1.35-3-3-3-.96 0-1.86.48-2.42 1.24-1.64-1-3.75-1.64-5.99-1.72l1.23-3.83 3.93.84c.02.94.79 1.7 1.74 1.7 1 0 1.8-.8 1.8-1.8S18.7.63 17.7.63c-.88 0-1.62.63-1.77 1.48l-4.27-.9c-.19-.04-.37.07-.43.26l-1.34 4.2C7.58 5.75 5.43 6.4 3.19 6.48 2.62 5.71 1.73 5.25.75 5.25c-1.65 0-3 1.35-3 3 0 1.21.72 2.26 1.76 2.72-.03.22-.05.45-.05.68 0 3.93 4.9 7.12 11 7.12s11-3.19 11-7.12c0-.23-.02-.46-.05-.68 1.05-.47 1.76-1.52 1.76-2.72zm-17.5 1.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm6.63 3.52c-.93.93-2.6.93-3.52 0-.15-.15-.15-.41 0-.56.15-.15.41-.15.56 0 .63.63 1.78.63 2.4 0 .15-.15.41-.15.56 0 .16.15.16.41.01.56zm.87-3.52c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
   </svg>
 )
 const XSVG = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#0A0A0A]">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.732-8.845L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/>
+  </svg>
+)
+const HackerNewsSVG = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#FF6600]">
+    <path d="M0 0h24v24H0z" fill="#FF6600"/>
+    <path d="M4.97 4.72l4.89 9.38v5.18h2.28v-5.18l4.89-9.38h-2.48l-3.55 7.4-3.55-7.4z" fill="white"/>
+  </svg>
+)
+const ProductHuntSVG = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#DA552F]">
+    <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12zm-1.2-17.4h3c2.316 0 4.2 1.884 4.2 4.2 0 2.316-1.884 4.2-4.2 4.2h-3v4.8h-2.4V6.6zm2.4 6h.6c.996 0 1.8-.804 1.8-1.8 0-.996-.804-1.8-1.8-1.8h-.6v3.6z"/>
+  </svg>
+)
+const GitHubSVG = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#181717]">
+    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
   </svg>
 )
 
 const sourcePlatforms = [
+  { name: 'LinkedIn', sub: 'Founders, hiring, posts', color: '#0A66C2', bg: '#F4F7FA', Icon: LinkedInSVG, count: '1,428', textColor: undefined },
   { name: 'Reddit', sub: 'r/startups + 12,400 more', color: '#FF4500', bg: '#FFF0EB', Icon: RedditSVG, count: '847', textColor: undefined },
-  { name: 'Bluesky', sub: '#buildinpublic, #saas', color: '#0085FF', bg: '#EBF4FF', Icon: BlueskySVG, count: '312', textColor: undefined },
-  { name: 'X (Twitter)', sub: '#indiehackers, #nocode', color: '#0F1419', bg: '#F0F0F0', Icon: XSVG, count: '523x#0F1419' },
+  { name: 'X (Twitter)', sub: '#indiehackers, #saas', color: '#0F1419', bg: '#F0F0F0', Icon: XSVG, count: '523' },
 ]
 
 const PlatformSourcesWidget = () => {
   return (
     <div className="flex flex-col items-center gap-5 w-full">
       {/* Label */}
-      <div style={{ fontSize: '11px', fontFamily: 'var(--font-inter)', fontWeight: 500, letterSpacing: '0.08em', color: '#ADADAD', textTransform: 'uppercase' }}>
-        Takes signals from
+      <div style={{ fontSize: '11px', fontFamily: 'var(--font-inter)', fontWeight: 600, letterSpacing: '0.08em', color: '#ADADAD', textTransform: 'uppercase', textAlign: 'center' }}>
+        Monitors conversations where your customers are
       </div>
 
-        {/* ━━━━ section separator ━━━━ */}
-      <div className="flex items-center gap-8 md:gap-12">
+      <div className="flex flex-wrap items-center justify-center gap-y-4 gap-x-5 md:gap-x-8 px-4">
+        {/* LinkedIn */}
+        <div className="flex items-center gap-2 opacity-75 hover:opacity-100 transition-opacity duration-200">
+          <div className="w-5 h-5 flex-shrink-0">
+            <LinkedInSVG />
+          </div>
+          <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>LinkedIn</span>
+        </div>
+
+        <span style={{ color: '#D1D1D1', fontSize: '16px' }}>•</span>
+
         {/* Reddit */}
-        <div className="flex items-center gap-2.5 opacity-70 hover:opacity-100 transition-opacity duration-200">
-          <div className="w-6 h-6 flex-shrink-0">
+        <div className="flex items-center gap-2 opacity-75 hover:opacity-100 transition-opacity duration-200">
+          <div className="w-5 h-5 flex-shrink-0">
             <RedditSVG />
           </div>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Reddit</span>
+          <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Reddit</span>
         </div>
 
-        <span style={{ color: '#D1D1D1', fontSize: '18px' }}>•</span>
-
-        {/* Bluesky */}
-        <div className="flex items-center gap-2.5 opacity-70 hover:opacity-100 transition-opacity duration-200">
-          <div className="w-6 h-6 flex-shrink-0">
-            <BlueskySVG />
-          </div>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Bluesky</span>
-        </div>
-
-        <span style={{ color: '#D1D1D1', fontSize: '18px' }}>•</span>
+        <span style={{ color: '#D1D1D1', fontSize: '16px' }}>•</span>
 
         {/* X */}
-        <div className="flex items-center gap-2.5 opacity-70 hover:opacity-100 transition-opacity duration-200">
-          <div className="w-[22px] h-[22px] flex-shrink-0 flex items-center justify-center" style={{ color: '#0F1419' }}>
+        <div className="flex items-center gap-2 opacity-75 hover:opacity-100 transition-opacity duration-200">
+          <div className="w-4.5 h-4.5 flex-shrink-0 flex items-center justify-center">
             <XSVG />
           </div>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>X (Twitter)</span>
+          <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>X (Twitter)</span>
+        </div>
+
+        <span style={{ color: '#D1D1D1', fontSize: '16px' }}>•</span>
+
+        {/* Hacker News */}
+        <div className="flex items-center gap-2 opacity-75 hover:opacity-100 transition-opacity duration-200">
+          <div className="w-5 h-5 flex-shrink-0">
+            <HackerNewsSVG />
+          </div>
+          <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Hacker News</span>
+        </div>
+
+        <span style={{ color: '#D1D1D1', fontSize: '16px' }}>•</span>
+
+        {/* Product Hunt */}
+        <div className="flex items-center gap-2 opacity-75 hover:opacity-100 transition-opacity duration-200">
+          <div className="w-5 h-5 flex-shrink-0">
+            <ProductHuntSVG />
+          </div>
+          <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Product Hunt</span>
+        </div>
+
+        <span style={{ color: '#D1D1D1', fontSize: '16px' }}>•</span>
+
+        {/* GitHub */}
+        <div className="flex items-center gap-2 opacity-75 hover:opacity-100 transition-opacity duration-200">
+          <div className="w-5 h-5 flex-shrink-0">
+            <GitHubSVG />
+          </div>
+          <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>GitHub</span>
         </div>
       </div>
     </div>
@@ -446,13 +490,13 @@ export default function LandingPage() {
           <h1 className="mb-5 mt-1" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(52px, 6.5vw, 80px)', letterSpacing: '-0.04em', lineHeight: 1.0, color: '#0A0A0A' }}>
             <WordFadeIn text="Find your customers" />
             <br />
-            <WordFadeIn text="on Reddit." delay={0.3} />
+            <WordFadeIn text="where they already are." delay={0.3} />
             <br />
             <span style={{ color: '#9B9B9B', fontWeight: 700 }}>Before anyone else does.</span>
           </h1>
 
           <p className="max-w-[520px] mb-10" style={{ fontFamily: 'var(--font-inter), sans-serif', fontWeight: 400, fontSize: '17px', lineHeight: 1.65, color: '#6B6B6B' }}>
-            Scouto monitors Reddit and Bluesky 24/7, finds high-intent conversations, and organizes your outreach in one focused dashboard.
+            Scouto monitors B2B networks, tech forums, and social communities 24/7, finds high-intent conversations, and organizes your outreach in one focused dashboard.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
@@ -509,7 +553,7 @@ export default function LandingPage() {
                   {[
                     { title: 'Buyer Intent Scoring', body: 'Every conversation scored 0-100 for purchase likelihood. No more wading through noise — you see only the conversations that matter.' },
                     { title: 'AI Reply Drafting', body: 'Replies written in your exact voice. Context-aware, helpful, never spammy. Review, edit, post. Done.' },
-                    { title: '24/7 Keyword Monitoring', body: 'Reddit, Bluesky, and more scanned continuously. Competitor mentions, pain-point keywords, buying signals.' }
+                    { title: '24/7 Keyword Monitoring', body: 'LinkedIn, Reddit, Hacker News, X, and more scanned continuously. Competitor mentions, pain-point keywords, and buying signals.' }
                   ].map((item, i) => (
                     <motion.div key={i} variants={fadeUp} className="border-b border-black/[0.07] overflow-hidden">
                       <button onClick={() => setActiveAccordion(i)} className="w-full text-left py-6 flex items-center justify-between gap-4">
@@ -583,7 +627,7 @@ export default function LandingPage() {
         {/* ━━━━ section separator ━━━━ */}
             <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[24px]">
               {[
-                { Icon: ScanSearch, title: 'Keyword Monitoring', body: 'Set keywords once. We scan Reddit, Bluesky, and more 24/7 while you focus on building.' },
+                { Icon: ScanSearch, title: 'Keyword Monitoring', body: 'Set keywords once. We scan LinkedIn, Reddit, Hacker News, and more 24/7 while you focus on building.' },
                 { Icon: BrainCircuit, title: 'Intent Scoring', body: 'AI scores every match 0-100 for purchase likelihood. Only high-signal leads reach you.' },
                 { Icon: MessageSquareText, title: 'AI Reply Drafting', body: 'Authentic, context-aware replies in your voice. Review, edit, post. Takes minutes.' },
                 { Icon: Zap, title: 'Triage Queue', body: 'A focused inbox of opportunities, sorted by intent. No noise, no irrelevance.' },
@@ -664,7 +708,7 @@ export default function LandingPage() {
                     <PlatformSourcesWidget />
                   </div>
                   <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '5px' }}>Multi-Platform Coverage</h4>
-                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>Signals from Reddit, Bluesky & X — all in one place, always live.</p>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>Signals from LinkedIn, Reddit, Hacker News, X, and more — all in one place, always live.</p>
                 </motion.div>
 
         {/* ━━━━ section separator ━━━━ */}
@@ -889,7 +933,7 @@ export default function LandingPage() {
                       Set your keywords
                     </h4>
                     <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Competitor names, pain points, buying signals. We monitor Reddit and Bluesky 24/7, automatically.
+                      Competitor names, pain points, and buying signals. We monitor professional channels 24/7, automatically.
                     </p>
                   </div>
 
