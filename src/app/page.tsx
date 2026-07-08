@@ -101,33 +101,33 @@ const CustomTooltip = ({ active, payload }: any) => {
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 const LinkedInSVG = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#0A66C2]">
-    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
   </svg>
 )
 const RedditSVG = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#FF4500]">
-    <path d="M24 11.5c0-1.65-1.35-3-3-3-.96 0-1.86.48-2.42 1.24-1.64-1-3.75-1.64-5.99-1.72l1.23-3.83 3.93.84c.02.94.79 1.7 1.74 1.7 1 0 1.8-.8 1.8-1.8S18.7.63 17.7.63c-.88 0-1.62.63-1.77 1.48l-4.27-.9c-.19-.04-.37.07-.43.26l-1.34 4.2C7.58 5.75 5.43 6.4 3.19 6.48 2.62 5.71 1.73 5.25.75 5.25c-1.65 0-3 1.35-3 3 0 1.21.72 2.26 1.76 2.72-.03.22-.05.45-.05.68 0 3.93 4.9 7.12 11 7.12s11-3.19 11-7.12c0-.23-.02-.46-.05-.68 1.05-.47 1.76-1.52 1.76-2.72zm-17.5 1.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm6.63 3.52c-.93.93-2.6.93-3.52 0-.15-.15-.15-.41 0-.56.15-.15.41-.15.56 0 .63.63 1.78.63 2.4 0 .15-.15.41-.15.56 0 .16.15.16.41.01.56zm.87-3.52c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+    <path d="M24 11.5c0-1.65-1.35-3-3-3-.96 0-1.86.48-2.42 1.24-1.64-1-3.75-1.64-5.99-1.72l1.23-3.83 3.93.84c.02.94.79 1.7 1.74 1.7 1 0 1.8-.8 1.8-1.8S18.7.63 17.7.63c-.88 0-1.62.63-1.77 1.48l-4.27-.9c-.19-.04-.37.07-.43.26l-1.34 4.2C7.58 5.75 5.43 6.4 3.19 6.48 2.62 5.71 1.73 5.25.75 5.25c-1.65 0-3 1.35-3 3 0 1.21.72 2.26 1.76 2.72-.03.22-.05.45-.05.68 0 3.93 4.9 7.12 11 7.12s11-3.19 11-7.12c0-.23-.02-.46-.05-.68 1.05-.47 1.76-1.52 1.76-2.72zm-17.5 1.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm6.63 3.52c-.93.93-2.6.93-3.52 0-.15-.15-.15-.41 0-.56.15-.15.41-.15.56 0 .63.63 1.78.63 2.4 0 .15-.15.41-.15.56 0 .16.15.16.41.01.56zm.87-3.52c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
   </svg>
 )
 const XSVG = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#0A0A0A]">
-    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.732-8.845L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/>
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.732-8.845L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
   </svg>
 )
 const HackerNewsSVG = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#FF6600]">
-    <path d="M0 0h24v24H0z" fill="#FF6600"/>
-    <path d="M4.97 4.72l4.89 9.38v5.18h2.28v-5.18l4.89-9.38h-2.48l-3.55 7.4-3.55-7.4z" fill="white"/>
+    <path d="M0 0h24v24H0z" fill="#FF6600" />
+    <path d="M4.97 4.72l4.89 9.38v5.18h2.28v-5.18l4.89-9.38h-2.48l-3.55 7.4-3.55-7.4z" fill="white" />
   </svg>
 )
 const ProductHuntSVG = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#DA552F]">
-    <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12zm-1.2-17.4h3c2.316 0 4.2 1.884 4.2 4.2 0 2.316-1.884 4.2-4.2 4.2h-3v4.8h-2.4V6.6zm2.4 6h.6c.996 0 1.8-.804 1.8-1.8 0-.996-.804-1.8-1.8-1.8h-.6v3.6z"/>
+    <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12zm-1.2-17.4h3c2.316 0 4.2 1.884 4.2 4.2 0 2.316-1.884 4.2-4.2 4.2h-3v4.8h-2.4V6.6zm2.4 6h.6c.996 0 1.8-.804 1.8-1.8 0-.996-.804-1.8-1.8-1.8h-.6v3.6z" />
   </svg>
 )
 const GitHubSVG = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#181717]">
-    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
   </svg>
 )
 
@@ -430,7 +430,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-[#0A0A0A] selection:bg-[#0A84FF]/20">
 
-        {/* ━ ━ ━ ━  section separator: NAVBAR ━ ━ ━ ━  */}
+      {/* ━ ━ ━ ━  section separator: NAVBAR ━ ━ ━ ━  */}
       <motion.nav
         style={{ backgroundColor: navBg, backdropFilter: navBlur, borderColor: navBorder, boxShadow: navShadow }}
         className="fixed top-0 left-0 right-0 z-50 border-b will-change-transform">
@@ -454,7 +454,7 @@ export default function LandingPage() {
         </div>
       </motion.nav>
 
-        {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
+      {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
       <section className="hero-mesh relative min-h-[92vh] flex flex-col items-center justify-center px-6 pt-[100px] pb-[80px] overflow-hidden">
         {/* Gradient mesh blobs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -620,7 +620,7 @@ export default function LandingPage() {
               </motion.div>
             </div>
 
-        {/* ━━━━ section separator ━━━━ */}
+            {/* ━━━━ section separator ━━━━ */}
             <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[24px]">
               {[
                 { Icon: ScanSearch, title: 'Keyword Monitoring', body: 'Set keywords once. We scan LinkedIn, Reddit, Hacker News, and more 24/7 while you focus on building.' },
@@ -649,7 +649,7 @@ export default function LandingPage() {
 
             <div className="flex flex-col gap-[12px] text-left">
               <motion.div variants={staggerContainer} className="grid md:grid-cols-2 gap-[12px]">
-        {/* ━━━━ section separator ━━━━ */}
+                {/* ━━━━ section separator ━━━━ */}
                 <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col h-[380px]">
                   <div className="flex-1 flex flex-col justify-center mb-6">
                     {platformData.map((p, i) => (
@@ -678,7 +678,7 @@ export default function LandingPage() {
                   </div>
                 </motion.div>
 
-        {/* ━━━━ section separator ━━━━ */}
+                {/* ━━━━ section separator ━━━━ */}
                 <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col h-[380px]">
                   <div className="flex-1 flex flex-col items-center justify-center mb-4">
                     <RadialGauge percentage={72} label="Drafted / Posted" />
@@ -696,7 +696,7 @@ export default function LandingPage() {
               </motion.div>
 
               <motion.div variants={staggerContainer} className="grid md:grid-cols-3 gap-[12px]">
-        {/* ━━━━ section separator ━━━━ */}
+                {/* ━━━━ section separator ━━━━ */}
                 <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="myniq-card p-[28px] flex flex-col">
                   <div className="flex-1 flex flex-col justify-center w-full py-3">
                     <PlatformSourcesWidget />
@@ -705,7 +705,7 @@ export default function LandingPage() {
                   <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>Signals from LinkedIn, Reddit, Hacker News, X, and more — all in one place, always live.</p>
                 </motion.div>
 
-        {/* ━━━━ section separator ━━━━ */}
+                {/* ━━━━ section separator ━━━━ */}
                 <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="myniq-card p-[28px] flex flex-col">
                   <div className="flex-1 flex flex-col justify-center items-center h-full pt-4">
                     <ChatSimulation />
@@ -714,7 +714,7 @@ export default function LandingPage() {
                   <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>Wake up to overnight leads, pre-sorted by intent score.</p>
                 </motion.div>
 
-        {/* ━━━━ section separator ━━━━ */}
+                {/* ━━━━ section separator ━━━━ */}
                 <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="myniq-card p-[28px] flex flex-col">
                   <div className="flex-1 flex flex-col justify-center gap-2.5 mb-6">
                     {[
@@ -1043,7 +1043,7 @@ export default function LandingPage() {
                 </div>
               </motion.div>
 
-        {/* ━━━━ section separator ━━━━ */}
+              {/* ━━━━ section separator ━━━━ */}
               <motion.div variants={fadeUp}
                 className="rounded-[20px] border border-black/[0.07] p-[36px] flex flex-col relative overflow-hidden"
                 style={{ boxShadow: 'var(--shadow-card)', background: 'linear-gradient(130deg, rgba(255,175,115,0.10) 0%, rgba(255,200,160,0.06) 25%, #ffffff 55%)' }}
