@@ -14,18 +14,18 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
   const endAngle = 360
   const angleStep = (endAngle - startAngle) / (tickCount - 1)
 
-  const radius = 96
-  const tickLen = 25
-  const cx = 110
+  const radius = 120
+  const tickLen = 32
+  const cx = 138
   // cy near bottom of SVG so the arch is fully visible above it
-  const cy = 128
+  const cy = 160
 
   const safePercentage = Math.min(Math.max(percentage, 0), 100)
   const activeTicks = Math.round((safePercentage / 100) * tickCount)
 
   return (
-    <div className="relative flex flex-col items-center justify-center" style={{ width: 220, height: 158 }}>
-      <svg width="220" height="158" viewBox="0 0 220 158" style={{ overflow: 'visible' }}>
+    <div className="relative flex flex-col items-center justify-center" style={{ width: 276, height: 198 }}>
+      <svg width="276" height="198" viewBox="0 0 276 198" style={{ overflow: 'visible' }}>
         {Array.from({ length: tickCount }).map((_, i) => {
           const angle = startAngle + i * angleStep
           const angleRad = (angle * Math.PI) / 180
@@ -55,7 +55,7 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
               x1={x1} y1={y1}
               x2={x2} y2={y2}
               stroke={strokeColor}
-              strokeWidth={4.0}
+              strokeWidth={5.0}
               strokeLinecap="round"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, stroke: strokeColor }}
@@ -68,12 +68,12 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
       {/* Percentage label centered in the lower arc area */}
       <div
         className="absolute flex items-center justify-center"
-        style={{ bottom: 10, left: 0, right: 0 }}
+        style={{ bottom: 15, left: 0, right: 0 }}
       >
         <span
           style={{
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-            fontSize: '34px',
+            fontSize: '42px',
             fontWeight: 700,
             letterSpacing: '-0.03em',
             color: '#0A0A0A',
