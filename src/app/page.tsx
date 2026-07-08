@@ -486,13 +486,13 @@ export default function LandingPage() {
           <h1 className="mb-5 mt-1" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(52px, 6.5vw, 80px)', letterSpacing: '-0.04em', lineHeight: 1.0, color: '#0A0A0A' }}>
             <WordFadeIn text="Find your customers" />
             <br />
-            <WordFadeIn text="where they already are." delay={0.3} />
+            <WordFadeIn text="where they are." delay={0.3} />
             <br />
             <span style={{ color: '#9B9B9B', fontWeight: 700 }}>Before anyone else does.</span>
           </h1>
 
           <p className="max-w-[520px] mb-10" style={{ fontFamily: 'var(--font-inter), sans-serif', fontWeight: 400, fontSize: '17px', lineHeight: 1.65, color: '#6B6B6B' }}>
-            Scouto monitors B2B networks, tech forums, and social communities 24/7, finds high-intent conversations, and organizes your outreach in one focused dashboard.
+            Monitor professional channels 24/7. Detect high-intent conversations, draft personalized replies, and acquire customers organically.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
