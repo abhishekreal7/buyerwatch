@@ -430,9 +430,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-[#0A0A0A] selection:bg-[#0A84FF]/20">
 
-        {/* ━━━━ section separator ━━━━ */}
-          NAVBAR
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: NAVBAR ━ ━ ━ ━  */}
       <motion.nav
         style={{ backgroundColor: navBg, backdropFilter: navBlur, borderColor: navBorder, boxShadow: navShadow }}
         className="fixed top-0 left-0 right-0 z-50 border-b will-change-transform">
@@ -456,9 +454,7 @@ export default function LandingPage() {
         </div>
       </motion.nav>
 
-        {/* ━━━━ section separator ━━━━ */}
-          HERO
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
       <section className="hero-mesh relative min-h-[92vh] flex flex-col items-center justify-center px-6 pt-[100px] pb-[80px] overflow-hidden">
         {/* Gradient mesh blobs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -642,9 +638,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          MORE FEATURES (Bento Grid)
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: MORE FEATURES (Bento Grid) ━ ━ ━ ━  */}
         <Section className="bg-white pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px] text-center">
             <SectionBadge color="#0A84FF" text="More Features" />
@@ -748,9 +742,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          ANALYTICS
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: ANALYTICS ━ ━ ━ ━  */}
         <Section className="bg-[#f5f5f5] pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px] text-center">
             <SectionBadge color="#30D158" text="Analytics" />
@@ -801,9 +793,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          SOCIAL PROOF
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: SOCIAL PROOF ━ ━ ━ ━  */}
         <Section className="bg-white pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-6">
             <motion.div variants={fadeUp} className="text-center mb-[64px]">
@@ -905,9 +895,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          HOW IT WORKS
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: HOW IT WORKS ━ ━ ━ ━  */}
         <Section id="how-it-works" className="bg-[#f5f5f5] pt-[120px] pb-[120px]">
           <div className="max-w-[1100px] mx-auto px-[24px]">
             <div className="text-center mb-[64px]">
@@ -979,14 +967,10 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          STICKY FEATURE SCROLL
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: STICKY FEATURE SCROLL ━ ━ ━ ━  */}
         <StickyFeatureScroll />
 
-        {/* ━━━━ section separator ━━━━ */}
-          PRICING
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
         <Section id="pricing" className="bg-white pt-[100px] pb-[100px]">
           <div className="max-w-[920px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[36px]">
@@ -1114,9 +1098,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          FAQ
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: FAQ ━ ━ ━ ━  */}
         <Section id="faq" className="bg-[#f5f5f5] pt-[100px] pb-[100px]">
           <div className="max-w-[680px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[52px]">
@@ -1162,9 +1144,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          FOOTER CTA
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: FOOTER CTA ━ ━ ━ ━  */}
         <Section className="bg-white pt-[100px] pb-[100px]">
           <div className="max-w-[640px] mx-auto px-[24px] text-center">
             <motion.h2 variants={fadeUp} className="mb-4"
@@ -1185,9 +1165,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━━━━ section separator ━━━━ */}
-          FOOTER
-        {/* ━━━━ section separator ━━━━ */}
+        {/* ━ ━ ━ ━  section separator: FOOTER ━ ━ ━ ━  */}
         <footer className="bg-[#0A0A0A] text-white py-20 px-6">
           <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div className="md:col-span-1">
