@@ -142,7 +142,7 @@ const PlatformSourcesWidget = () => {
     <div className="flex flex-col items-center gap-5 w-full">
       {/* Label */}
       <div style={{ fontSize: '11px', fontFamily: 'var(--font-inter)', fontWeight: 600, letterSpacing: '0.08em', color: '#ADADAD', textTransform: 'uppercase', textAlign: 'center' }}>
-        Work where your customers already are
+        Seamlessly monitors signals from
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-y-4 gap-x-5 md:gap-x-8 px-4">
