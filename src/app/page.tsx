@@ -9,7 +9,7 @@ import {
   Target, Plus, Minus,
   ScanSearch, BrainCircuit, MessageSquareText, Zap,
   MessageSquare, BarChart3, BellRing, TrendingUp,
-  ChevronRight
+  ChevronRight, Radar, Gauge, PenLine, Layers
 } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
 import EyebrowBadge from '@/components/EyebrowBadge'
@@ -17,7 +17,19 @@ import { StickyFeatureScroll } from '@/components/StickyFeatureScroll'
 import { FaReddit } from 'react-icons/fa6'
 
 
-// ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+const pathVariants = {
+  hidden: { pathLength: 0, opacity: 0 },
+  show: {
+    pathLength: 1,
+    opacity: 1,
+    transition: {
+      duration: 0.8,
+      ease: [0.16, 1, 0.3, 1],
+      delay: 0.15
+    }
+  }
+}
+
 const platformData = [
   { name: 'Reddit', count: 847, color: '#FF6B35' },
   { name: 'LinkedIn', count: 1428, color: '#0A66C2' }
@@ -739,63 +751,129 @@ export default function LandingPage() {
             <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[24px]">
               {[
                 {
-                  Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
-                    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="5" y="5" width="14" height="14" rx="2" stroke="rgba(255,255,255,0.3)" />
-                      <rect x="9" y="9" width="6" height="6" rx="1" stroke="#FFFFFF" />
-                      <circle cx="12" cy="12" r="1.2" fill="#0A84FF" stroke="none" />
-                      <path className="animate-crawl-cashflow" stroke="#38BDF8" style={{ filter: 'drop-shadow(0 0 2px #0A84FF)' }} strokeWidth={2} d="M9 1v4M12 1v4M15 1v4M9 19v4M12 19v4M15 19v4M1 9h4M1 12h4M1 15h4M19 9h4M19 12h4M19 15h4" />
-                    </svg>
-                  ),
-                  title: 'Cashflow Control',
-                  body: 'Stay on top of your money with real time cashflow tracking'
+                  id: 'radar',
+                  title: 'Live Monitoring',
+                  body: 'Real-time Reddit tracking across every keyword you set'
                 },
                 {
-                  Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
-                    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="rgba(255,255,255,0.35)" />
-                      <circle cx="7" cy="6.5" r="0.75" fill="#30D158" stroke="none" />
-                      <path d="M4 11v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" stroke="rgba(255,255,255,0.55)" />
-                      <circle cx="7" cy="11.5" r="0.75" fill="#0A84FF" stroke="none" />
-                      <path className="animate-crawl-expenses" stroke="#00D2FC" style={{ filter: 'drop-shadow(0 0 2px #00D2FC)' }} strokeWidth={2} d="M4 16v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
-                      <circle cx="7" cy="16.5" r="0.75" fill="#FF9F0A" stroke="none" />
-                    </svg>
-                  ),
-                  title: 'Smart Expenses',
-                  body: 'Automatically track, categorize and manage your business'
+                  id: 'gauge',
+                  title: 'Intent Scoring',
+                  body: "Every match ranked 0-100 so you know what's worth your time"
                 },
                 {
-                  Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
-                    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="6" cy="6" r="3" stroke="rgba(255,255,255,0.4)" />
-                      <circle cx="6" cy="6" r="1.2" fill="#FF375F" stroke="none" />
-                      <circle cx="18" cy="18" r="3" stroke="rgba(255,255,255,0.4)" />
-                      <circle cx="18" cy="18" r="1.2" fill="#BF5AF2" stroke="none" />
-                      <circle cx="18" cy="6" r="3" stroke="rgba(255,255,255,0.4)" />
-                      <circle cx="18" cy="6" r="1.2" fill="#0A84FF" stroke="none" />
-                      <path className="animate-crawl-invoicing" stroke="#BF5AF2" style={{ filter: 'drop-shadow(0 0 2.5px #BF5AF2)' }} strokeWidth={2} d="M6 9v6a3 3 0 003 3h6M9 6h6" />
-                    </svg>
-                  ),
-                  title: 'Auto Invoicing',
-                  body: 'Save time and reduce errors with automated invoicing'
+                  id: 'pen',
+                  title: 'AI Drafting',
+                  body: 'Replies written in your voice, ready to review and send'
                 },
                 {
-                  Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
-                    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="12" height="10" rx="1.5" stroke="rgba(255,255,255,0.3)" />
-                      <rect x="9" y="10" width="12" height="10" rx="1.5" stroke="#FFFFFF" />
-                      <circle cx="12" cy="13" r="1.2" fill="#30D158" stroke="none" />
-                      <path className="animate-crawl-sync" stroke="#30D158" style={{ filter: 'drop-shadow(0 0 2.5px #30D158)' }} strokeWidth={2} d="M12 4h3v3M12 20H9v-3" />
-                    </svg>
-                  ),
-                  title: 'Bank Sync.',
-                  body: 'Connect all your bank accounts in one place & get visibility'
+                  id: 'layers',
+                  title: 'Multi-Platform',
+                  body: 'Reddit live now, more platforms rolling out soon'
                 },
-              ].map(({ Icon, title, body }, i) => (
+              ].map(({ id, title, body }, i) => (
                 <motion.div key={i} variants={fadeUp} whileHover={{ y: -4 }} transition={springs.snappy} className="flex flex-col">
-                  <FeatureIcon icon={Icon} />
-                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '16px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '6px' }}>{title}</h4>
-                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>{body}</p>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    background: '#0A0A0A',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '20px'
+                  }}>
+                    {id === 'radar' && (
+                      <motion.svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#FFFFFF"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <motion.path variants={pathVariants} d="M19.07 4.93a10 10 0 0 0-14.14 0" />
+                        <motion.path variants={pathVariants} d="M16.24 7.76a6 6 0 0 0-8.49 0" />
+                        <motion.path variants={pathVariants} d="M12 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" />
+                        <motion.path variants={pathVariants} d="M12 2v4" />
+                        <motion.path variants={pathVariants} d="M12 18v4" />
+                        <motion.path variants={pathVariants} d="M4.93 19.07l2.83-2.83" />
+                        <motion.path variants={pathVariants} d="M16.24 7.76l2.83-2.83" />
+                        <motion.path variants={pathVariants} d="M2 12h4" />
+                        <motion.path variants={pathVariants} d="M18 12h4" />
+                        <motion.path variants={pathVariants} d="M4.93 4.93l2.83 2.83" />
+                        <motion.path variants={pathVariants} d="M16.24 16.24l2.83 2.83" />
+                      </motion.svg>
+                    )}
+                    {id === 'gauge' && (
+                      <motion.svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#FFFFFF"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <motion.path variants={pathVariants} d="M3.34 19a10 10 0 1 1 17.32 0" />
+                        <motion.path variants={pathVariants} d="m12 14 4-4" />
+                        <motion.path variants={pathVariants} d="M12 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" />
+                      </motion.svg>
+                    )}
+                    {id === 'pen' && (
+                      <motion.svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#FFFFFF"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <motion.path variants={pathVariants} d="M12 20h9" />
+                        <motion.path variants={pathVariants} d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </motion.svg>
+                    )}
+                    {id === 'layers' && (
+                      <motion.svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#FFFFFF"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <motion.path variants={pathVariants} d="m12 3-10 5 10 5 10-5-10-5Z" />
+                        <motion.path variants={pathVariants} d="m2 17 10 5 10-5" />
+                        <motion.path variants={pathVariants} d="m2 12 10 5 10-5" />
+                      </motion.svg>
+                    )}
+                  </div>
+                  <h4 style={{
+                    fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
+                    fontSize: '17px',
+                    fontWeight: 600,
+                    color: '#0A0A0A',
+                    letterSpacing: '-0.01em',
+                    marginBottom: '6px'
+                  }}>
+                    {title}
+                  </h4>
+                  <p style={{
+                    fontFamily: 'var(--font-inter), sans-serif',
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#6B6B6B',
+                    lineHeight: 1.5,
+                    maxWidth: '220px'
+                  }}>
+                    {body}
+                  </p>
                 </motion.div>
               ))}
             </motion.div>
