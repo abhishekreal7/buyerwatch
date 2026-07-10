@@ -540,7 +540,7 @@ const BentoTrafficWidget = () => {
 
 function Section({ children, className = '', delay = 0, id }: { children: React.ReactNode; className?: string; delay?: number; id?: string }) {
   const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: '-80px' })
+  const inView = useInView(ref, { once: true, margin: '-20px' })
   return (
     <motion.section
       ref={ref}
@@ -598,7 +598,7 @@ export default function LandingPage() {
       </motion.nav>
 
       {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
-      <section className="hero-mesh relative min-h-[92vh] flex flex-col items-center justify-center px-6 pt-[100px] pb-[80px] overflow-hidden">
+      <section className="hero-mesh relative flex flex-col items-center justify-center px-6 pt-[100px] pb-[40px] overflow-hidden">
         {/* Gradient mesh blobs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <motion.div
@@ -675,7 +675,7 @@ export default function LandingPage() {
         {/* FEATURES */}
 
 
-        <Section id="features" className="bg-white pt-[100px] pb-[100px]">
+        <Section id="features" className="bg-white pt-[50px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <SectionBadge color="#0A84FF" text="Features" />
 
