@@ -783,7 +783,7 @@ export default function LandingPage() {
                     marginBottom: '20px'
                   }}>
                     {id === 'radar' && (
-                      <motion.svg
+                      <svg
                         width="20"
                         height="20"
                         viewBox="0 0 24 24"
@@ -793,21 +793,13 @@ export default function LandingPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <motion.path variants={pathVariants} d="M19.07 4.93a10 10 0 0 0-14.14 0" />
-                        <motion.path variants={pathVariants} d="M16.24 7.76a6 6 0 0 0-8.49 0" />
-                        <motion.path variants={pathVariants} d="M12 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" />
-                        <motion.path variants={pathVariants} d="M12 2v4" />
-                        <motion.path variants={pathVariants} d="M12 18v4" />
-                        <motion.path variants={pathVariants} d="M4.93 19.07l2.83-2.83" />
-                        <motion.path variants={pathVariants} d="M16.24 7.76l2.83-2.83" />
-                        <motion.path variants={pathVariants} d="M2 12h4" />
-                        <motion.path variants={pathVariants} d="M18 12h4" />
-                        <motion.path variants={pathVariants} d="M4.93 4.93l2.83 2.83" />
-                        <motion.path variants={pathVariants} d="M16.24 16.24l2.83 2.83" />
-                      </motion.svg>
+                        <rect x="5" y="5" width="14" height="14" rx="2" stroke="rgba(255,255,255,0.3)" />
+                        <rect x="9" y="9" width="6" height="6" rx="1" stroke="#FFFFFF" />
+                        <path className="animate-crawl-cashflow" d="M9 1v4M12 1v4M15 1v4M9 19v4M12 19v4M15 19v4M1 9h4M1 12h4M1 15h4M19 9h4M19 12h4M19 15h4" />
+                      </svg>
                     )}
                     {id === 'gauge' && (
-                      <motion.svg
+                      <svg
                         width="20"
                         height="20"
                         viewBox="0 0 24 24"
@@ -817,13 +809,13 @@ export default function LandingPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <motion.path variants={pathVariants} d="M3.34 19a10 10 0 1 1 17.32 0" />
-                        <motion.path variants={pathVariants} d="m12 14 4-4" />
-                        <motion.path variants={pathVariants} d="M12 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" />
-                      </motion.svg>
+                        <path d="M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="rgba(255,255,255,0.3)" />
+                        <path d="M4 11v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" stroke="rgba(255,255,255,0.5)" />
+                        <path className="animate-crawl-expenses" d="M4 16v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
+                      </svg>
                     )}
                     {id === 'pen' && (
-                      <motion.svg
+                      <svg
                         width="20"
                         height="20"
                         viewBox="0 0 24 24"
@@ -833,12 +825,14 @@ export default function LandingPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <motion.path variants={pathVariants} d="M12 20h9" />
-                        <motion.path variants={pathVariants} d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                      </motion.svg>
+                        <circle cx="6" cy="6" r="3" stroke="rgba(255,255,255,0.3)" />
+                        <circle cx="18" cy="18" r="3" stroke="rgba(255,255,255,0.3)" />
+                        <circle cx="18" cy="6" r="3" stroke="rgba(255,255,255,0.3)" />
+                        <path className="animate-crawl-invoicing" d="M6 9v6a3 3 0 003 3h6M9 6h6" />
+                      </svg>
                     )}
                     {id === 'layers' && (
-                      <motion.svg
+                      <svg
                         width="20"
                         height="20"
                         viewBox="0 0 24 24"
@@ -848,10 +842,10 @@ export default function LandingPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <motion.path variants={pathVariants} d="m12 3-10 5 10 5 10-5-10-5Z" />
-                        <motion.path variants={pathVariants} d="m2 17 10 5 10-5" />
-                        <motion.path variants={pathVariants} d="m2 12 10 5 10-5" />
-                      </motion.svg>
+                        <rect x="3" y="4" width="12" height="10" rx="1.5" stroke="rgba(255,255,255,0.3)" />
+                        <rect x="9" y="10" width="12" height="10" rx="1.5" stroke="#FFFFFF" />
+                        <path className="animate-crawl-sync" d="M12 4h3v3M12 20H9v-3" />
+                      </svg>
                     )}
                   </div>
                   <h4 style={{
