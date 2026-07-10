@@ -599,22 +599,16 @@ export default function LandingPage() {
 
       {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
       <section className="hero-mesh relative flex flex-col items-center justify-center px-6 pt-[100px] pb-[40px] overflow-hidden">
-        {/* Gradient mesh blobs */}
+        {/* Gradient mesh blobs (optimized static background) */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <motion.div
-            animate={{ rotate: 360, x: [0, 30, 0], y: [0, -20, 0] }}
-            transition={{ repeat: Infinity, duration: 25, ease: "linear" }}
-            className="absolute -top-[10%] -left-[5%] w-[45%] h-[60%] rounded-full"
+          <div
+            className="absolute -top-[10%] -left-[5%] w-[45%] h-[60%] rounded-full opacity-70"
             style={{ background: 'radial-gradient(ellipse, rgba(255,180,100,0.38) 0%, transparent 68%)', filter: 'blur(40px)' }} />
-          <motion.div
-            animate={{ rotate: -360, x: [0, -40, 0], y: [0, 30, 0] }}
-            transition={{ repeat: Infinity, duration: 30, ease: "linear" }}
-            className="absolute -top-[15%] right-0 w-[40%] h-[55%] rounded-full"
+          <div
+            className="absolute -top-[15%] right-0 w-[40%] h-[55%] rounded-full opacity-70"
             style={{ background: 'radial-gradient(ellipse, rgba(200,150,255,0.28) 0%, transparent 68%)', filter: 'blur(50px)' }} />
-          <motion.div
-            animate={{ x: [0, 50, -50, 0], y: [0, 10, -10, 0] }}
-            transition={{ repeat: Infinity, duration: 20, ease: "easeInOut" }}
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[50%] h-[30%]"
+          <div
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[50%] h-[30%] opacity-60"
             style={{ background: 'radial-gradient(ellipse, rgba(255,200,150,0.2) 0%, transparent 68%)', filter: 'blur(40px)' }} />
         </div>
 
@@ -747,9 +741,10 @@ export default function LandingPage() {
                 {
                   Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
                     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="5" y="5" width="14" height="14" rx="2" />
-                      <rect x="9" y="9" width="6" height="6" rx="1" />
-                      <path className="animate-crawl-cashflow" d="M9 1v4M12 1v4M15 1v4M9 19v4M12 19v4M15 19v4M1 9h4M1 12h4M1 15h4M19 9h4M19 12h4M19 15h4" />
+                      <rect x="5" y="5" width="14" height="14" rx="2" stroke="rgba(255,255,255,0.3)" />
+                      <rect x="9" y="9" width="6" height="6" rx="1" stroke="#FFFFFF" />
+                      <circle cx="12" cy="12" r="1.2" fill="#0A84FF" stroke="none" />
+                      <path className="animate-crawl-cashflow" stroke="#38BDF8" style={{ filter: 'drop-shadow(0 0 2px #0A84FF)' }} strokeWidth={2} d="M9 1v4M12 1v4M15 1v4M9 19v4M12 19v4M15 19v4M1 9h4M1 12h4M1 15h4M19 9h4M19 12h4M19 15h4" />
                     </svg>
                   ),
                   title: 'Cashflow Control',
@@ -758,9 +753,12 @@ export default function LandingPage() {
                 {
                   Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
                     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6" />
-                      <path d="M4 11v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
-                      <path className="animate-crawl-expenses" d="M4 16v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
+                      <path d="M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="rgba(255,255,255,0.35)" />
+                      <circle cx="7" cy="6.5" r="0.75" fill="#30D158" stroke="none" />
+                      <path d="M4 11v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" stroke="rgba(255,255,255,0.55)" />
+                      <circle cx="7" cy="11.5" r="0.75" fill="#0A84FF" stroke="none" />
+                      <path className="animate-crawl-expenses" stroke="#00D2FC" style={{ filter: 'drop-shadow(0 0 2px #00D2FC)' }} strokeWidth={2} d="M4 16v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
+                      <circle cx="7" cy="16.5" r="0.75" fill="#FF9F0A" stroke="none" />
                     </svg>
                   ),
                   title: 'Smart Expenses',
@@ -769,10 +767,13 @@ export default function LandingPage() {
                 {
                   Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
                     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="6" cy="6" r="3" />
-                      <circle cx="18" cy="18" r="3" />
-                      <circle cx="18" cy="6" r="3" />
-                      <path className="animate-crawl-invoicing" d="M6 9v6a3 3 0 003 3h6M9 6h6" />
+                      <circle cx="6" cy="6" r="3" stroke="rgba(255,255,255,0.4)" />
+                      <circle cx="6" cy="6" r="1.2" fill="#FF375F" stroke="none" />
+                      <circle cx="18" cy="18" r="3" stroke="rgba(255,255,255,0.4)" />
+                      <circle cx="18" cy="18" r="1.2" fill="#BF5AF2" stroke="none" />
+                      <circle cx="18" cy="6" r="3" stroke="rgba(255,255,255,0.4)" />
+                      <circle cx="18" cy="6" r="1.2" fill="#0A84FF" stroke="none" />
+                      <path className="animate-crawl-invoicing" stroke="#BF5AF2" style={{ filter: 'drop-shadow(0 0 2.5px #BF5AF2)' }} strokeWidth={2} d="M6 9v6a3 3 0 003 3h6M9 6h6" />
                     </svg>
                   ),
                   title: 'Auto Invoicing',
@@ -781,9 +782,10 @@ export default function LandingPage() {
                 {
                   Icon: ({ className, strokeWidth }: { className?: string; strokeWidth?: number }) => (
                     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth || 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="12" height="10" rx="1.5" />
-                      <rect x="9" y="10" width="12" height="10" rx="1.5" />
-                      <path className="animate-crawl-sync" d="M12 4h3v3M12 20H9v-3" />
+                      <rect x="3" y="4" width="12" height="10" rx="1.5" stroke="rgba(255,255,255,0.3)" />
+                      <rect x="9" y="10" width="12" height="10" rx="1.5" stroke="#FFFFFF" />
+                      <circle cx="12" cy="13" r="1.2" fill="#30D158" stroke="none" />
+                      <path className="animate-crawl-sync" stroke="#30D158" style={{ filter: 'drop-shadow(0 0 2.5px #30D158)' }} strokeWidth={2} d="M12 4h3v3M12 20H9v-3" />
                     </svg>
                   ),
                   title: 'Bank Sync.',
