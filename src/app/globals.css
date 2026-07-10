@@ -503,3 +503,64 @@ p {
     0 8px 24px rgba(10, 132, 255, 0.08),
     0 2px 6px rgba(10, 132, 255, 0.06);
 }
+
+/* ─── SVG Dash Crawl Animations ─────────────────────────── */
+@keyframes crawl-cashflow {
+  from {
+    stroke-dashoffset: 89.73px;
+  }
+
+  to {
+    stroke-dashoffset: 0px;
+  }
+}
+
+.animate-crawl-cashflow {
+  stroke-dasharray: 74.78px 14.96px;
+  animation: crawl-cashflow 2.8s linear infinite;
+}
+
+@keyframes crawl-expenses {
+  from {
+    stroke-dashoffset: 134.47px;
+  }
+
+  to {
+    stroke-dashoffset: 0px;
+  }
+}
+
+.animate-crawl-expenses {
+  stroke-dasharray: 112.06px 22.41px;
+  animation: crawl-expenses 4.2s linear infinite;
+}
+
+@keyframes crawl-invoicing {
+  from {
+    stroke-dashoffset: 90.50px;
+  }
+
+  to {
+    stroke-dashoffset: 0px;
+  }
+}
+
+.animate-crawl-invoicing {
+  stroke-dasharray: 75.41px 15.08px;
+  animation: crawl-invoicing 2.8s linear infinite;
+}
+
+@keyframes crawl-sync {
+  from {
+    stroke-dashoffset: 125.57px;
+  }
+
+  to {
+    stroke-dashoffset: 0px;
+  }
+}
+
+.animate-crawl-sync {
+  stroke-dasharray: 104.64px 20.93px;
+  animation: crawl-sync 4.2s linear infinite;
+}

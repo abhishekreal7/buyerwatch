@@ -24,10 +24,10 @@ interface Keyword {
 
 /* ─── Platform metadata ──────────────────────────────────────────── */
 const PLATFORM_META: Record<Platform, { label: string; color: string; bg: string; border: string }> = {
-  reddit:  { label: 'Reddit',  color: '#FF4500', bg: 'bg-[#FF4500]/8',  border: 'border-[#FF4500]/15' },
-  bluesky: { label: 'Bluesky', color: '#1185FE', bg: 'bg-[#1185FE]/8',  border: 'border-[#1185FE]/15' },
-  x:       { label: 'X',       color: '#000000', bg: 'bg-black/5',       border: 'border-black/10' },
-  threads: { label: 'Threads', color: '#000000', bg: 'bg-black/5',       border: 'border-black/10' },
+  reddit: { label: 'Reddit', color: '#FF4500', bg: 'bg-[#FF4500]/8', border: 'border-[#FF4500]/15' },
+  bluesky: { label: 'Bluesky', color: '#1185FE', bg: 'bg-[#1185FE]/8', border: 'border-[#1185FE]/15' },
+  x: { label: 'X', color: '#000000', bg: 'bg-black/5', border: 'border-black/10' },
+  threads: { label: 'Threads', color: '#000000', bg: 'bg-black/5', border: 'border-black/10' },
 }
 
 const PLATFORMS_AVAILABLE: Platform[] = ['reddit', 'bluesky']
@@ -36,7 +36,7 @@ const PLATFORMS_AVAILABLE: Platform[] = ['reddit', 'bluesky']
 function PlatformChip({ platform }: { platform: Platform }) {
   let imgSrc = ''
   let label = ''
-  
+
   if (platform === 'reddit') {
     imgSrc = 'https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png'
     label = 'Reddit'
@@ -59,24 +59,52 @@ function PlatformChip({ platform }: { platform: Platform }) {
   )
 }
 
-function StatusDot({ active }: { active: boolean }) {
+function StatusPill({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${active ? 'text-[#10B981]' : 'text-text-tertiary'}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-[#10B981]' : 'bg-text-tertiary/50'}`} />
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider transition-colors duration-150 cursor-pointer border-none"
+      style={{
+        backgroundColor: active ? '#EAFDF5' : '#F4F5F7',
+        color: active ? '#0B8A5A' : '#6B6B6B'
+      }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? '#10B981' : '#8E8E93' }} />
       {active ? 'Active' : 'Paused'}
-    </span>
+    </button>
   )
 }
+
+// Deterministic hash functions for premium onboarding placeholder values
+const getPopularity = (kwId: string, threadCount: number) => {
+  if (threadCount > 0) {
+    return Math.min(Math.round((threadCount / 15) * 100), 100)
+  }
+  const charSum = kwId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return (charSum % 60) + 25 // 25% to 85%
+}
+
+const getSuccessRate = (kwId: string, threadCount: number, repliedCount: number) => {
+  if (threadCount > 0) {
+    return Math.round((repliedCount / threadCount) * 100)
+  }
+  const charSum = kwId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return (charSum % 40) + 15 // 15% to 55%
+}
+
+
 
 /* ─── Filter pill button ─────────────────────────────────────────── */
 function FilterPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className={`h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-all duration-150 cursor-pointer border ${
-        active
+      className={`h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-all duration-150 cursor-pointer border ${active
           ? 'bg-text-primary text-white border-text-primary shadow-sm'
           : 'bg-white text-text-secondary border-black/[0.08] hover:border-black/[0.14] hover:text-text-primary'
-      }`}>
+        }`}>
       {label}
     </button>
   )
@@ -89,17 +117,18 @@ const fieldCls = `w-full bg-surface border border-black/[0.08] rounded-[10px] px
 
 /* ─── Main ───────────────────────────────────────────────────────── */
 export default function KeywordsPage() {
-  const [keywords, setKeywords]       = useState<Keyword[]>([])
-  const [loading, setLoading]         = useState(true)
-  const [showAdd, setShowAdd]         = useState(false)
-  const [saving, setSaving]           = useState(false)
-  const [newTerm, setNewTerm]         = useState('')
+  const [keywords, setKeywords] = useState<Keyword[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [newTerm, setNewTerm] = useState('')
   const [newPlatform, setNewPlatform] = useState<Platform>('reddit')
-  const [newTarget, setNewTarget]     = useState('')
-  const [search, setSearch]           = useState('')
+  const [newTarget, setNewTarget] = useState('')
+  const [search, setSearch] = useState('')
   const [filterPlatform, setFilterPlatform] = useState<'all' | Platform>('all')
-  const [filterStatus, setFilterStatus]     = useState<'all' | 'active' | 'paused'>('all')
-  const [menuId, setMenuId]           = useState<string | null>(null)
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused'>('all')
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [metrics, setMetrics] = useState<Record<string, { total: number; replied: number }>>({})
   const termRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -121,9 +150,34 @@ export default function KeywordsPage() {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
     const { data, error } = await supabase.from('keywords').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-    if (error) toast.error('Failed to load keywords')
-    else setKeywords(data || [])
+    if (error) {
+      toast.error('Failed to load keywords')
+    } else {
+      setKeywords(data || [])
+
+      // Fetch thread counts for popularity and success metrics
+      const { data: threadsData } = await supabase
+        .from('monitored_threads')
+        .select('keyword_id, status')
+        .eq('user_id', user.id)
+
+      const counts: Record<string, { total: number; replied: number }> = {}
+      if (threadsData) {
+        threadsData.forEach(t => {
+          if (!t.keyword_id) return
+          if (!counts[t.keyword_id]) {
+            counts[t.keyword_id] = { total: 0, replied: 0 }
+          }
+          counts[t.keyword_id].total++
+          if (t.status === 'replied') {
+            counts[t.keyword_id].replied++
+          }
+        })
+      }
+      setMetrics(counts)
+    }
     setLoading(false)
   }
 
@@ -132,7 +186,7 @@ export default function KeywordsPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
-    
+
     // Auto-strip "r/" prefix if user accidentally included it
     let cleanTarget = newTarget.trim()
     if (newPlatform === 'reddit' && cleanTarget.toLowerCase().startsWith('r/')) {
@@ -146,15 +200,15 @@ export default function KeywordsPage() {
     else {
       setKeywords(prev => [data, ...prev])
       setNewTerm(''); setNewTarget(''); setShowAdd(false)
-      
+
       // Reset filters so the new active rule is immediately visible
       setFilterStatus('all')
       setFilterPlatform('all')
       setSearch('')
-      
+
       toast.success('Rule created')
       toast.info('Searching network for past 24 hours of data...')
-      
+
       // Trigger Instant Aha Moment
       fetch('/api/keywords/fetch-now', {
         method: 'POST',
@@ -188,13 +242,13 @@ export default function KeywordsPage() {
   const filtered = useMemo(() => keywords.filter(kw => {
     const q = search.toLowerCase()
     const matchSearch = !q || kw.term.toLowerCase().includes(q) || kw.target.toLowerCase().includes(q)
-    const matchPlat   = filterPlatform === 'all' || kw.platform === filterPlatform
+    const matchPlat = filterPlatform === 'all' || kw.platform === filterPlatform
     const matchStatus = filterStatus === 'all' || (filterStatus === 'active' ? kw.is_active : !kw.is_active)
     return matchSearch && matchPlat && matchStatus
   }), [keywords, search, filterPlatform, filterStatus])
 
-  const activeCount  = keywords.filter(k => k.is_active).length
-  const pausedCount  = keywords.filter(k => !k.is_active).length
+  const activeCount = keywords.filter(k => k.is_active).length
+  const pausedCount = keywords.filter(k => !k.is_active).length
 
   return (
     <AppPage>
@@ -322,18 +376,18 @@ export default function KeywordsPage() {
 
           {/* Platform pills */}
           <div className="flex items-center gap-1.5">
-            <FilterPill label="All Platforms" active={filterPlatform === 'all'}     onClick={() => setFilterPlatform('all')} />
-            <FilterPill label="Reddit"        active={filterPlatform === 'reddit'}  onClick={() => setFilterPlatform('reddit')} />
-            <FilterPill label="Bluesky"       active={filterPlatform === 'bluesky'} onClick={() => setFilterPlatform('bluesky')} />
+            <FilterPill label="All Platforms" active={filterPlatform === 'all'} onClick={() => setFilterPlatform('all')} />
+            <FilterPill label="Reddit" active={filterPlatform === 'reddit'} onClick={() => setFilterPlatform('reddit')} />
+            <FilterPill label="Bluesky" active={filterPlatform === 'bluesky'} onClick={() => setFilterPlatform('bluesky')} />
           </div>
 
           <div className="w-px h-5 bg-black/[0.07]" />
 
           {/* Status pills */}
           <div className="flex items-center gap-1.5">
-            <FilterPill label="All Statuses" active={filterStatus === 'all'}    onClick={() => setFilterStatus('all')} />
-            <FilterPill label="Active"       active={filterStatus === 'active'} onClick={() => setFilterStatus('active')} />
-            <FilterPill label="Paused"       active={filterStatus === 'paused'} onClick={() => setFilterStatus('paused')} />
+            <FilterPill label="All Statuses" active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} />
+            <FilterPill label="Active" active={filterStatus === 'active'} onClick={() => setFilterStatus('active')} />
+            <FilterPill label="Paused" active={filterStatus === 'paused'} onClick={() => setFilterStatus('paused')} />
           </div>
 
           {/* Result count — right-aligned */}
@@ -348,10 +402,12 @@ export default function KeywordsPage() {
         <div className="rounded-[18px] border border-black/[0.06] bg-white">
 
           {/* Table head */}
-          <div className="grid grid-cols-[1fr_140px_100px_44px] items-center px-5 py-3 bg-surface border-b border-black/[0.05] rounded-t-[17px]">
-            <span className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-text-tertiary">Keyword</span>
-            <span className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-text-tertiary">Target</span>
-            <span className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-text-tertiary">Status</span>
+          <div className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_160px_100px_100px_44px] items-center px-5 py-3 bg-surface border-b border-black/[0.05] rounded-t-[17px]">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">#</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Rule</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Popularity</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Success</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Status</span>
             <span />
           </div>
 
@@ -390,71 +446,111 @@ export default function KeywordsPage() {
           {/* Rows */}
           <div className="divide-y divide-black/[0.04]">
             <AnimatePresence initial={false}>
-              {filtered.map(kw => (
-                <motion.div
-                  key={kw.id}
-                  layout
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: kw.is_active ? 1 : 0.55, y: 0 }}
-                  exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                  transition={{ duration: 0.18 }}
-                  className="grid grid-cols-[1fr_140px_100px_44px] items-center px-5 py-4 hover:bg-surface/60 group transition-colors duration-150 relative last:rounded-b-[17px]"
-                >
-                  {/* Keyword + platform */}
-                  <div className="flex items-center gap-3 min-w-0 pr-4">
-                    <PlatformChip platform={kw.platform} />
-                    <span className="text-[14px] font-medium text-text-primary truncate">{kw.term}</span>
-                  </div>
+              {filtered.map((kw, index) => {
+                const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
+                const popularity = getPopularity(kw.id, threadStats.total)
+                const successRate = getSuccessRate(kw.id, threadStats.total, threadStats.replied)
 
-                  {/* Target */}
-                  <div className="text-[13px] text-text-secondary truncate pr-4">
-                    {kw.platform === 'reddit' ? <span className="font-mono">r/{kw.target}</span> : kw.target}
-                  </div>
+                return (
+                  <motion.div
+                    key={kw.id}
+                    layout
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: kw.is_active ? 1 : 0.55, y: 0 }}
+                    exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                    transition={{ duration: 0.18 }}
+                    className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_160px_100px_100px_44px] items-center px-5 py-4 hover:bg-surface/60 group transition-colors duration-150 relative last:rounded-b-[17px]"
+                  >
+                    {/* Index column */}
+                    <span className="text-[13px] font-mono text-text-tertiary font-semibold">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
 
-                  {/* Status */}
-                  <div>
-                    <StatusDot active={kw.is_active} />
-                  </div>
+                    {/* Name column */}
+                    <div className="flex items-center gap-3.5 min-w-0 pr-4">
+                      <div className="flex-shrink-0">
+                        {kw.platform === 'reddit' ? (
+                          <div className="w-8 h-8 rounded-xl bg-[#FF4500]/8 flex items-center justify-center border border-[#FF4500]/15">
+                            <img src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" alt="Reddit" className="w-[18px] h-[18px] rounded-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-xl bg-[#1185FE]/8 flex items-center justify-center border border-[#1185FE]/15">
+                            <img src="https://bsky.app/static/apple-touch-icon.png" alt="Bluesky" className="w-[18px] h-[18px] rounded-full object-cover" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[14px] font-semibold text-text-primary truncate leading-snug">{kw.term}</span>
+                        <span className="text-[12px] text-text-secondary truncate font-medium mt-0.5">
+                          {kw.platform === 'reddit' ? `r/${kw.target}` : kw.target}
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center justify-end" data-menu>
-                    <button
-                      onClick={() => setMenuId(menuId === kw.id ? null : kw.id)}
-                      className="w-8 h-8 rounded-[9px] flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-black/[0.05] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-150 cursor-pointer"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-
-                    <AnimatePresence>
-                      {menuId === kw.id && (
+                    {/* Popularity column */}
+                    <div className="hidden md:flex items-center pr-6">
+                      <div className="h-1.5 w-full bg-black/[0.05] rounded-full overflow-hidden">
                         <motion.div
-                          initial={{ opacity: 0, scale: 0.94, y: -4 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.94, y: -4 }}
-                          transition={{ duration: 0.1 }}
-                          className="absolute right-4 top-12 z-30 bg-surface border border-black/[0.09] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.09),0_2px_8px_rgba(0,0,0,0.05)] p-1 w-40"
-                        >
-                          <button
-                            onClick={() => handleToggle(kw)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[13px] font-medium text-text-primary hover:bg-surface transition-colors cursor-pointer"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${popularity}%` }}
+                          transition={{ duration: 0.8, delay: index * 0.05 }}
+                          className="h-full bg-text-primary rounded-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Success column */}
+                    <div className="hidden md:block">
+                      <span className="text-[13.5px] font-bold text-text-primary tabular-nums tracking-tight">
+                        {successRate}%
+                      </span>
+                    </div>
+
+                    {/* Status column */}
+                    <div>
+                      <StatusPill active={kw.is_active} onClick={() => handleToggle(kw)} />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end" data-menu>
+                      <button
+                        onClick={() => setMenuId(menuId === kw.id ? null : kw.id)}
+                        className="w-8 h-8 rounded-[9px] flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-black/[0.05] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-150 cursor-pointer"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+
+                      <AnimatePresence>
+                        {menuId === kw.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.94, y: -4 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.94, y: -4 }}
+                            transition={{ duration: 0.1 }}
+                            className="absolute right-4 top-12 z-30 bg-surface border border-black/[0.09] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.09),0_2px_8px_rgba(0,0,0,0.05)] p-1 w-40"
                           >
-                            {kw.is_active
-                              ? <><Pause className="w-3.5 h-3.5 text-text-secondary" /> Pause rule</>
-                              : <><Play  className="w-3.5 h-3.5 text-text-secondary" /> Activate rule</>}
-                          </button>
-                          <div className="h-px bg-black/[0.05] my-1" />
-                          <button
-                            onClick={() => handleDelete(kw.id)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[13px] font-medium text-destructive hover:bg-destructive/5 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> Delete rule
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </motion.div>
-              ))}
+                            <button
+                              onClick={() => handleToggle(kw)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[13px] font-medium text-text-primary hover:bg-surface transition-colors cursor-pointer"
+                            >
+                              {kw.is_active
+                                ? <><Pause className="w-3.5 h-3.5 text-text-secondary" /> Pause rule</>
+                                : <><Play className="w-3.5 h-3.5 text-text-secondary" /> Activate rule</>}
+                            </button>
+                            <div className="h-px bg-black/[0.05] my-1" />
+                            <button
+                              onClick={() => handleDelete(kw.id)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[13px] font-medium text-destructive hover:bg-destructive/5 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete rule
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+                )
+              })}
             </AnimatePresence>
           </div>
 

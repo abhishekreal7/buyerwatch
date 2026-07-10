@@ -109,7 +109,7 @@ export default function DashboardPage() {
       const postedToday = allThreads.filter(t => t.status === 'replied' && new Date(t.created_at) >= today).length
       const totalPosted = allThreads.filter(t => t.status === 'replied').length
       setTotalSent(totalPosted)
-      
+
       const drafted = allThreads.filter(t => t.status === 'drafted').length
       const highIntent = allThreads.filter(t =>
         ['pending', 'drafted', 'needs_manual_reply'].includes(t.status) &&
@@ -130,7 +130,7 @@ export default function DashboardPage() {
 
   const handleApproveAndSend = async () => {
     if (!selectedThread || !selectedThread.draft) return
-    
+
     // Call the actual API endpoint
     try {
       const res = await fetch('/api/replies/send', {
@@ -151,7 +151,7 @@ export default function DashboardPage() {
     // Optimistic UI update
     setThreads(prev => prev.filter(t => t.id !== selectedThread.id))
     setSelectedThread(threads.find(t => t.id !== selectedThread.id) || null)
-    
+
     if (totalSent === 0) {
       toast.success("First reply sent! You're officially monitoring the internet on autopilot.", {
         duration: 5000,
@@ -160,7 +160,7 @@ export default function DashboardPage() {
     } else {
       toast.success('Reply queued for sending.')
     }
-    
+
     setTotalSent(prev => prev + 1)
   }
 
@@ -195,9 +195,9 @@ export default function DashboardPage() {
         body: JSON.stringify({ threadId: selectedThread.id })
       })
       if (!res.ok) throw new Error()
-      
+
       const { draft } = await res.json()
-      
+
       // Also log feedback in background
       fetch('/api/feedback', {
         method: 'POST',
@@ -330,8 +330,8 @@ export default function DashboardPage() {
                 key={thread.id}
                 onClick={() => setSelectedThread(thread)}
                 className={`rounded-2xl p-5 bg-white cursor-pointer transition-all ${isSelected
-                    ? 'border-2 border-[#0A84FF] shadow-sm'
-                    : 'border border-black/5 hover:border-black/15'
+                  ? 'border-2 border-[#0A84FF] shadow-sm'
+                  : 'border border-black/5 hover:border-black/15'
                   }`}
               >
                 <div className="flex items-center justify-between mb-3">
@@ -384,7 +384,7 @@ export default function DashboardPage() {
               </div>
             )
           })}
-          
+
           {plan === 'free' && stats.threadsFound > 50 && (
             <div className="rounded-2xl p-6 bg-surface border border-black/5 shadow-sm text-center relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-white/90 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
@@ -401,7 +401,7 @@ export default function DashboardPage() {
                   Upgrade to Pro
                 </a>
               </div>
-              
+
               {/* Dummy blurred content behind */}
               <div className="opacity-20 blur-[3px] select-none pointer-events-none">
                 <div className="h-4 bg-gray-200 rounded w-1/4 mb-3" />

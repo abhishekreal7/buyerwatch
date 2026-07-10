@@ -36,7 +36,7 @@ export default function LoginPage() {
       >
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity">
-            <Target className="w-8 h-8 text-[#FF6B35]" strokeWidth={2.5} />
+            <Target className="w-8 h-8 text-[#0A84FF]" strokeWidth={2.5} />
             <h1 className="text-3xl font-bold tracking-tight text-text-primary">Scouto</h1>
           </Link>
           <p className="text-text-secondary">Log in to your account</p>

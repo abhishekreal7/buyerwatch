@@ -19,6 +19,10 @@ const redisAdapter = redisClient ? {
   eval: async (script: string, keys: string[], args: string[]) => {
     // ioredis eval takes: script, numKeys, ...keys, ...args
     return redisClient!.eval(script, keys.length, ...keys, ...args)
+  },
+  evalsha: async (sha: string, keys: string[], args: string[]) => {
+    // ioredis evalsha takes: sha, numKeys, ...keys, ...args
+    return redisClient!.evalsha(sha, keys.length, ...keys, ...args)
   }
 } : null
 

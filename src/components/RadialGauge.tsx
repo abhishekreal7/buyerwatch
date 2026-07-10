@@ -30,23 +30,23 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
           const angle = startAngle + i * angleStep
           const angleRad = (angle * Math.PI) / 180
 
-          const x2 = cx + radius * Math.cos(angleRad)
-          const y2 = cy + radius * Math.sin(angleRad)
-          const x1 = cx + (radius - tickLen) * Math.cos(angleRad)
-          const y1 = cy + (radius - tickLen) * Math.sin(angleRad)
+          const x2 = Math.round((cx + radius * Math.cos(angleRad)) * 10000) / 10000
+          const y2 = Math.round((cy + radius * Math.sin(angleRad)) * 10000) / 10000
+          const x1 = Math.round((cx + (radius - tickLen) * Math.cos(angleRad)) * 10000) / 10000
+          const y1 = Math.round((cy + (radius - tickLen) * Math.sin(angleRad)) * 10000) / 10000
 
           const isActive = i < activeTicks
 
           let strokeColor: string
           if (isActive) {
-            // Deep coral → light salmon as ticks progress left→right
+            // Rich brand blue gradient (light blue to deep brand blue)
             const t = activeTicks > 1 ? i / (activeTicks - 1) : 0
-            const r = Math.round(232 + (245 - 232) * t)
-            const g = Math.round(67 + (160 - 67) * t)
-            const b = Math.round(45 + (138 - 45) * t)
+            const r = Math.round(102 + (10 - 102) * t)
+            const g = Math.round(178 + (132 - 178) * t)
+            const b = Math.round(255 + (255 - 255) * t)
             strokeColor = `rgb(${r},${g},${b})`
           } else {
-            strokeColor = '#F5DDD9'
+            strokeColor = '#EBF4FF' // Soft inactive blue track
           }
 
           return (

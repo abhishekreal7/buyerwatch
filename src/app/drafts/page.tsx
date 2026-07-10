@@ -16,10 +16,10 @@ function ScoreBadge({ score, label }: { score: number; label: string }) {
   return (
     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold ${
       isHigh ? 'bg-success/10 text-success border border-success/20' : 
-      isMid ? 'bg-[#FF9F0A]/10 text-[#FF9F0A] border border-[#FF9F0A]/20' : 
-      'bg-accent/10 text-accent border border-accent/20'
+      isMid ? 'bg-accent/10 text-accent border border-accent/20' : 
+      'bg-black/[0.05] text-black/60 border border-black/[0.08]'
     }`}>
-      {isHigh ? '🟢' : isMid ? '🟡' : '🔵'} <span className="tabular-nums">{score}</span> · {label}
+      {isHigh ? '🟢' : isMid ? '🔵' : '⚫'} <span className="tabular-nums">{score}</span> · {label}
     </div>
   )
 }

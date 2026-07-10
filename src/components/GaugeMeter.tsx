@@ -3,11 +3,15 @@ import React from 'react'
 export function GaugeMeter({ 
   value, 
   label,
-  size = 180 
+  size = 180,
+  textColor = '#0A0A0A',
+  trackColor = '#EBEBEB'
 }: { 
   value: number
   label: string
   size?: number 
+  textColor?: string
+  trackColor?: string
 }) {
   const r = 70
   const cx = size / 2
@@ -16,10 +20,10 @@ export function GaugeMeter({
   const offset = circumference - (value / 100) * circumference
 
   const color = value >= 80 
-    ? '#30D158' 
+    ? '#0A84FF' 
     : value >= 60 
-    ? '#FF9F0A' 
-    : '#FF453A'
+    ? '#64D2FF' 
+    : '#8E8E93'
 
   return (
     <div style={{ 
@@ -37,7 +41,7 @@ export function GaugeMeter({
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
-          stroke="#EBEBEB"
+          stroke={trackColor}
           strokeWidth="12"
           strokeLinecap="round"
         />
@@ -60,7 +64,7 @@ export function GaugeMeter({
           fontSize="32"
           fontWeight="700"
           fontFamily="Inter, sans-serif"
-          fill="#0A0A0A"
+          fill={textColor}
           letterSpacing="-0.03em"
         >
           {value}

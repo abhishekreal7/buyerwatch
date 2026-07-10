@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
+import {
   CheckCircle, FileText, Send, AlertTriangle, Activity
 } from 'lucide-react'
-import { 
+import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, CartesianGrid, Cell, LabelList
 } from 'recharts'
@@ -110,12 +110,12 @@ export default function AnalyticsPage() {
       const found = threads.length
       const draftedThreads = threads.filter(t => t.status === 'drafted' || t.status === 'needs_manual_reply')
       const draftedCount = draftedThreads.length
-      
+
       const sentAnalytics = analytics.filter(a => a.was_sent && a.sent_at)
       const totalSent = sentAnalytics.length
 
       const sentThisMonth = sentAnalytics.filter(a => isAfter(new Date(a.sent_at), thirtyDaysAgo)).length
-      const sentLastMonth = sentAnalytics.filter(a => 
+      const sentLastMonth = sentAnalytics.filter(a =>
         isAfter(new Date(a.sent_at), sixtyDaysAgo) && isBefore(new Date(a.sent_at), thirtyDaysAgo)
       ).length
 
@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
 
       // --- ACTIVITY FEED ---
       const activityEvents: any[] = []
-      
+
       // Approvals & Auto-sends
       feedback.forEach(f => {
         if (f.action_type === 'APPROVED' || f.action_type === 'EDITED_APPROVED') {
@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
       })
       setLoading(false)
     }
-    
+
     loadData()
   }, [])
 
@@ -226,8 +226,8 @@ export default function AnalyticsPage() {
 
   // Delta calculation
   const delta = data.stats.sentThisMonth - data.stats.sentLastMonth
-  const deltaPct = data.stats.sentLastMonth > 0 
-    ? Math.round((delta / data.stats.sentLastMonth) * 100) 
+  const deltaPct = data.stats.sentLastMonth > 0
+    ? Math.round((delta / data.stats.sentLastMonth) * 100)
     : (data.stats.sentThisMonth > 0 ? 100 : 0)
   const isPositive = deltaPct >= 0
 
@@ -240,64 +240,77 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          
+
           {/* ════════════════════ ROW 1 ════════════════════ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Left Card: Replies Overview */}
+
+            {/* Left Card: Lead Discovery */}
             <div className="lg:col-span-2 surface-ceramic border border-black/[0.04] p-8 flex flex-col relative overflow-hidden">
-              <div className="flex items-center gap-12 mb-10">
-                <div className="flex flex-col">
-                  <span className="text-[12px] font-semibold text-text-tertiary uppercase tracking-wider mb-1">Found</span>
-                  <span className="text-[16px] font-bold text-text-primary tabular-nums">{data.stats.found}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[12px] font-semibold text-text-tertiary uppercase tracking-wider mb-1">Drafted</span>
-                  <span className="text-[16px] font-bold text-text-primary tabular-nums">{data.stats.drafted}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[12px] font-semibold text-text-tertiary uppercase tracking-wider mb-1">Sent</span>
-                  <span className="text-[16px] font-bold text-text-primary tabular-nums">{data.stats.sent}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-text-secondary">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
+                    Discovered: <span className="font-bold text-text-primary">{data.stats.found}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
+                    Qualified: <span className="font-bold text-[#0A84FF]">{data.stats.drafted + data.stats.sent}</span>
+                  </span>
+                  <span className="text-text-tertiary hidden sm:inline">|</span>
+                  <span className="text-[12px] text-text-tertiary">
+                    Drafted: <span className="font-bold text-text-secondary">{data.stats.drafted}</span>
+                  </span>
+                  <span className="text-[12px] text-text-tertiary">
+                    Sent: <span className="font-bold text-text-secondary">{data.stats.sent}</span>
+                  </span>
                 </div>
               </div>
 
-              <div className="mb-2">
-                <div className="flex items-end gap-4">
-                  <h2 className="stat-hero">{data.stats.sentThisMonth}</h2>
-                  {deltaPct !== 0 && (
-                    <span className={`inline-flex items-center gap-1 mb-2 px-2 py-0.5 rounded-md text-[12px] font-bold ${
-                      isPositive ? 'text-[#10B981] bg-[#10B981]/10' : 'text-[#EF4444] bg-[#EF4444]/10'
-                    }`}>
-                      {isPositive ? '↑' : '↓'} {Math.abs(deltaPct)}% <span className="font-medium opacity-80 ml-0.5 font-sans">vs last month</span>
-                    </span>
-                  )}
-                </div>
-                <p className="text-[14px] font-medium text-text-secondary mt-1">Replies Sent</p>
-              </div>
-
-              <div className="flex-1 mt-6 h-[140px] -ml-2 -mb-2 relative z-10">
+              <div className="flex-1 mt-2 h-[200px] -ml-2 -mb-2 relative z-10">
+                {data.stats.found === 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 backdrop-blur-[0.5px] z-20">
+                    <p className="text-[13.5px] font-bold text-text-primary mb-1">No leads discovered yet</p>
+                    <p className="text-[12px] text-text-tertiary max-w-[280px] text-center leading-relaxed font-medium">
+                      Create a keyword rule in <Link href="/keywords" className="text-[#0A84FF] hover:underline font-bold">Keywords</Link> to start monitoring.
+                    </p>
+                  </div>
+                )}
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data.trendData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.15}/>
-                        <stop offset="95%" stopColor="#0A84FF" stopOpacity={0}/>
+                      <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0A0A0A" stopOpacity={0.03} />
+                        <stop offset="95%" stopColor="#0A0A0A" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#0A84FF" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis 
-                      dataKey="date" 
-                      axisLine={false} tickLine={false} 
+                    <XAxis
+                      dataKey="date"
+                      axisLine={false} tickLine={false}
                       tick={{ fill: 'rgba(20, 18, 16, 0.38)', fontSize: 11, fontWeight: 500 }}
                       minTickGap={30}
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
-                    <Area 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#0A84FF" 
-                      strokeWidth={2.5}
-                      fillOpacity={1} 
-                      fill="url(#colorValue)" 
+                    <Area
+                      type="monotone"
+                      dataKey="discovered"
+                      stroke="#0A0A0A"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorDiscovered)"
+                      activeDot={{ r: 5, fill: '#0A0A0A', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="qualified"
+                      stroke="#0A84FF"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorQualified)"
                       activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
                     />
                   </AreaChart>
