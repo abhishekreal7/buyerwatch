@@ -809,7 +809,7 @@ export default function LandingPage() {
                             duration: 3,
                             ease: "easeInOut"
                           }}
-                          style={{ originX: "12px", originY: "12px" }}
+                          style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
                         />
                         <circle cx="12" cy="12" r="1.5" />
                       </svg>
