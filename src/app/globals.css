@@ -564,3 +564,35 @@ p {
   stroke-dasharray: 104.64px 20.93px;
   animation: crawl-sync 4.2s linear infinite;
 }
+
+/* ─── Gauge Crawl (tuned for 270° arc r=9, path ≈ 42.4px) ── */
+@keyframes crawl-gauge {
+  from {
+    stroke-dashoffset: 42.4px;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-crawl-gauge {
+  stroke-dasharray: 36.4px 6px;
+  animation: crawl-gauge 2.8s linear infinite;
+}
+
+/* ─── Pen Crawl (tuned for pen body path ≈ 54px) ─────────── */
+@keyframes crawl-pen {
+  from {
+    stroke-dashoffset: 54px;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-crawl-pen {
+  stroke-dasharray: 46px 8px;
+  animation: crawl-pen 3s linear infinite;
+}

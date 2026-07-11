@@ -100,6 +100,12 @@ const Check = () => (
   </svg>
 )
 
+const GreenCheck = () => (
+  <svg className="w-4 h-4 flex-shrink-0 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+)
+
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload?.length) {
     return (
@@ -783,70 +789,38 @@ export default function LandingPage() {
                     marginBottom: '20px'
                   }}>
                     {id === 'radar' && (
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#FFFFFF"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect x="5" y="5" width="14" height="14" rx="2" stroke="rgba(255,255,255,0.3)" />
-                        <rect x="9" y="9" width="6" height="6" rx="1" stroke="#FFFFFF" />
-                        <path className="animate-crawl-cashflow" d="M9 1v4M12 1v4M15 1v4M9 19v4M12 19v4M15 19v4M1 9h4M1 12h4M1 15h4M19 9h4M19 12h4M19 15h4" />
-                      </svg>
+                      <Radar
+                        className="animate-crawl-cashflow"
+                        size={20}
+                        strokeWidth={1.5}
+                        color="#FFFFFF"
+                      />
                     )}
                     {id === 'gauge' && (
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#FFFFFF"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="rgba(255,255,255,0.3)" />
-                        <path d="M4 11v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" stroke="rgba(255,255,255,0.5)" />
-                        <path className="animate-crawl-expenses" d="M4 16v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
+                      <svg className="animate-crawl-gauge" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5.64 18.36A9 9 0 1 1 18.36 18.36" />
+                        <path d="M6 12a6 6 0 0 1 12 0" strokeOpacity="0.3" />
+                        <path d="M12 3v1.5M3 12h1.5M21 12h-1.5M5.64 5.64l1.06 1.06M18.36 5.64l-1.06 1.06" />
+                        <line x1="12" y1="12" x2="16" y2="7" />
+                        <circle cx="12" cy="12" r="1.5" />
                       </svg>
                     )}
                     {id === 'pen' && (
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#FFFFFF"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="6" cy="6" r="3" stroke="rgba(255,255,255,0.3)" />
-                        <circle cx="18" cy="18" r="3" stroke="rgba(255,255,255,0.3)" />
-                        <circle cx="18" cy="6" r="3" stroke="rgba(255,255,255,0.3)" />
-                        <path className="animate-crawl-invoicing" d="M6 9v6a3 3 0 003 3h6M9 6h6" />
+                      <svg className="animate-crawl-pen" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="M15 5l4 4" />
+                        <path d="M5 3v2M4 4h2" strokeOpacity="0.5" />
+                        <path d="M21 14v2M20 15h2" strokeOpacity="0.35" />
                       </svg>
                     )}
                     {id === 'layers' && (
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#FFFFFF"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect x="3" y="4" width="12" height="10" rx="1.5" stroke="rgba(255,255,255,0.3)" />
-                        <rect x="9" y="10" width="12" height="10" rx="1.5" stroke="#FFFFFF" />
-                        <path className="animate-crawl-sync" d="M12 4h3v3M12 20H9v-3" />
-                      </svg>
-                    )}
+  <Layers
+    className="animate-crawl-sync"
+    size={20}
+    strokeWidth={1.5}
+    color="#FFFFFF"
+  />
+)}
                   </div>
                   <h4 style={{
                     fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
@@ -1166,25 +1140,25 @@ export default function LandingPage() {
 
         {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
         <Section id="pricing" className="bg-white pt-[100px] pb-[100px]">
-          <div className="max-w-[920px] mx-auto px-[24px]">
+          <div className="max-w-[1200px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[36px]">
-              <SectionBadge color="#0A84FF" text="Pricing" />
+              <SectionBadge color="#FF5101" text="Pricing" />
               <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 52px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A' }}>
                 Simple, honest pricing
               </h2>
             </motion.div>
 
             {/* Toggle */}
-            <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-8">
-              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 500, color: !isYearly ? '#0A0A0A' : '#ADADAD' }}>Monthly</span>
-              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer" style={{ background: '#0A0A0A' }} aria-label="Toggle yearly billing">
+            <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-12">
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: !isYearly ? '#0A0A0A' : '#ADADAD' }}>Monthly</span>
+              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer" style={{ background: '#FF5101' }} aria-label="Toggle yearly billing">
                 <motion.div
                   className="w-[18px] h-[18px] bg-white rounded-full absolute top-[4px] shadow-sm"
                   animate={{ x: isYearly ? 26 : 4 }}
                   transition={springs.snappy}
                 />
               </button>
-              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 500, color: isYearly ? '#0A0A0A' : '#ADADAD' }}>Yearly</span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: isYearly ? '#0A0A0A' : '#ADADAD' }}>Yearly</span>
               <AnimatePresence>
                 {isYearly && (
                   <motion.span
@@ -1192,7 +1166,7 @@ export default function LandingPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.85 }}
                     transition={springs.snappy}
-                    className="bg-[#FFCCBA] text-[#0A0A0A] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
+                    className="bg-[#FFE3D8] text-[#FF5101] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
                   >
                     Save 20%
                   </motion.span>
@@ -1200,94 +1174,151 @@ export default function LandingPage() {
               </AnimatePresence>
             </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid md:grid-cols-2 gap-[12px] mb-[12px]">
-              {/* Free */}
-              <motion.div variants={fadeUp} whileHover={{ y: -6 }} transition={springs.snappy} className="myniq-card p-[36px] flex flex-col">
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 500, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '14px' }}>Free</div>
-                <div className="flex items-baseline mb-3">
-                  <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '60px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A' }}>$0</span>
-                  <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#ADADAD', marginLeft: '6px' }}>/month</span>
-                </div>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6, marginBottom: '24px' }}>Test the waters. No commitment.</p>
-                <Link href="/signup" className="w-full bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] text-center px-6 py-3.5 rounded-full transition-colors duration-150 mb-7 block">
-                  Get Started Free
-                </Link>
-                <div className="flex flex-col gap-3.5">
-                  {['2 keywords', '10 threads/month', 'Basic intent scoring', 'Manual reply drafting'].map((f) => (
-                    <div key={f} className="flex items-center gap-3"><Check /><span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#3A3A3A' }}>{f}</span></div>
-                  ))}
-                </div>
-              </motion.div>
-
-              {/* Starter */}
-              <motion.div variants={fadeUp} whileHover={{ y: -6 }} transition={springs.snappy} className="myniq-card p-[36px] flex flex-col">
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 500, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '14px' }}>Starter</div>
-                <div className="flex items-baseline mb-3">
-                  <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '60px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A' }}>${isYearly ? '15' : '19'}</span>
-                  <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#ADADAD', marginLeft: '6px' }}>/month</span>
-                </div>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6, marginBottom: '24px' }}>For founders doing serious organic outreach.</p>
-                <Link href="/signup" className="w-full bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] text-center px-6 py-3.5 rounded-full transition-colors duration-150 mb-7 block">
-                  Get Started
-                </Link>
-                <div className="flex flex-col gap-3.5">
-                  {['5 keywords', '100 threads/month', '50 AI drafts/month', 'Intent scoring', 'Daily email digest'].map((f) => (
-                    <div key={f} className="flex items-center gap-3"><Check /><span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#3A3A3A' }}>{f}</span></div>
-                  ))}
-                </div>
-              </motion.div>
-
-              {/* ━━━━ section separator ━━━━ */}
-              <motion.div variants={fadeUp}
-                className="rounded-[20px] border border-black/[0.07] p-[36px] flex flex-col relative overflow-hidden"
-                style={{ boxShadow: 'var(--shadow-card)', background: 'linear-gradient(130deg, rgba(255,175,115,0.10) 0%, rgba(255,200,160,0.06) 25%, #ffffff 55%)' }}
+            <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-8">
+              {/* Free Card */}
+              <motion.div 
+                variants={fadeUp} 
+                whileHover={{ y: -6 }} 
+                transition={springs.snappy} 
+                className="bg-white rounded-[32px] border border-black/[0.06] p-9 flex flex-col justify-between"
+                style={{ boxShadow: '0 20px 40px -15px rgba(0,0,0,0.02)' }}
               >
-                <div className="absolute top-0 right-0 w-[160px] h-[160px] rounded-full pointer-events-none"
-                  style={{ background: 'radial-gradient(circle, rgba(255,145,70,0.14) 0%, transparent 70%)', filter: 'blur(16px)', transform: 'translate(30%, -30%)' }} />
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '18px', letterSpacing: '-0.02em', background: 'linear-gradient(90deg, #0A84FF, #00C7BE)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '14px' }}>Pro</div>
-                <div className="flex items-baseline mb-3">
-                  <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '60px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A' }}>${isYearly ? '39' : '49'}</span>
-                  <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#ADADAD', marginLeft: '6px' }}>/month</span>
-                </div>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6, marginBottom: '24px' }}>For founders who want to dominate organic Reddit growth.</p>
-                <Link href="/signup" className="w-full bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] text-center px-6 py-3.5 rounded-full transition-colors duration-150 mb-7 block">
-                  Get Started Now
-                </Link>
-                <div className="flex flex-col gap-3.5">
-                  {['20 keywords', 'Unlimited threads', 'Unlimited AI drafts', 'Advanced intent scoring', 'Subreddit targeting', 'Reply analytics', 'Weekly report'].map((f) => (
-                    <div key={f} className="flex items-center gap-3"><Check /><span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#3A3A3A' }}>{f}</span></div>
-                  ))}
+                <div>
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '16px' }}>
+                    Free
+                  </h3>
+                  <div className="flex items-baseline mb-3">
+                    <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '54px', letterSpacing: '-0.04em', lineHeight: 1.1, color: '#0A0A0A' }}>
+                      $0
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#808080', marginLeft: '6px' }}>
+                      /per month
+                    </span>
+                  </div>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.6, marginBottom: '32px', minHeight: '48px' }}>
+                    Great for trying out Scouto features and signals.
+                  </p>
+                  
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-bold text-center py-3.5 rounded-full transition-colors duration-150 mb-8 block shadow-[0_4px_14px_rgba(255,81,1,0.15)]">
+                    Get Started
+                  </Link>
+
+                  <div className="w-full border-t border-dashed border-black/[0.08] my-8" />
+
+                  <div className="flex flex-col gap-4">
+                    {[
+                      '3 Automation Workflows',
+                      '1,000 Tasks / month',
+                      'Basic Integrations',
+                      'AI Workflow Builder (Lite)',
+                      'Community Support'
+                    ].map((f) => (
+                      <div key={f} className="flex items-center gap-3.5 text-left">
+                        <GreenCheck />
+                        <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#374151' }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
 
-              {/* Agency */}
-              <motion.div variants={fadeUp} className="myniq-card p-[36px] flex flex-col">
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 500, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '14px' }}>Agency</div>
-                <div className="flex items-baseline mb-3">
-                  <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '60px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A' }}>${isYearly ? '119' : '149'}</span>
-                  <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#ADADAD', marginLeft: '6px' }}>/month</span>
-                </div>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6, marginBottom: '24px' }}>For agencies managing multiple client brands.</p>
-                <Link href="/signup" className="w-full bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] text-center px-6 py-3.5 rounded-full transition-colors duration-150 mb-7 block">
-                  Contact Sales
-                </Link>
-                <div className="flex flex-col gap-3.5">
-                  {['Unlimited keywords', 'Unlimited threads', 'Unlimited AI drafts', '5 client workspaces', 'White-label reports', 'Priority support'].map((f) => (
-                    <div key={f} className="flex items-center gap-3"><Check /><span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#3A3A3A' }}>{f}</span></div>
-                  ))}
+              {/* Professional Card */}
+              <motion.div 
+                variants={fadeUp} 
+                whileHover={{ y: -6 }} 
+                transition={springs.snappy} 
+                className="bg-white rounded-[32px] border border-black/[0.06] p-9 flex flex-col justify-between"
+                style={{ boxShadow: '0 20px 40px -15px rgba(0,0,0,0.02)' }}
+              >
+                <div>
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '16px' }}>
+                    Professional
+                  </h3>
+                  <div className="flex items-baseline mb-3">
+                    <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '54px', letterSpacing: '-0.04em', lineHeight: 1.1, color: '#0A0A0A' }}>
+                      ${isYearly ? '79' : '97'}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#808080', marginLeft: '6px' }}>
+                      /per month
+                    </span>
+                  </div>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.6, marginBottom: '32px', minHeight: '48px' }}>
+                    Best for solo founders, freelancers & growing teams.
+                  </p>
+                  
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-bold text-center py-3.5 rounded-full transition-colors duration-150 mb-8 block shadow-[0_4px_14px_rgba(255,81,1,0.15)]">
+                    Get Started
+                  </Link>
+
+                  <div className="w-full border-t border-dashed border-black/[0.08] my-8" />
+
+                  <div className="flex flex-col gap-4">
+                    {[
+                      'Everything in Free',
+                      '20 Automation Workflows',
+                      '15,000 Tasks / month',
+                      'API Access',
+                      'Advanced Integrations (CRM, Notion, Slack, etc.)'
+                    ].map((f) => (
+                      <div key={f} className="flex items-center gap-3.5 text-left">
+                        <GreenCheck />
+                        <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#374151' }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
-            </motion.div>
 
-            {/* Enterprise */}
-            <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col md:flex-row items-center justify-between gap-5">
-              <div>
-                <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.025em', color: '#0A0A0A', marginBottom: '3px' }}>Need enterprise scale?</h3>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B' }}>Custom limits, SLAs, and white-glove onboarding.</p>
-              </div>
-              <Link href="mailto:sales@scouto.com" className="flex items-center gap-2 bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] px-7 py-3.5 rounded-full transition-colors duration-150 whitespace-nowrap">
-                Talk to us <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
-              </Link>
+              {/* Enterprise Card */}
+              <motion.div 
+                variants={fadeUp} 
+                whileHover={{ y: -6 }} 
+                transition={springs.snappy} 
+                className="rounded-[32px] p-9 flex flex-col justify-between"
+                style={{ 
+                  backgroundColor: '#FFF0EA',
+                  border: '1px solid rgba(255, 81, 1, 0.1)',
+                  boxShadow: '0 20px 40px -15px rgba(255, 81, 1, 0.05)'
+                }}
+              >
+                <div>
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#FF5101', marginBottom: '16px' }}>
+                    Enterprise
+                  </h3>
+                  <div className="flex items-baseline mb-3">
+                    <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '54px', letterSpacing: '-0.04em', lineHeight: 1.1, color: '#0A0A0A' }}>
+                      ${isYearly ? '209' : '257'}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#808080', marginLeft: '6px' }}>
+                      /per month
+                    </span>
+                  </div>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.6, marginBottom: '32px', minHeight: '48px' }}>
+                    Ideal for scaling companies that need deep automation & custom setups.
+                  </p>
+                  
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-bold text-center py-3.5 rounded-full transition-colors duration-150 mb-8 block shadow-[0_4px_14px_rgba(255,81,1,0.15)]">
+                    Get Started
+                  </Link>
+
+                  <div className="w-full border-t border-dashed border-[#FF5101]/20 my-8" />
+
+                  <div className="flex flex-col gap-4">
+                    {[
+                      'Unlimited Workflows',
+                      '50,000+ Tasks / month',
+                      'Custom Integrations',
+                      'Dedicated Success Manager',
+                      'SLA-backed Support'
+                    ].map((f) => (
+                      <div key={f} className="flex items-center gap-3.5 text-left">
+                        <GreenCheck />
+                        <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#374151' }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           </div>
         </Section>
