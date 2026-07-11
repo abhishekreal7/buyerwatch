@@ -801,12 +801,12 @@ export default function LandingPage() {
                         <motion.line
                           x1="12"
                           y1="12"
-                          x2="16"
-                          y2="7"
-                          animate={{ rotate: [-50, 50, -50] }}
+                          x2="12"
+                          y2="5.5"
+                          animate={{ rotate: [-100, 100, -100] }}
                           transition={{
                             repeat: Infinity,
-                            duration: 3,
+                            duration: 3.5,
                             ease: "easeInOut"
                           }}
                           style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
