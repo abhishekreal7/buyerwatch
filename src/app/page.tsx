@@ -787,6 +787,7 @@ export default function LandingPage() {
                   <div className="mb-5 text-[#FF5101]">
                     {id === 'radar' && (
                       <Radar
+                        className="animate-crawl-cashflow"
                         size={44}
                         strokeWidth={1.5}
                         color="currentColor"
@@ -797,12 +798,12 @@ export default function LandingPage() {
                         <path d="M5.64 18.36A9 9 0 1 1 18.36 18.36" />
                         <path d="M6 12a6 6 0 0 1 12 0" strokeOpacity="0.3" />
                         <path d="M12 3v1.5M3 12h1.5M21 12h-1.5M5.64 5.64l1.06 1.06M18.36 5.64l-1.06 1.06" />
-                        <line x1="12" y1="12" x2="16" y2="7" />
+                        <line x1="12" y1="12" x2="16" y2="7" className="animate-gauge-needle" />
                         <circle cx="12" cy="12" r="1.5" />
                       </svg>
                     )}
                     {id === 'pen' && (
-                      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="animate-crawl-pen" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                         <path d="M15 5l4 4" />
                         <path d="M5 3v2M4 4h2" strokeOpacity="0.5" />
@@ -811,6 +812,7 @@ export default function LandingPage() {
                     )}
                     {id === 'layers' && (
                       <Layers
+                        className="animate-crawl-sync"
                         size={44}
                         strokeWidth={1.5}
                         color="currentColor"
@@ -1171,10 +1173,10 @@ export default function LandingPage() {
 
             <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-8">
               {/* Free Card */}
-              <motion.div 
-                variants={fadeUp} 
-                whileHover={{ y: -6 }} 
-                transition={springs.snappy} 
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6 }}
+                transition={springs.snappy}
                 className="bg-white rounded-[32px] border border-black/[0.06] p-8 flex flex-col justify-between min-h-[580px]"
                 style={{ boxShadow: '0 20px 40px -15px rgba(0,0,0,0.02)' }}
               >
@@ -1218,10 +1220,10 @@ export default function LandingPage() {
               </motion.div>
 
               {/* Professional Card */}
-              <motion.div 
-                variants={fadeUp} 
-                whileHover={{ y: -6 }} 
-                transition={springs.snappy} 
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6 }}
+                transition={springs.snappy}
                 className="bg-white rounded-[32px] border border-black/[0.06] p-8 flex flex-col justify-between min-h-[580px]"
                 style={{ boxShadow: '0 20px 40px -15px rgba(0,0,0,0.02)' }}
               >
@@ -1265,12 +1267,12 @@ export default function LandingPage() {
               </motion.div>
 
               {/* Enterprise Card */}
-              <motion.div 
-                variants={fadeUp} 
-                whileHover={{ y: -6 }} 
-                transition={springs.snappy} 
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6 }}
+                transition={springs.snappy}
                 className="rounded-[32px] p-8 flex flex-col justify-between min-h-[580px]"
-                style={{ 
+                style={{
                   backgroundColor: '#FFF0EA',
                   border: '1px solid rgba(255, 81, 1, 0.1)',
                   boxShadow: '0 20px 40px -15px rgba(255, 81, 1, 0.05)'

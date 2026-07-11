@@ -596,3 +596,18 @@ p {
   stroke-dasharray: 46px 8px;
   animation: crawl-pen 3s linear infinite;
 }
+
+/* ─── Gauge Needle Sweep Animation ───────────────────────── */
+@keyframes sweep-needle {
+  0%, 100% {
+    transform: rotate(-50deg);
+  }
+  50% {
+    transform: rotate(50deg);
+  }
+}
+
+.animate-gauge-needle {
+  transform-origin: 12px 12px;
+  animation: sweep-needle 3s ease-in-out infinite;
+}
