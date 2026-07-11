@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { draftReply } from '@/lib/draft-reply'
 import { NormalizedPost } from '@/lib/types'
+import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 
 export async function POST(req: Request) {
   try {
@@ -39,7 +40,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    // 2. Map thread to NormalizedPost format for drafting
+    // 2. Enforce monthly AI draft limit
+    const plan = normalizePlan(profile.plan)
+    const limits = getPlanLimits(plan)
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    const { count: draftsThisMonth, error: countError } = await supabase
+      .from('reply_analytics')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', monthStart.toISOString())
+      .not('draft_text', 'is', null)
+
+    if (countError) {
+      return NextResponse.json({ error: 'Failed to check draft usage' }, { status: 500 })
+    }
+
+    if ((draftsThisMonth ?? 0) >= limits.aiDraftsPerMonth) {
+      return NextResponse.json(
+        { error: 'plan_limit_reached', limit: 'ai_drafts' },
+        { status: 403 }
+      )
+    }
+
+    // 3. Map thread to NormalizedPost format for drafting
     const post: NormalizedPost = {
       externalId: thread.external_id,
       platform: thread.platform,
@@ -50,10 +76,10 @@ export async function POST(req: Request) {
       sourceTarget: thread.keyword_text || thread.subreddit || '',
     }
 
-    // 3. Draft reply
+    // 4. Draft reply
     const draftResult = await draftReply(post, profile, thread.intent_score || 0)
     
-    // 4. Update thread status and save draft
+    // 5. Update thread status and save draft
     await supabase
       .from('monitored_threads')
       .update({ status: 'drafted' })

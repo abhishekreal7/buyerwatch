@@ -11,6 +11,7 @@ import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
 import { AppPage } from '@/components/AppPage'
 import { toast } from 'sonner'
+import { PLAN_LIMITS, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 
 /* ─── Nav sections ────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -135,8 +136,13 @@ export default function SettingsPage() {
     weeklyReport: false,
   })
   
-  const [planState, setPlanState] = useState<{ plan: string, threadsMax: number, draftsMax: number, repliesMax: number }>({ plan: 'free', threadsMax: 50, draftsMax: 50, repliesMax: 20 })
-  const [usageStats, setUsageStats] = useState({ threads: 0, drafts: 0, replies: 0 })
+  const [planState, setPlanState] = useState<{ plan: string, keywordsMax: number, threadsMax: number, draftsMax: number }>({
+    plan: 'free',
+    keywordsMax: PLAN_LIMITS.free.keywords,
+    threadsMax: PLAN_LIMITS.free.threadsPerMonth,
+    draftsMax: PLAN_LIMITS.free.aiDraftsPerMonth,
+  })
+  const [usageStats, setUsageStats] = useState({ threads: 0, drafts: 0, replies: 0, keywords: 0 })
 
   const supabase = createClient()
 
@@ -172,26 +178,30 @@ export default function SettingsPage() {
       const [
         { count: threadsCount },
         { count: draftsCount },
-        { count: sentCount }
+        { count: sentCount },
+        { count: keywordsCount }
       ] = await Promise.all([
         supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay),
         supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay).not('draft_text', 'is', null),
-        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay).eq('was_sent', true)
+        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay).eq('was_sent', true),
+        supabase.from('keywords').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
       ])
       
       setUsageStats({
         threads: threadsCount || 0,
         drafts: draftsCount || 0,
-        replies: sentCount || 0
+        replies: sentCount || 0,
+        keywords: keywordsCount || 0,
       })
       
       if (p) {
-        const plan = p.plan || 'free'
+        const plan = normalizePlan(p.plan)
+        const limits = getPlanLimits(plan)
         setPlanState({
           plan,
-          threadsMax: plan === 'business' ? 5000 : plan === 'pro' ? 500 : 50,
-          draftsMax: plan === 'business' ? 5000 : plan === 'pro' ? 500 : 50,
-          repliesMax: plan === 'business' ? 500 : plan === 'pro' ? 100 : 20,
+          keywordsMax: limits.keywords,
+          threadsMax: limits.threadsPerMonth,
+          draftsMax: limits.aiDraftsPerMonth,
         })
       }
     }

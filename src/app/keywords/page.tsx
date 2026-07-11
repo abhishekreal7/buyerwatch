@@ -184,20 +184,33 @@ export default function KeywordsPage() {
   const handleAdd = async () => {
     if (!newTerm.trim() || !newTarget.trim()) { toast.error('Fill in keyword and target'); return }
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
 
-    // Auto-strip "r/" prefix if user accidentally included it
-    let cleanTarget = newTarget.trim()
-    if (newPlatform === 'reddit' && cleanTarget.toLowerCase().startsWith('r/')) {
-      cleanTarget = cleanTarget.substring(2)
-    }
+    try {
+      const res = await fetch('/api/keywords/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          term: newTerm.trim(),
+          platform: newPlatform,
+          target: newTarget.trim(),
+        }),
+      })
 
-    const { data, error } = await supabase.from('keywords').insert({
-      user_id: user.id, term: newTerm.trim(), platform: newPlatform, target: cleanTarget, is_active: true,
-    }).select().single()
-    if (error) toast.error('Failed to save keyword')
-    else {
+      const payload = await res.json().catch(() => ({}))
+
+      if (res.status === 403 && payload.error === 'plan_limit_reached') {
+        toast.error('Keyword limit reached for your plan. Upgrade to add more.')
+        setSaving(false)
+        return
+      }
+
+      if (!res.ok) {
+        toast.error(payload.error || 'Failed to save keyword')
+        setSaving(false)
+        return
+      }
+
+      const data = payload.keyword
       setKeywords(prev => [data, ...prev])
       setNewTerm(''); setNewTarget(''); setShowAdd(false)
 
@@ -215,6 +228,8 @@ export default function KeywordsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keywordId: data.id })
       }).catch(err => console.error('fetch-now error:', err))
+    } catch {
+      toast.error('Failed to save keyword')
     }
     setSaving(false)
   }

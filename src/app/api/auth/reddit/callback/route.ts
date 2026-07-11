@@ -1,18 +1,42 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { timingSafeEqual } from 'crypto'
 import { encrypt } from '@/lib/encryption'
+
+const OAUTH_STATE_COOKIE = 'reddit_oauth_state'
+
+function safeEqual(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a)
+    const bufB = Buffer.from(b)
+    if (bufA.length !== bufB.length) return false
+    return timingSafeEqual(bufA, bufB)
+  } catch {
+    return false
+  }
+}
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
+  const state = url.searchParams.get('state')
 
   if (error || !code) {
     return NextResponse.redirect(new URL('/settings?error=reddit_auth_failed', req.url))
   }
 
   const cookieStore = await cookies()
+  const expectedState = cookieStore.get(OAUTH_STATE_COOKIE)?.value
+
+  // One-time use: clear immediately so the state cannot be replayed
+  cookieStore.delete(OAUTH_STATE_COOKIE)
+
+  if (!state || !expectedState || !safeEqual(state, expectedState)) {
+    return NextResponse.redirect(new URL('/settings?error=reddit_state_mismatch', req.url))
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
