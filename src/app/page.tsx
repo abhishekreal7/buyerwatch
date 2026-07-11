@@ -798,7 +798,19 @@ export default function LandingPage() {
                         <path d="M5.64 18.36A9 9 0 1 1 18.36 18.36" />
                         <path d="M6 12a6 6 0 0 1 12 0" strokeOpacity="0.3" />
                         <path d="M12 3v1.5M3 12h1.5M21 12h-1.5M5.64 5.64l1.06 1.06M18.36 5.64l-1.06 1.06" />
-                        <line x1="12" y1="12" x2="16" y2="7" className="animate-gauge-needle" />
+                        <motion.line
+                          x1="12"
+                          y1="12"
+                          x2="16"
+                          y2="7"
+                          animate={{ rotate: [-50, 50, -50] }}
+                          transition={{
+                            repeat: Infinity,
+                            duration: 3,
+                            ease: "easeInOut"
+                          }}
+                          style={{ originX: "12px", originY: "12px" }}
+                        />
                         <circle cx="12" cy="12" r="1.5" />
                       </svg>
                     )}
