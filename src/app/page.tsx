@@ -466,13 +466,13 @@ const LeadDiscoveryWidget = () => {
             <defs>
               {/* Primary: #FF6B35 orange, 15% → 0% */}
               <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#FF6B35" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#FF6B35" stopOpacity={0.0}  />
+                <stop offset="5%" stopColor="#FF6B35" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#FF6B35" stopOpacity={0.0} />
               </linearGradient>
               {/* Secondary: #0A84FF blue, 10% → 0% */}
               <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#0A84FF" stopOpacity={0.10} />
-                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0}  />
+                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.10} />
+                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0} />
               </linearGradient>
             </defs>
 
