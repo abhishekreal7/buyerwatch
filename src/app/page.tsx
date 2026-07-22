@@ -1239,7 +1239,7 @@ export default function LandingPage() {
         </Section>
 
         {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
-        <Section id="pricing" className="bg-[#F2F2F5] pt-[100px] pb-[100px]">
+        <Section id="pricing" className="bg-[#EDEDF2] pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[36px]">
               <SectionBadge color="#FF5101" text="Pricing" />
@@ -1274,37 +1274,37 @@ export default function LandingPage() {
               </AnimatePresence>
             </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-7 items-stretch">
+            <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-6 items-stretch">
               {/* Free Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -6 }}
+                whileHover={{ y: -4 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[32px] border border-black/[0.05] p-9 flex flex-col justify-between shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-300"
+                className="bg-white rounded-[22px] border border-black/[0.04] p-8 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-300"
               >
                 <div>
-                  <h3 className="font-sans font-medium text-[22px] tracking-tight text-[#111111] mb-4">
+                  <h3 className="font-sans font-medium text-[20px] tracking-tight text-[#111111] mb-4">
                     Free
                   </h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="font-sans font-extrabold text-[48px] tracking-[-0.03em] leading-none text-[#111111]">
+                    <span className="font-sans font-extrabold text-[46px] tracking-[-0.03em] leading-none text-[#111111]">
                       $0
                     </span>
-                    <span className="font-sans text-[15px] text-[#8E8E93] ml-2 font-normal">
+                    <span className="font-sans text-[14px] text-[#999999] ml-2 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[15px] text-[#666666] font-normal mb-8 leading-[1.55] min-h-[46px]">
-                    Great for trying out Scouto features and signals.
+                  <p className="font-sans text-[14px] text-[#555555] font-normal mb-7 leading-[1.55] min-h-[42px]">
+                    Great for trying out Frames X component and templates.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.25)] block mb-7">
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-[18px] transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.22)] block mb-7">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dashed border-[#D4D4D8] mb-7" />
+                  <div className="w-full border-t border-dotted border-[#CCCCCC] mb-7" />
 
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3.5">
                     {[
                       '3 Automation Workflows',
                       '1,000 Tasks / month',
@@ -1312,9 +1312,11 @@ export default function LandingPage() {
                       'AI Workflow Builder (Lite)',
                       'Community Support'
                     ].map((f) => (
-                      <div key={f} className="flex items-center gap-3 text-left">
-                        <CheckIcon className="w-[18px] h-[18px] text-[#00A859] shrink-0" strokeWidth={2.5} />
-                        <span className="font-sans text-[14.5px] text-[#333333] font-normal leading-snug">{f}</span>
+                      <div key={f} className="flex items-start gap-2.5 text-left">
+                        <svg className="w-[17px] h-[17px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="font-sans text-[14px] text-[#444444] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
@@ -1324,33 +1326,33 @@ export default function LandingPage() {
               {/* Professional Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -6 }}
+                whileHover={{ y: -4 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[32px] border border-black/[0.05] p-9 flex flex-col justify-between shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-300"
+                className="bg-white rounded-[22px] border border-black/[0.04] p-8 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-300"
               >
                 <div>
-                  <h3 className="font-sans font-medium text-[22px] tracking-tight text-[#111111] mb-4">
+                  <h3 className="font-sans font-medium text-[20px] tracking-tight text-[#111111] mb-4">
                     Professional
                   </h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="font-sans font-extrabold text-[48px] tracking-[-0.03em] leading-none text-[#111111]">
+                    <span className="font-sans font-extrabold text-[46px] tracking-[-0.03em] leading-none text-[#111111]">
                       ${isYearly ? '79' : '97'}
                     </span>
-                    <span className="font-sans text-[15px] text-[#8E8E93] ml-2 font-normal">
+                    <span className="font-sans text-[14px] text-[#999999] ml-2 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[15px] text-[#666666] font-normal mb-8 leading-[1.55] min-h-[46px]">
+                  <p className="font-sans text-[14px] text-[#555555] font-normal mb-7 leading-[1.55] min-h-[42px]">
                     Best for solo founders, freelancers & growing teams.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.25)] block mb-7">
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-[18px] transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.22)] block mb-7">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dashed border-[#D4D4D8] mb-7" />
+                  <div className="w-full border-t border-dotted border-[#CCCCCC] mb-7" />
 
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3.5">
                     {[
                       'Everything in Free',
                       '20 Automation Workflows',
@@ -1358,9 +1360,11 @@ export default function LandingPage() {
                       'API Access',
                       'Advanced Integrations (CRM, Notion, Slack, etc.)'
                     ].map((f) => (
-                      <div key={f} className="flex items-center gap-3 text-left">
-                        <CheckIcon className="w-[18px] h-[18px] text-[#00A859] shrink-0" strokeWidth={2.5} />
-                        <span className="font-sans text-[14.5px] text-[#333333] font-normal leading-snug">{f}</span>
+                      <div key={f} className="flex items-start gap-2.5 text-left">
+                        <svg className="w-[17px] h-[17px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="font-sans text-[14px] text-[#444444] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
@@ -1370,33 +1374,33 @@ export default function LandingPage() {
               {/* Enterprise Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -6 }}
+                whileHover={{ y: -4 }}
                 transition={springs.snappy}
-                className="bg-[#FFEFE9] rounded-[32px] border border-[#FF5101]/15 p-9 flex flex-col justify-between shadow-[0_10px_30px_rgba(255,81,1,0.04)] hover:shadow-[0_20px_40px_rgba(255,81,1,0.08)] transition-all duration-300"
+                className="bg-[#FFEBE5] rounded-[22px] border border-[#FF6B4A]/10 p-8 flex flex-col justify-between shadow-[0_4px_20px_rgba(255,107,74,0.03)] hover:shadow-[0_12px_32px_rgba(255,107,74,0.06)] transition-all duration-300"
               >
                 <div>
-                  <h3 className="font-sans font-medium text-[22px] tracking-tight text-[#FF5101] mb-4">
+                  <h3 className="font-sans font-medium text-[20px] tracking-tight text-[#FF6B4A] mb-4">
                     Enterprise
                   </h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="font-sans font-extrabold text-[48px] tracking-[-0.03em] leading-none text-[#111111]">
+                    <span className="font-sans font-extrabold text-[46px] tracking-[-0.03em] leading-none text-[#111111]">
                       ${isYearly ? '209' : '257'}
                     </span>
-                    <span className="font-sans text-[15px] text-[#8E8E93] ml-2 font-normal">
+                    <span className="font-sans text-[14px] text-[#999999] ml-2 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[15px] text-[#666666] font-normal mb-8 leading-[1.55] min-h-[46px]">
+                  <p className="font-sans text-[14px] text-[#555555] font-normal mb-7 leading-[1.55] min-h-[42px]">
                     Ideal for scaling companies that need deep automation & custom setups.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.25)] block mb-7">
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-[18px] transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.22)] block mb-7">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dashed border-[#FF5101]/20 mb-7" />
+                  <div className="w-full border-t border-dotted border-[#FF6B4A]/25 mb-7" />
 
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3.5">
                     {[
                       'Unlimited Workflows',
                       '50,000+ Tasks / month',
@@ -1404,9 +1408,11 @@ export default function LandingPage() {
                       'Dedicated Success Manager',
                       'SLA-backed Support'
                     ].map((f) => (
-                      <div key={f} className="flex items-center gap-3 text-left">
-                        <CheckIcon className="w-[18px] h-[18px] text-[#00A859] shrink-0" strokeWidth={2.5} />
-                        <span className="font-sans text-[14.5px] text-[#333333] font-normal leading-snug">{f}</span>
+                      <div key={f} className="flex items-start gap-2.5 text-left">
+                        <svg className="w-[17px] h-[17px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="font-sans text-[14px] text-[#444444] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
