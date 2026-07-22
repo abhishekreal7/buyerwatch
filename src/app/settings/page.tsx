@@ -270,10 +270,14 @@ export default function SettingsPage() {
     setTimeout(() => setSaveSuccess(false), 2500)
   }
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (plan: 'pro' | 'growth' = 'pro') => {
     setUpgrading(true)
     try {
-      const res = await fetch('/api/billing/checkout', { method: 'POST' })
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
       const data = await res.json()
       if (res.ok && data.url) {
         window.location.href = data.url
@@ -708,7 +712,7 @@ export default function SettingsPage() {
                             </div>
                             <button
                               className="shrink-0 text-[13px] font-semibold bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                              onClick={handleUpgrade}
+                              onClick={() => handleUpgrade('pro')}
                               disabled={upgrading}
                             >
                               {upgrading ? 'Redirecting...' : 'Upgrade'}
@@ -755,7 +759,7 @@ export default function SettingsPage() {
                                 Professional members get 400 drafts/month — enough that this number becomes invisible.
                               </p>
                               <button
-                                onClick={handleUpgrade}
+                                onClick={() => handleUpgrade('pro')}
                                 disabled={upgrading}
                                 className="mt-2 text-[12.5px] font-semibold text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
                               >

@@ -1,27 +1,36 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
+import DodoPayments from 'dodopayments'
 
 /**
  * POST /api/billing/webhook
  *
- * Receives LemonSqueezy subscription lifecycle events and updates the user's
+ * Receives Dodo Payments subscription lifecycle events and updates the user's
  * plan + keyword rule state accordingly.
  *
- * Events handled:
- *   subscription_created   → activate plan (pro | growth)
- *   subscription_updated   → handle plan change / renewal
- *   subscription_cancelled → downgrade to free, pause excess keyword rules
- *   subscription_expired   → same as cancelled
+ * SECURITY — fail-closed design:
+ *   - If DODO_PAYMENTS_WEBHOOK_SECRET is missing → reject (never accept unverified)
+ *   - Verification uses client.webhooks.unwrap() from the Dodo SDK, which internally
+ *     validates the webhook-id, webhook-signature, and webhook-timestamp headers
+ *     using the Standard Webhooks specification (not plain HMAC — do not replace
+ *     with a manual crypto implementation)
+ *   - All errors from unwrap() are caught and return 401
  *
- * Downgrade contract (enforced here, displayed in keywords/page.tsx):
- *   - Do NOT delete any keyword rules, thread history, or draft history
- *   - Keep the most-recently-active keyword active (by updated_at, then created_at)
- *   - Set all other rules is_active = false
+ * Events handled:
+ *   subscription.active    → activate pro | growth plan
+ *   subscription.updated   → re-sync plan on renewal / change
+ *   subscription.cancelled → downgrade to free, pause excess keyword rules
+ *   subscription.on_hold   → payment failed; keep plan active but flag (no punitive action)
+ *   payment.failed         → log only; plan stays intact until subscription.on_hold or
+ *                            subscription.cancelled fires — Dodo retries before cancelling
+ *
+ * Downgrade contract (unchanged from previous version):
+ *   - Do NOT delete keyword rules, thread history, or draft history
+ *   - Keep the most-recently-updated keyword active, pause all others
  *   - User sees a persistent banner to upgrade and reactivate
  *
- * TODO: set LEMON_SQUEEZY_WEBHOOK_SECRET in .env.local after configuring the
- * webhook endpoint in LemonSqueezy dashboard → Settings → Webhooks.
+ * TODO: register this URL in the Dodo Payments dashboard → Webhooks → Add endpoint.
+ *       Set DODO_PAYMENTS_WEBHOOK_SECRET from the Dodo dashboard after creation.
  */
 
 function getSupabase() {
@@ -31,29 +40,9 @@ function getSupabase() {
   )
 }
 
-function verifySignature(body: string, signature: string | null): boolean {
-  const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-  if (!secret) {
-    // FAIL CLOSED: no secret configured → reject all requests.
-    // Never silently accept unverified webhooks — an unsecured endpoint can be
-    // used to fake plan upgrades. Set LEMON_SQUEEZY_WEBHOOK_SECRET before going live.
-    console.error('[billing/webhook] LEMON_SQUEEZY_WEBHOOK_SECRET is not set — rejecting all requests')
-    return false
-  }
-  if (!signature) return false
-  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex')
-  try {
-    // timingSafeEqual throws if buffers have different byte lengths.
-    // An attacker could send a malformed x-signature header to trigger this.
-    return crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))
-  } catch {
-    return false
-  }
-}
-
 /**
  * Enforce keyword rules after a downgrade to free.
- * Keeps the most-recently-active keyword active, pauses all others.
+ * Keeps the most-recently-updated keyword active, pauses all others.
  * Never deletes data.
  */
 async function enforceDowngradeKeywordLimit(userId: string, supabase: ReturnType<typeof getSupabase>) {
@@ -65,7 +54,6 @@ async function enforceDowngradeKeywordLimit(userId: string, supabase: ReturnType
 
   if (error || !keywords || keywords.length <= 1) return
 
-  // Most recently updated keyword stays active (already first due to order)
   const [keepActive, ...toDeactivate] = keywords
 
   if (toDeactivate.length === 0) return
@@ -76,7 +64,6 @@ async function enforceDowngradeKeywordLimit(userId: string, supabase: ReturnType
     .in('id', toDeactivate.map((k) => k.id))
     .eq('user_id', userId)
 
-  // Ensure the keepActive rule is actually active (it might have been paused)
   await supabase
     .from('keywords')
     .update({ is_active: true })
@@ -87,62 +74,83 @@ async function enforceDowngradeKeywordLimit(userId: string, supabase: ReturnType
 }
 
 export async function POST(req: Request) {
-  const body = await req.text()
-  const signature = req.headers.get('x-signature')
-
-  if (!verifySignature(body, signature)) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  // ── 1. Fail-closed: reject immediately if secret is not configured ──────
+  const webhookSecret = process.env.DODO_PAYMENTS_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    console.error('[billing/webhook] DODO_PAYMENTS_WEBHOOK_SECRET is not set — rejecting all requests')
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 401 })
   }
 
-  let event: { meta: { event_name: string; custom_data?: { user_id?: string } }; data: { attributes: Record<string, unknown> } }
+  const apiKey = process.env.DODO_PAYMENTS_API_KEY
+  if (!apiKey) {
+    console.error('[billing/webhook] DODO_PAYMENTS_API_KEY is not set — cannot initialise client')
+    return NextResponse.json({ error: 'API key not configured' }, { status: 401 })
+  }
+
+  // ── 2. Read the raw body (required for signature verification) ──────────
+  const rawBody = await req.text()
+
+  // ── 3. Verify signature via the Dodo SDK (Standard Webhooks spec) ───────
+  //    The SDK validates webhook-id + webhook-signature + webhook-timestamp.
+  //    This is NOT plain HMAC — do not replace with a manual crypto.createHmac call.
+  //    unwrap() throws on any verification failure; we catch and return 401.
+  const client = new DodoPayments({
+    bearerToken: apiKey,
+    webhookKey: webhookSecret,
+    environment: process.env.NODE_ENV === 'production' ? 'live_mode' : 'test_mode',
+  })
+
+  let event: any
   try {
-    event = JSON.parse(body)
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    event = client.webhooks.unwrap(rawBody, {
+      headers: {
+        'webhook-id':        req.headers.get('webhook-id')        ?? '',
+        'webhook-signature': req.headers.get('webhook-signature') ?? '',
+        'webhook-timestamp': req.headers.get('webhook-timestamp') ?? '',
+      },
+    })
+  } catch (err: any) {
+    // Covers: invalid signature, missing headers, expired timestamp, malformed payload
+    console.warn('[billing/webhook] Signature verification failed:', err?.message ?? err)
+    return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 })
   }
 
-  const eventName = event.meta?.event_name
-  const userId = event.meta?.custom_data?.user_id
+  // ── 4. Extract user identity from metadata ──────────────────────────────
+  const eventType: string = event?.type ?? ''
+  const metadata = event?.data?.metadata ?? {}
+  const userId: string | undefined = metadata.user_id
+  const requestedPlan: string | undefined = metadata.plan  // 'pro' | 'growth'
 
   if (!userId) {
-    console.warn(`[billing/webhook] No user_id in custom_data for event ${eventName}`)
+    console.warn(`[billing/webhook] No metadata.user_id for event "${eventType}" — cannot update plan`)
+    // Return 200 so Dodo doesn't retry; this is a configuration issue, not a transient error
     return NextResponse.json({ received: true })
   }
 
   const supabase = getSupabase()
-  const attrs = event.data?.attributes || {}
 
-  switch (eventName) {
-    case 'subscription_created':
-    case 'subscription_updated': {
-      // Map LemonSqueezy product/variant to Scouto plan tier
-      // TODO: replace variant IDs below with real values from LemonSqueezy dashboard
-      const variantId = attrs.variant_id as number | undefined
-      const PRO_VARIANT_ID = Number(process.env.LEMON_SQUEEZY_PRO_VARIANT_ID ?? 0)
-      const GROWTH_VARIANT_ID = Number(process.env.LEMON_SQUEEZY_GROWTH_VARIANT_ID ?? 0)
+  // ── 5. Route by event type ───────────────────────────────────────────────
+  switch (eventType) {
+    case 'subscription.active':
+    case 'subscription.updated': {
+      // Use the plan from checkout metadata, falling back to 'pro' if missing
+      const newPlan = (requestedPlan === 'growth' || requestedPlan === 'pro') ? requestedPlan : 'pro'
 
-      let newPlan = 'free'
-      if (variantId && variantId === PRO_VARIANT_ID) newPlan = 'pro'
-      else if (variantId && variantId === GROWTH_VARIANT_ID) newPlan = 'growth'
+      const { error } = await supabase
+        .from('profiles')
+        .update({ plan: newPlan })
+        .eq('id', userId)
 
-      if (newPlan !== 'free') {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ plan: newPlan })
-          .eq('id', userId)
-
-        if (error) {
-          console.error(`[billing/webhook] Failed to update plan for ${userId}:`, error)
-          return NextResponse.json({ error: 'DB update failed' }, { status: 500 })
-        }
-        console.info(`[billing/webhook] ${eventName}: set plan=${newPlan} for user ${userId}`)
+      if (error) {
+        console.error(`[billing/webhook] Failed to upgrade plan for ${userId}:`, error)
+        return NextResponse.json({ error: 'DB update failed' }, { status: 500 })
       }
+      console.info(`[billing/webhook] ${eventType}: set plan=${newPlan} for user ${userId}`)
       break
     }
 
-    case 'subscription_cancelled':
-    case 'subscription_expired': {
-      // Downgrade to free: update plan, then enforce keyword limit
+    case 'subscription.cancelled': {
+      // Hard cancellation — downgrade immediately and pause excess keyword rules
       const { error } = await supabase
         .from('profiles')
         .update({ plan: 'free', auto_send_enabled: false })
@@ -154,12 +162,31 @@ export async function POST(req: Request) {
       }
 
       await enforceDowngradeKeywordLimit(userId, supabase)
-      console.info(`[billing/webhook] ${eventName}: downgraded user ${userId} to free`)
+      console.info(`[billing/webhook] subscription.cancelled: downgraded user ${userId} to free`)
+      break
+    }
+
+    case 'subscription.on_hold': {
+      // Payment failed and Dodo has paused the subscription.
+      // Strategy: keep the plan active — Dodo will retry and fire subscription.cancelled
+      // if all retries fail. Punishing users immediately for a single failed payment
+      // (e.g. card expired but not yet updated) is bad UX and bad revenue practice.
+      // Log only; the dunning/cancellation path will fire if retries exhaust.
+      console.info(`[billing/webhook] subscription.on_hold for user ${userId} — plan unchanged, awaiting Dodo retry`)
+      break
+    }
+
+    case 'payment.failed': {
+      // Individual payment failure (before subscription-level retry exhaustion).
+      // Same strategy as on_hold: do not downgrade prematurely.
+      // If Dodo exhausts retries it will fire subscription.on_hold then subscription.cancelled.
+      console.info(`[billing/webhook] payment.failed for user ${userId} — plan unchanged, Dodo will retry`)
       break
     }
 
     default:
-      // Other events (invoices, order created, etc.) — acknowledge without action
+      // Other events (payment.succeeded, invoices, etc.) — acknowledge without action
+      console.info(`[billing/webhook] Unhandled event "${eventType}" for user ${userId} — no-op`)
       break
   }
 
