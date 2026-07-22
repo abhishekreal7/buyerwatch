@@ -1239,10 +1239,10 @@ export default function LandingPage() {
         </Section>
 
         {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
-        <Section id="pricing" className="bg-[#EDEDF2] pt-[100px] pb-[100px]">
+        <Section id="pricing" className="bg-[#F4F4F6] pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[36px]">
-              <SectionBadge color="#FF5101" text="Pricing" />
+              <SectionBadge color="#FF5622" text="Pricing" />
               <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 52px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A' }}>
                 Simple, honest pricing
               </h2>
@@ -1251,7 +1251,7 @@ export default function LandingPage() {
             {/* Toggle */}
             <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-12">
               <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: !isYearly ? '#0A0A0A' : '#ADADAD' }}>Monthly</span>
-              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer bg-[#FF5101]" aria-label="Toggle yearly billing">
+              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer bg-[#FF5622]" aria-label="Toggle yearly billing">
                 <motion.div
                   className="w-[18px] h-[18px] bg-white rounded-full absolute top-[4px] shadow-sm"
                   animate={{ x: isYearly ? 26 : 4 }}
@@ -1266,7 +1266,7 @@ export default function LandingPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.85 }}
                     transition={springs.snappy}
-                    className="bg-[#FFE3D8] text-[#FF5101] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
+                    className="bg-[#FFE3D8] text-[#FF5622] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
                   >
                     Save 20%
                   </motion.span>
@@ -1278,31 +1278,31 @@ export default function LandingPage() {
               {/* Free Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -3 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[22px] border border-black/[0.04] p-8 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-300"
+                className="bg-white rounded-[24px] border border-[#EAEAEC] p-8 flex flex-col justify-between"
               >
                 <div>
-                  <h3 className="font-sans font-medium text-[20px] tracking-tight text-[#111111] mb-4">
+                  <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
                     Free
                   </h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="font-sans font-extrabold text-[46px] tracking-[-0.03em] leading-none text-[#111111]">
+                    <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
                       $0
                     </span>
-                    <span className="font-sans text-[14px] text-[#999999] ml-2 font-normal">
+                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-[#555555] font-normal mb-7 leading-[1.55] min-h-[42px]">
+                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
                     Great for trying out Frames X component and templates.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-[18px] transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.22)] block mb-7">
+                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dotted border-[#CCCCCC] mb-7" />
+                  <div className="w-full border-t border-dotted border-[#E2E2E6] mb-6" />
 
                   <div className="flex flex-col gap-3.5">
                     {[
@@ -1313,10 +1313,10 @@ export default function LandingPage() {
                       'Community Support'
                     ].map((f) => (
                       <div key={f} className="flex items-start gap-2.5 text-left">
-                        <svg className="w-[17px] h-[17px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                        <svg className="w-[16px] h-[16px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
                           <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="font-sans text-[14px] text-[#444444] font-normal leading-snug">{f}</span>
+                        <span className="font-sans text-[14px] text-[#3F3F46] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
@@ -1326,31 +1326,31 @@ export default function LandingPage() {
               {/* Professional Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -3 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[22px] border border-black/[0.04] p-8 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-300"
+                className="bg-white rounded-[24px] border border-[#EAEAEC] p-8 flex flex-col justify-between"
               >
                 <div>
-                  <h3 className="font-sans font-medium text-[20px] tracking-tight text-[#111111] mb-4">
+                  <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
                     Professional
                   </h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="font-sans font-extrabold text-[46px] tracking-[-0.03em] leading-none text-[#111111]">
+                    <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
                       ${isYearly ? '79' : '97'}
                     </span>
-                    <span className="font-sans text-[14px] text-[#999999] ml-2 font-normal">
+                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-[#555555] font-normal mb-7 leading-[1.55] min-h-[42px]">
+                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
                     Best for solo founders, freelancers & growing teams.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-[18px] transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.22)] block mb-7">
+                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dotted border-[#CCCCCC] mb-7" />
+                  <div className="w-full border-t border-dotted border-[#E2E2E6] mb-6" />
 
                   <div className="flex flex-col gap-3.5">
                     {[
@@ -1361,10 +1361,10 @@ export default function LandingPage() {
                       'Advanced Integrations (CRM, Notion, Slack, etc.)'
                     ].map((f) => (
                       <div key={f} className="flex items-start gap-2.5 text-left">
-                        <svg className="w-[17px] h-[17px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                        <svg className="w-[16px] h-[16px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
                           <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="font-sans text-[14px] text-[#444444] font-normal leading-snug">{f}</span>
+                        <span className="font-sans text-[14px] text-[#3F3F46] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
@@ -1374,31 +1374,31 @@ export default function LandingPage() {
               {/* Enterprise Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -3 }}
                 transition={springs.snappy}
-                className="bg-[#FFEBE5] rounded-[22px] border border-[#FF6B4A]/10 p-8 flex flex-col justify-between shadow-[0_4px_20px_rgba(255,107,74,0.03)] hover:shadow-[0_12px_32px_rgba(255,107,74,0.06)] transition-all duration-300"
+                className="bg-[#FFEBE5] rounded-[24px] border border-[#FF6B4A]/10 p-8 flex flex-col justify-between"
               >
                 <div>
-                  <h3 className="font-sans font-medium text-[20px] tracking-tight text-[#FF6B4A] mb-4">
+                  <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#FF6B4A] mb-4">
                     Enterprise
                   </h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="font-sans font-extrabold text-[46px] tracking-[-0.03em] leading-none text-[#111111]">
+                    <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
                       ${isYearly ? '209' : '257'}
                     </span>
-                    <span className="font-sans text-[14px] text-[#999999] ml-2 font-normal">
+                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-[#555555] font-normal mb-7 leading-[1.55] min-h-[42px]">
+                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
                     Ideal for scaling companies that need deep automation & custom setups.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-[18px] transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.22)] block mb-7">
+                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dotted border-[#FF6B4A]/25 mb-7" />
+                  <div className="w-full border-t border-dotted border-[#FF6B4A]/25 mb-6" />
 
                   <div className="flex flex-col gap-3.5">
                     {[
@@ -1409,10 +1409,10 @@ export default function LandingPage() {
                       'SLA-backed Support'
                     ].map((f) => (
                       <div key={f} className="flex items-start gap-2.5 text-left">
-                        <svg className="w-[17px] h-[17px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                        <svg className="w-[16px] h-[16px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
                           <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="font-sans text-[14px] text-[#444444] font-normal leading-snug">{f}</span>
+                        <span className="font-sans text-[14px] text-[#3F3F46] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
