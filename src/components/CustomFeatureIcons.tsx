@@ -11,31 +11,40 @@ interface CustomIconProps {
 }
 
 // ─── 1. Custom Keyword Rules ──────────────────────────────────────────────────
-// Rules tracks where rule gate nodes slide smoothly along the tracks
+// Option 2: 3 Delicate Keyword Filter Chips ([+], [-], [✓]) gliding into precision alignment
 export function CustomKeywordRulesIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.9, style }: CustomIconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
-      {/* Slider tracks */}
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <line x1="4" y1="18" x2="20" y2="18" />
-
-      {/* Sliding rule gates (knobs) with explicit fill/stroke and direct cx animation to prevent track bleed-through */}
-      <motion.circle
-        cy="6" r="2.2" fill="white" stroke={color} strokeWidth={strokeWidth}
-        animate={{ cx: [9, 15, 9] }}
+      {/* Top Filter Chip (+ Target Match) */}
+      <motion.g
+        animate={{ x: [-2, 2, -2] }}
         transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-      />
-      <motion.circle
-        cy="12" r="2.2" fill="white" stroke={color} strokeWidth={strokeWidth}
-        animate={{ cx: [15, 9, 15] }}
+      >
+        <rect x="5" y="4" width="14" height="4.5" rx="2" fill="white" stroke={color} strokeWidth={strokeWidth} />
+        <line x1="8" y1="5.25" x2="8" y2="7.25" stroke={color} strokeWidth={strokeWidth} />
+        <line x1="7" y1="6.25" x2="9" y2="6.25" stroke={color} strokeWidth={strokeWidth} />
+        <line x1="11.5" y1="6.25" x2="16" y2="6.25" stroke={color} strokeWidth={strokeWidth} opacity="0.5" />
+      </motion.g>
+
+      {/* Middle Filter Chip (- Exclusion Filter) */}
+      <motion.g
+        animate={{ x: [2, -2, 2] }}
         transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut" }}
-      />
-      <motion.circle
-        cy="18" r="2.2" fill="white" stroke={color} strokeWidth={strokeWidth}
-        animate={{ cx: [8, 15, 8] }}
+      >
+        <rect x="5" y="10" width="14" height="4.5" rx="2" fill="white" stroke={color} strokeWidth={strokeWidth} />
+        <line x1="7" y1="12.25" x2="9" y2="12.25" stroke={color} strokeWidth={strokeWidth} />
+        <line x1="11.5" y1="12.25" x2="16" y2="12.25" stroke={color} strokeWidth={strokeWidth} opacity="0.5" />
+      </motion.g>
+
+      {/* Bottom Filter Chip (✓ Lead Match) */}
+      <motion.g
+        animate={{ x: [-1.5, 1.5, -1.5] }}
         transition={{ repeat: Infinity, duration: 3.8, ease: "easeInOut" }}
-      />
+      >
+        <rect x="5" y="16" width="14" height="4.5" rx="2" fill="white" stroke={color} strokeWidth={strokeWidth} />
+        <path d="M 7 18.25 L 8 19.25 L 9.5 17.5" stroke={color} strokeWidth={strokeWidth} />
+        <line x1="11.5" y1="18.25" x2="16" y2="18.25" stroke={color} strokeWidth={strokeWidth} opacity="0.5" />
+      </motion.g>
     </svg>
   );
 }
