@@ -1239,10 +1239,10 @@ export default function LandingPage() {
         </Section>
 
         {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
-        <Section id="pricing" className="bg-white pt-[100px] pb-[100px]">
+        <Section id="pricing" className="bg-[#F2F2F5] pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[36px]">
-              <SectionBadge color="#0A84FF" text="Pricing" />
+              <SectionBadge color="#FF5101" text="Pricing" />
               <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 52px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A' }}>
                 Simple, honest pricing
               </h2>
@@ -1251,9 +1251,9 @@ export default function LandingPage() {
             {/* Toggle */}
             <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-12">
               <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: !isYearly ? '#0A0A0A' : '#ADADAD' }}>Monthly</span>
-              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer bg-black/10 hover:bg-black/20" aria-label="Toggle yearly billing">
+              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer bg-[#FF5101]" aria-label="Toggle yearly billing">
                 <motion.div
-                  className="w-[18px] h-[18px] bg-[#0A84FF] rounded-full absolute top-[4px] shadow-sm"
+                  className="w-[18px] h-[18px] bg-white rounded-full absolute top-[4px] shadow-sm"
                   animate={{ x: isYearly ? 26 : 4 }}
                   transition={springs.snappy}
                 />
@@ -1266,7 +1266,7 @@ export default function LandingPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.85 }}
                     transition={springs.snappy}
-                    className="bg-[#0A84FF]/10 text-[#0A84FF] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
+                    className="bg-[#FFE3D8] text-[#FF5101] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
                   >
                     Save 20%
                   </motion.span>
@@ -1274,47 +1274,47 @@ export default function LandingPage() {
               </AnimatePresence>
             </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-8 items-stretch">
-              {/* Starter Free Card */}
+            <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-7 items-stretch">
+              {/* Free Card */}
               <motion.div
                 variants={fadeUp}
                 whileHover={{ y: -6 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[28px] border border-black/[0.08] p-8 flex flex-col justify-between shadow-[0_4px_24px_rgba(0,0,0,0.03)]"
+                className="bg-white rounded-[32px] border border-black/[0.05] p-9 flex flex-col justify-between shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-300"
               >
                 <div>
-                  <h3 className="font-sans font-bold text-[22px] tracking-tight text-[#0A0A0A] mb-3">
+                  <h3 className="font-sans font-medium text-[22px] tracking-tight text-[#111111] mb-4">
                     Free
                   </h3>
-                  <div className="flex items-baseline mb-3">
-                    <span className="font-sans font-extrabold text-[50px] tracking-tight leading-none text-[#0A0A0A]">
+                  <div className="flex items-baseline mb-4">
+                    <span className="font-sans font-extrabold text-[48px] tracking-[-0.03em] leading-none text-[#111111]">
                       $0
                     </span>
-                    <span className="font-sans text-[14px] text-neutral-400 ml-1.5 font-medium">
+                    <span className="font-sans text-[15px] text-[#8E8E93] ml-2 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-neutral-500 mb-6 leading-relaxed min-h-[42px]">
+                  <p className="font-sans text-[15px] text-[#666666] font-normal mb-8 leading-[1.55] min-h-[46px]">
                     Great for trying out Scouto features and signals.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-bold text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.2)] block mb-6">
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.25)] block mb-7">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dashed border-black/[0.12] mb-6" />
+                  <div className="w-full border-t border-dashed border-[#D4D4D8] mb-7" />
 
-                  <div className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-4">
                     {[
-                      '1 Active Keyword Rule',
-                      '15 Buyer Intent Signals / month',
-                      'AI Intent Scoring (0–100)',
-                      '1-Click Draft Preview',
-                      'Reddit & Bluesky Monitoring'
+                      '3 Automation Workflows',
+                      '1,000 Tasks / month',
+                      'Basic Integrations',
+                      'AI Workflow Builder (Lite)',
+                      'Community Support'
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-3 text-left">
-                        <CheckIcon className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
-                        <span className="font-sans text-[14px] text-neutral-700 font-medium leading-normal">{f}</span>
+                        <CheckIcon className="w-[18px] h-[18px] text-[#00A859] shrink-0" strokeWidth={2.5} />
+                        <span className="font-sans text-[14.5px] text-[#333333] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
@@ -1326,42 +1326,41 @@ export default function LandingPage() {
                 variants={fadeUp}
                 whileHover={{ y: -6 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[28px] border border-black/[0.08] p-8 flex flex-col justify-between shadow-[0_4px_24px_rgba(0,0,0,0.03)]"
+                className="bg-white rounded-[32px] border border-black/[0.05] p-9 flex flex-col justify-between shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-300"
               >
                 <div>
-                  <h3 className="font-sans font-bold text-[22px] tracking-tight text-[#0A0A0A] mb-3">
+                  <h3 className="font-sans font-medium text-[22px] tracking-tight text-[#111111] mb-4">
                     Professional
                   </h3>
-                  <div className="flex items-baseline mb-3">
-                    <span className="font-sans font-extrabold text-[50px] tracking-tight leading-none text-[#0A0A0A]">
+                  <div className="flex items-baseline mb-4">
+                    <span className="font-sans font-extrabold text-[48px] tracking-[-0.03em] leading-none text-[#111111]">
                       ${isYearly ? '79' : '97'}
                     </span>
-                    <span className="font-sans text-[14px] text-neutral-400 ml-1.5 font-medium">
+                    <span className="font-sans text-[15px] text-[#8E8E93] ml-2 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-neutral-500 mb-6 leading-relaxed min-h-[42px]">
+                  <p className="font-sans text-[15px] text-[#666666] font-normal mb-8 leading-[1.55] min-h-[46px]">
                     Best for solo founders, freelancers & growing teams.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-bold text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.2)] block mb-6">
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.25)] block mb-7">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dashed border-black/[0.12] mb-6" />
+                  <div className="w-full border-t border-dashed border-[#D4D4D8] mb-7" />
 
-                  <div className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-4">
                     {[
                       'Everything in Free',
-                      '10 Active Keyword Rules',
-                      '250 Buyer Intent Signals / month',
-                      '1-Click Automated Posting',
-                      'Auto-Send Automation Engine',
-                      'Custom Brand Voice Training'
+                      '20 Automation Workflows',
+                      '15,000 Tasks / month',
+                      'API Access',
+                      'Advanced Integrations (CRM, Notion, Slack, etc.)'
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-3 text-left">
-                        <CheckIcon className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
-                        <span className="font-sans text-[14px] text-neutral-700 font-medium leading-normal">{f}</span>
+                        <CheckIcon className="w-[18px] h-[18px] text-[#00A859] shrink-0" strokeWidth={2.5} />
+                        <span className="font-sans text-[14.5px] text-[#333333] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
@@ -1373,46 +1372,41 @@ export default function LandingPage() {
                 variants={fadeUp}
                 whileHover={{ y: -6 }}
                 transition={springs.snappy}
-                className="rounded-[28px] p-8 flex flex-col justify-between shadow-sm"
-                style={{
-                  backgroundColor: '#FFF0EA',
-                  border: '1px solid rgba(255, 81, 1, 0.15)',
-                }}
+                className="bg-[#FFEFE9] rounded-[32px] border border-[#FF5101]/15 p-9 flex flex-col justify-between shadow-[0_10px_30px_rgba(255,81,1,0.04)] hover:shadow-[0_20px_40px_rgba(255,81,1,0.08)] transition-all duration-300"
               >
                 <div>
-                  <h3 className="font-sans font-bold text-[22px] tracking-tight text-[#FF5101] mb-3">
+                  <h3 className="font-sans font-medium text-[22px] tracking-tight text-[#FF5101] mb-4">
                     Enterprise
                   </h3>
-                  <div className="flex items-baseline mb-3">
-                    <span className="font-sans font-extrabold text-[50px] tracking-tight leading-none text-[#0A0A0A]">
+                  <div className="flex items-baseline mb-4">
+                    <span className="font-sans font-extrabold text-[48px] tracking-[-0.03em] leading-none text-[#111111]">
                       ${isYearly ? '209' : '257'}
                     </span>
-                    <span className="font-sans text-[14px] text-neutral-400 ml-1.5 font-medium">
+                    <span className="font-sans text-[15px] text-[#8E8E93] ml-2 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-neutral-500 mb-6 leading-relaxed min-h-[42px]">
+                  <p className="font-sans text-[15px] text-[#666666] font-normal mb-8 leading-[1.55] min-h-[46px]">
                     Ideal for scaling companies that need deep automation & custom setups.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-bold text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.2)] block mb-6">
+                  <Link href="/signup" className="w-full bg-[#FF5101] hover:bg-[#E04400] text-white text-[15px] font-[600] text-center py-3.5 rounded-full transition-all duration-150 shadow-[0_4px_14px_rgba(255,81,1,0.25)] block mb-7">
                     Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dashed border-[#FF5101]/20 mb-6" />
+                  <div className="w-full border-t border-dashed border-[#FF5101]/20 mb-7" />
 
-                  <div className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-4">
                     {[
-                      'Everything in Professional',
-                      '50 Active Keyword Rules',
-                      '1,500 Buyer Intent Signals / month',
-                      'Priority Subreddit Fan-out',
-                      'Community Trust Analytics',
-                      'Dedicated Founder Support'
+                      'Unlimited Workflows',
+                      '50,000+ Tasks / month',
+                      'Custom Integrations',
+                      'Dedicated Success Manager',
+                      'SLA-backed Support'
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-3 text-left">
-                        <CheckIcon className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
-                        <span className="font-sans text-[14px] text-neutral-700 font-medium leading-normal">{f}</span>
+                        <CheckIcon className="w-[18px] h-[18px] text-[#00A859] shrink-0" strokeWidth={2.5} />
+                        <span className="font-sans text-[14.5px] text-[#333333] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
