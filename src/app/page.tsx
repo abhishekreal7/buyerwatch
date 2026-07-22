@@ -1239,7 +1239,7 @@ export default function LandingPage() {
         </Section>
 
         {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
-        <Section id="pricing" className="bg-[#F6F6F8] pt-[100px] pb-[100px]">
+        <Section id="pricing" className="bg-[#F4F4F6] pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[36px]">
               <SectionBadge color="#FF5622" text="Pricing" />
@@ -1274,32 +1274,32 @@ export default function LandingPage() {
               </AnimatePresence>
             </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-7 items-stretch">
-              {/* Free Card */}
+            <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-6 items-stretch">
+              {/* Free / Starter Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -3 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[24px] border border-[#E5E5EA] p-8 flex flex-col justify-between shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-all duration-300"
+                className="bg-white rounded-[24px] border border-[#EAEAEC] p-8 flex flex-col justify-between"
               >
                 <div>
-                  <h3 className="font-sans font-bold text-[20px] tracking-tight text-[#18181B] mb-3">
-                    Starter
+                  <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
+                    Free
                   </h3>
-                  <div className="flex items-baseline mb-3">
-                    <span className="font-sans font-extrabold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
+                  <div className="flex items-baseline mb-4">
+                    <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
                       $0
                     </span>
-                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-medium">
+                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[42px]">
+                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
                     Great for trying out Scouto buyer intent signals and rule monitoring.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#18181B] hover:bg-[#27272A] text-white text-[15px] font-semibold text-center py-3.5 rounded-[16px] transition-all duration-150 block mb-6 shadow-sm">
-                    Get Started Free
+                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
+                    Get Started
                   </Link>
 
                   <div className="w-full border-t border-dotted border-[#E2E2E6] mb-6" />
@@ -1312,97 +1312,94 @@ export default function LandingPage() {
                       '1-Click Draft Preview',
                       'Reddit & Bluesky Monitoring'
                     ].map((f) => (
-                      <div key={f} className="flex items-start gap-3 text-left">
-                        <div className="w-[20px] h-[20px] rounded-full bg-[#10B981]/12 flex items-center justify-center shrink-0 mt-0.5">
-                          <CheckIcon className="w-3.5 h-3.5 text-[#059669]" strokeWidth={3} />
-                        </div>
-                        <span className="font-sans text-[14px] text-[#3F3F46] font-medium leading-snug">{f}</span>
+                      <div key={f} className="flex items-start gap-2.5 text-left">
+                        <svg className="w-[16px] h-[16px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="font-sans text-[14px] text-[#3F3F46] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </motion.div>
 
-              {/* Professional Card (Featured) */}
+              {/* Professional Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -5 }}
+                whileHover={{ y: -3 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[24px] border-2 border-[#FF5622]/30 p-8 flex flex-col justify-between shadow-[0_12px_40px_rgba(255,86,34,0.08)] relative z-10 before:absolute before:top-0 before:left-0 before:right-0 before:h-[4px] before:bg-gradient-to-r before:from-[#FF5622] before:to-[#FF8A65] before:rounded-t-[22px] overflow-hidden"
+                className="bg-white rounded-[24px] border border-[#EAEAEC] p-8 flex flex-col justify-between"
               >
                 <div>
-                  <div className="inline-flex items-center gap-1.5 bg-[#FF5622]/10 text-[#FF5622] border border-[#FF5622]/20 font-extrabold text-[11px] px-3 py-1 rounded-full tracking-wider uppercase mb-3 shadow-xs">
-                    <Sparkles className="w-3 h-3 text-[#FF5622]" /> Most Popular
-                  </div>
-                  <h3 className="font-sans font-bold text-[20px] tracking-tight text-[#18181B] mb-3">
+                  <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
                     Professional
                   </h3>
-                  <div className="flex items-baseline mb-3">
-                    <span className="font-sans font-extrabold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
-                      ${isYearly ? '24' : '29'}
+                  <div className="flex items-baseline mb-4">
+                    <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
+                      ${isYearly ? '79' : '97'}
                     </span>
-                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-medium">
+                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[42px]">
-                    Ideal for indie founders & solo builders scaling customer acquisition.
+                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
+                    Best for solo founders, freelancers & growing teams.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-gradient-to-r from-[#FF5622] to-[#FF3D00] hover:from-[#E64A19] hover:to-[#D83A00] text-white text-[15px] font-bold text-center py-3.5 rounded-[16px] transition-all duration-150 block mb-6 shadow-[0_4px_16px_rgba(255,86,34,0.3)] hover:shadow-[0_6px_22px_rgba(255,86,34,0.4)]">
-                    Start Pro Trial
+                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
+                    Get Started
                   </Link>
 
                   <div className="w-full border-t border-dotted border-[#E2E2E6] mb-6" />
 
                   <div className="flex flex-col gap-3.5">
                     {[
-                      'Everything in Starter',
+                      'Everything in Free',
                       '10 Active Keyword Rules',
                       '250 Buyer Intent Signals / mo',
                       '1-Click Automated Posting',
                       'Auto-Send Automation Engine',
                       'Custom Brand Voice Training'
                     ].map((f) => (
-                      <div key={f} className="flex items-start gap-3 text-left">
-                        <div className="w-[20px] h-[20px] rounded-full bg-[#10B981]/12 flex items-center justify-center shrink-0 mt-0.5">
-                          <CheckIcon className="w-3.5 h-3.5 text-[#059669]" strokeWidth={3} />
-                        </div>
-                        <span className="font-sans text-[14px] text-[#27272A] font-semibold leading-snug">{f}</span>
+                      <div key={f} className="flex items-start gap-2.5 text-left">
+                        <svg className="w-[16px] h-[16px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="font-sans text-[14px] text-[#3F3F46] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </motion.div>
 
-              {/* Enterprise / Growth Card */}
+              {/* Enterprise Card */}
               <motion.div
                 variants={fadeUp}
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -3 }}
                 transition={springs.snappy}
-                className="bg-[#FFF5EE] rounded-[24px] border border-[#FF5622]/15 p-8 flex flex-col justify-between shadow-[0_2px_12px_rgba(255,86,34,0.02)] transition-all duration-300"
+                className="bg-white rounded-[24px] border border-[#EAEAEC] p-8 flex flex-col justify-between"
               >
                 <div>
-                  <h3 className="font-sans font-bold text-[20px] tracking-tight text-[#FF5622] mb-3">
-                    Growth
+                  <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
+                    Enterprise
                   </h3>
-                  <div className="flex items-baseline mb-3">
-                    <span className="font-sans font-extrabold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
-                      ${isYearly ? '79' : '99'}
+                  <div className="flex items-baseline mb-4">
+                    <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
+                      ${isYearly ? '209' : '257'}
                     </span>
-                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-medium">
+                    <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
                     </span>
                   </div>
-                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[42px]">
-                    Built for scaling teams requiring high-volume signals & deep coverage.
+                  <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
+                    Ideal for scaling companies that need deep automation & custom setups.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-semibold text-center py-3.5 rounded-[16px] transition-all duration-150 block mb-6 shadow-sm">
-                    Get Started Growth
+                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
+                    Get Started
                   </Link>
 
-                  <div className="w-full border-t border-dotted border-[#FF5622]/20 mb-6" />
+                  <div className="w-full border-t border-dotted border-[#E2E2E6] mb-6" />
 
                   <div className="flex flex-col gap-3.5">
                     {[
@@ -1413,11 +1410,11 @@ export default function LandingPage() {
                       'Community Trust Analytics',
                       'Dedicated Founder Support'
                     ].map((f) => (
-                      <div key={f} className="flex items-start gap-3 text-left">
-                        <div className="w-[20px] h-[20px] rounded-full bg-[#10B981]/12 flex items-center justify-center shrink-0 mt-0.5">
-                          <CheckIcon className="w-3.5 h-3.5 text-[#059669]" strokeWidth={3} />
-                        </div>
-                        <span className="font-sans text-[14px] text-[#3F3F46] font-medium leading-snug">{f}</span>
+                      <div key={f} className="flex items-start gap-2.5 text-left">
+                        <svg className="w-[16px] h-[16px] shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#10A352" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="font-sans text-[14px] text-[#3F3F46] font-normal leading-snug">{f}</span>
                       </div>
                     ))}
                   </div>
