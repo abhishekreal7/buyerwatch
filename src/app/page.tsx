@@ -634,17 +634,17 @@ export default function LandingPage() {
 
       {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
       <section className="hero-mesh relative flex flex-col items-center justify-center px-6 pt-[100px] pb-[40px] overflow-hidden">
-        {/* Gradient mesh blobs (optimized static background) */}
+        {/* Gradient mesh blobs (subtle Framer/Linear depth background) */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div
-            className="absolute -top-[10%] -left-[5%] w-[45%] h-[60%] rounded-full opacity-70"
-            style={{ background: 'radial-gradient(ellipse, rgba(255,180,100,0.38) 0%, transparent 68%)', filter: 'blur(40px)' }} />
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[800px] pointer-events-none z-0 opacity-80"
+            style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(255, 81, 1, 0.04) 0%, transparent 60%)' }} />
           <div
-            className="absolute -top-[15%] right-0 w-[40%] h-[55%] rounded-full opacity-70"
-            style={{ background: 'radial-gradient(ellipse, rgba(200,150,255,0.28) 0%, transparent 68%)', filter: 'blur(50px)' }} />
+            className="absolute -top-[10%] -left-[5%] w-[45%] h-[60%] rounded-full opacity-60"
+            style={{ background: 'radial-gradient(ellipse, rgba(255,180,100,0.3) 0%, transparent 68%)', filter: 'blur(40px)' }} />
           <div
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[50%] h-[30%] opacity-60"
-            style={{ background: 'radial-gradient(ellipse, rgba(255,200,150,0.2) 0%, transparent 68%)', filter: 'blur(40px)' }} />
+            className="absolute -top-[15%] right-0 w-[40%] h-[55%] rounded-full opacity-60"
+            style={{ background: 'radial-gradient(ellipse, rgba(200,150,255,0.2) 0%, transparent 68%)', filter: 'blur(50px)' }} />
         </div>
 
         <motion.div
