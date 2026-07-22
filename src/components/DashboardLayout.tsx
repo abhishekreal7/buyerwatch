@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Settings, Bell, Search, LogOut, Zap, ZapOff } from 'lucide-react'
+import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Settings, Bell, Search, LogOut, Zap, ZapOff, HelpCircle, X, ArrowRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 
@@ -26,6 +26,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
   const [draftCount, setDraftCount] = useState<number | null>(null)
   const [userInitial, setUserInitial] = useState('')
+  const [showWalkthrough, setShowWalkthrough] = useState(false)
 
   useEffect(() => {
     async function loadSidebarData() {
@@ -149,51 +150,51 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className="flex-1 md:pl-[260px] flex flex-col min-h-screen">
         {/* Topbar */}
         <header className="h-[72px] flex items-center justify-between px-8 bg-white/90 backdrop-blur-md sticky top-0 z-20 shrink-0 border-b border-black/[0.04]">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className="hidden md:flex relative w-96 max-w-full group">
-                <Search className="w-[15px] h-[15px] absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" strokeWidth={2.5} />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full bg-[#F4F5F7] border border-transparent rounded-full pl-10 pr-4 py-2 text-[14px] text-text-primary placeholder-text-tertiary font-medium focus-signature transition-all duration-300"
-                />
-              </div>
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="hidden md:flex relative w-96 max-w-full group">
+              <Search className="w-[15px] h-[15px] absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" strokeWidth={2.5} />
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-full bg-[#F4F5F7] border border-transparent rounded-full pl-10 pr-4 py-2 text-[14px] text-text-primary placeholder-text-tertiary font-medium focus-signature transition-all duration-300"
+              />
             </div>
+          </div>
 
-            <div className="flex items-center gap-3">
-              {/* Auto-send toggle pill */}
-              {autoSend !== null && (
-                <button
-                  onClick={handleToggleAutoSend}
-                  disabled={togglingAutoSend}
-                  title={autoSend ? 'Auto-send is active — click to pause' : 'Auto-send is paused — click to resume'}
-                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-surface border border-black/5 hover:border-black/10 hover:bg-gray-50 transition-all duration-200 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-                >
-                  <span className={`text-[12.5px] font-medium transition-colors ${autoSend ? 'text-gray-900' : 'text-gray-500'}`}>
-                    Auto-send
-                  </span>
-                  <div className={`relative w-[28px] h-[16px] rounded-full transition-colors duration-300 ${autoSend ? 'bg-[#0A84FF]' : 'bg-gray-200'}`}>
-                    <div className={`absolute top-[2px] left-[2px] w-[12px] h-[12px] bg-white rounded-full shadow-sm transition-transform duration-300 ${autoSend ? 'translate-x-[12px]' : 'translate-x-0'}`} />
-                  </div>
-                </button>
-              )}
-
-              {/* Bell — no dot until we have a real notification system */}
-              <button className="btn-icon" title="Notifications">
-                <Bell className="w-[18px] h-[18px]" strokeWidth={2} />
+          <div className="flex items-center gap-3">
+            {/* Auto-send toggle pill */}
+            {autoSend !== null && (
+              <button
+                onClick={handleToggleAutoSend}
+                disabled={togglingAutoSend}
+                title={autoSend ? 'Auto-send is active — click to pause' : 'Auto-send is paused — click to resume'}
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-surface border border-black/5 hover:border-black/10 hover:bg-gray-50 transition-all duration-200 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+              >
+                <span className={`text-[12.5px] font-medium transition-colors ${autoSend ? 'text-gray-900' : 'text-gray-500'}`}>
+                  Auto-send
+                </span>
+                <div className={`relative w-[28px] h-[16px] rounded-full transition-colors duration-300 ${autoSend ? 'bg-[#0A84FF]' : 'bg-gray-200'}`}>
+                  <div className={`absolute top-[2px] left-[2px] w-[12px] h-[12px] bg-white rounded-full shadow-sm transition-transform duration-300 ${autoSend ? 'translate-x-[12px]' : 'translate-x-0'}`} />
+                </div>
               </button>
+            )}
 
-              {/* User avatar with real initial */}
-              <div className="w-8 h-8 rounded-full bg-[#F4F5F7] border border-black/5 hover:border-black/15 shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer transition-colors duration-200 flex items-center justify-center">
-                <span className="text-[13px] font-semibold text-text-primary leading-none uppercase">{userInitial}</span>
-              </div>
+            {/* Bell */}
+            <button className="btn-icon" title="Notifications">
+              <Bell className="w-[18px] h-[18px]" strokeWidth={2} />
+            </button>
+
+            {/* User avatar */}
+            <div className="w-8 h-8 rounded-full bg-[#F4F5F7] border border-black/5 hover:border-black/15 shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer transition-colors duration-200 flex items-center justify-center">
+              <span className="text-[13px] font-semibold text-text-primary leading-none uppercase">{userInitial}</span>
             </div>
-          </header>
+          </div>
+        </header>
 
-          {/* Content */}
-          <main className="flex-1 pb-[90px] md:pb-8 relative z-10 px-8 py-6">
-            {children}
-          </main>
+        {/* Content */}
+        <main className="flex-1 pb-[90px] md:pb-8 relative z-10 px-8 py-6">
+          {children}
+        </main>
 
         {/* Mobile Nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/80 backdrop-blur-[24px] saturate-[1.8] border-t border-black/[0.04] pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.02)]">

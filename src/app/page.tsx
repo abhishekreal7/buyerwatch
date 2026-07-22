@@ -1131,8 +1131,10 @@ export default function LandingPage() {
 
 
 
-        {/* ━ ━ ━ ━  section separator: STICKY FEATURE SCROLL ━ ━ ━ ━  */}
-        <StickyFeatureScroll />
+        {/* ━ ━ ━ ━  section separator: STICKY FEATURE SCROLL (HOW IT WORKS) ━ ━ ━ ━  */}
+        <div id="how-it-works">
+          <StickyFeatureScroll />
+        </div>
 
         {/* ━ ━ ━ ━  section separator: SOCIAL PROOF ━ ━ ━ ━  */}
         <Section className="bg-white pt-[100px] pb-[100px]">
@@ -1502,15 +1504,34 @@ export default function LandingPage() {
             </div>
             <div className="grid grid-cols-3 gap-8 md:col-span-2">
               {[
-                { label: 'Product', links: ['Features', 'Pricing', 'How it Works'] },
-                { label: 'Company', links: ['About', 'Blog', 'Contact'] },
-                { label: 'Legal', links: ['Privacy', 'Terms'] },
+                {
+                  label: 'Product',
+                  links: [
+                    { name: 'Features', href: '#features' },
+                    { name: 'Pricing', href: '#pricing' },
+                    { name: 'How it Works', href: '#how-it-works' },
+                  ],
+                },
+                {
+                  label: 'Company',
+                  links: [
+                    { name: 'About', href: '/about' },
+                    { name: 'Contact', href: '/contact' },
+                  ],
+                },
+                {
+                  label: 'Legal',
+                  links: [
+                    { name: 'Privacy', href: '/privacy' },
+                    { name: 'Terms', href: '/terms' },
+                  ],
+                },
               ].map(({ label, links }) => (
                 <div key={label}>
                   <div style={{ fontFamily: 'var(--font-inter)', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
                   <div className="flex flex-col gap-3">
-                    {links.map((l) => (
-                      <Link key={l} href="#" style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.38)' }} className="hover:text-white transition-colors duration-150">{l}</Link>
+                    {links.map(({ name, href }) => (
+                      <Link key={name} href={href} style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.38)' }} className="hover:text-white transition-colors duration-150">{name}</Link>
                     ))}
                   </div>
                 </div>
