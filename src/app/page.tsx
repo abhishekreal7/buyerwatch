@@ -22,7 +22,7 @@ import {
   ApprovalQueueIcon,
   DailyDigestIcon,
   InsightsHubIcon,
-  DataSecurityIcon
+  ConfidenceEngineIcon
 } from '@/components/CustomFeatureIcons'
 
 
@@ -717,7 +717,7 @@ export default function LandingPage() {
                 { title: 'The window is minutes', desc: 'If you don\'t reply within 15 minutes, someone else already did.' }
               ].map((p, i) => (
                 <div key={i} className="flex flex-col gap-2">
-                  <span className="text-[12px] font-bold text-[#FF3B30] uppercase tracking-wider">0{i+1}</span>
+                  <span className="text-[12px] font-bold text-[#FF3B30] uppercase tracking-wider">0{i + 1}</span>
                   <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A' }}>{p.title}</h4>
                   <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>{p.desc}</p>
                 </div>
@@ -1064,7 +1064,7 @@ export default function LandingPage() {
 
         {/* ━ ━ ━ ━  section separator: ANALYTICS ━ ━ ━ ━  */}
         <Section className="bg-[#F9F9FB] pt-[140px] pb-[140px]">
-          <div className="max-w-[1000px] mx-auto px-[24px] text-center">
+          <div className="max-w-[1140px] mx-auto px-[24px] text-center">
             <SectionBadge color="#4ade80" text="Core Features" />
             <motion.h2 
               initial="hidden"
@@ -1092,7 +1092,7 @@ export default function LandingPage() {
               whileInView="show"
               viewport={{ once: true, margin: "-100px" }}
               variants={staggerContainer} 
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-20 text-center"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-14 gap-y-20 text-center"
             >
               {[
                 { icon: CustomKeywordRulesIcon, title: 'Custom Keyword Rules', body: 'Exact-match, negative keywords, subreddit filters. You decide what counts as a lead.' },
@@ -1100,7 +1100,7 @@ export default function LandingPage() {
                 { icon: ApprovalQueueIcon, title: 'Approval Queue', body: 'Nothing posts without you clicking approve first. Full control, every time.' },
                 { icon: DailyDigestIcon, title: 'Daily Digest', body: 'One morning summary of every match, already scored and ready to review.' },
                 { icon: InsightsHubIcon, title: 'Insights Hub', body: "Get clear reports on activity, progress, and bottlenecks—instantly." },
-                { icon: DataSecurityIcon, title: 'Data Security', body: 'Your keywords, drafts, and matches stay private and encrypted. Always.' }, // Force Next.js compilation refresh
+                { icon: ConfidenceEngineIcon, title: 'Confidence Engine', body: 'AI intent scoring evaluates every post (0–100) to filter out noise and surface high-converting buyer leads instantly.' },
               ].map(({ icon: Icon, title, body }, i) => (
                 <motion.div 
                   key={i} 
@@ -1114,13 +1114,13 @@ export default function LandingPage() {
                     whileHover={{ scale: 1.05 }}
                     transition={springs.snappy}
                   >
-                    {/* Render custom icons directly to avoid raw DOM-manipulating draw collisions */}
+                    {/* Ultra-delicate thin vector stroke matching Framer reference site */}
                     <div style={{ display: 'inline-flex', lineHeight: 0 }} className="animated-icon-wrapper">
-                      <Icon size={64} color="#0A0A0A" strokeWidth={1.75} style={{ display: 'block' }} />
+                      <Icon size={64} color="#0A0A0A" strokeWidth={0.85} style={{ display: 'block' }} />
                     </div>
                   </motion.div>
-                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>{title}</h4>
-                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.6, maxWidth: '290px' }}>{body}</p>
+                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 500, fontSize: '19px', letterSpacing: '-0.01em', color: '#111111', marginBottom: '6px' }}>{title}</h4>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14.5px', color: '#666666', lineHeight: 1.55, maxWidth: '290px' }}>{body}</p>
                 </motion.div>
               ))}
             </motion.div>
