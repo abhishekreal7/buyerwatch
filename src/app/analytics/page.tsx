@@ -51,16 +51,35 @@ const CustomBarLabel = (props: any) => {
   )
 }
 
-// Custom Tooltip for Area Chart
-const CustomTooltip = ({ active, payload, label }: any) => {
+// HIGH_INTENT_THRESHOLD must match the dashboard stat card (intent_score >= 80)
+const HIGH_INTENT_THRESHOLD = 80
+
+// Custom Tooltip for Lead Discovery Chart
+const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
+    const discovered = payload.find((p: any) => p.dataKey === 'discovered')
+    const qualified = payload.find((p: any) => p.dataKey === 'qualified')
     return (
-      <div className="bg-surface border border-black/[0.06] shadow-[0_4px_16px_rgba(0,0,0,0.08)] rounded-xl px-4 py-3 text-sm min-w-[140px] z-50 relative">
-        <p className="font-semibold text-text-primary mb-1">{label}</p>
-        <p className="flex items-center gap-2 text-text-secondary">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#0A84FF]" />
-          <span className="font-medium">{payload[0].value} sent</span>
-        </p>
+      <div className="bg-surface border border-black/[0.06] shadow-[0_4px_16px_rgba(0,0,0,0.08)] rounded-xl px-4 py-3 text-sm min-w-[160px] z-50 relative">
+        <p className="font-semibold text-text-primary mb-2">{label}</p>
+        {discovered && (
+          <p className="flex items-center justify-between gap-4 text-text-secondary mb-1">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#0A0A0A]" />
+              <span className="font-medium">Discovered</span>
+            </span>
+            <span className="font-bold text-text-primary">{discovered.value}</span>
+          </p>
+        )}
+        {qualified && (
+          <p className="flex items-center justify-between gap-4 text-text-secondary">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#0A84FF]" />
+              <span className="font-medium">Qualified</span>
+            </span>
+            <span className="font-bold text-[#0A84FF]">{qualified.value}</span>
+          </p>
+        )}
       </div>
     )
   }
@@ -71,7 +90,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{
     stats: { found: number, drafted: number, sent: number, sentThisMonth: number, sentLastMonth: number }
-    trendData: { date: string, value: number }[]
+    trendData: { date: string, discovered: number, qualified: number }[]
     activity: any[]
     topKeywords: any[]
     needsAttention: any[]
@@ -120,20 +139,34 @@ export default function AnalyticsPage() {
       ).length
 
       // --- TREND DATA (Last 30 Days) ---
-      const datesMap: Record<string, number> = {}
+      // Discovered = all threads found that day
+      // Qualified = threads where intent_score >= HIGH_INTENT_THRESHOLD (same as dashboard "High Intent" stat)
+      const discoveredMap: Record<string, number> = {}
+      const qualifiedMap: Record<string, number> = {}
       for (let i = 29; i >= 0; i--) {
         const d = subDays(startOfDay(now), i)
-        datesMap[format(d, 'MMM d')] = 0
+        const key = format(d, 'MMM d')
+        discoveredMap[key] = 0
+        qualifiedMap[key] = 0
       }
 
-      sentAnalytics.forEach(a => {
-        const d = new Date(a.sent_at)
+      threads.forEach(t => {
+        const d = new Date(t.created_at)
         if (isAfter(d, thirtyDaysAgo)) {
           const dateStr = format(d, 'MMM d')
-          if (datesMap[dateStr] !== undefined) datesMap[dateStr]++
+          if (discoveredMap[dateStr] !== undefined) {
+            discoveredMap[dateStr]++
+            if (Number(t.intent_score) >= HIGH_INTENT_THRESHOLD) {
+              qualifiedMap[dateStr]++
+            }
+          }
         }
       })
-      const trendData = Object.entries(datesMap).map(([date, value]) => ({ date, value }))
+      const trendData = Object.keys(discoveredMap).map(date => ({
+        date,
+        discovered: discoveredMap[date],
+        qualified: qualifiedMap[date],
+      }))
 
       // --- ACTIVITY FEED ---
       const activityEvents: any[] = []
@@ -250,15 +283,13 @@ export default function AnalyticsPage() {
                 <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-text-secondary">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-                    Replies sent: <span className="font-bold text-[#0A84FF]">{data.stats.sent}</span>
+                    <span className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
+                    Discovered: <span className="font-bold text-text-primary">{data.stats.found}</span>
                   </span>
                   <span className="text-text-tertiary hidden sm:inline">|</span>
-                  <span className="text-[12px] text-text-tertiary">
-                    Discovered: <span className="font-bold text-text-secondary">{data.stats.found}</span>
-                  </span>
-                  <span className="text-[12px] text-text-tertiary">
-                    Drafted: <span className="font-bold text-text-secondary">{data.stats.drafted}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
+                    Qualified: <span className="font-bold text-[#0A84FF]">{data.trendData.reduce((s, d) => s + d.qualified, 0)}</span>
                   </span>
                 </div>
               </div>
@@ -275,7 +306,11 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data.trendData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="colorSent" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0A0A0A" stopOpacity={0.05} />
+                        <stop offset="95%" stopColor="#0A0A0A" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.12} />
                         <stop offset="95%" stopColor="#0A84FF" stopOpacity={0} />
                       </linearGradient>
@@ -286,14 +321,25 @@ export default function AnalyticsPage() {
                       tick={{ fill: 'rgba(20, 18, 16, 0.38)', fontSize: 11, fontWeight: 500 }}
                       minTickGap={30}
                     />
-                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
+                    <Tooltip content={<LeadDiscoveryTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
+                    {/* Discovered — dark primary line (always >= Qualified by construction) */}
                     <Area
                       type="monotone"
-                      dataKey="value"
+                      dataKey="discovered"
+                      stroke="#0A0A0A"
+                      strokeWidth={1.5}
+                      fillOpacity={1}
+                      fill="url(#colorDiscovered)"
+                      activeDot={{ r: 4, fill: '#0A0A0A', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                    {/* Qualified — accent blue line (intent_score >= 80, same as dashboard High Intent) */}
+                    <Area
+                      type="monotone"
+                      dataKey="qualified"
                       stroke="#0A84FF"
                       strokeWidth={2}
                       fillOpacity={1}
-                      fill="url(#colorSent)"
+                      fill="url(#colorQualified)"
                       activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
                     />
                   </AreaChart>

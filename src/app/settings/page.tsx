@@ -144,6 +144,8 @@ export default function SettingsPage() {
     draftsMax: PLAN_LIMITS.free.aiDraftsPerMonth,
   })
   const [usageStats, setUsageStats] = useState({ threads: 0, drafts: 0, replies: 0, keywords: 0 })
+  // total_drafts_reviewed from user_trust_metrics — used to show trust-meter in locked auto-send toggle
+  const [draftsReviewed, setDraftsReviewed] = useState<number>(0)
 
   const supabase = createClient()
 
@@ -205,6 +207,14 @@ export default function SettingsPage() {
           draftsMax: limits.aiDraftsPerMonth,
         })
       }
+
+      // Load trust metrics for auto-send trust meter (shown to all users)
+      const { data: trustData } = await supabase
+        .from('user_trust_metrics')
+        .select('total_drafts_reviewed')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      setDraftsReviewed(Math.min(trustData?.total_drafts_reviewed ?? 0, 10))
     }
     load()
 
@@ -532,11 +542,28 @@ export default function SettingsPage() {
                         <div className="flex items-start justify-between gap-6">
                           <div className="flex-1">
                             <p className="text-[14px] font-semibold text-gray-900">Auto-send high-confidence replies</p>
-                            <p className="text-[13px] text-gray-500 mt-1">
-                              Automatically post replies when the intent score exceeds the threshold below. Only triggers when a platform is connected.
-                            </p>
+                            {planState.plan === 'free' ? (
+                              <p className="text-[13px] text-gray-500 mt-1">
+                                Auto-send unlocks at Professional — you&apos;ve reviewed{' '}
+                                <span className="font-semibold text-gray-900">{draftsReviewed} of 10</span>{' '}
+                                drafts needed to activate it.
+                              </p>
+                            ) : (
+                              <p className="text-[13px] text-gray-500 mt-1">
+                                Automatically post replies when the intent score exceeds the threshold below. Only triggers when a platform is connected.
+                              </p>
+                            )}
                           </div>
-                          <Toggle checked={profile.autoSendEnabled} onChange={v => setProfile(p => ({ ...p, autoSendEnabled: v }))} />
+                          {planState.plan === 'free' ? (
+                            <div className="relative shrink-0">
+                              <div className="w-10 h-[22px] rounded-full bg-gray-200 opacity-50 cursor-not-allowed" />
+                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-gray-400 rounded-full flex items-center justify-center">
+                                <Shield className="w-2.5 h-2.5 text-white" strokeWidth={2.5} />
+                              </span>
+                            </div>
+                          ) : (
+                            <Toggle checked={profile.autoSendEnabled} onChange={v => setProfile(p => ({ ...p, autoSendEnabled: v }))} />
+                          )}
                         </div>
 
                         <AnimatePresence>
@@ -643,7 +670,9 @@ export default function SettingsPage() {
                             <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Active</span>
                           </div>
                           <p className="text-[13px] text-gray-500">
-                            {planState.plan === 'free' ? 'Limited to 10 threads/month. Upgrade for full power.' : 'You have access to all premium features.'}
+                            {planState.plan === 'free'
+                              ? '1 keyword rule. Upgrade for 10 rules, 1,000 signals, and auto-send.'
+                              : 'You have access to all premium features.'}
                           </p>
                         </div>
                       </div>
@@ -670,11 +699,11 @@ export default function SettingsPage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <Sparkles className="w-4 h-4 text-amber-400" />
-                                <span className="text-[14px] font-bold text-white">Upgrade to Pro</span>
-                                <span className="text-[12px] font-semibold text-white/60">$19/mo</span>
+                                <span className="text-[14px] font-bold text-white">Upgrade to Professional</span>
+                                <span className="text-[12px] font-semibold text-white/60">$49/mo</span>
                               </div>
                               <p className="text-[12px] text-white/50 leading-relaxed">
-                                500 threads/month, auto-send, subreddit targeting, priority support.
+                                10 keyword rules, 1,000 signals/month, auto-send, subreddit targeting.
                               </p>
                             </div>
                             <button
@@ -708,6 +737,34 @@ export default function SettingsPage() {
                           </div>
                         </div>
                       ))}
+
+                      {/* Placement C — Draft limit warning
+                          Only fires for free users who have used >= 35 of 40 drafts.
+                          Should be a rare event for a 1-keyword user; shown honestly. */}
+                      {planState.plan === 'free' && usageStats.drafts >= 35 && (() => {
+                        const now = new Date()
+                        const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+                        const resetStr = resetDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+                        return (
+                          <div className="mt-4 p-3.5 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2.5">
+                            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" strokeWidth={1.75} />
+                            <div>
+                              <p className="text-[13px] text-amber-900 leading-relaxed">
+                                You&apos;ve used <span className="font-semibold">{usageStats.drafts}</span> of 40 draft previews this month.
+                                This resets on <span className="font-semibold">{resetStr}</span>.{' '}
+                                Professional members get 400 drafts/month — enough that this number becomes invisible.
+                              </p>
+                              <button
+                                onClick={handleUpgrade}
+                                disabled={upgrading}
+                                className="mt-2 text-[12.5px] font-semibold text-amber-700 hover:text-amber-900 transition-colors cursor-pointer"
+                              >
+                                Upgrade to Professional →
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </SectionCard>
                   </>
                 )}

@@ -60,7 +60,7 @@ const faqs = [
   { q: 'Does it work for non-SaaS businesses?', a: 'Yes. As long as your customers talk about their problems online, Scouto can find them.' },
   { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. Scouto finds active buying intent from people who don\'t know you yet.' },
   { q: 'How accurate is the intent scoring?', a: 'We classify posts into Buying, Researching, Complaining, and Other. It has a 94% accuracy rate on confirmed buyers.' },
-  { q: 'Can I try it for free?', a: 'Yes. Start with 2 keywords and 10 matches a month. No card required.' },
+  { q: 'Can I try it for free?', a: 'Yes. Start with 1 keyword and up to 50 conversations per month. No card required.' },
   { q: 'Does this violate Reddit, X, or Bluesky terms of service?', a: 'No. We use public APIs and never auto-post. You are just a human replying to public conversations.' },
   { q: 'Won\'t these replies feel like AI spam?', a: 'Only if you let them. Scouto drafts replies using your product context and voice. If a draft feels off, edit it or skip it.' }
 ]
@@ -395,26 +395,34 @@ const leadDiscoveryData = [
 
 const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const cleanLabel = label.split('-')[0] + ' 2025';
+    const cleanLabel = label.split('-')[0] + ' 2025'
     return (
-      <div className="bg-white border border-black/[0.08] shadow-[0_12px_32px_rgba(0,0,0,0.12)] rounded-2xl p-4 min-w-[160px]">
-        <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontSize: '13px', fontWeight: 700, color: '#0A0A0A', marginBottom: '8px' }}>
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid rgba(0,0,0,0.07)',
+        borderRadius: '14px',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.10)',
+        padding: '12px 16px',
+        minWidth: '168px',
+        fontFamily: 'var(--font-inter), sans-serif',
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: '#0A0A0A', marginBottom: '10px', letterSpacing: '-0.01em' }}>
           {cleanLabel}
         </div>
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-6 text-[12px]" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-            <span className="flex items-center gap-1.5 text-[#555] font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-black" />
-              Discovered
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B35', flexShrink: 0 }} />
+              Threads Found
             </span>
-            <span className="font-bold text-black">{payload[0]?.value}</span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B35' }}>{payload[0]?.value}</span>
           </div>
-          <div className="flex items-center justify-between gap-6 text-[12px]" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-            <span className="flex items-center gap-1.5 text-[#555] font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#0A84FF]" />
-              Qualified
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0 }} />
+              High-Intent
             </span>
-            <span className="font-bold text-[#0A84FF]">{payload[1]?.value}</span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0A84FF' }}>{payload[1]?.value}</span>
           </div>
         </div>
       </div>
@@ -426,44 +434,74 @@ const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
 const LeadDiscoveryWidget = () => {
   return (
     <div className="w-full h-full flex flex-col justify-between">
+      {/* Header row: title + legend */}
       <div className="flex items-center justify-between mb-4">
-        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>Lead Discovery</h4>
+        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>
+          Lead Discovery
+        </h4>
+        {/* Legend pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontFamily: 'var(--font-inter), sans-serif', fontSize: '12px',
+            color: '#9B9B9B', fontWeight: 500,
+          }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B35', flexShrink: 0, display: 'inline-block' }} />
+            Threads Found
+          </span>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontFamily: 'var(--font-inter), sans-serif', fontSize: '12px',
+            color: '#9B9B9B', fontWeight: 500,
+          }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0, display: 'inline-block' }} />
+            High-Intent
+          </span>
+        </div>
       </div>
+
       <div className="flex-1 w-full min-h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={leadDiscoveryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
             <defs>
+              {/* Primary: #FF6B35 orange, 15% → 0% */}
               <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0A0A0A" stopOpacity={0.03} />
-                <stop offset="95%" stopColor="#0A0A0A" stopOpacity={0.0} />
+                <stop offset="5%"  stopColor="#FF6B35" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#FF6B35" stopOpacity={0.0}  />
               </linearGradient>
+              {/* Secondary: #0A84FF blue, 10% → 0% */}
               <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.12} />
-                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0} />
+                <stop offset="5%"  stopColor="#0A84FF" stopOpacity={0.10} />
+                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0}  />
               </linearGradient>
             </defs>
+
+            {/* No gridlines — clean design-system spec */}
             <XAxis
               dataKey="name"
               tickFormatter={(tick) => (tick.includes('-') ? '' : tick)}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: '#8E8E93', fontSize: 11, fontFamily: 'var(--font-inter)' }}
+              tick={{ fill: '#9B9B9B', fontSize: 12, fontFamily: 'var(--font-inter), sans-serif' }}
             />
             <YAxis
               ticks={[0, 250, 500, 1000]}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: '#8E8E93', fontSize: 11, fontFamily: 'var(--font-inter)' }}
+              tick={{ fill: '#9B9B9B', fontSize: 12, fontFamily: 'var(--font-inter), sans-serif' }}
             />
-            <Tooltip content={<LeadDiscoveryTooltip />} />
+            <Tooltip content={<LeadDiscoveryTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
+
+            {/* Primary series — Threads Found — #FF6B35 orange */}
             <Area
               type="monotone"
               dataKey="discovered"
-              stroke="#0A0A0A"
+              stroke="#FF6B35"
               strokeWidth={2}
               fill="url(#colorDiscovered)"
-              activeDot={{ r: 5, fill: '#0A0A0A', stroke: '#fff', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: '#FF6B35', stroke: '#fff', strokeWidth: 2 }}
             />
+            {/* Secondary series — High-Intent Matches — #0A84FF blue (intentional) */}
             <Area
               type="monotone"
               dataKey="qualified"
@@ -869,14 +907,8 @@ export default function LandingPage() {
 
               {/* Right: Mockup Card */}
               <motion.div variants={fadeUp} className="relative">
-                <div className="myniq-card p-[28px] relative z-10 flex flex-col h-[400px] justify-between">
-                  <div className="flex-1 flex flex-col justify-center mb-6">
-                    <LeadDiscoveryWidget />
-                  </div>
-                  <div>
-                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.025em', color: '#0A0A0A', marginBottom: '5px' }}>Lead Discovery</h4>
-                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>Track discovered vs qualified leads generated in real time</p>
-                  </div>
+                <div className="myniq-card p-[28px] relative z-10 flex flex-col h-[400px]">
+                  <LeadDiscoveryWidget />
                 </div>
               </motion.div>
             </div>
@@ -1242,7 +1274,7 @@ export default function LandingPage() {
         <Section id="pricing" className="bg-[#F4F4F6] pt-[100px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <motion.div variants={fadeUp} className="text-center mb-[36px]">
-              <SectionBadge color="#FF5622" text="Pricing" />
+              <SectionBadge color="#0A0A0A" text="Pricing" />
               <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 52px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A' }}>
                 Simple, honest pricing
               </h2>
@@ -1250,15 +1282,15 @@ export default function LandingPage() {
 
             {/* Toggle */}
             <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-12">
-              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: !isYearly ? '#0A0A0A' : '#ADADAD' }}>Monthly</span>
-              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer bg-[#FF5622]" aria-label="Toggle yearly billing">
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: !isYearly ? '#0A0A0A' : '#71717A' }}>Monthly</span>
+              <button onClick={() => setIsYearly(!isYearly)} className="w-[48px] h-[26px] rounded-full relative transition-colors duration-200 cursor-pointer bg-[#0A0A0A]" aria-label="Toggle yearly billing">
                 <motion.div
                   className="w-[18px] h-[18px] bg-white rounded-full absolute top-[4px] shadow-sm"
                   animate={{ x: isYearly ? 26 : 4 }}
                   transition={springs.snappy}
                 />
               </button>
-              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: isYearly ? '#0A0A0A' : '#ADADAD' }}>Yearly</span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', fontWeight: 600, color: isYearly ? '#0A0A0A' : '#71717A' }}>Yearly</span>
               <AnimatePresence>
                 {isYearly && (
                   <motion.span
@@ -1266,9 +1298,9 @@ export default function LandingPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.85 }}
                     transition={springs.snappy}
-                    className="bg-[#FFE3D8] text-[#FF5622] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
+                    className="bg-[#E4E4E7] text-[#0A0A0A] text-[11px] font-[800] px-3 py-1 rounded-full tracking-[0.02em] uppercase"
                   >
-                    Save 20%
+                    Save 2 months
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -1298,7 +1330,7 @@ export default function LandingPage() {
                     Great for trying out Scouto buyer intent signals and rule monitoring.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
+                  <Link href="/signup" className="w-full bg-[#0A0A0A] hover:bg-[#27272A] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6 shadow-sm">
                     Get Started
                   </Link>
 
@@ -1307,9 +1339,9 @@ export default function LandingPage() {
                   <div className="flex flex-col gap-3.5">
                     {[
                       '1 Active Keyword Rule',
-                      '15 Buyer Intent Signals / mo',
+                      'Up to 50 Buyer Intent Signals / mo',
                       'AI Intent Scoring (0–100)',
-                      '1-Click Draft Preview',
+                      '1-Click Draft Preview (Manual copy/send requires upgrade)',
                       'Reddit & Bluesky Monitoring'
                     ].map((f) => (
                       <div key={f} className="flex items-start gap-2.5 text-left">
@@ -1323,20 +1355,25 @@ export default function LandingPage() {
                 </div>
               </motion.div>
 
-              {/* Professional Card */}
+              {/* Professional Card (Most Popular Anchor) */}
               <motion.div
                 variants={fadeUp}
                 whileHover={{ y: -3 }}
                 transition={springs.snappy}
-                className="bg-white rounded-[24px] border border-[#EAEAEC] p-8 flex flex-col justify-between"
+                className="bg-white rounded-[24px] border-2 border-[#0A0A0A] p-8 flex flex-col justify-between relative shadow-xl"
               >
+                {/* Most Popular Anchor Badge */}
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0A0A0A] text-white text-[11px] font-bold px-3.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                  Most Popular
+                </div>
+
                 <div>
                   <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
                     Professional
                   </h3>
                   <div className="flex items-baseline mb-4">
                     <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
-                      ${isYearly ? '79' : '97'}
+                      ${isYearly ? '39' : '49'}
                     </span>
                     <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
@@ -1346,9 +1383,15 @@ export default function LandingPage() {
                     Best for solo founders, freelancers & growing teams.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
+                  <Link href="/signup" className="w-full bg-[#0A0A0A] hover:bg-[#27272A] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6 shadow-sm">
                     Get Started
                   </Link>
+
+                  {/* Highlighted Headline Feature for Confidence Engine */}
+                  <div className="mb-6 p-3.5 rounded-[14px] bg-[#F4F4F6] border border-[#EAEAEC] text-[13px] font-medium text-[#18181B] leading-snug text-left flex items-start gap-2.5">
+                    <span className="text-[#0A0A0A] font-bold text-[14px] leading-none">✦</span>
+                    <span>The only tool that learns when it&apos;s safe to auto-send — and when it isn&apos;t.</span>
+                  </div>
 
                   <div className="w-full border-t border-dotted border-[#E2E2E6] mb-6" />
 
@@ -1356,7 +1399,7 @@ export default function LandingPage() {
                     {[
                       'Everything in Free',
                       '10 Active Keyword Rules',
-                      '250 Buyer Intent Signals / mo',
+                      'Up to 1,000 Buyer Intent Signals / mo',
                       '1-Click Automated Posting',
                       'Auto-Send Automation Engine',
                       'Custom Brand Voice Training'
@@ -1372,7 +1415,7 @@ export default function LandingPage() {
                 </div>
               </motion.div>
 
-              {/* Enterprise Card */}
+              {/* Growth Card (Renamed from Enterprise) */}
               <motion.div
                 variants={fadeUp}
                 whileHover={{ y: -3 }}
@@ -1381,21 +1424,21 @@ export default function LandingPage() {
               >
                 <div>
                   <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
-                    Enterprise
+                    Growth
                   </h3>
                   <div className="flex items-baseline mb-4">
                     <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
-                      ${isYearly ? '209' : '257'}
+                      ${isYearly ? '119' : '149'}
                     </span>
                     <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
                     </span>
                   </div>
                   <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
-                    Ideal for scaling companies that need deep automation & custom setups.
+                    Ideal for scaling teams that need deep automation & maximum signal volume.
                   </p>
 
-                  <Link href="/signup" className="w-full bg-[#FF5622] hover:bg-[#E64A19] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6">
+                  <Link href="/signup" className="w-full bg-[#0A0A0A] hover:bg-[#27272A] text-white text-[15px] font-medium text-center py-3 rounded-[16px] transition-all duration-150 block mb-6 shadow-sm">
                     Get Started
                   </Link>
 
@@ -1405,9 +1448,9 @@ export default function LandingPage() {
                     {[
                       'Everything in Professional',
                       '50 Active Keyword Rules',
-                      '1,500 Buyer Intent Signals / mo',
-                      'Priority Subreddit Fan-out',
-                      'Community Trust Analytics',
+                      'Up to 5,000 Buyer Intent Signals / mo',
+                      'Faster discovery — new posts surface sooner',
+                      'Subreddit reply conversion & trust analytics',
                       'Dedicated Founder Support'
                     ].map((f) => (
                       <div key={f} className="flex items-start gap-2.5 text-left">
@@ -1418,8 +1461,29 @@ export default function LandingPage() {
                       </div>
                     ))}
                   </div>
+
+                  <div className="mt-5 pt-4 border-t border-dashed border-[#E2E2E6]">
+                    <Link
+                      href="/contact"
+                      style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#71717A' }}
+                      className="hover:text-[#0A0A0A] transition-colors"
+                    >
+                      Need more? Talk to us →
+                    </Link>
+                  </div>
                 </div>
               </motion.div>
+            </motion.div>
+
+            {/* Overage & Custom Limits Messaging */}
+            <motion.div variants={fadeUp} className="text-center mt-10">
+              <p className="font-sans text-[14px] text-[#71717A]">
+                Need more volume or custom limits?{' '}
+                <Link href="/signup" className="text-[#0A0A0A] font-medium underline underline-offset-4 hover:text-[#27272A] transition-colors">
+                  Upgrade or contact us anytime
+                </Link>{' '}
+                — no penalty for outgrowing your plan.
+              </p>
             </motion.div>
           </div>
         </Section>

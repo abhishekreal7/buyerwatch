@@ -74,10 +74,7 @@ export async function scorePostHandler(job: Job) {
       userId,
       post.platform,
       draftResult,
-      profile,
-      // targetCommunity must be the subreddit/hashtag name (e.g. "entrepreneur"),
-      // NOT post.author (the post-author's username). community_trust_metrics rows
-      // are keyed by target_community which stores the monitoring target.
+      { auto_send_enabled: profile.auto_send_enabled, plan: profile.plan ?? 'free' },
       post.sourceTarget ?? null
     )
 
@@ -110,8 +107,9 @@ export async function scorePostHandler(job: Job) {
 
 async function checkBudget(userId: string, plan: string, service: 'gemini' | 'claude') {
   const limits: Record<string, Record<'gemini' | 'claude', number>> = {
-    free: { gemini: 50, claude: 5 },
-    pro: { gemini: 500, claude: 100 },
+    free:   { gemini: 50,   claude: 40 },   // 40 aligns with plan-limits.ts free.aiDraftsPerMonth
+    pro:    { gemini: 500,  claude: 400 },
+    growth: { gemini: 2000, claude: 2000 },
   }
   
   const userPlan = limits[plan] ? plan : 'free'

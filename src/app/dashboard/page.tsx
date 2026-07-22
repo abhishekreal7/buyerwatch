@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Target, Edit3, CheckCircle, Filter, ChevronDown, MessageCircle, ArrowUp, ExternalLink, X, RefreshCcw, Copy, ArrowRight, FileText, Lock } from 'lucide-react'
+import { Search, Target, Edit3, CheckCircle, Filter, ChevronDown, MessageCircle, ArrowUp, ExternalLink, X, RefreshCcw, Copy, ArrowRight, FileText, Lock, Sparkles } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
+import { UpgradeModal } from '@/components/UpgradeModal'
+import { getPlanLimits } from '@/lib/plan-limits'
 
 interface Thread {
   id: string
@@ -45,16 +47,29 @@ export default function DashboardPage() {
     postedToday: 0,
     trend: '+0 today',
   })
+  const [keywordsCount, setKeywordsCount] = useState(0)
+  const [keywordsMax, setKeywordsMax] = useState(1)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [userId, setUserId] = useState('')
   const supabase = createClient()
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    setUserId(user.id)
 
     const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
     if (profile?.plan) {
       setPlan(profile.plan)
+      setKeywordsMax(getPlanLimits(profile.plan).keywords)
     }
+
+    // Load keyword count for upgrade banner logic
+    const { count: kwCount } = await supabase
+      .from('keywords')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+    setKeywordsCount(kwCount ?? 0)
 
     // Load threads with their drafts
     const { data: threadData, error } = await supabase
@@ -231,6 +246,16 @@ export default function DashboardPage() {
   return (
     <div className="max-w-[1400px] mx-auto py-8">
 
+      {/* Post-upgrade modal — shown once per plan tier per browser, via localStorage */}
+      {!loading && userId && (
+        <UpgradeModal
+          userId={userId}
+          plan={plan}
+          keywordsUsed={keywordsCount}
+          keywordsMax={keywordsMax}
+        />
+      )}
+
       {/* Stats Container */}
       <div className="bg-surface rounded-2xl border border-black/5 shadow-sm py-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-black/5">
@@ -284,6 +309,38 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Upgrade banner (Placement B) ──────────────────────────────
+          Show once per session when:
+          - plan === 'free'
+          - user is at 1-keyword limit (keywordsCount >= 1)
+          - at least 1 high-intent thread found (real data)
+          - banner not yet dismissed this session
+      ──────────────────────────────────────────────────────────── */}
+      {!loading && plan === 'free' && keywordsCount >= 1 && stats.highIntent > 0 && !bannerDismissed && (
+        <div className="mb-6 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 flex items-center gap-4">
+          <Sparkles className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={1.75} />
+          <p className="flex-1 text-[13.5px] text-amber-900 leading-relaxed">
+            <span className="font-semibold">{stats.highIntent} high-intent conversation{stats.highIntent !== 1 ? 's' : ''} found</span>{' '}
+            this month with your current keyword. You&apos;re only monitoring 1 topic. Upgrading to Professional
+            adds 9 more keywords — each one is a different buying conversation you&apos;re currently invisible in.
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="/pricing"
+              className="text-[13px] font-semibold text-white bg-gray-900 hover:bg-gray-800 px-3.5 py-2 rounded-xl transition-colors"
+            >
+              Upgrade
+            </a>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters & Tabs */}
       <div className="flex items-center gap-4 mb-6 flex-wrap">

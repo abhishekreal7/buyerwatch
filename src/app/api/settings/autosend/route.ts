@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { normalizePlan } from '@/lib/plan-limits'
 
 export async function PATCH(req: Request) {
   const cookieStore = await cookies()
@@ -23,6 +24,24 @@ export async function PATCH(req: Request) {
   const { auto_send_enabled } = await req.json()
   if (typeof auto_send_enabled !== 'boolean') {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+  }
+
+  // Plan gate: auto-send is a Professional/Growth feature.
+  // Block Free users from enabling it at the API level — this prevents a direct
+  // API call from bypassing the UI-level locked toggle in Settings.
+  if (auto_send_enabled === true) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', user.id)
+      .single()
+
+    if (normalizePlan(profile?.plan) === 'free') {
+      return NextResponse.json(
+        { error: 'auto_send_requires_paid_plan' },
+        { status: 403 }
+      )
+    }
   }
 
   const { error } = await supabase

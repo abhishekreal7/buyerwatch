@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, MoreHorizontal, Check, X, Pause, Play,
-  Trash2, Target, ChevronDown, Radio, Rss
+  Trash2, Target, ChevronDown, Radio, Rss, Sparkles, ArrowRight
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
+import { normalizePlan } from '@/lib/plan-limits'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
 
@@ -132,6 +133,7 @@ export default function KeywordsPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused'>('all')
   const [menuId, setMenuId] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<Record<string, { total: number; replied: number }>>({})
+  const [userPlan, setUserPlan] = useState<string>('free')
   const termRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -184,7 +186,18 @@ export default function KeywordsPage() {
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
+        setUserPlan(normalizePlan(profile?.plan))
+      }
+      await load()
+    }
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleAdd = async () => {
     if (!newTerm.trim() || !newTarget.trim()) { toast.error('Fill in keyword and target'); return }
@@ -297,6 +310,30 @@ export default function KeywordsPage() {
             New Rule
           </motion.button>
         </div>
+
+        {/* ── Downgrade banner ─────────────────────────────────────
+            Shown when plan=free and there are paused rules (post-downgrade).
+            Never shown to always-free users (they have 0 paused rules).
+            Persistent — resolves only when user upgrades.
+        ─────────────────────────────────────────────────────────── */}
+        {!loading && userPlan === 'free' && pausedCount > 0 && (
+          <div className="mb-6 rounded-2xl border border-orange-100 bg-orange-50 px-5 py-4 flex items-center gap-4">
+            <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+              <Rss className="w-4 h-4 text-orange-500" strokeWidth={1.75} />
+            </div>
+            <p className="flex-1 text-[13.5px] text-orange-900 leading-relaxed">
+              <span className="font-semibold">{pausedCount} rule{pausedCount !== 1 ? 's are' : ' is'} paused</span>{' '}
+              because your current plan includes 1 active keyword.
+              Upgrade to reactivate all {pausedCount}.
+            </p>
+            <a
+              href="/pricing"
+              className="shrink-0 text-[13px] font-semibold text-white bg-gray-900 hover:bg-gray-800 px-3.5 py-2 rounded-xl transition-colors"
+            >
+              Upgrade →
+            </a>
+          </div>
+        )}
 
         {/* ── Add Rule Panel ───────────────────────────────────── */}
         <AnimatePresence>
@@ -575,6 +612,49 @@ export default function KeywordsPage() {
           </div>
 
         </div>
+
+        {/* ── Upgrade prompt (Placement A) ─────────────────────────
+            Shown only when:
+            1. plan === 'free'
+            2. user is at the 1-keyword limit (keywords.length >= 1)
+            3. that keyword has >= 1 real discovered thread (real data only)
+        ─────────────────────────────────────────────────────────── */}
+        {!loading && userPlan === 'free' && keywords.length >= 1 && (() => {
+          const firstKw = keywords[0]
+          const kwStats = metrics[firstKw?.id] || { total: 0, replied: 0 }
+          if (kwStats.total === 0) return null
+          const avgPerKeyword = kwStats.total
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              className="mt-4 rounded-[18px] border border-black/[0.06] bg-gradient-to-br from-white to-[#F9F9FB] p-5 flex items-start gap-4"
+            >
+              <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles className="w-4 h-4 text-amber-500" strokeWidth={1.75} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-semibold text-text-primary mb-1">
+                  Your 1 keyword has found{' '}
+                  <span className="text-black">{kwStats.total}</span>{' '}
+                  conversation{kwStats.total !== 1 ? 's' : ''} this month.
+                </p>
+                <p className="text-[13px] text-text-secondary leading-relaxed">
+                  Teams on Professional track up to 10 topics simultaneously — each additional
+                  keyword typically surfaces ~{avgPerKeyword} new conversation{avgPerKeyword !== 1 ? 's' : ''} per month.
+                </p>
+              </div>
+              <a
+                href="/pricing"
+                className="shrink-0 flex items-center gap-1.5 text-[13px] font-semibold text-white bg-gray-900 hover:bg-gray-800 px-4 py-2 rounded-xl transition-colors"
+              >
+                Upgrade to Professional
+                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </a>
+            </motion.div>
+          )
+        })()}
       </div>
     </AppPage>
   )
