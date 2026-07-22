@@ -11,12 +11,12 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 import { supabaseWorker as supabase } from '../lib/supabase'
 
 export async function redditFetchHandler(job: Job) {
-  const { target } = job.data // e.g. "smallbusiness"
+  // keywordMappings is optionally pre-supplied by the fetch-now route so that
+  // results are correctly linked to the triggering user without a second DB lookup.
+  const { target, keywordMappings: preloadedMappings } = job.data // e.g. "smallbusiness"
 
   if (process.env.REDDIT_API_APPROVED !== 'true') {
     logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode — pending API approval')
-  } else if (process.env.USE_MOCK_REDDIT === 'true') {
-    logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode (USE_MOCK_REDDIT=true)')
   }
 
   try {
@@ -24,18 +24,34 @@ export async function redditFetchHandler(job: Job) {
     
     if (!posts || posts.length === 0) return
 
-    // Find all users watching this specific subreddit
-    // Note: in a massive app, you'd cache the mappings of target -> users in Redis
-    const { data: keywordMappings, error } = await supabase
-      .from('keywords')
-      .select('id, user_id, term')
-      .eq('platform', 'reddit')
-      .eq('target', target)
-      .eq('is_active', true) // assuming an active flag exists
+    // If keywordMappings was pre-supplied (fetch-now path), use it directly.
+    // Otherwise fall back to DB lookup (standard cron path).
+    let keywordMappings = preloadedMappings
+    if (!keywordMappings) {
+      // Find all users watching this specific subreddit
+      // Note: in a massive app, you'd cache the mappings of target -> users in Redis
+      const { data, error } = await supabase
+        .from('keywords')
+        .select('id, user_id, term')
+        .eq('platform', 'reddit')
+        .eq('target', target)
+        .eq('is_active', true)
 
-    if (error) {
-      logger.error({ error }, 'Supabase error fetching keywords:')
-      return
+      if (error) {
+        logger.error({ error }, 'Supabase error fetching keywords:')
+        return
+      }
+      keywordMappings = data
+    } else {
+      // When mappings are pre-supplied, fetch the keyword terms for text matching
+      if (keywordMappings.length > 0) {
+        const ids = keywordMappings.map((m: any) => m.id)
+        const { data: kwData } = await supabase
+          .from('keywords')
+          .select('id, user_id, term')
+          .in('id', ids)
+        if (kwData) keywordMappings = kwData
+      }
     }
 
     if (!keywordMappings || keywordMappings.length === 0) return
@@ -64,3 +80,4 @@ export async function redditFetchHandler(job: Job) {
     throw error // BullMQ will retry based on config
   }
 }
+

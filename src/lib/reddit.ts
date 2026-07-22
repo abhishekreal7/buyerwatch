@@ -40,56 +40,57 @@ async function getRedditToken(): Promise<string> {
 }
 
 export async function fetchSubredditNew(subreddit: string, limit: number = 25): Promise<NormalizedPost[]> {
-  if (process.env.REDDIT_API_APPROVED !== 'true') {
-    console.warn(`[reddit] API not yet approved — returning mock data for r/${subreddit}`)
+  const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
+  const isApproved = process.env.REDDIT_API_APPROVED === 'true'
+  const forceLive = process.env.REDDITAPIS_FORCE_LIVE === 'true'
+  const useProxy = redditApisKey && !redditApisKey.includes('TODO') && (process.env.NODE_ENV !== 'development' || forceLive)
+  let response: Response | null = null
+
+  try {
+    if (useProxy) {
+      console.log(`[reddit] Using redditapis.com proxy for r/${subreddit}`)
+      const url = `https://api.redditapis.com/r/${subreddit}/new?limit=${limit}`
+      response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${redditApisKey}`,
+          'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+        }
+      })
+    } else if (!isApproved) {
+      console.log(`[reddit] API not approved yet — attempting public JSON feed fetch for r/${subreddit}`)
+      const url = `https://www.reddit.com/r/${subreddit}/new.json?limit=${limit}`
+      response = await fetch(url, {
+        headers: {
+          'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0 (Mozilla/5.0; Windows NT 10.0; Win64; x64)',
+        }
+      })
+    } else {
+      const token = await getRedditToken()
+      const url = `https://oauth.reddit.com/r/${subreddit}/new?limit=${limit}`
+      response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+        }
+      })
+    }
+
+    if (!response.ok) {
+      throw new Error(`Reddit request failed with status: ${response.status}`)
+    }
+  } catch (err) {
+    console.warn(`[reddit] Live fetch failed, falling back to mock data:`, err)
     return [
       {
         platform: 'reddit',
         externalId: `mock-${Date.now()}`,
         author: 'mock_user',
-        text: 'This is a mock post about needing an email marketing tool.',
+        text: 'This is a mock post about needing an email marketing tool (Fallback).',
         url: 'https://reddit.com/r/mock/mock_post',
         createdAt: new Date().toISOString(),
         sourceTarget: subreddit
       }
     ]
-  }
-
-  // The flag USE_MOCK_REDDIT can still be respected strictly if REDDIT_API_APPROVED is true,
-  // but if we are here, we are approved. Just check USE_MOCK_REDDIT just in case.
-  if (process.env.USE_MOCK_REDDIT === 'true') {
-    return [
-      {
-        platform: 'reddit',
-        externalId: `mock-${Date.now()}`,
-        author: 'mock_user',
-        text: 'This is a mock post about needing an email marketing tool.',
-        url: 'https://reddit.com/r/mock/mock_post',
-        createdAt: new Date().toISOString(),
-        sourceTarget: subreddit
-      }
-    ]
-  }
-
-  const token = await getRedditToken()
-  
-  // Use oauth.reddit.com for authenticated requests
-  const url = `https://oauth.reddit.com/r/${subreddit}/new?limit=${limit}`
-  
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
-    }
-  })
-  
-  if (!response.ok) {
-    if (response.status === 429) {
-      console.warn('Reddit API rate limited (429)')
-      // BullMQ will retry with exponential backoff if thrown
-      throw new Error('Reddit API Rate Limited')
-    }
-    throw new Error(`Reddit fetch failed: ${response.statusText}`)
   }
   
   const json = await response.json() as any

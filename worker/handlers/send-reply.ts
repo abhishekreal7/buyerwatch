@@ -28,12 +28,20 @@ export async function sendReplyHandler(job: Job<SendReplyData>) {
     // 1. Enforce rate limits
     const rateLimitCheck = await checkSendRateLimit(userId, platform as 'reddit' | 'bluesky')
     if (!rateLimitCheck.allowed) {
-      const { sendReplyQueue } = await import('../../src/lib/queues/index.js')
       const delayMs = rateLimitCheck.reset ? Math.max(rateLimitCheck.reset - Date.now(), 10000) : 60000
       
-      logger.info({ jobId: job.id, platform, delayMs }, 'Rate limit exceeded, re-queuing with delay')
-      await sendReplyQueue.add(job.name, job.data, { delay: delayMs })
-      return // Gracefully exit without failing, as we have re-queued it
+      logger.info({ jobId: job.id, platform, delayMs, reason: rateLimitCheck.reason }, 'Rate limit exceeded, will retry after delay')
+
+      // Throw a retriable PlatformPostError so BullMQ handles the retry with backoff
+      // and the job appears in the "delayed" or "waiting" state — not "completed".
+      // The error handler below treats retriable=true as non-permanent and skips the
+      // failure audit log, so there is no false alarm at this stage.
+      const retryErr = new PlatformPostError(
+        platform,
+        `Rate limited: ${rateLimitCheck.reason}`,
+        true
+      )
+      throw retryErr
     }
 
     // 2. Dispatch to platform

@@ -109,38 +109,47 @@ Write ONLY the reply text, nothing else.
   let draftText = ''
 
   try {
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    
-    let response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }]
-    })
-    
-    if (response.content[0].type === 'text') {
-      draftText = response.content[0].text
-    }
-
-    if (flagsAsPromotional(draftText)) {
-      // Regenerate once to remove promotional language
-      response = await anthropic.messages.create({
+    if (process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
+      const { generateKimiChat } = await import('./kimi')
+      draftText = await generateKimiChat({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.5,
+      })
+    } else {
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      
+      let response = await anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1000,
         system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt },
-          { role: 'assistant', content: draftText },
-          { role: 'user', content: 'This draft sounds too promotional or templated. Rewrite it to completely remove marketing phrasing (like "check out", "game changer", etc.) and ensure it reads like a completely organic, helpful community comment.' }
-        ]
+        messages: [{ role: 'user', content: userPrompt }]
       })
+      
       if (response.content[0].type === 'text') {
         draftText = response.content[0].text
       }
-    }
 
+      if (flagsAsPromotional(draftText)) {
+        response = await anthropic.messages.create({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [
+            { role: 'user', content: userPrompt },
+            { role: 'assistant', content: draftText },
+            { role: 'user', content: 'This draft sounds too promotional or templated. Rewrite it to completely remove marketing phrasing (like "check out", "game changer", etc.) and ensure it reads like a completely organic, helpful community comment.' }
+          ]
+        })
+        if (response.content[0].type === 'text') {
+          draftText = response.content[0].text
+        }
+      }
+    }
   } catch (error) {
-    console.warn('Claude failed, using Gemini', error)
+    console.warn('Primary LLM failed, falling back to Gemini...', error)
     try {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
@@ -148,7 +157,7 @@ Write ONLY the reply text, nothing else.
       const result = await model.generateContent(combinedPrompt)
       draftText = result.response.text()
     } catch (fallbackError) {
-      console.error('Both Claude and Gemini failed to draft:', fallbackError)
+      console.error('Gemini fallback failed to draft:', fallbackError)
       draftText = getMockDraft(post, userProfile)
     }
   }

@@ -111,6 +111,7 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('profile')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [upgrading, setUpgrading] = useState(false)
 
   const [profile, setProfile] = useState({
     businessName: '',
@@ -135,7 +136,7 @@ export default function SettingsPage() {
     highIntentAlerts: true,
     weeklyReport: false,
   })
-  
+
   const [planState, setPlanState] = useState<{ plan: string, keywordsMax: number, threadsMax: number, draftsMax: number }>({
     plan: 'free',
     keywordsMax: PLAN_LIMITS.free.keywords,
@@ -174,7 +175,7 @@ export default function SettingsPage() {
       // Load Usage Data
       const now = new Date()
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      
+
       const [
         { count: threadsCount },
         { count: draftsCount },
@@ -186,14 +187,14 @@ export default function SettingsPage() {
         supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay).eq('was_sent', true),
         supabase.from('keywords').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
       ])
-      
+
       setUsageStats({
         threads: threadsCount || 0,
         drafts: draftsCount || 0,
         replies: sentCount || 0,
         keywords: keywordsCount || 0,
       })
-      
+
       if (p) {
         const plan = normalizePlan(p.plan)
         const limits = getPlanLimits(plan)
@@ -206,6 +207,31 @@ export default function SettingsPage() {
       }
     }
     load()
+
+    // Handle OAuth Callback search parameters
+    const params = new URLSearchParams(window.location.search)
+    const success = params.get('success')
+    const error = params.get('error')
+
+    if (success === 'reddit_connected') {
+      toast.success('Successfully connected Reddit account!')
+      const newUrl = window.location.pathname + window.location.hash
+      window.history.replaceState({}, '', newUrl)
+    } else if (error) {
+      if (error === 'reddit_state_mismatch') {
+        toast.error('Reddit connection failed: State mismatch (CSRF protection triggered).')
+      } else if (error === 'reddit_token_failed') {
+        toast.error('Reddit connection failed: Could not exchange authorization token.')
+      } else if (error === 'reddit_auth_failed') {
+        toast.error('Reddit connection failed: Access denied or authorization failed.')
+      } else if (error === 'reddit_credentials_missing') {
+        toast.error('Reddit connection failed: REDDIT_CLIENT_ID is missing or empty in .env.local.')
+      } else {
+        toast.error(`Reddit connection failed: ${error.replace(/_/g, ' ')}`)
+      }
+      const newUrl = window.location.pathname + window.location.hash
+      window.history.replaceState({}, '', newUrl)
+    }
   }, [])
 
   const handleSave = async () => {
@@ -232,6 +258,24 @@ export default function SettingsPage() {
     setSaveSuccess(true)
     toast.success('Settings saved')
     setTimeout(() => setSaveSuccess(false), 2500)
+  }
+
+  const handleUpgrade = async () => {
+    setUpgrading(true)
+    try {
+      const res = await fetch('/api/billing/checkout', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && data.url) {
+        window.location.href = data.url
+      } else {
+        toast.error('Billing not yet configured')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Billing not yet configured')
+    } finally {
+      setUpgrading(false)
+    }
   }
 
   const handleConnectReddit = () => { window.location.href = '/api/auth/reddit' }
@@ -290,8 +334,8 @@ export default function SettingsPage() {
                   <button
                     onClick={() => setActiveSection(s.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer group ${activeSection === s.id
-                        ? 'bg-gray-900 text-white'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'bg-gray-900 text-white'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                       }`}
                   >
                     <s.icon className={`w-4 h-4 shrink-0 ${activeSection === s.id ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={2} />
@@ -386,7 +430,7 @@ export default function SettingsPage() {
                             className={inputCls + ' resize-none'}
                           />
                         </Field>
-                        
+
                         <Field label="Tone Examples" hint="Paste 2-3 examples of replies you've written in the past.">
                           <textarea
                             value={profile.toneExamples}
@@ -415,8 +459,8 @@ export default function SettingsPage() {
                         onClick={handleSave}
                         disabled={saving}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-200 cursor-pointer shadow-sm ${saveSuccess
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-gray-900 hover:bg-gray-800 text-white'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-gray-900 hover:bg-gray-800 text-white'
                           }`}
                       >
                         {saveSuccess ? (
@@ -599,7 +643,7 @@ export default function SettingsPage() {
                             <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Active</span>
                           </div>
                           <p className="text-[13px] text-gray-500">
-                            {planState.plan === 'free' ? 'Limited to 50 threads/month. Upgrade for full power.' : 'You have access to all premium features.'}
+                            {planState.plan === 'free' ? 'Limited to 10 threads/month. Upgrade for full power.' : 'You have access to all premium features.'}
                           </p>
                         </div>
                       </div>
@@ -630,16 +674,15 @@ export default function SettingsPage() {
                                 <span className="text-[12px] font-semibold text-white/60">$19/mo</span>
                               </div>
                               <p className="text-[12px] text-white/50 leading-relaxed">
-                                500 threads/month, auto-send, X/Twitter monitoring, priority support.
+                                500 threads/month, auto-send, subreddit targeting, priority support.
                               </p>
                             </div>
-                            <button className="shrink-0 text-[13px] font-semibold bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors cursor-pointer"
-                              onClick={() => {
-                                // Real implementation would redirect to LemonSqueezy checkout URL with user_id
-                                toast.success('Redirecting to checkout (Placeholder)')
-                              }}
+                            <button
+                              className="shrink-0 text-[13px] font-semibold bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                              onClick={handleUpgrade}
+                              disabled={upgrading}
                             >
-                              Upgrade
+                              {upgrading ? 'Redirecting...' : 'Upgrade'}
                             </button>
                           </div>
                         </div>
@@ -650,7 +693,7 @@ export default function SettingsPage() {
                       {[
                         { label: 'Threads monitored', used: usageStats.threads, max: planState.threadsMax },
                         { label: 'Drafts generated', used: usageStats.drafts, max: planState.draftsMax },
-                        { label: 'Replies sent', used: usageStats.replies, max: planState.repliesMax },
+                        { label: 'Replies sent', used: usageStats.replies, max: planState.draftsMax },
                       ].map(item => (
                         <div key={item.label} className="mb-5 last:mb-0">
                           <div className="flex items-center justify-between text-[13px] mb-1.5">

@@ -58,7 +58,7 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
         const targets = blueskyTargets.length > 0 ? blueskyTargets : [k.term]
         targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'bluesky', target: t }))
       }
-      if (k.platforms.includes('x') && plan === 'business') {
+      if (k.platforms.includes('x') && false) {
         const targets = xTargets.length > 0 ? xTargets : [k.term]
         targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'x', target: t }))
       }
@@ -221,12 +221,12 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${kw.platforms.includes('bluesky') ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'border-border text-text-secondary hover:border-border-hover'}`}
                       >Bluesky</button>
                       <button 
-                        disabled={plan !== 'business'}
+                        disabled={true}
                         onClick={() => toggleKeywordPlatform(i, 'x')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${kw.platforms.includes('x') ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'border-border text-text-secondary hover:border-border-hover'} ${plan !== 'business' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={plan !== 'business' ? 'Requires Business plan' : ''}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-tertiary opacity-50 cursor-not-allowed"
+                        title="X (Twitter) Monitoring is currently unavailable"
                       >
-                        X (Twitter) {plan !== 'business' && '🔒'}
+                        X (Twitter) 🔒
                       </button>
                       <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-tertiary opacity-50 cursor-not-allowed">Threads (Coming Soon)</button>
                     </div>
@@ -260,11 +260,11 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                     className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'bluesky' ? 'border-[#0A84FF] text-[#0A84FF]' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
                   >Bluesky Targets</button>
                   <button 
-                    disabled={plan !== 'business'}
+                    disabled={true}
                     onClick={() => setActiveTab('x')}
-                    className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'x' ? 'border-[#0A84FF] text-[#0A84FF]' : 'border-transparent text-text-secondary hover:text-text-primary'} ${plan !== 'business' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className="pb-2 text-sm font-medium transition-colors border-b-2 border-transparent text-text-tertiary opacity-50 cursor-not-allowed"
                   >
-                    X Targets {plan !== 'business' && '🔒'}
+                    X Targets 🔒
                   </button>
                 </div>
 

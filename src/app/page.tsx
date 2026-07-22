@@ -15,6 +15,15 @@ import { springs, staggers } from '@/lib/motion'
 import EyebrowBadge from '@/components/EyebrowBadge'
 import { StickyFeatureScroll } from '@/components/StickyFeatureScroll'
 import { FaReddit } from 'react-icons/fa6'
+import { AnimatedIcon } from '@/components/AnimatedIcon'
+import {
+  CustomKeywordRulesIcon,
+  ToneMatchingIcon,
+  ApprovalQueueIcon,
+  DailyDigestIcon,
+  InsightsHubIcon,
+  DataSecurityIcon
+} from '@/components/CustomFeatureIcons'
 
 
 const pathVariants = {
@@ -46,12 +55,14 @@ const analyticsData = [
 ]
 
 const faqs = [
-  { q: 'What is Scouto?', a: 'Scouto is an AI-powered social listening tool that monitors Reddit 24/7 for conversations where people need your product. It scores each match for buyer intent and drafts authentic replies in your voice, so you can engage with warm leads in minutes a day.' },
-  { q: 'Will Reddit ban my account?', a: 'No. Scouto never auto-posts. You personally review and post every reply. Authentic human engagement is exactly what Reddit encourages.' },
-  { q: 'Does it work for non-SaaS businesses?', a: 'Yes. Scouto works for any business with customers on Reddit — ecommerce, agencies, freelancers, coaches, newsletters, and physical products.' },
-  { q: 'How is this different from Google Alerts?', a: "Google Alerts finds mentions of your name after the fact. Scouto finds conversations where people NEED you — even if they've never heard of you — and scores them by how likely they are to buy." },
-  { q: 'How accurate is the intent scoring?', a: 'Our AI scores conversations across 4 categories: Buying, Researching, Complaining, and Other. Users report 94% accuracy on the Buying category — the highest-value matches.' },
-  { q: 'Can I try it for free?', a: 'Yes. The free plan gives you 2 keywords and 10 thread matches per month — no credit card required.' }
+  { q: 'What is Scouto?', a: 'It monitors Reddit, X, and Bluesky for people looking for solutions like yours, scores their intent, and drafts a reply. You just review and send.' },
+  { q: 'Will Reddit ban my account?', a: 'No. Scouto never posts without your approval. Since you review and send every reply, it complies with platform rules.' },
+  { q: 'Does it work for non-SaaS businesses?', a: 'Yes. As long as your customers talk about their problems online, Scouto can find them.' },
+  { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. Scouto finds active buying intent from people who don\'t know you yet.' },
+  { q: 'How accurate is the intent scoring?', a: 'We classify posts into Buying, Researching, Complaining, and Other. It has a 94% accuracy rate on confirmed buyers.' },
+  { q: 'Can I try it for free?', a: 'Yes. Start with 2 keywords and 10 matches a month. No card required.' },
+  { q: 'Does this violate Reddit, X, or Bluesky terms of service?', a: 'No. We use public APIs and never auto-post. You are just a human replying to public conversations.' },
+  { q: 'Won\'t these replies feel like AI spam?', a: 'Only if you let them. Scouto drafts replies using your product context and voice. If a draft feels off, edit it or skip it.' }
 ]
 
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
@@ -147,7 +158,7 @@ const PlatformSourcesWidget = () => {
     <div className="flex flex-col items-center gap-5 w-full">
       {/* Label */}
       <div style={{ fontSize: '11px', fontFamily: 'var(--font-inter)', fontWeight: 600, letterSpacing: '0.08em', color: '#ADADAD', textTransform: 'uppercase', textAlign: 'center' }}>
-        Seamlessly monitors signals from
+        Monitors intent signals on
       </div>
 
       <div className="flex items-center justify-center gap-8 md:gap-12 px-4">
@@ -690,6 +701,117 @@ export default function LandingPage() {
 
       <div className="relative z-20">
 
+        {/* ━ ━ ━ ━  section separator: PROBLEM ━ ━ ━ ━  */}
+        <Section className="bg-white py-20 border-b border-black/[0.05]">
+          <div className="max-w-[1200px] mx-auto px-6">
+            <div className="text-center mb-12">
+              <SectionBadge color="#FF3B30" text="The Problem" />
+              <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(32px, 4vw, 48px)', letterSpacing: '-0.04em', lineHeight: 1.1, color: '#0A0A0A' }}>
+                Cold outreach doesn't work anymore.
+              </h2>
+            </div>
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { title: 'Cold email response is <1%', desc: 'Inboxes are flooded. Nobody replies to cold pitches anymore.' },
+                { title: 'Manual search is a time sink', desc: 'Scrolling subreddits and social feeds takes hours you don\'t have.' },
+                { title: 'The window is minutes', desc: 'If you don\'t reply within 15 minutes, someone else already did.' }
+              ].map((p, i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <span className="text-[12px] font-bold text-[#FF3B30] uppercase tracking-wider">0{i+1}</span>
+                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A' }}>{p.title}</h4>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>{p.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+
+        {/* ━ ━ ━ ━  section separator: HOW IT WORKS ━ ━ ━ ━  */}
+        <Section id="how-it-works" className="bg-white pt-[120px] pb-[120px] border-b border-black/[0.05]">
+          <div className="max-w-[1100px] mx-auto px-[24px]">
+            <div className="text-center mb-[64px]">
+              <SectionBadge color="#0A84FF" text="How It Works" />
+              <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(36px, 4vw, 54px)', letterSpacing: '-0.045em', lineHeight: 1.05, color: '#0A0A0A' }}>
+                Simplify organic growth<br />step by step
+              </h2>
+            </div>
+
+            <motion.div variants={fadeUp} className="myniq-card p-[48px] bg-white relative">
+              <div className="relative">
+                {/* Connecting line passing through center of step dots */}
+                <div className="absolute top-[5px] left-[8px] right-[calc(25%+8px)] h-[1.5px] bg-black/[0.06] hidden md:block z-0" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-6 relative z-10">
+                  {/* Step 1 */}
+                  <div className="flex flex-col items-start">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#FF9F0A] mb-4 border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] relative z-20" />
+                    <div className="inline-flex items-center text-[12px] font-[600] tracking-[-0.01em] px-3.5 py-1.5 rounded-[8px] mb-4 text-[#C97D00] bg-[#FF9F0A]/10 border border-[#FF9F0A]/15">
+                      01 | Monitor
+                    </div>
+                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>
+                      Set your keywords
+                    </h4>
+                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
+                      Competitor names, pain points, and buying signals. Scouto monitors Reddit, X, and Bluesky 24/7.
+                    </p>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="flex flex-col items-start">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#BF5AF2] mb-4 border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] relative z-20" />
+                    <div className="inline-flex items-center text-[12px] font-[600] tracking-[-0.01em] px-3.5 py-1.5 rounded-[8px] mb-4 text-[#8E2DE2] bg-[#BF5AF2]/10 border border-[#BF5AF2]/15">
+                      02 | Score
+                    </div>
+                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>
+                      AI scores intent
+                    </h4>
+                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
+                      Each post gets a buyer intent score from 0-100. High-intent posts hit your queue immediately.
+                    </p>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="flex flex-col items-start">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#0A84FF] mb-4 border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] relative z-20" />
+                    <div className="inline-flex items-center text-[12px] font-[600] tracking-[-0.01em] px-3.5 py-1.5 rounded-[8px] mb-4 text-[#0062CC] bg-[#0A84FF]/10 border border-[#0A84FF]/15">
+                      03 | Draft
+                    </div>
+                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>
+                      AI drafts a reply
+                    </h4>
+                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
+                      Scouto writes a reply using your profile, past replies, and post context. No generic templates.
+                    </p>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="flex flex-col items-start">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#30D158] mb-4 border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] relative z-20" />
+                    <div className="inline-flex items-center text-[12px] font-[600] tracking-[-0.01em] px-3.5 py-1.5 rounded-[8px] mb-4 text-[#1C7A30] bg-[#30D158]/10 border border-[#30D158]/15">
+                      04 | Approve & Send
+                    </div>
+                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>
+                      Review and post
+                    </h4>
+                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
+                      Read the draft, edit if needed, and hit send. Nothing posts without your manual approval.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-black/[0.06] pt-8 mt-12 flex flex-col sm:flex-row items-center justify-between gap-5">
+                <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '19px', letterSpacing: '-0.025em', color: '#0A0A0A' }}>
+                  Acquire buyers organically
+                </span>
+                <Link href="/signup" className="flex items-center gap-2 bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] px-8 py-3.5 rounded-full transition-all duration-200 shadow-[0_4px_14px_rgba(0,0,0,0.18)]">
+                  Start 14-Day Free Trial
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        </Section>
+
         {/* FEATURES */}
 
 
@@ -795,23 +917,26 @@ export default function LandingPage() {
                     )}
                     {id === 'gauge' && (
                       <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        {/* Clean 270° Speedometer Dial Arc */}
                         <path d="M5.64 18.36A9 9 0 1 1 18.36 18.36" />
-                        <path d="M6 12a6 6 0 0 1 12 0" strokeOpacity="0.3" />
+                        {/* Perimeter Tick Marks */}
                         <path d="M12 3v1.5M3 12h1.5M21 12h-1.5M5.64 5.64l1.06 1.06M18.36 5.64l-1.06 1.06" />
+                        {/* Animated Sweeping Needle */}
                         <motion.line
                           x1="12"
                           y1="12"
                           x2="12"
                           y2="5.5"
-                          animate={{ rotate: [-100, 100, -100] }}
+                          animate={{ rotate: [-95, 95, -95] }}
                           transition={{
                             repeat: Infinity,
-                            duration: 3.5,
+                            duration: 3.2,
                             ease: "easeInOut"
                           }}
                           style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
                         />
-                        <circle cx="12" cy="12" r="1.5" />
+                        {/* Solid Central Pivot Point */}
+                        <circle cx="12" cy="12" r="1.75" fill="currentColor" stroke="none" />
                       </svg>
                     )}
                     {id === 'pen' && (
@@ -938,37 +1063,76 @@ export default function LandingPage() {
         </Section>
 
         {/* ━ ━ ━ ━  section separator: ANALYTICS ━ ━ ━ ━  */}
-        <Section className="bg-white pt-[100px] pb-[100px]">
-          <div className="max-w-[1200px] mx-auto px-[24px] text-center">
+        <Section className="bg-[#F9F9FB] pt-[140px] pb-[140px]">
+          <div className="max-w-[1000px] mx-auto px-[24px] text-center">
             <SectionBadge color="#4ade80" text="Core Features" />
-            <motion.h2 variants={fadeUp} className="mb-5 text-[#0A0A0A]"
-              style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(48px, 7vw, 76px)', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
+            <motion.h2 
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeUp} 
+              className="mb-5 text-[#0A0A0A]"
+              style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(44px, 6vw, 68px)', letterSpacing: '-0.04em', lineHeight: 1.05 }}
+            >
               Everything You Need.<br />Nothing Extra.
             </motion.h2>
-            <p className="text-[#6b7280] text-[16px] max-w-[680px] mx-auto mb-16 leading-relaxed" style={{ fontFamily: 'var(--font-inter)' }}>
+            <motion.p 
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeUp}
+              className="text-[#6b7280] text-[16px] max-w-[620px] mx-auto mb-20 leading-relaxed" 
+              style={{ fontFamily: 'var(--font-inter)' }}
+            >
               A tight, powerful set of features crafted to make your team faster and more focused.
-            </p>
+            </motion.p>
 
-            <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-16 text-center">
+            <motion.div 
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={staggerContainer} 
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-20 text-center"
+            >
               {[
-                { gif: '/features/smart-tasks.gif', title: 'Smart Tasks', body: 'Automatically organize, prioritize, and update tasks as your team works.' },
-                { gif: '/features/auto-workflows.gif', title: 'Auto Workflows', body: 'Create rules once and let Saaset handle repetitive work forever.' },
-                { gif: '/features/team-sync.gif', title: 'Team Sync', body: 'Real-time updates, shared spaces, and smoother communication across projects.' },
-                { gif: '/features/insights-hub.gif', title: 'Insights Hub', body: 'Get clear reports on activity, progress, and bottlenecks—instantly.' },
-                { gif: '/features/easy-integrations.gif', title: 'Easy Integrations', body: 'Connect your favorite apps and keep your entire workflow in one place.' },
-                { gif: '/features/secure-space.gif', title: 'Secure Space', body: 'Your data stays encrypted, protected, and available whenever you need it.' },
-              ].map(({ gif, title, body }, i) => (
-                <motion.div key={i} variants={fadeUp} whileHover={{ y: -6 }} transition={springs.snappy} className="flex flex-col items-center">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden mb-6 bg-white border border-[#e5e5e7] flex items-center justify-center shadow-sm">
-                    <img src={gif} alt={title} className="w-full h-full object-contain" />
-                  </div>
-                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', marginBottom: '10px' }}>{title}</h4>
-                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14.5px', color: '#6B6B6B', lineHeight: 1.6, maxWidth: '320px' }}>{body}</p>
+                { icon: CustomKeywordRulesIcon, title: 'Custom Keyword Rules', body: 'Exact-match, negative keywords, subreddit filters. You decide what counts as a lead.' },
+                { icon: ToneMatchingIcon, title: 'Tone Matching', body: "Drafts sound like you wrote them — not like a bot dropped a link and left." },
+                { icon: ApprovalQueueIcon, title: 'Approval Queue', body: 'Nothing posts without you clicking approve first. Full control, every time.' },
+                { icon: DailyDigestIcon, title: 'Daily Digest', body: 'One morning summary of every match, already scored and ready to review.' },
+                { icon: InsightsHubIcon, title: 'Insights Hub', body: "Get clear reports on activity, progress, and bottlenecks—instantly." },
+                { icon: DataSecurityIcon, title: 'Data Security', body: 'Your keywords, drafts, and matches stay private and encrypted. Always.' }, // Force Next.js compilation refresh
+              ].map(({ icon: Icon, title, body }, i) => (
+                <motion.div 
+                  key={i} 
+                  variants={fadeUp} 
+                  whileHover={{ y: -4 }} 
+                  transition={springs.snappy} 
+                  className="flex flex-col items-center"
+                >
+                  <motion.div 
+                    className="mb-6 flex items-center justify-center text-[#0A0A0A]"
+                    whileHover={{ scale: 1.05 }}
+                    transition={springs.snappy}
+                  >
+                    {/* Render custom icons directly to avoid raw DOM-manipulating draw collisions */}
+                    <div style={{ display: 'inline-flex', lineHeight: 0 }} className="animated-icon-wrapper">
+                      <Icon size={64} color="#0A0A0A" strokeWidth={1.75} style={{ display: 'block' }} />
+                    </div>
+                  </motion.div>
+                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>{title}</h4>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.6, maxWidth: '290px' }}>{body}</p>
                 </motion.div>
               ))}
             </motion.div>
           </div>
         </Section>
+
+
+
+
+
+        {/* ━ ━ ━ ━  section separator: STICKY FEATURE SCROLL ━ ━ ━ ━  */}
+        <StickyFeatureScroll />
 
         {/* ━ ━ ━ ━  section separator: SOCIAL PROOF ━ ━ ━ ━  */}
         <Section className="bg-white pt-[100px] pb-[100px]">
@@ -1071,81 +1235,6 @@ export default function LandingPage() {
             </motion.div>
           </div>
         </Section>
-
-        {/* ━ ━ ━ ━  section separator: HOW IT WORKS ━ ━ ━ ━  */}
-        <Section id="how-it-works" className="bg-white pt-[120px] pb-[120px]">
-          <div className="max-w-[1100px] mx-auto px-[24px]">
-            <div className="text-center mb-[64px]">
-              <SectionBadge color="#0A84FF" text="How It Works" />
-              <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(36px, 4vw, 54px)', letterSpacing: '-0.045em', lineHeight: 1.05, color: '#0A0A0A' }}>
-                Simplify organic growth<br />step by step
-              </h2>
-            </div>
-
-            <motion.div variants={fadeUp} className="myniq-card p-[48px] bg-white relative">
-              <div className="relative">
-                {/* Connecting line passing through center of step dots */}
-                <div className="absolute top-[5px] left-[8px] right-[calc(33.3%+8px)] h-[1.5px] bg-black/[0.06] hidden md:block z-0" />
-
-                <div className="grid md:grid-cols-3 gap-12 mb-6 relative z-10">
-                  {/* Step 1 */}
-                  <div className="flex flex-col items-start">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#FF9F0A] mb-4 border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] relative z-20" />
-                    <div className="inline-flex items-center text-[12px] font-[600] tracking-[-0.01em] px-3.5 py-1.5 rounded-[8px] mb-4 text-[#C97D00] bg-[#FF9F0A]/10 border border-[#FF9F0A]/15">
-                      01 | Monitor
-                    </div>
-                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>
-                      Set your keywords
-                    </h4>
-                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Competitor names, pain points, and buying signals. We monitor professional channels 24/7, automatically.
-                    </p>
-                  </div>
-
-                  {/* Step 2 */}
-                  <div className="flex flex-col items-start">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#BF5AF2] mb-4 border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] relative z-20" />
-                    <div className="inline-flex items-center text-[12px] font-[600] tracking-[-0.01em] px-3.5 py-1.5 rounded-[8px] mb-4 text-[#8E2DE2] bg-[#BF5AF2]/10 border border-[#BF5AF2]/15">
-                      02 | Score
-                    </div>
-                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>
-                      AI scores every match
-                    </h4>
-                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Each conversation gets a Buyer Intent Score. Only high-signal leads reach your queue.
-                    </p>
-                  </div>
-
-                  {/* Step 3 */}
-                  <div className="flex flex-col items-start">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#0A84FF] mb-4 border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.1)] relative z-20" />
-                    <div className="inline-flex items-center text-[12px] font-[600] tracking-[-0.01em] px-3.5 py-1.5 rounded-[8px] mb-4 text-[#0062CC] bg-[#0A84FF]/10 border border-[#0A84FF]/15">
-                      03 | Engage
-                    </div>
-                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '8px' }}>
-                      Review and reply
-                    </h4>
-                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Read the AI draft, edit if needed, post it. Done in minutes, not hours.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-black/[0.06] pt-8 mt-12 flex flex-col sm:flex-row items-center justify-between gap-5">
-                <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '19px', letterSpacing: '-0.025em', color: '#0A0A0A' }}>
-                  Automation powered by smart AI
-                </span>
-                <Link href="/signup" className="flex items-center gap-2 bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] px-8 py-3.5 rounded-full transition-all duration-200 shadow-[0_4px_14px_rgba(0,0,0,0.18)]">
-                  Start 14-Day Free Trial
-                </Link>
-              </div>
-            </motion.div>
-          </div>
-        </Section>
-
-        {/* ━ ━ ━ ━  section separator: STICKY FEATURE SCROLL ━ ━ ━ ━  */}
-        <StickyFeatureScroll />
 
         {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
         <Section id="pricing" className="bg-white pt-[100px] pb-[100px]">

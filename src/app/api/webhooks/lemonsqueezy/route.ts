@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         // Find which plan this variant corresponds to
         // For production, you map variant_id to 'pro' or 'business'
         // We'll assume a basic mapping or default to 'pro' if unknown
-        const planName = obj.product_name?.toLowerCase().includes('business') ? 'business' : 'pro'
+        const planName = 'pro'
         
         await supabase
           .from('profiles')

@@ -91,12 +91,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex selection:bg-accent/20 selection:text-accent">
-      <div className="flex-1 flex overflow-hidden relative">
+    <div className="h-screen w-screen overflow-hidden bg-background flex selection:bg-accent/20 selection:text-accent">
+      <div className="flex-1 flex h-full overflow-hidden relative">
         {/* Sidebar */}
-        <aside className="w-[260px] hidden md:flex flex-col bg-[#F8F9FA] border-r border-black/[0.04] shrink-0 relative z-20 py-5">
+        <aside className="w-[260px] h-full hidden md:flex flex-col bg-[#F8F9FA] border-r border-black/[0.04] shrink-0 relative z-20 py-4">
           {/* Logo */}
-          <div className="h-14 flex items-center px-6 shrink-0 mb-4">
+          <div className="h-12 flex items-center px-5 shrink-0 mb-2">
             <Link href="/dashboard" className="text-xl font-display font-bold tracking-tight text-text-primary flex items-center gap-2">
               <Target className="w-6 h-6 text-[#0A84FF]" strokeWidth={2.5} />
               Scouto
@@ -104,7 +104,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto no-scrollbar">
+          <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto no-scrollbar">
             {NAV_ITEMS.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               const badge = badges[item.href]
@@ -112,13 +112,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center justify-between px-3.5 py-2.5 mb-0.5 rounded-[12px] transition-all duration-300 text-[14px] ${isActive
+                  className={`flex items-center justify-between px-3 py-2 rounded-[12px] transition-all duration-200 text-[13.5px] ${isActive
                     ? 'bg-white text-[#0A84FF] font-[600] shadow-sm'
                     : 'text-text-secondary hover:bg-black/5 hover:text-text-primary font-[500]'
                     }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <item.icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-[#0A84FF]' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <item.icon className={`w-[17px] h-[17px] shrink-0 ${isActive ? 'text-[#0A84FF]' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
                     <span className="truncate">{item.name}</span>
                   </div>
                   {badge != null && badge > 0 && (
@@ -132,14 +132,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          {/* Footer */}
-          <div className="px-4 pt-4 border-t border-black/[0.05] shrink-0 space-y-1">
+          {/* Footer - Sign Out pinned at bottom */}
+          <div className="px-3 pt-3 border-t border-black/[0.05] shrink-0 space-y-1">
             <form action="/api/auth/signout" method="POST">
               <button
                 type="submit"
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[14px] text-text-secondary hover:bg-black/5 hover:text-text-primary transition-all duration-300 text-[14px] font-medium"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[12px] text-text-secondary hover:bg-black/5 hover:text-text-primary transition-all duration-200 text-[13.5px] font-medium cursor-pointer"
               >
-                <LogOut className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+                <LogOut className="w-[17px] h-[17px] shrink-0 text-text-tertiary" strokeWidth={2} />
                 <span>Sign out</span>
               </button>
             </form>

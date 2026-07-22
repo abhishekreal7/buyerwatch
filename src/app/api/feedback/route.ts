@@ -5,8 +5,8 @@ export async function POST(request: Request) {
   try {
     const supabase = await createClient()
     
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     // Call the Postgres function we created in schema.sql
     const { error } = await supabase.rpc('log_draft_feedback', {
-      p_user_id: session.user.id,
+      p_user_id: user.id,
       p_thread_id: threadId,
       p_original_draft: originalDraft || null,
       p_final_draft: finalDraft || null,

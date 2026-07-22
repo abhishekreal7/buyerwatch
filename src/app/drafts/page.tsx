@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, MessageCircle } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
@@ -47,8 +47,15 @@ export default function DraftsPage() {
   const [drafts, setDrafts] = useState<any[]>([])
   const [selected, setSelected] = useState<any | null>(null)
   const [draftContent, setDraftContent] = useState('')
+  // Tracks the original AI-generated draft text at the moment it was selected.
+  // This is the source-of-truth for edit-distance: comparing this against draftContent
+  // at approval time is what determines APPROVED vs EDITED_APPROVED.
+  // We must NOT use selected.draft here — selected updates on every selection change,
+  // so reading selected.draft inside handleApproveAndSend would be stale.
+  const originalDraftRef = useRef<string>('')
   const [copied, setCopied] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [connections, setConnections] = useState<string[]>([])
   const supabase = createClient()
 
@@ -85,8 +92,18 @@ export default function DraftsPage() {
   const handleSelect = (d: any) => {
     setSelected(d)
     setDraftContent(d.draft)
+    // Capture the original AI draft at selection time — this is the baseline
+    // for edit-distance comparison in handleApproveAndSend.
+    originalDraftRef.current = d.draft
     setCopied(false)
   }
+
+  // Also sync ref on initial load (first draft auto-selected)
+  useEffect(() => {
+    if (drafts.length > 0 && originalDraftRef.current === '') {
+      originalDraftRef.current = drafts[0].draft
+    }
+  }, [drafts])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(draftContent)
@@ -103,7 +120,10 @@ export default function DraftsPage() {
     setIsSending(true)
     const threadIdToSend = selected.id
     const platformToSend = selected.platform
-    const originalReplyText = selected.draft
+    // Use the ref — not selected.draft — to get the original at the time this
+    // draft was selected. selected.draft would be stale if the user switched
+    // between drafts before approving.
+    const originalReplyText = originalDraftRef.current
     const replyTextToSend = draftContent
     
     setDrafts(prev => prev.filter(d => d.id !== threadIdToSend))
@@ -112,6 +132,8 @@ export default function DraftsPage() {
     if (nextSelected) setDraftContent(nextSelected.draft)
     toast.success('Reply queued for posting')
 
+    // Reset ref after send — next draft selection will re-populate it
+    originalDraftRef.current = ''
     try {
       const actionType = originalReplyText === replyTextToSend ? 'APPROVED' : 'EDITED_APPROVED'
       fetch('/api/feedback', {
@@ -150,7 +172,7 @@ export default function DraftsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         threadId: threadIdToDismiss,
-        originalDraft: selected.draft,
+        originalDraft: originalDraftRef.current,
         finalDraft: draftContent,
         actionType: 'REJECTED',
         platform: selected.platform,
@@ -159,12 +181,48 @@ export default function DraftsPage() {
       })
     }).catch(console.error)
 
+    // Reset ref so it doesn't bleed into the next selected draft
+    originalDraftRef.current = ''
     supabase.from('monitored_threads').update({ status: 'dismissed' }).eq('id', threadIdToDismiss).then()
     setDrafts(prev => prev.filter(d => d.id !== threadIdToDismiss))
     const nextSelected = drafts.find(d => d.id !== threadIdToDismiss) || null
     setSelected(nextSelected)
     if (nextSelected) setDraftContent(nextSelected.draft)
     toast.success('Draft dismissed')
+  }
+
+  const handleRegenerate = async () => {
+    if (!selected || isRegenerating) return
+    setIsRegenerating(true)
+    try {
+      const res = await fetch('/api/replies/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: selected.id })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        if (res.status === 403) {
+          toast.error('Draft limit reached for your plan.')
+        } else {
+          toast.error(err.error || 'Failed to regenerate draft')
+        }
+        return
+      }
+      const { draft: newDraft } = await res.json()
+      // Update the textarea
+      setDraftContent(newDraft)
+      // Update the in-memory list so re-selecting this draft shows the new text
+      setDrafts(prev => prev.map(d => d.id === selected.id ? { ...d, draft: newDraft } : d))
+      setSelected((prev: any) => prev ? { ...prev, draft: newDraft } : prev)
+      // The newly generated text is now the baseline for edit-distance
+      originalDraftRef.current = newDraft
+      toast.success('Draft regenerated')
+    } catch {
+      toast.error('Failed to regenerate draft')
+    } finally {
+      setIsRegenerating(false)
+    }
   }
 
   return (
@@ -273,8 +331,13 @@ export default function DraftsPage() {
                 <X className="w-5 h-5" strokeWidth={2} />
               </button>
               {/* Regenerate */}
-              <button className="btn-icon bg-background border border-black/[0.04]" title="Regenerate Draft">
-                <RefreshCcw className="w-5 h-5" strokeWidth={2} />
+              <button
+                onClick={handleRegenerate}
+                disabled={isRegenerating || isSending}
+                className="btn-icon bg-background border border-black/[0.04] disabled:opacity-40"
+                title="Regenerate Draft"
+              >
+                <RefreshCcw className={`w-5 h-5 ${isRegenerating ? 'animate-spin' : ''}`} strokeWidth={2} />
               </button>
               <div className="flex-1" />
               {/* Copy */}

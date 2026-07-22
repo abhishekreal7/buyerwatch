@@ -75,7 +75,10 @@ export async function scorePostHandler(job: Job) {
       post.platform,
       draftResult,
       profile,
-      post.author ?? null // targetCommunity: use subreddit/community identifier
+      // targetCommunity must be the subreddit/hashtag name (e.g. "entrepreneur"),
+      // NOT post.author (the post-author's username). community_trust_metrics rows
+      // are keyed by target_community which stores the monitoring target.
+      post.sourceTarget ?? null
     )
 
     if (evaluation.approved) {
@@ -109,7 +112,6 @@ async function checkBudget(userId: string, plan: string, service: 'gemini' | 'cl
   const limits: Record<string, Record<'gemini' | 'claude', number>> = {
     free: { gemini: 50, claude: 5 },
     pro: { gemini: 500, claude: 100 },
-    business: { gemini: 2000, claude: 500 },
   }
   
   const userPlan = limits[plan] ? plan : 'free'

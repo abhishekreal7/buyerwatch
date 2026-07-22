@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
         alerts.push({ id: 'drafts', type: 'warning', label: `${draftedCount} drafts ready for review`, actionLabel: 'Take action →', href: '/dashboard' })
       }
       if (!conns.some(c => c.platform === 'reddit')) {
-        alerts.push({ id: 'reddit_api', type: 'error', label: 'Reddit API pending approval', actionLabel: 'Check status →', href: '/settings' })
+        alerts.push({ id: 'reddit_api', type: 'warning', label: 'Reddit not connected', actionLabel: 'Connect Reddit →', href: '/settings' })
       }
       if (profile && !profile.auto_send_enabled) {
         alerts.push({ id: 'autosend', type: 'warning', label: 'Auto-send paused', actionLabel: 'Resume →', href: '/settings' })
@@ -250,19 +250,15 @@ export default function AnalyticsPage() {
                 <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-text-secondary">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
-                    Discovered: <span className="font-bold text-text-primary">{data.stats.found}</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-                    Qualified: <span className="font-bold text-[#0A84FF]">{data.stats.drafted + data.stats.sent}</span>
+                    Replies sent: <span className="font-bold text-[#0A84FF]">{data.stats.sent}</span>
                   </span>
                   <span className="text-text-tertiary hidden sm:inline">|</span>
                   <span className="text-[12px] text-text-tertiary">
-                    Drafted: <span className="font-bold text-text-secondary">{data.stats.drafted}</span>
+                    Discovered: <span className="font-bold text-text-secondary">{data.stats.found}</span>
                   </span>
                   <span className="text-[12px] text-text-tertiary">
-                    Sent: <span className="font-bold text-text-secondary">{data.stats.sent}</span>
+                    Drafted: <span className="font-bold text-text-secondary">{data.stats.drafted}</span>
                   </span>
                 </div>
               </div>
@@ -279,11 +275,7 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data.trendData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0A0A0A" stopOpacity={0.03} />
-                        <stop offset="95%" stopColor="#0A0A0A" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="colorSent" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.12} />
                         <stop offset="95%" stopColor="#0A84FF" stopOpacity={0} />
                       </linearGradient>
@@ -297,20 +289,11 @@ export default function AnalyticsPage() {
                     <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
                     <Area
                       type="monotone"
-                      dataKey="discovered"
-                      stroke="#0A0A0A"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorDiscovered)"
-                      activeDot={{ r: 5, fill: '#0A0A0A', stroke: '#fff', strokeWidth: 2 }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="qualified"
+                      dataKey="value"
                       stroke="#0A84FF"
                       strokeWidth={2}
                       fillOpacity={1}
-                      fill="url(#colorQualified)"
+                      fill="url(#colorSent)"
                       activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
                     />
                   </AreaChart>

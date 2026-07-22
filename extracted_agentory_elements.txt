@@ -1,0 +1,49 @@
+--- EXTRACTED ACCORDIONS AND SVGS ---
+
+=== Title: Automated Emails ===
+Parent: p, Classes: ['framer-text', 'framer-styles-preset-1yb3vhd'], Styles: --framer-text-color:var(--extracted-r6o4lv, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-zrvjbb'], Styles: --extracted-r6o4lv:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1bmwzog'], Styles: 
+Parent: div, Classes: ['framer-1mkmelf'], Styles: background-color:rgb(10, 10, 10);border-bottom-left-radius:16px;border-bottom-right-radius:16px;border-top-left-radius:16px;border-top-right-radius:16px;opacity:0.8
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-t4vs9a'], Styles: width:100%
+Parent: p, Classes: ['framer-text', 'framer-styles-preset-1yb3vhd'], Styles: --framer-text-color:var(--extracted-r6o4lv, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-zrvjbb'], Styles: --extracted-r6o4lv:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1bmwzog'], Styles: 
+Parent: div, Classes: ['framer-1mkmelf'], Styles: background-color:rgb(10, 10, 10);border-bottom-left-radius:16px;border-bottom-right-radius:16px;border-top-left-radius:16px;border-top-right-radius:16px;opacity:0.8
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-t4vs9a'], Styles: width:100%
+
+=== Title: Effortless Scheduling ===
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-n473yh'], Styles: width:100%
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-n473yh'], Styles: width:100%
+
+=== Title: Task Automation ===
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-n473yh'], Styles: width:100%
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-n473yh'], Styles: width:100%
+
+=== Title: Smart Summaries ===
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-n473yh'], Styles: width:100%
+Parent: h4, Classes: ['framer-text', 'framer-styles-preset-1qyq0hy'], Styles: --framer-text-color:var(--extracted-1eung3n, var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255)))
+Parent: div, Classes: ['framer-912tu9'], Styles: --extracted-1eung3n:var(--token-1c8be5c3-fcec-4fad-95e8-fb31145b9ffc, rgb(255, 255, 255));--framer-paragraph-spacing:0px;transform:none
+Parent: div, Classes: ['framer-1rwnqrq'], Styles: 
+Parent: div, Classes: ['framer-p5D30', 'framer-XtS24', 'framer-p735A', 'framer-t4vs9a', 'framer-v-n473yh'], Styles: width:100%

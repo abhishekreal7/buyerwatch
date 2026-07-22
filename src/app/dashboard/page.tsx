@@ -47,10 +47,6 @@ export default function DashboardPage() {
   })
   const supabase = createClient()
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -78,14 +74,14 @@ export default function DashboardPage() {
     const parsed: Thread[] = (threadData || []).map(t => ({
       id: t.id,
       platform: t.platform,
-      target: (t.keywords as any)?.target || t.platform,
+      target: (t.keywords as unknown as { target?: string })?.target || t.platform,
       timeAgo: formatTimeAgo(t.created_at),
       title: '',
       content: t.text_content || '',
       score: Number(t.intent_score) || 0,
       label: Number(t.intent_score) >= 80 ? 'Buying' : Number(t.intent_score) >= 60 ? 'Exploring' : 'Researching',
-      matchedKeyword: (t.keywords as any)?.term || '',
-      draft: (t.reply_analytics as any)?.[0]?.draft_text || '',
+      matchedKeyword: (t.keywords as unknown as { term?: string })?.term || '',
+      draft: (t.reply_analytics as unknown as { draft_text?: string }[])?.[0]?.draft_text || '',
       url: t.url || null,
       flag: t.flag || undefined,
     }))
@@ -127,6 +123,11 @@ export default function DashboardPage() {
 
     setLoading(false)
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData()
+  }, [])
 
   const handleApproveAndSend = async () => {
     if (!selectedThread || !selectedThread.draft) return
@@ -372,7 +373,7 @@ export default function DashboardPage() {
                       </span>
                     )}
                     {thread.matchedKeyword && (
-                      <span className="text-xs text-text-tertiary font-medium tracking-wide">Matched: "{thread.matchedKeyword}"</span>
+                      <span className="text-xs text-text-tertiary font-medium tracking-wide">Matched: &quot;{thread.matchedKeyword}&quot;</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -385,17 +386,17 @@ export default function DashboardPage() {
             )
           })}
 
-          {plan === 'free' && stats.threadsFound > 50 && (
+          {plan === 'free' && stats.threadsFound > 10 && (
             <div className="rounded-2xl p-6 bg-surface border border-black/5 shadow-sm text-center relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-white/90 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
                 <div className="bg-black/5 p-3 rounded-full mb-3">
                   <Lock className="w-5 h-5 text-gray-700" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1">
-                  {stats.threadsFound - 50} more high-intent threads waiting
+                  {stats.threadsFound - 10} more high-intent threads waiting
                 </h3>
                 <p className="text-[13px] text-gray-500 mb-4 max-w-[260px]">
-                  You've reached the free tier limit. Upgrade to unlock all conversations.
+                  You&apos;ve reached the free tier limit. Upgrade to unlock all conversations.
                 </p>
                 <a href="/settings" className="px-5 py-2 rounded-lg bg-[#0A84FF] hover:bg-blue-600 text-white text-[13px] font-medium transition-colors shadow-[0_0_20px_rgba(10,132,255,0.2)]">
                   Upgrade to Pro

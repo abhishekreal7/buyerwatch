@@ -34,7 +34,7 @@ export default function PostedPage() {
       
       const { data } = await supabase
         .from('monitored_threads')
-        .select('*, reply_analytics(final_draft, sent_at)')
+        .select('*, reply_analytics(draft_text, sent_at)')
         .eq('user_id', user.id)
         .eq('status', 'replied')
         .order('created_at', { ascending: false })
@@ -48,8 +48,8 @@ export default function PostedPage() {
             target: t.author || 'unknown', 
             threadTitle: t.text_content ? t.text_content.slice(0, 80) + '...' : 'Unknown thread',
             sentAt: analytics?.sent_at ? formatPostedDate(analytics.sent_at) : formatPostedDate(t.created_at),
-            reply: analytics?.final_draft || analytics?.draft_text || t.reply_analytics?.[0]?.draft_text || 'Reply logged.',
-            threadUrl: t.url || '#',
+            reply: analytics?.draft_text || 'Reply logged.',
+            threadUrl: t.url || null,
             score: Number(t.intent_score) || 0
           }
         }))
@@ -95,9 +95,15 @@ export default function PostedPage() {
               {/* Thread title */}
               <div className="flex items-center justify-between gap-4 mb-3">
                 <h3 className="text-[16px] font-semibold text-text-primary line-clamp-1 flex-1 tracking-tight">{p.threadTitle}</h3>
-                <a href={p.threadUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:opacity-80 transition-opacity shrink-0 bg-accent/5 p-2 rounded-full">
-                  <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
-                </a>
+                {p.threadUrl ? (
+                  <a href={p.threadUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:opacity-80 transition-opacity shrink-0 bg-accent/5 p-2 rounded-full">
+                    <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
+                  </a>
+                ) : (
+                  <span className="text-text-tertiary/40 shrink-0 bg-black/[0.03] p-2 rounded-full" title="No thread URL available">
+                    <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
+                  </span>
+                )}
               </div>
 
               {/* Reply preview */}

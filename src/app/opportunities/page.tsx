@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Target, Filter, MessageCircle, ExternalLink, Zap } from 'lucide-react'
+import { Target, Filter, MessageCircle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -45,6 +45,7 @@ function formatTimeAgo(dateString: string) {
 
 export default function OpportunitiesPage() {
   const [activeFilter, setActiveFilter] = useState('All')
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [opportunities, setOpportunities] = useState<any[]>([])
   const [draftingId, setDraftingId] = useState<string | null>(null)
   const supabase = createClient()
@@ -92,14 +93,16 @@ export default function OpportunitiesPage() {
     }
   }
 
-  const filtered = opportunities.filter(o => {
-    if (activeFilter === 'All') return true
-    if (activeFilter === 'Buying Intent') return o.label === 'Buying'
-    if (activeFilter === 'Researching') return o.label === 'Researching'
-    if (activeFilter === 'Reddit') return o.platform === 'reddit'
-    if (activeFilter === 'Bluesky') return o.platform === 'bluesky'
-    return true
-  })
+  const filtered = opportunities
+    .filter(o => {
+      if (activeFilter === 'All') return true
+      if (activeFilter === 'Buying Intent') return o.label === 'Buying'
+      if (activeFilter === 'Researching') return o.label === 'Researching'
+      if (activeFilter === 'Reddit') return o.platform === 'reddit'
+      if (activeFilter === 'Bluesky') return o.platform === 'bluesky'
+      return true
+    })
+    .sort((a, b) => sortOrder === 'desc' ? b.score - a.score : a.score - b.score)
 
   return (
     <AppPage>
@@ -125,21 +128,36 @@ export default function OpportunitiesPage() {
         />
 
         {/* Filter bar */}
-        <div className="flex gap-1.5 mb-6 overflow-x-auto no-scrollbar pb-1 px-1">
-          {FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className={`!rounded-full whitespace-nowrap ${activeFilter === f
-                  ? 'btn-primary'
-                  : 'btn-secondary text-text-secondary hover:text-text-primary border-none shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.02)] bg-white'
-                }`}
-            >
-              {f}
-            </button>
-          ))}
-          <button className="ml-auto flex items-center gap-2 !rounded-full btn-secondary text-text-primary bg-surface shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.02)] whitespace-nowrap">
-            <Filter className="w-4 h-4" strokeWidth={2} /> Sort
+        <div className="flex items-center justify-between gap-3 mb-6 overflow-x-auto no-scrollbar pb-1 px-1">
+          <div className="inline-flex items-center gap-1 p-1 bg-surface rounded-[14px] border border-black/[0.06] shadow-sm">
+            {FILTERS.map(f => {
+              const isActive = activeFilter === f
+              return (
+                <button
+                  key={f}
+                  onClick={() => setActiveFilter(f)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                    isActive
+                      ? 'bg-text-primary text-white font-semibold shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-black/[0.04] font-medium'
+                  }`}
+                >
+                  {f === 'Reddit' && <RedditIcon className="w-3.5 h-3.5 shrink-0" />}
+                  {f === 'Bluesky' && <BlueskyIcon className="w-3.5 h-3.5 shrink-0" />}
+                  {f}
+                </button>
+              )
+            })}
+          </div>
+
+          <button
+            onClick={() => setSortOrder(s => s === 'desc' ? 'asc' : 'desc')}
+            className="ml-auto flex items-center gap-2 px-3.5 py-2 rounded-[14px] border border-black/[0.06] bg-surface hover:bg-white text-text-primary text-[13px] font-semibold shadow-sm transition-all cursor-pointer whitespace-nowrap"
+          >
+            {sortOrder === 'desc'
+              ? <ChevronDown className="w-4 h-4 text-text-secondary" strokeWidth={2} />
+              : <ChevronUp className="w-4 h-4 text-text-secondary" strokeWidth={2} />}
+            <span className="text-text-secondary font-medium">Sort by:</span> Score
           </button>
         </div>
 

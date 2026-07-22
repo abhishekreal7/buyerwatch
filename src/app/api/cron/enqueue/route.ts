@@ -9,10 +9,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Returns current hour bucket like "2026-07-03-12"
+// Returns current hour bucket like "2026-07-03T12" — ISO format avoids month off-by-one
+// from getUTCMonth() which returns 0-indexed months (Jan=0).
 function getHourBucket() {
-  const now = new Date()
-  return `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${now.getUTCHours()}`
+  return new Date().toISOString().slice(0, 13)
 }
 
 export async function GET(request: Request) {
@@ -27,7 +27,6 @@ export async function GET(request: Request) {
   const pollIntervalMin: Record<string, number> = {
     free: 360,     // every 6 hours
     pro: 30,       // every 30 mins
-    business: 15   // every 15 mins
   }
 
   try {

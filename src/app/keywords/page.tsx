@@ -100,11 +100,14 @@ const getSuccessRate = (kwId: string, threadCount: number, repliedCount: number)
 /* ─── Filter pill button ─────────────────────────────────────────── */
 function FilterPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick}
-      className={`h-8 px-3.5 rounded-full text-[12.5px] font-semibold transition-all duration-150 cursor-pointer border ${active
-          ? 'bg-text-primary text-white border-text-primary shadow-sm'
-          : 'bg-white text-text-secondary border-black/[0.08] hover:border-black/[0.14] hover:text-text-primary'
-        }`}>
+    <button
+      onClick={onClick}
+      className={`h-8 px-3.5 rounded-[10px] text-[13px] whitespace-nowrap transition-all duration-150 cursor-pointer ${
+        active
+          ? 'bg-text-primary text-white font-semibold shadow-sm'
+          : 'text-text-secondary hover:text-text-primary hover:bg-black/[0.04] font-medium'
+      }`}
+    >
       {label}
     </button>
   )
@@ -132,7 +135,6 @@ export default function KeywordsPage() {
   const termRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  useEffect(() => { load() }, [])
 
   useEffect(() => {
     const down = (e: MouseEvent) => {
@@ -180,6 +182,9 @@ export default function KeywordsPage() {
     }
     setLoading(false)
   }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load() }, [])
 
   const handleAdd = async () => {
     if (!newTerm.trim() || !newTarget.trim()) { toast.error('Fill in keyword and target'); return }
