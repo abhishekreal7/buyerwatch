@@ -1066,32 +1066,32 @@ export default function LandingPage() {
         <Section className="bg-[#F9F9FB] pt-[140px] pb-[140px]">
           <div className="max-w-[1140px] mx-auto px-[24px] text-center">
             <SectionBadge color="#4ade80" text="Core Features" />
-            <motion.h2 
+            <motion.h2
               initial="hidden"
               whileInView="show"
               viewport={{ once: true, margin: "-100px" }}
-              variants={fadeUp} 
+              variants={fadeUp}
               className="mb-5 text-[#0A0A0A]"
               style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(44px, 6vw, 68px)', letterSpacing: '-0.04em', lineHeight: 1.05 }}
             >
               Everything You Need.<br />Nothing Extra.
             </motion.h2>
-            <motion.p 
+            <motion.p
               initial="hidden"
               whileInView="show"
               viewport={{ once: true, margin: "-100px" }}
               variants={fadeUp}
-              className="text-[#6b7280] text-[16px] max-w-[620px] mx-auto mb-20 leading-relaxed" 
+              className="text-[#6b7280] text-[16px] max-w-[620px] mx-auto mb-20 leading-relaxed"
               style={{ fontFamily: 'var(--font-inter)' }}
             >
               A tight, powerful set of features crafted to make your team faster and more focused.
             </motion.p>
 
-            <motion.div 
+            <motion.div
               initial="hidden"
               whileInView="show"
               viewport={{ once: true, margin: "-100px" }}
-              variants={staggerContainer} 
+              variants={staggerContainer}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-14 gap-y-20 text-center"
             >
               {[
@@ -1100,16 +1100,16 @@ export default function LandingPage() {
                 { icon: ApprovalQueueIcon, title: 'Approval Queue', body: 'Nothing posts without you clicking approve first. Full control, every time.' },
                 { icon: DailyDigestIcon, title: 'Daily Digest', body: 'One morning summary of every match, already scored and ready to review.' },
                 { icon: InsightsHubIcon, title: 'Insights Hub', body: "Get clear reports on activity, progress, and bottlenecks—instantly." },
-                { icon: ConfidenceEngineIcon, title: 'Confidence Engine', body: 'AI intent scoring evaluates every post (0–100) to filter out noise and surface high-converting buyer leads instantly.' },
+                { icon: ConfidenceEngineIcon, title: 'Confidence Engine', body: 'AI intent scoring filters noise to auto-post high-confidence matches.' },
               ].map(({ icon: Icon, title, body }, i) => (
-                <motion.div 
-                  key={i} 
-                  variants={fadeUp} 
-                  whileHover={{ y: -4 }} 
-                  transition={springs.snappy} 
+                <motion.div
+                  key={i}
+                  variants={fadeUp}
+                  whileHover={{ y: -4 }}
+                  transition={springs.snappy}
                   className="flex flex-col items-center"
                 >
-                  <motion.div 
+                  <motion.div
                     className="mb-6 flex items-center justify-center text-[#0A0A0A]"
                     whileHover={{ scale: 1.05 }}
                     transition={springs.snappy}

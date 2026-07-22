@@ -279,61 +279,40 @@ export function InsightsHubIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.
   );
 }
 
-
-
 // ─── 6. Confidence Engine ───────────────────────────────────────────────────
-// Premium AI Intent Reticle with solid corner brackets, 4 node dots, breathing AI Diamond Sparkle, & radar pulse
+// Option 2: Precision Target Reticle with 3D AI Diamond Sparkle & radar rings (Raycast Style)
 export function ConfidenceEngineIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.9, style }: CustomIconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
-      {/* Expanding AI Intent Radar Ring */}
+      {/* Precision Reticle Corner Brackets */}
+      <path d="M 4 7.5 V 5 A 1 1 0 0 1 5 4 H 7.5" stroke={color} strokeWidth={strokeWidth} />
+      <path d="M 16.5 4 H 19 A 1 1 0 0 1 20 5 V 7.5" stroke={color} strokeWidth={strokeWidth} />
+      <path d="M 20 16.5 V 19 A 1 1 0 0 1 19 20 H 16.5" stroke={color} strokeWidth={strokeWidth} />
+      <path d="M 7.5 20 H 5 A 1 1 0 0 1 4 19 V 16.5" stroke={color} strokeWidth={strokeWidth} />
+
+      {/* Pulsing Concentric Radar Target Ring */}
       <motion.circle
-        cx="12"
-        cy="12"
-        r="7"
-        stroke="rgba(0,0,0,0.18)"
-        strokeWidth={0.75}
-        animate={{ scale: [0.5, 1.35, 0.5], opacity: [0.75, 0, 0.75] }}
-        transition={{ repeat: Infinity, duration: 2.5, ease: "easeOut" }}
+        cx="12" cy="12" r="6.8"
+        stroke={color} strokeWidth={strokeWidth} opacity="0.3"
+        animate={{ scale: [0.7, 1.25, 0.7], opacity: [0.5, 0, 0.5] }}
+        transition={{ repeat: Infinity, duration: 2.8, ease: "easeOut" }}
         style={{ transformOrigin: "12px 12px" }}
       />
 
-      {/* Solid High-Tech Reticle Corner Brackets (Grounded Frame) */}
-      <path d="M 4 7.5 V 5 A 1 1 0 0 1 5 4 H 7.5" strokeWidth={strokeWidth} />
-      <path d="M 16.5 4 H 19 A 1 1 0 0 1 20 5 V 7.5" strokeWidth={strokeWidth} />
-      <path d="M 20 16.5 V 19 A 1 1 0 0 1 19 20 H 16.5" strokeWidth={strokeWidth} />
-      <path d="M 7.5 20 H 5 A 1 1 0 0 1 4 19 V 16.5" strokeWidth={strokeWidth} />
-
-      {/* 4 Corner Targeting Node Dots */}
-      <motion.circle cx="4" cy="4" r="0.8" fill={color} stroke="none" animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.8, delay: 0 }} />
-      <motion.circle cx="20" cy="4" r="0.8" fill={color} stroke="none" animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.8, delay: 0.45 }} />
-      <motion.circle cx="20" cy="20" r="0.8" fill={color} stroke="none" animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.8, delay: 0.9 }} />
-      <motion.circle cx="4" cy="20" r="0.8" fill={color} stroke="none" animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.8, delay: 1.35 }} />
-
-      {/* Central AI Intent Sparkle Diamond Core */}
+      {/* Central 3D Rotating AI Sparkle Diamond */}
       <motion.path
-        d="M 12 5.5 L 13.8 10.2 L 18.5 12 L 13.8 13.8 L 12 18.5 L 10.2 13.8 L 5.5 12 L 10.2 10.2 Z"
+        d="M 12 6.5 L 13.5 10.5 L 17.5 12 L 13.5 13.5 L 12 17.5 L 10.5 13.5 L 6.5 12 L 10.5 10.5 Z"
+        fill="white"
+        stroke={color}
         strokeWidth={strokeWidth}
         animate={{
-          scale: [0.88, 1.12, 0.88],
+          scale: [0.9, 1.1, 0.9],
           rotate: [0, 90, 180, 270, 360]
         }}
         transition={{
-          scale: { repeat: Infinity, duration: 2.6, ease: "easeInOut" },
+          scale: { repeat: Infinity, duration: 2.8, ease: "easeInOut" },
           rotate: { repeat: Infinity, duration: 10, ease: "linear" }
         }}
-        style={{ transformOrigin: "12px 12px" }}
-      />
-
-      {/* Central Pulsing AI Intent Core Node */}
-      <motion.circle
-        cx="12"
-        cy="12"
-        r="1.6"
-        fill={color}
-        stroke="none"
-        animate={{ scale: [0.75, 1.25, 0.75], opacity: [0.6, 1, 0.6] }}
-        transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
         style={{ transformOrigin: "12px 12px" }}
       />
     </svg>
