@@ -82,7 +82,7 @@ export async function scorePostHandler(job: Job) {
       // All gates cleared — save and enqueue for auto-send
       const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag)
       if (thread) {
-        const { sendReplyQueue } = await import('../../src/lib/queues/index.js')
+        const { sendReplyQueue, notifySlackQueue } = await import('../../src/lib/queues/index.js')
         await sendReplyQueue.add(`send-${thread.id}`, {
           userId,
           threadExternalId: post.externalId,
@@ -91,11 +91,34 @@ export async function scorePostHandler(job: Job) {
           platform: post.platform,
           triggerType: 'auto'
         })
+        // Fire-and-forget Slack notification
+        notifySlackQueue.add(`slack-${thread.id}`, {
+          userId,
+          postUrl: post.url,
+          postTitle: post.title || post.text?.slice(0, 100),
+          postAuthor: post.author,
+          intentScore: scoreResult.score,
+          draftText,
+          subreddit: post.sourceTarget || 'reddit',
+        }).catch(() => {}) // never block on Slack
         logger.info({ userId, threadId: thread.id, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Enqueued auto-send')
       }
     } else {
       // Any gate failed — route to manual review queue
-      await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag)
+      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag)
+      if (thread) {
+        const { notifySlackQueue } = await import('../../src/lib/queues/index.js')
+        // Fire-and-forget Slack notification
+        notifySlackQueue.add(`slack-${thread.id}`, {
+          userId,
+          postUrl: post.url,
+          postTitle: post.title || post.text?.slice(0, 100),
+          postAuthor: post.author,
+          intentScore: scoreResult.score,
+          draftText,
+          subreddit: post.sourceTarget || 'reddit',
+        }).catch(() => {}) // never block on Slack
+      }
       logger.info({ userId, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Routed to manual review')
     }
 

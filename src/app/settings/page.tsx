@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Zap, Bell, CreditCard, Save, Check, ChevronRight,
   Globe, FileText, AtSign, Briefcase, Palette, Shield,
-  Link, Unlink, AlertTriangle, Sparkles, Mail, Activity, BarChart2
+  Link, Unlink, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
@@ -37,7 +37,7 @@ function SectionCard({ title, description, children }: {
   )
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
@@ -131,6 +131,9 @@ export default function SettingsPage() {
   const [bskyPassword, setBskyPassword] = useState('')
   const [bskyConnecting, setBskyConnecting] = useState(false)
 
+  const [slack, setSlack] = useState({ webhookUrl: '', threshold: 70 })
+  const [slackTesting, setSlackTesting] = useState(false)
+
   const [notifications, setNotifications] = useState({
     emailDigest: true,
     highIntentAlerts: true,
@@ -169,6 +172,7 @@ export default function SettingsPage() {
           autoSendThreshold: p.auto_send_threshold || 85,
         })
         if (p.notification_preferences) setNotifications(p.notification_preferences)
+        setSlack({ webhookUrl: p.slack_webhook_url || '', threshold: p.slack_notify_threshold ?? 70 })
       }
 
       const { data: conns } = await supabase.from('platform_connections').select('platform').eq('user_id', user.id)
@@ -261,6 +265,8 @@ export default function SettingsPage() {
       auto_send_enabled: profile.autoSendEnabled,
       auto_send_threshold: profile.autoSendThreshold,
       notification_preferences: notifications,
+      slack_webhook_url: slack.webhookUrl || null,
+      slack_notify_threshold: slack.threshold,
     }).eq('id', user.id)
 
     setSaving(false)
@@ -647,6 +653,85 @@ export default function SettingsPage() {
                             />
                           </div>
                         ))}
+                      </div>
+                    </SectionCard>
+
+                    {/* Slack Notifications Card */}
+                    <SectionCard
+                      title="Slack Notifications"
+                      description="Get an instant Slack message with the AI draft reply whenever Scouto finds a high-intent lead."
+                    >
+                      <div className="space-y-5">
+                        {/* Webhook URL */}
+                        <Field
+                          label="Webhook URL"
+                          hint={
+                            <a
+                              href="https://api.slack.com/messaging/webhooks"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline"
+                            >
+                              How to get one →
+                            </a>
+                          }
+                        >
+                          <input
+                            type="url"
+                            value={slack.webhookUrl}
+                            onChange={e => setSlack(s => ({ ...s, webhookUrl: e.target.value }))}
+                            placeholder="https://hooks.slack.com/services/T.../B.../..."
+                            className={inputCls}
+                          />
+                        </Field>
+
+                        {/* Threshold slider */}
+                        {slack.webhookUrl && (
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="text-[13px] font-medium text-gray-700">Minimum intent score to notify</label>
+                              <span className="text-[13px] font-bold text-gray-900 tabular-nums">{slack.threshold}</span>
+                            </div>
+                            <input
+                              type="range" min="60" max="95"
+                              value={slack.threshold}
+                              onChange={e => setSlack(s => ({ ...s, threshold: parseInt(e.target.value) }))}
+                              className="w-full accent-gray-900 cursor-pointer"
+                            />
+                            <div className="flex justify-between text-[11px] text-gray-400 mt-1">
+                              <span>60 — Catch more</span>
+                              <span>95 — Only the best</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Test button */}
+                        {slack.webhookUrl && (
+                          <button
+                            onClick={async () => {
+                              if (!slack.webhookUrl) return
+                              setSlackTesting(true)
+                              try {
+                                const res = await fetch('/api/settings/test-slack', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ webhookUrl: slack.webhookUrl }),
+                                })
+                                if (res.ok) toast.success('Test message sent to Slack ✓')
+                                else toast.error('Failed to send test — check your webhook URL')
+                              } catch {
+                                toast.error('Network error sending test')
+                              } finally {
+                                setSlackTesting(false)
+                              }
+                            }}
+                            disabled={slackTesting}
+                            className="flex items-center gap-2 text-[13px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                          >
+                            <Send className="w-3.5 h-3.5" strokeWidth={2} />
+                            {slackTesting ? 'Sending...' : 'Send test message'}
+                          </button>
+                        )}
                       </div>
                     </SectionCard>
 

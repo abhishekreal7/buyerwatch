@@ -30,3 +30,14 @@ export const sendReplyQueue = new Queue('send-reply', {
     removeOnFail: 100
   }
 })
+
+// Queue for Slack webhook push notifications
+export const notifySlackQueue = new Queue('notify-slack', {
+  connection: redis as any,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 3000 },
+    removeOnComplete: true,
+    removeOnFail: 50,
+  }
+})

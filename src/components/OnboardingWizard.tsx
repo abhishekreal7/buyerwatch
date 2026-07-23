@@ -3,8 +3,11 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { completeOnboardingAction } from '@/app/actions/onboarding'
-import { Monitor, ShoppingBag, Briefcase, User, Edit3, MessageSquare, Package, HelpCircle, Plus, X, Search } from 'lucide-react'
-import { springs, staggers } from '@/lib/motion'
+import {
+  Monitor, ShoppingBag, Briefcase, User, Edit3, MessageSquare, Package,
+  HelpCircle, Plus, X, Search, Sparkles, Target, Zap, ShieldAlert, Check, ArrowRight
+} from 'lucide-react'
+import { springs } from '@/lib/motion'
 
 const BUSINESS_TYPES = [
   { id: 'saas', label: 'SaaS', icon: Monitor },
@@ -20,6 +23,7 @@ const BUSINESS_TYPES = [
 export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [analyzingUrl, setAnalyzingUrl] = useState(false)
 
   // Form State
   const [businessName, setBusinessName] = useState('')
@@ -28,10 +32,17 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
   const [businessType, setBusinessType] = useState('saas')
 
   const [keywords, setKeywords] = useState<{ term: string; platforms: string[] }[]>([
-    { term: '', platforms: ['reddit'] }
+    { term: 'alternative to', platforms: ['reddit'] }
   ])
 
-  const [redditTargets, setRedditTargets] = useState<string[]>([])
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    subreddits: string[];
+    buyer: string[];
+    competitor: string[];
+    painPoint: string[];
+  } | null>(null)
+
+  const [redditTargets, setRedditTargets] = useState<string[]>(['SaaS', 'startups', 'Entrepreneur'])
   const [blueskyTargets, setBlueskyTargets] = useState<string[]>([])
   const [xTargets, setXTargets] = useState<string[]>([])
   const [targetInput, setTargetInput] = useState('')
@@ -43,10 +54,63 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
   const handleNext = () => setStep(s => Math.min(4, s + 1))
   const handlePrev = () => setStep(s => Math.max(1, s - 1))
 
+  // AI Auto-Analyze URL or Inputs
+  const handleAiAnalyze = async () => {
+    if (!businessUrl && !businessName) return
+    setAnalyzingUrl(true)
+    try {
+      const res = await fetch('/api/onboarding/ai-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: businessUrl, businessName, businessDescription })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.description && !businessDescription) setBusinessDescription(data.description)
+        if (data.subreddits && data.subreddits.length > 0) setRedditTargets(data.subreddits)
+
+        const suggestedKeywords: { term: string; platforms: string[] }[] = []
+        if (data.buyerKeywords) data.buyerKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
+        if (data.competitorKeywords) data.competitorKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
+        if (data.painPointKeywords) data.painPointKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
+
+        if (suggestedKeywords.length > 0) setKeywords(suggestedKeywords)
+
+        setAiSuggestions({
+          subreddits: data.subreddits || [],
+          buyer: data.buyerKeywords || [],
+          competitor: data.competitorKeywords || [],
+          painPoint: data.painPointKeywords || [],
+        })
+      }
+    } catch (err) {
+      console.error('[onboarding] AI analyze failed:', err)
+    } finally {
+      setAnalyzingUrl(false)
+    }
+  }
+
+  const toggleKeywordTerm = (term: string) => {
+    const exists = keywords.some(k => k.term.toLowerCase() === term.toLowerCase())
+    if (exists) {
+      setKeywords(keywords.filter(k => k.term.toLowerCase() !== term.toLowerCase()))
+    } else {
+      setKeywords([...keywords, { term, platforms: ['reddit'] }])
+    }
+  }
+
+  const toggleSubreddit = (sub: string) => {
+    if (redditTargets.includes(sub)) {
+      setRedditTargets(redditTargets.filter(s => s !== sub))
+    } else {
+      setRedditTargets([...redditTargets, sub])
+    }
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
     const validTerms = keywords.filter(k => k.term.trim() !== '')
-    
+
     // Construct the rows for the `keywords` table
     const dbKeywords: any[] = []
     for (const k of validTerms) {
@@ -57,10 +121,6 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
       if (k.platforms.includes('bluesky')) {
         const targets = blueskyTargets.length > 0 ? blueskyTargets : [k.term]
         targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'bluesky', target: t }))
-      }
-      if (k.platforms.includes('x') && false) {
-        const targets = xTargets.length > 0 ? xTargets : [k.term]
-        targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'x', target: t }))
       }
     }
 
@@ -86,41 +146,26 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
     newK[index] = { ...newK[index], term }
     setKeywords(newK)
   }
-  const toggleKeywordPlatform = (index: number, platform: string) => {
-    const newK = [...keywords]
-    const p = newK[index].platforms
-    if (p.includes(platform)) newK[index].platforms = p.filter(x => x !== platform)
-    else newK[index].platforms = [...p, platform]
-    setKeywords(newK)
-  }
   const removeKeyword = (index: number) => {
     setKeywords(keywords.filter((_, i) => i !== index))
   }
 
   const addTarget = () => {
     if (!targetInput.trim()) return
-    if (activeTab === 'reddit' && !redditTargets.includes(targetInput.trim().toLowerCase())) {
-      setRedditTargets([...redditTargets, targetInput.trim().toLowerCase()])
-    } else if (activeTab === 'bluesky' && !blueskyTargets.includes(targetInput.trim().toLowerCase())) {
-      setBlueskyTargets([...blueskyTargets, targetInput.trim().toLowerCase()])
-    } else if (activeTab === 'x' && !xTargets.includes(targetInput.trim().toLowerCase())) {
-      setXTargets([...xTargets, targetInput.trim().toLowerCase()])
+    const clean = targetInput.trim().replace(/^r\//, '').toLowerCase()
+    if (activeTab === 'reddit' && !redditTargets.includes(clean)) {
+      setRedditTargets([...redditTargets, clean])
     }
     setTargetInput('')
   }
 
-  const removeTarget = (target: string, platform: 'reddit' | 'bluesky' | 'x') => {
-    if (platform === 'reddit') setRedditTargets(redditTargets.filter(t => t !== target))
-    if (platform === 'bluesky') setBlueskyTargets(blueskyTargets.filter(t => t !== target))
-    if (platform === 'x') setXTargets(xTargets.filter(t => t !== target))
-  }
-
   return (
     <div className="w-full max-w-2xl">
-      <div className="flex items-center justify-center gap-2 mb-12">
+      {/* Progress Steps */}
+      <div className="flex items-center justify-center gap-2 mb-10">
         {[1, 2, 3, 4].map(i => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             className={`h-1.5 rounded-full transition-all duration-300 ${step >= i ? 'bg-[#0A84FF] w-12' : 'bg-black/10 w-4'}`}
           />
         ))}
@@ -133,55 +178,71 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={springs.smooth}
-          className="glass rounded-2xl p-8 md:p-10"
+          className="glass rounded-2xl p-8 md:p-10 border border-border"
         >
+          {/* STEP 1: PRODUCT INFO + INSTANT AI EXTRACT */}
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2 tracking-tight">What's your business?</h2>
-                <p className="text-text-secondary text-sm">Tell us what you do so we can find the right conversations.</p>
+                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">What is your product?</h2>
+                <p className="text-text-secondary text-sm">Enter your website URL — our AI will automatically extract your positioning and target buyers.</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Business Name</label>
-                  <input 
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Business Name *</label>
+                  <input
                     value={businessName} onChange={e => setBusinessName(e.target.value)}
-                    type="text" placeholder="e.g. Scouto" 
-                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#48484A] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                    type="text" placeholder="e.g. Scouto"
+                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Business Website</label>
-                  <input 
-                    value={businessUrl} onChange={e => setBusinessUrl(e.target.value)}
-                    type="url" placeholder="https://..." 
-                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#48484A] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
-                  />
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Website URL</label>
+                    <span className="text-xs text-[#0A84FF] font-medium">Auto-Extracts Intelligence</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={businessUrl} onChange={e => setBusinessUrl(e.target.value)}
+                      type="url" placeholder="https://yourproduct.com"
+                      className="flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAiAnalyze}
+                      disabled={analyzingUrl || (!businessUrl && !businessName)}
+                      className="flex items-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      {analyzingUrl ? 'Analyzing...' : 'AI Auto-Fill'}
+                    </button>
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">What do you do?</label>
-                  <textarea 
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">What problem do you solve?</label>
+                  <textarea
                     value={businessDescription} onChange={e => setBusinessDescription(e.target.value)}
-                    placeholder="We make project management software for remote teams..." rows={3}
-                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#48484A] focus:outline-none focus:border-[#0A84FF]/50 transition-colors resize-none"
+                    placeholder="e.g. We monitor Reddit for buying intent signals and automatically draft tailored replies for SaaS founders..." rows={3}
+                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors resize-none"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">Business Type</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Category</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {BUSINESS_TYPES.map(type => (
-                      <motion.button
+                      <button
+                        type="button"
                         key={type.id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.97 }}
-                        transition={springs.snappy}
                         onClick={() => setBusinessType(type.id)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border ${businessType === type.id ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'bg-surface-elevated border-border text-text-secondary hover:border-border-hover'}`}
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all cursor-pointer ${businessType === type.id ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF] font-semibold' : 'bg-surface-elevated border-border text-text-secondary hover:border-border-hover'}`}
                       >
-                        <type.icon className="w-5 h-5 mb-2" />
-                        <span className="text-xs font-medium">{type.label}</span>
-                      </motion.button>
+                        <type.icon className="w-4 h-4 mb-1.5" />
+                        <span className="text-xs">{type.label}</span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -189,183 +250,226 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
             </div>
           )}
 
+          {/* STEP 2: 3-TIER BUYER INTENT KEYWORDS */}
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2 tracking-tight">What should we look for?</h2>
-                <p className="text-text-secondary text-sm">Add keywords that signal someone needs your product.</p>
+                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">3-Tier Buyer Intent Keywords</h2>
+                <p className="text-text-secondary text-sm">Select intent triggers to monitor. Click any phrase to toggle it on/off.</p>
               </div>
 
-              <div className="space-y-4">
+              {/* AI Suggested 3-Tier Badges */}
+              {aiSuggestions && (
+                <div className="space-y-4 p-4 bg-[#0A84FF]/5 border border-[#0A84FF]/15 rounded-2xl">
+                  {/* Category 1: Direct Buyer */}
+                  {aiSuggestions.buyer.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">
+                        <Zap className="w-3.5 h-3.5" /> Direct Buyer Intent
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {aiSuggestions.buyer.map(phrase => {
+                          const active = keywords.some(k => k.term.toLowerCase() === phrase.toLowerCase())
+                          return (
+                            <button
+                              type="button"
+                              key={phrase}
+                              onClick={() => toggleKeywordTerm(phrase)}
+                              className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer font-medium flex items-center gap-1.5 ${active ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
+                            >
+                              {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
+                              "{phrase}"
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category 2: Competitor Hijack */}
+                  {aiSuggestions.competitor.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">
+                        <Target className="w-3.5 h-3.5" /> Competitor Hijack Signals
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {aiSuggestions.competitor.map(phrase => {
+                          const active = keywords.some(k => k.term.toLowerCase() === phrase.toLowerCase())
+                          return (
+                            <button
+                              type="button"
+                              key={phrase}
+                              onClick={() => toggleKeywordTerm(phrase)}
+                              className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer font-medium flex items-center gap-1.5 ${active ? 'bg-amber-500 text-white border-amber-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
+                            >
+                              {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
+                              "{phrase}"
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category 3: Pain Point */}
+                  {aiSuggestions.painPoint.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700 uppercase tracking-wider mb-2">
+                        <ShieldAlert className="w-3.5 h-3.5" /> Pain-Point Discussions
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {aiSuggestions.painPoint.map(phrase => {
+                          const active = keywords.some(k => k.term.toLowerCase() === phrase.toLowerCase())
+                          return (
+                            <button
+                              type="button"
+                              key={phrase}
+                              onClick={() => toggleKeywordTerm(phrase)}
+                              className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer font-medium flex items-center gap-1.5 ${active ? 'bg-blue-500 text-white border-blue-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
+                            >
+                              {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
+                              "{phrase}"
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Active Custom Keyword Input List */}
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Active Monitoring Phrases ({keywords.length})</label>
                 {keywords.map((kw, i) => (
-                  <div key={i} className="flex flex-col gap-2 p-4 bg-black/5 border border-border rounded-xl">
-                    <div className="flex gap-3">
-                      <input 
-                        value={kw.term} onChange={e => updateKeywordTerm(i, e.target.value)}
-                        type="text" placeholder="e.g. looking for email marketing tool" 
-                        className="flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#48484A] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
-                      />
-                      {keywords.length > 1 && (
-                        <button onClick={() => removeKeyword(i)} className="p-3 text-text-tertiary hover:text-[#FF453A] transition-colors rounded-xl border border-transparent hover:bg-black/5">
-                          <X className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <button 
-                        onClick={() => toggleKeywordPlatform(i, 'reddit')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${kw.platforms.includes('reddit') ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'border-border text-text-secondary hover:border-border-hover'}`}
-                      >Reddit</button>
-                      <button 
-                        onClick={() => toggleKeywordPlatform(i, 'bluesky')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${kw.platforms.includes('bluesky') ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF]' : 'border-border text-text-secondary hover:border-border-hover'}`}
-                      >Bluesky</button>
-                      <button 
-                        disabled={true}
-                        onClick={() => toggleKeywordPlatform(i, 'x')}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-tertiary opacity-50 cursor-not-allowed"
-                        title="X (Twitter) Monitoring is currently unavailable"
-                      >
-                        X (Twitter) 🔒
+                  <div key={i} className="flex gap-2">
+                    <input
+                      value={kw.term} onChange={e => updateKeywordTerm(i, e.target.value)}
+                      type="text" placeholder="e.g. alternative to competitor"
+                      className="flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF]"
+                    />
+                    {keywords.length > 1 && (
+                      <button type="button" onClick={() => removeKeyword(i)} className="p-2.5 text-gray-400 hover:text-red-500 transition-colors">
+                        <X className="w-4 h-4" />
                       </button>
-                      <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-tertiary opacity-50 cursor-not-allowed">Threads (Coming Soon)</button>
-                    </div>
+                    )}
                   </div>
                 ))}
-                
-                {keywords.length < 5 && (
-                  <button onClick={addKeyword} className="flex items-center gap-2 text-sm text-[#0A84FF] font-medium hover:opacity-80 transition-opacity">
-                    <Plus className="w-4 h-4" /> Add another keyword
-                  </button>
-                )}
+
+                <button type="button" onClick={addKeyword} className="flex items-center gap-1.5 text-xs text-[#0A84FF] font-semibold hover:opacity-80 transition-opacity">
+                  <Plus className="w-3.5 h-3.5" /> Add custom phrase
+                </button>
               </div>
             </div>
           )}
 
+          {/* STEP 3: SUBREDDIT TARGETING */}
           {step === 3 && (
-              <div className="space-y-6">
+            <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2 tracking-tight">Where to look?</h2>
-                <p className="text-text-secondary text-sm">Define specific subreddits or search queries. Leave empty to monitor broadly.</p>
+                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">Target Communities</h2>
+                <p className="text-text-secondary text-sm">Choose subreddits to monitor. Click any suggested subreddit to toggle it.</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex gap-4 border-b border-border pb-2">
-                  <button 
-                    onClick={() => setActiveTab('reddit')}
-                    className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'reddit' ? 'border-[#0A84FF] text-[#0A84FF]' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
-                  >Reddit Targets</button>
-                  <button 
-                    onClick={() => setActiveTab('bluesky')}
-                    className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'bluesky' ? 'border-[#0A84FF] text-[#0A84FF]' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
-                  >Bluesky Targets</button>
-                  <button 
-                    disabled={true}
-                    onClick={() => setActiveTab('x')}
-                    className="pb-2 text-sm font-medium transition-colors border-b-2 border-transparent text-text-tertiary opacity-50 cursor-not-allowed"
-                  >
-                    X Targets 🔒
-                  </button>
-                </div>
-
-                {activeTab === 'x' && (
-                  <div className="bg-[#0A84FF]/10 text-[#0A84FF] px-4 py-3 rounded-xl text-sm mb-4">
-                    <strong>Note:</strong> X monitoring has a daily cost cap — heavy discovery keywords may be throttled once your plan's daily limit is reached.
+              {/* AI Suggested Subreddits */}
+              {aiSuggestions?.subreddits && aiSuggestions.subreddits.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">AI Suggested Subreddits</label>
+                  <div className="flex flex-wrap gap-2">
+                    {aiSuggestions.subreddits.map(sub => {
+                      const active = redditTargets.includes(sub)
+                      return (
+                        <button
+                          type="button"
+                          key={sub}
+                          onClick={() => toggleSubreddit(sub)}
+                          className={`text-xs px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-semibold flex items-center gap-1.5 ${active ? 'bg-[#0A84FF] text-white border-[#0A84FF] shadow-xs' : 'bg-surface-elevated text-gray-700 border-border hover:border-gray-300'}`}
+                        >
+                          r/{sub}
+                          {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
+                        </button>
+                      )
+                    })}
                   </div>
-                )}
+                </div>
+              )}
 
-                <div className="flex gap-3 mt-4">
+              {/* Add Custom Subreddit */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Add Custom Subreddit</label>
+                <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
-                    <input 
-                      value={targetInput} 
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">r/</span>
+                    <input
+                      value={targetInput}
                       onChange={e => setTargetInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addTarget()}
-                      type="text" 
-                      placeholder={activeTab === 'reddit' ? "e.g. startups (no 'r/')" : "e.g. email marketing software"} 
-                      className="w-full bg-surface-elevated border border-border rounded-xl pl-12 pr-4 py-3 text-text-primary placeholder-[#48484A] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTarget())}
+                      type="text"
+                      placeholder="marketing"
+                      className="w-full bg-surface-elevated border border-border rounded-xl pl-8 pr-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-[#0A84FF]"
                     />
                   </div>
-                  <button onClick={addTarget} className="bg-surface-elevated border border-border text-text-primary px-6 py-3 rounded-xl hover:bg-black/5 transition-colors font-medium">
+                  <button type="button" onClick={addTarget} className="bg-gray-900 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors">
                     Add
                   </button>
                 </div>
+              </div>
 
-                <div className="flex flex-wrap gap-2 pt-2 min-h-[60px]">
-                  {activeTab === 'reddit' ? (
-                    <>
-                      {redditTargets.map(sub => (
-                        <div key={sub} className="flex items-center gap-2 bg-[#0A84FF]/10 text-[#0A84FF] border border-[#0A84FF]/20 px-3 py-1.5 rounded-lg text-sm font-medium">
-                          r/{sub}
-                          <button onClick={() => removeTarget(sub, 'reddit')} className="hover:text-text-primary transition-colors">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                      {redditTargets.length === 0 && (
-                        <span className="text-text-tertiary text-sm italic py-2">Monitoring all of Reddit...</span>
-                      )}
-                    </>
-                  ) : activeTab === 'bluesky' ? (
-                    <>
-                      {blueskyTargets.map(query => (
-                        <div key={query} className="flex items-center gap-2 bg-[#0A84FF]/10 text-[#0A84FF] border border-[#0A84FF]/20 px-3 py-1.5 rounded-lg text-sm font-medium">
-                          "{query}"
-                          <button onClick={() => removeTarget(query, 'bluesky')} className="hover:text-text-primary transition-colors">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                      {blueskyTargets.length === 0 && (
-                        <span className="text-text-tertiary text-sm italic py-2">Will use your keywords as search queries...</span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {xTargets.map(query => (
-                        <div key={query} className="flex items-center gap-2 bg-[#0A84FF]/10 text-[#0A84FF] border border-[#0A84FF]/20 px-3 py-1.5 rounded-lg text-sm font-medium">
-                          "{query}"
-                          <button onClick={() => removeTarget(query, 'x')} className="hover:text-text-primary transition-colors">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                      {xTargets.length === 0 && (
-                        <span className="text-text-tertiary text-sm italic py-2">Will use your keywords as search queries...</span>
-                      )}
-                    </>
-                  )}
+              {/* Selected Subreddits List */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Active Targets ({redditTargets.length})</label>
+                <div className="flex flex-wrap gap-2">
+                  {redditTargets.map(sub => (
+                    <span key={sub} className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-800 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200">
+                      r/{sub}
+                      <button type="button" onClick={() => toggleSubreddit(sub)} className="hover:text-red-500 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
+          {/* STEP 4: INSTANT LIVE SIGNAL PREVIEW & CONFIRM */}
           {step === 4 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold mb-2 tracking-tight">Help us sound like you</h2>
-                <p className="text-text-secondary text-sm">Describe your communication style so drafts feel authentic.</p>
+                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">Brand Voice & Final Confirmation</h2>
+                <p className="text-text-secondary text-sm">Tell us how you want AI drafts to sound, then launch your monitoring pipeline.</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Writing Style</label>
-                  <textarea 
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Writing Style & Tone</label>
+                  <textarea
                     value={writingStyle} onChange={e => setWritingStyle(e.target.value)}
-                    placeholder="I'm casual and direct. I like to lead with value before mentioning my product. I never sound salesy. I use short paragraphs..." rows={4}
-                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#48484A] focus:outline-none focus:border-[#0A84FF]/50 transition-colors resize-none"
+                    placeholder="Direct, helpful, no hype. Lead with genuine value before mentioning our product..." rows={3}
+                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors resize-none text-sm"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Reddit Username (optional)</label>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Reddit Username (optional)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary">u/</span>
-                    <input 
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">u/</span>
+                    <input
                       value={redditUsername} onChange={e => setRedditUsername(e.target.value)}
-                      type="text" placeholder="username" 
-                      className="w-full bg-surface-elevated border border-border rounded-xl pl-9 pr-4 py-3 text-text-primary placeholder-[#48484A] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                      type="text" placeholder="username"
+                      className="w-full bg-surface-elevated border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-[#0A84FF]"
                     />
                   </div>
+                </div>
+
+                {/* Instant Signal Summary Card */}
+                <div className="p-4 bg-[#0A84FF]/5 border border-[#0A84FF]/20 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#0A84FF] uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4" /> Ready to Launch Monitoring Pipeline
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Scouto will monitor <span className="font-semibold text-gray-900">{redditTargets.length} subreddits</span> for <span className="font-semibold text-gray-900">{keywords.length} high-intent phrases</span>. High-scoring leads will automatically draft replies and notify you in real-time.
+                  </p>
                 </div>
               </div>
             </div>
@@ -373,46 +477,36 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
         </motion.div>
       </AnimatePresence>
 
+      {/* Navigation Buttons */}
       <div className="flex justify-between mt-8">
         {step > 1 ? (
-          <button 
+          <button
+            type="button"
             onClick={handlePrev}
-            className="text-text-secondary hover:text-text-primary px-6 py-3 font-medium transition-colors"
+            className="text-text-secondary hover:text-text-primary px-6 py-3 font-semibold text-sm transition-colors cursor-pointer"
           >
             Back
           </button>
         ) : <div />}
 
         {step < 4 ? (
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            transition={springs.snappy}
+          <button
+            type="button"
             onClick={handleNext}
             disabled={step === 1 && !businessName}
-            className="bg-[#1D1D1F] text-white px-8 py-3 rounded-xl font-medium disabled:opacity-50"
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50"
           >
-            Continue
-          </motion.button>
+            Continue <ArrowRight className="w-4 h-4" />
+          </button>
         ) : (
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            transition={springs.snappy}
+          <button
+            type="button"
             onClick={handleSubmit}
-            disabled={loading || !writingStyle}
-            className="bg-[#0A84FF] text-text-primary px-8 py-3 rounded-xl font-medium shadow-[0_0_20px_rgba(10,132,255,0.3)] disabled:opacity-50 flex items-center gap-2"
+            disabled={loading}
+            className="flex items-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50"
           >
-            {loading ? (
-              <>
-                <svg className="animate-spin h-5 w-5 text-text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Setting up...
-              </>
-            ) : 'Start Monitoring →'}
-          </motion.button>
+            {loading ? 'Launching Scouto...' : 'Launch Monitoring Pipeline 🔥'}
+          </button>
         )}
       </div>
     </div>

@@ -672,17 +672,11 @@ export default function LandingPage() {
 
       {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
       <section className="hero-mesh relative flex flex-col items-center justify-center px-6 pt-[100px] pb-[40px] overflow-hidden">
-        {/* Gradient mesh blobs (subtle Framer/Linear depth background) */}
+        {/* Subtle neutral depth — no colored blobs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[800px] pointer-events-none z-0 opacity-80"
-            style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(255, 81, 1, 0.04) 0%, transparent 60%)' }} />
-          <div
-            className="absolute -top-[10%] -left-[5%] w-[45%] h-[60%] rounded-full opacity-60"
-            style={{ background: 'radial-gradient(ellipse, rgba(255,180,100,0.3) 0%, transparent 68%)', filter: 'blur(40px)' }} />
-          <div
-            className="absolute -top-[15%] right-0 w-[40%] h-[55%] rounded-full opacity-60"
-            style={{ background: 'radial-gradient(ellipse, rgba(200,150,255,0.2) 0%, transparent 68%)', filter: 'blur(50px)' }} />
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] pointer-events-none z-0"
+            style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(0,0,0,0.025) 0%, transparent 60%)' }} />
         </div>
 
         <motion.div
@@ -706,16 +700,16 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} transition={springs.snappy}>
-              <div className="relative group inline-flex w-full sm:w-auto">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-[#FF2E93] to-[#FF8A00] rounded-full blur-[7px] opacity-65 group-hover:opacity-95 transition duration-300 pointer-events-none translate-y-[2px]" />
-                <Link href="/signup" className="relative w-full sm:w-auto bg-[#0A0A0A] text-white text-[15px] font-[600] flex items-center justify-center px-8 py-[14px] rounded-full shadow-[inset_0_2px_3px_rgba(255,255,255,0.12)]">
-                  Start 14-Day Free Trial
-                </Link>
-              </div>
+            <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.975 }} transition={springs.snappy}>
+              <Link
+                href="/signup"
+                className="w-full sm:w-auto bg-[#0A0A0A] text-white text-[15px] font-[600] flex items-center justify-center px-8 py-[14px] rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.1)] hover:bg-[#1C1C1E] transition-colors duration-200"
+              >
+                Start 14-Day Free Trial
+              </Link>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} transition={springs.snappy}>
-              <Link href="#how-it-works" className="w-full sm:w-auto px-7 py-[14px] rounded-full font-[500] text-[15px] text-[#0A0A0A] hover:bg-black/[0.04] border border-black/[0.10] flex items-center justify-center gap-2 transition-colors duration-150">
+            <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.975 }} transition={springs.snappy}>
+              <Link href="#how-it-works" className="w-full sm:w-auto px-7 py-[14px] rounded-full font-[500] text-[15px] text-[#0A0A0A] hover:bg-black/[0.04] border border-black/[0.10] flex items-center justify-center gap-2 transition-colors duration-200">
                 See how it works
                 <ChevronRight className="w-4 h-4" strokeWidth={2} />
               </Link>

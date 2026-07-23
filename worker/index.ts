@@ -10,7 +10,8 @@ import { xFetchHandler } from './handlers/fetch-x'
 import { scorePostHandler } from './handlers/score-post'
 import { sendDigestHandler } from './handlers/send-digest'
 import { sendReplyHandler } from './handlers/send-reply'
-import { redditFetchQueue, blueskyFetchQueue, xFetchQueue, scorePostQueue, sendDigestQueue, sendReplyQueue } from '../src/lib/queues'
+import { notifySlackHandler } from './handlers/notify-slack'
+import { redditFetchQueue, blueskyFetchQueue, xFetchQueue, scorePostQueue, sendDigestQueue, sendReplyQueue, notifySlackQueue } from '../src/lib/queues'
 import { logger } from '../src/lib/logger'
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -110,6 +111,13 @@ const sendDigestWorker = new Worker('send-digest', sendDigestHandler, {
 sendDigestWorker.on('ready', () => logger.info('🎧 send-digest worker is listening...'))
 sendDigestWorker.on('failed', captureJobError)
 
+const notifySlackWorker = new Worker('notify-slack', notifySlackHandler, {
+  connection: redis as any,
+  concurrency: 10,
+})
+notifySlackWorker.on('ready', () => logger.info('🎧 notify-slack worker is listening...'))
+notifySlackWorker.on('failed', captureJobError)
+
 // Worker Heartbeat (Healthchecks.io or similar)
 if (process.env.WORKER_HEALTHCHECK_URL) {
   setInterval(() => {
@@ -130,6 +138,7 @@ createBullBoard({
     new BullMQAdapter(scorePostQueue),
     new BullMQAdapter(sendDigestQueue),
     new BullMQAdapter(sendReplyQueue),
+    new BullMQAdapter(notifySlackQueue),
   ],
   serverAdapter,
 })

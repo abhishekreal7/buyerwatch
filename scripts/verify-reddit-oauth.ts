@@ -54,7 +54,7 @@ async function main() {
 
   console.log('\n=== SUMMARY ===')
   if (connections.length > 0) {
-    const hasAllTokens = tokenData?.every(c => c.access_token && c.refresh_token)
+    const hasAllTokens = connections.every((c: any) => c.access_token && c.refresh_token)
     console.log(`OAuth write path prerequisite (tokens in DB): ${hasAllTokens ? '✅ tokens exist for all connections' : '⚠️ some connections missing tokens'}`)
     console.log(`OAuth write path prerequisite (client credentials): ${clientId && !clientId.includes('TODO') ? '✅' : '❌ REDDIT_CLIENT_ID not set — token refresh will fail'}`)
     
