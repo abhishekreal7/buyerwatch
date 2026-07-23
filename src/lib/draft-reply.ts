@@ -110,7 +110,7 @@ Write ONLY the reply text, nothing else.
 
   try {
     if (process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
-      const { generateKimiChat } = await import('./kimi')
+      const { generateKimiChat } = await import('./kimi.js')
       draftText = await generateKimiChat({
         messages: [
           { role: 'system', content: systemPrompt },
@@ -152,7 +152,7 @@ Write ONLY the reply text, nothing else.
     console.warn('Primary LLM failed, falling back to Gemini...', error)
     try {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`
       const result = await model.generateContent(combinedPrompt)
       draftText = result.response.text()

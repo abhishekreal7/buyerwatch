@@ -52,7 +52,7 @@ Respond ONLY with this JSON (no markdown formatting, just pure JSON):
 
     if (process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
       try {
-        const { generateKimiChat } = await import('./kimi')
+        const { generateKimiChat } = await import('./kimi.js')
         responseText = await generateKimiChat({
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.1,
@@ -60,13 +60,13 @@ Respond ONLY with this JSON (no markdown formatting, just pure JSON):
       } catch (kimiErr) {
         console.warn('Kimi API failed, falling back to Gemini...', kimiErr)
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
         const result = await model.generateContent(prompt)
         responseText = result.response.text()
       }
     } else {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
       const result = await model.generateContent(prompt)
       responseText = result.response.text()
     }

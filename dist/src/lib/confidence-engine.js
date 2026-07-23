@@ -11,6 +11,7 @@ const supabase_js_1 = require("@supabase/supabase-js");
  * must dynamicThreshold or automationConfidence be independently calculated.
  *
  * Gate ordering (fail-fast):
+ *   Plan gate: free plan → blocked regardless of auto_send_enabled flag
  *   Gate 0: auto_send_enabled feature flag
  *   Gate 1: hard content safeguards (disclosure presence, promotional tone)
  *   Gate 2: cold-start floor (< MIN_FEEDBACK_FOR_TRUST reviews → force manual)
@@ -88,6 +89,16 @@ async function getCommunityMetrics(platform, targetCommunity) {
  * @param targetCommunity - Optional subreddit/community for community metrics lookup
  */
 async function evaluateAutoSend(userId, platform, draftResult, profile, targetCommunity) {
+    // Plan gate: auto-send is a paid feature — block free users regardless of flag state.
+    // This means a direct DB write of auto_send_enabled=true cannot bypass the gate.
+    if (profile.plan === 'free') {
+        return {
+            approved: false,
+            reason: 'auto_send_requires_paid_plan',
+            dynamicThreshold: 100,
+            automationConfidence: 0,
+        };
+    }
     // Gate 0: feature flag — hard stop if the user has disabled automation entirely
     if (!profile.auto_send_enabled) {
         return {

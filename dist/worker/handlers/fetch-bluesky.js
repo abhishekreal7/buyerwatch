@@ -67,12 +67,13 @@ async function blueskyFetchHandler(job) {
             const postText = `${post.text || ''}`.toLowerCase();
             for (const mapping of keywordMappings) {
                 if (postText.includes(mapping.term.toLowerCase())) {
+                    const safeJobId = post.externalId.replace(/:/g, '_');
                     await queues_1.scorePostQueue.add('score', {
                         userId: mapping.user_id,
                         keywordId: mapping.id,
                         post,
                     }, {
-                        jobId: `score-${mapping.user_id}-${post.externalId}`
+                        jobId: `score-${mapping.user_id}-${safeJobId}`
                     });
                 }
             }

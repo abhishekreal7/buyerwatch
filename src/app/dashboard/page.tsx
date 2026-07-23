@@ -370,14 +370,67 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {!loading && filtered.length === 0 && (
-            <div className="rounded-2xl p-10 bg-surface border border-black/5 flex flex-col items-center justify-center gap-3 text-center">
-              <p className="text-text-primary font-semibold">No threads yet</p>
-              <p className="text-text-secondary text-sm max-w-[280px]">
-                Add keywords in Monitoring Rules and the system will start finding matching threads.
-              </p>
+          {!loading && filtered.length === 0 && keywordsCount === 0 && (
+            /* ── No keywords yet — onboarding CTA ── */
+            <div className="rounded-2xl bg-surface border border-black/5 overflow-hidden">
+              <div className="p-10 flex flex-col items-center text-center gap-5">
+                <div className="w-16 h-16 rounded-2xl bg-[#F0F7FF] flex items-center justify-center">
+                  <Search className="w-7 h-7 text-[#0A84FF]" strokeWidth={1.6} />
+                </div>
+                <div>
+                  <p className="text-[18px] font-bold text-text-primary mb-2 tracking-tight">
+                    Your signal radar is idle
+                  </p>
+                  <p className="text-text-secondary text-[14px] max-w-[320px] leading-relaxed">
+                    Add your first keyword and Scouto will start scanning Reddit and Bluesky for people who need what you sell.
+                  </p>
+                </div>
+                <a
+                  href="/keywords"
+                  className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white px-5 py-2.5 rounded-xl font-medium text-[14px] hover:bg-[#222] transition-colors"
+                >
+                  <Target className="w-4 h-4" strokeWidth={2} />
+                  Add first keyword
+                </a>
+                <div className="flex items-center gap-8 pt-2 border-t border-black/5 w-full justify-center">
+                  <div className="text-center">
+                    <p className="text-[13px] font-semibold text-text-primary">Free plan</p>
+                    <p className="text-[12px] text-text-tertiary">1 keyword · 50 signals/mo</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[13px] font-semibold text-text-primary">Takes 2 min</p>
+                    <p className="text-[12px] text-text-tertiary">First results in hours</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[13px] font-semibold text-text-primary">You approve</p>
+                    <p className="text-[12px] text-text-tertiary">Every reply before it sends</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
+
+          {!loading && filtered.length === 0 && keywordsCount > 0 && (
+            /* ── Keywords exist, no threads yet — scanning state ── */
+            <div className="rounded-2xl bg-surface border border-black/5 p-10 flex flex-col items-center text-center gap-5">
+              <div className="w-16 h-16 rounded-2xl bg-[#F0FFF6] flex items-center justify-center relative">
+                <RefreshCcw className="w-7 h-7 text-[#10B981] animate-spin" strokeWidth={1.6} style={{ animationDuration: '2.5s' }} />
+              </div>
+              <div>
+                <p className="text-[18px] font-bold text-text-primary mb-2 tracking-tight">
+                  Scouto is scanning…
+                </p>
+                <p className="text-text-secondary text-[14px] max-w-[300px] leading-relaxed">
+                  You have {keywordsCount} keyword{keywordsCount > 1 ? 's' : ''} active. Results usually appear within a few hours of your first scan.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-[13px] text-text-tertiary">
+                <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
+                Monitoring is live
+              </div>
+            </div>
+          )}
+
 
           {filtered.map((thread) => {
             const isSelected = selectedThread?.id === thread.id

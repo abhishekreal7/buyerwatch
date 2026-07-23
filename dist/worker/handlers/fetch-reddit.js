@@ -40,57 +40,85 @@ exports.redditFetchHandler = redditFetchHandler;
 const logger_1 = require("../../src/lib/logger");
 const reddit_1 = require("../../src/lib/reddit");
 const queues_1 = require("../../src/lib/queues");
+const buying_signal_filter_1 = require("../../src/lib/buying-signal-filter");
 const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 async function redditFetchHandler(job) {
-    const { target } = job.data; // e.g. "smallbusiness"
+    const { target, keywordMappings: preloadedMappings } = job.data;
     if (process.env.REDDIT_API_APPROVED !== 'true') {
-        logger_1.logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode — pending API approval');
-    }
-    else if (process.env.USE_MOCK_REDDIT === 'true') {
-        logger_1.logger.info({ job: job.id, subreddit: job.data.target }, 'Reddit fetch running in mock mode (USE_MOCK_REDDIT=true)');
+        logger_1.logger.info({ job: job.id, subreddit: target }, 'Reddit fetch running in mock mode — pending API approval');
     }
     try {
         const posts = await (0, reddit_1.fetchSubredditNew)(target);
         if (!posts || posts.length === 0)
             return;
-        // Find all users watching this specific subreddit
-        // Note: in a massive app, you'd cache the mappings of target -> users in Redis
-        const { data: keywordMappings, error } = await supabase_1.supabaseWorker
-            .from('keywords')
-            .select('id, user_id, term')
-            .eq('platform', 'reddit')
-            .eq('target', target)
-            .eq('is_active', true); // assuming an active flag exists
-        if (error) {
-            logger_1.logger.error({ error }, 'Supabase error fetching keywords:');
-            return;
+        // Resolve keyword mappings (pre-supplied by fetch-now, or queried from DB)
+        let keywordMappings = preloadedMappings;
+        if (!keywordMappings) {
+            const { data, error } = await supabase_1.supabaseWorker
+                .from('keywords')
+                .select('id, user_id, term')
+                .eq('platform', 'reddit')
+                .eq('target', target)
+                .eq('is_active', true);
+            if (error) {
+                logger_1.logger.error({ error }, 'Supabase error fetching keywords:');
+                return;
+            }
+            keywordMappings = data;
+        }
+        else if (keywordMappings.length > 0) {
+            const ids = keywordMappings.map((m) => m.id);
+            const { data: kwData } = await supabase_1.supabaseWorker
+                .from('keywords')
+                .select('id, user_id, term')
+                .in('id', ids);
+            if (kwData)
+                keywordMappings = kwData;
         }
         if (!keywordMappings || keywordMappings.length === 0)
             return;
-        // For every post, check against the terms of users watching this subreddit
+        // Group keywords by user — one user may have multiple keywords on the same subreddit.
+        // We score each post once per user (not once per keyword) to avoid duplicate work.
+        // The keyword chosen is whichever of the user's terms appears in the post; if none
+        // match textually we still score because the subreddit subscription itself implies intent.
+        const userKeywords = new Map();
+        for (const m of keywordMappings) {
+            if (!userKeywords.has(m.user_id))
+                userKeywords.set(m.user_id, []);
+            userKeywords.get(m.user_id).push({ id: m.id, term: m.term });
+        }
+        let skipped = 0;
+        let enqueued = 0;
         for (const post of posts) {
-            // Very basic text search (case insensitive) for matching
-            const postText = `${post.text || ''}`.toLowerCase();
-            for (const mapping of keywordMappings) {
-                if (postText.includes(mapping.term.toLowerCase())) {
-                    // Push to score queue
-                    await queues_1.scorePostQueue.add('score', {
-                        userId: mapping.user_id,
-                        keywordId: mapping.id,
-                        post,
-                    }, {
-                        // Deduplicate: same user shouldn't score same post twice
-                        jobId: `score-${mapping.user_id}-${post.externalId}`
-                    });
+            const searchable = `${post.title || ''} ${post.text || ''}`.toLowerCase();
+            for (const [userId, keywords] of userKeywords) {
+                // Determine if this post has explicit keyword match in title+body
+                const matched = keywords.find(k => searchable.includes(k.term.toLowerCase()));
+                const keywordId = (matched ?? keywords[0]).id;
+                // Gate: keyword match always passes. No keyword match requires a buying signal.
+                // This eliminates ~60-70% of noise before any Gemini call.
+                if (!matched && !(0, buying_signal_filter_1.hasBuyingSignal)(searchable)) {
+                    skipped++;
+                    continue;
                 }
+                // Deduplicate: one score job per user per post, regardless of keyword count
+                await queues_1.scorePostQueue.add('score', {
+                    userId,
+                    keywordId,
+                    post,
+                }, {
+                    jobId: `score-${userId}-${post.externalId}`,
+                });
+                enqueued++;
             }
         }
+        logger_1.logger.info({ subreddit: target, posts: posts.length, enqueued, skipped, users: userKeywords.size }, `r/${target}: ${enqueued} enqueued, ${skipped} skipped (no buying signal)`);
     }
     catch (error) {
         logger_1.logger.error({ error }, `Failed to fetch reddit target r/${target}:`);
-        throw error; // BullMQ will retry based on config
+        throw error;
     }
 }

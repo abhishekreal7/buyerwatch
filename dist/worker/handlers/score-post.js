@@ -94,8 +94,7 @@ async function scorePostHandler(job) {
         // 7. Auto-send decision — routed through the single unified gatekeeper.
         //    All safeguards (disclosure, tone, cold-start, confidence threshold)
         //    are enforced inside evaluateAutoSend(). DO NOT inline duplicate logic here.
-        const evaluation = await (0, confidence_engine_1.evaluateAutoSend)(userId, post.platform, draftResult, profile, post.author ?? null // targetCommunity: use subreddit/community identifier
-        );
+        const evaluation = await (0, confidence_engine_1.evaluateAutoSend)(userId, post.platform, draftResult, { auto_send_enabled: profile.auto_send_enabled, plan: profile.plan ?? 'free' }, post.sourceTarget ?? null);
         if (evaluation.approved) {
             // All gates cleared — save and enqueue for auto-send
             const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag);
@@ -125,9 +124,9 @@ async function scorePostHandler(job) {
 }
 async function checkBudget(userId, plan, service) {
     const limits = {
-        free: { gemini: 50, claude: 5 },
-        pro: { gemini: 500, claude: 100 },
-        business: { gemini: 2000, claude: 500 },
+        free: { gemini: 50, claude: 40 }, // 40 aligns with plan-limits.ts free.aiDraftsPerMonth
+        pro: { gemini: 500, claude: 400 },
+        growth: { gemini: 2000, claude: 2000 },
     };
     const userPlan = limits[plan] ? plan : 'free';
     const limit = limits[userPlan][service];

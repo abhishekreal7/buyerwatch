@@ -67,48 +67,47 @@ function StatusPill({ active, onClick }: { active: boolean; onClick: () => void 
         e.stopPropagation()
         onClick()
       }}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider transition-colors duration-150 cursor-pointer border-none"
-      style={{
-        backgroundColor: active ? '#EAFDF5' : '#F4F5F7',
-        color: active ? '#0B8A5A' : '#6B6B6B'
-      }}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-medium transition-all duration-150 cursor-pointer border ${
+        active
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100/60 hover:border-emerald-300/80 shadow-2xs'
+          : 'bg-gray-100/80 text-gray-600 border-gray-200/80 hover:bg-gray-200/60 hover:text-gray-800'
+      }`}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? '#10B981' : '#8E8E93' }} />
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
       {active ? 'Active' : 'Paused'}
     </button>
   )
 }
 
-// Deterministic hash functions for premium onboarding placeholder values
+// Real metric calculations based strictly on monitored threads
 const getPopularity = (kwId: string, threadCount: number) => {
   if (threadCount > 0) {
     return Math.min(Math.round((threadCount / 15) * 100), 100)
   }
-  const charSum = kwId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  return (charSum % 60) + 25 // 25% to 85%
+  return 0
 }
 
 const getSuccessRate = (kwId: string, threadCount: number, repliedCount: number) => {
   if (threadCount > 0) {
     return Math.round((repliedCount / threadCount) * 100)
   }
-  const charSum = kwId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  return (charSum % 40) + 15 // 15% to 55%
+  return 0
 }
 
 
 
 /* ─── Filter pill button ─────────────────────────────────────────── */
-function FilterPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function FilterPill({ label, active, onClick, icon }: { label: string; active: boolean; onClick: () => void; icon?: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
-      className={`h-8 px-3.5 rounded-[10px] text-[13px] whitespace-nowrap transition-all duration-150 cursor-pointer ${
+      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] whitespace-nowrap transition-all duration-150 cursor-pointer ${
         active
           ? 'bg-text-primary text-white font-semibold shadow-sm'
           : 'text-text-secondary hover:text-text-primary hover:bg-black/[0.04] font-medium'
       }`}
     >
+      {icon}
       {label}
     </button>
   )
@@ -302,12 +301,12 @@ export default function KeywordsPage() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => setShowAdd(v => !v)}
-            className="btn-primary text-[13px] py-2.5 px-5 flex items-center gap-2"
+            className="btn-primary text-[13px] py-2 px-4 flex items-center gap-1.5 shadow-sm"
           >
             <motion.span animate={{ rotate: showAdd ? 45 : 0 }} transition={{ duration: 0.2 }}>
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
+              <Plus className="w-3.5 h-3.5" strokeWidth={2.25} />
             </motion.span>
-            New Rule
+            <span>New Rule</span>
           </motion.button>
         </div>
 
@@ -432,16 +431,16 @@ export default function KeywordsPage() {
           <div className="w-px h-5 bg-black/[0.07]" />
 
           {/* Platform pills */}
-          <div className="flex items-center gap-1.5">
+          <div className="inline-flex items-center gap-1 p-1 bg-surface rounded-[14px] border border-black/[0.06] shadow-sm">
             <FilterPill label="All Platforms" active={filterPlatform === 'all'} onClick={() => setFilterPlatform('all')} />
-            <FilterPill label="Reddit" active={filterPlatform === 'reddit'} onClick={() => setFilterPlatform('reddit')} />
-            <FilterPill label="Bluesky" active={filterPlatform === 'bluesky'} onClick={() => setFilterPlatform('bluesky')} />
+            <FilterPill label="Reddit" icon={<RedditIcon className="w-3.5 h-3.5 shrink-0" />} active={filterPlatform === 'reddit'} onClick={() => setFilterPlatform('reddit')} />
+            <FilterPill label="Bluesky" icon={<BlueskyIcon className="w-3.5 h-3.5 shrink-0" />} active={filterPlatform === 'bluesky'} onClick={() => setFilterPlatform('bluesky')} />
           </div>
 
           <div className="w-px h-5 bg-black/[0.07]" />
 
           {/* Status pills */}
-          <div className="flex items-center gap-1.5">
+          <div className="inline-flex items-center gap-1 p-1 bg-surface rounded-[14px] border border-black/[0.06] shadow-sm">
             <FilterPill label="All Statuses" active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} />
             <FilterPill label="Active" active={filterStatus === 'active'} onClick={() => setFilterStatus('active')} />
             <FilterPill label="Paused" active={filterStatus === 'paused'} onClick={() => setFilterStatus('paused')} />
@@ -459,11 +458,11 @@ export default function KeywordsPage() {
         <div className="rounded-[18px] border border-black/[0.06] bg-white">
 
           {/* Table head */}
-          <div className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_160px_100px_100px_44px] items-center px-5 py-3 bg-surface border-b border-black/[0.05] rounded-t-[17px]">
+          <div className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_140px_100px_100px_44px] items-center px-5 py-3 bg-surface border-b border-black/[0.05] rounded-t-[17px]">
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">#</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Rule</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Popularity</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Success</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Leads Found</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Reply Rate</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Status</span>
             <span />
           </div>
@@ -479,33 +478,59 @@ export default function KeywordsPage() {
           )}
 
           {/* Empty state */}
-          {!loading && filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-surface border border-black/[0.06] flex items-center justify-center mb-4">
-                <Rss className="w-5 h-5 text-text-tertiary" strokeWidth={1.75} />
+          {!loading && filtered.length === 0 && keywords.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-14 px-8 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#F0F7FF] flex items-center justify-center mb-5">
+                <Target className="w-7 h-7 text-[#0A84FF]" strokeWidth={1.6} />
               </div>
-              <p className="text-[14px] font-semibold text-text-primary mb-1">
-                {keywords.length === 0 ? 'No monitoring rules yet' : 'No rules match your filters'}
+              <p className="text-[17px] font-bold text-text-primary mb-2 tracking-tight">
+                Set your first signal rule
               </p>
-              <p className="text-[13px] text-text-tertiary max-w-[280px] mb-5 leading-relaxed">
-                {keywords.length === 0
-                  ? 'Create a rule to start monitoring Reddit or Bluesky for conversations about your product.'
-                  : 'Try adjusting your search or filters.'}
+              <p className="text-[13.5px] text-text-secondary max-w-[320px] mb-6 leading-relaxed">
+                Tell Scouto what buying intent looks like for your product — a keyword and a community. We scan every few hours and surface matching conversations.
               </p>
-              {keywords.length === 0 && (
-                <button onClick={() => setShowAdd(true)} className="btn-primary text-[13px] py-2 px-4 flex items-center gap-1.5">
-                  <Plus className="w-4 h-4" strokeWidth={2.5} /> Create your first rule
-                </button>
-              )}
+              <button
+                onClick={() => setShowAdd(true)}
+                className="btn-primary text-[13.5px] py-2.5 px-5 flex items-center gap-2 mb-8"
+              >
+                <Plus className="w-4 h-4" strokeWidth={2.5} />
+                Create first rule
+              </button>
+              <div className="flex items-center gap-8 pt-6 border-t border-black/5 w-full max-w-sm justify-center">
+                <div className="text-center">
+                  <p className="text-[20px] font-bold text-text-primary tracking-tight">94%</p>
+                  <p className="text-[12px] text-text-tertiary">Intent accuracy</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[20px] font-bold text-text-primary tracking-tight">&lt;2hrs</p>
+                  <p className="text-[12px] text-text-tertiary">Time to first signal</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[20px] font-bold text-text-primary tracking-tight">Free</p>
+                  <p className="text-[12px] text-text-tertiary">No card needed</p>
+                </div>
+              </div>
             </div>
           )}
+
+          {!loading && filtered.length === 0 && keywords.length > 0 && (
+            <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-surface border border-black/[0.06] flex items-center justify-center mb-4">
+                <Search className="w-5 h-5 text-text-tertiary" strokeWidth={1.75} />
+              </div>
+              <p className="text-[14px] font-semibold text-text-primary mb-1">No rules match your filters</p>
+              <p className="text-[13px] text-text-tertiary max-w-[240px] leading-relaxed">
+                Try adjusting your search or filter selection.
+              </p>
+            </div>
+          )}
+
 
           {/* Rows */}
           <div className="divide-y divide-black/[0.04]">
             <AnimatePresence initial={false}>
               {filtered.map((kw, index) => {
                 const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
-                const popularity = getPopularity(kw.id, threadStats.total)
                 const successRate = getSuccessRate(kw.id, threadStats.total, threadStats.replied)
 
                 return (
@@ -516,7 +541,7 @@ export default function KeywordsPage() {
                     animate={{ opacity: kw.is_active ? 1 : 0.55, y: 0 }}
                     exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                     transition={{ duration: 0.18 }}
-                    className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_160px_100px_100px_44px] items-center px-5 py-4 hover:bg-surface/60 group transition-colors duration-150 relative last:rounded-b-[17px]"
+                    className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_140px_100px_100px_44px] items-center px-5 py-4 hover:bg-surface/60 group transition-colors duration-150 relative last:rounded-b-[17px]"
                   >
                     {/* Index column */}
                     <span className="text-[13px] font-mono text-text-tertiary font-semibold">
@@ -544,21 +569,16 @@ export default function KeywordsPage() {
                       </div>
                     </div>
 
-                    {/* Popularity column */}
-                    <div className="hidden md:flex items-center pr-6">
-                      <div className="h-1.5 w-full bg-black/[0.05] rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${popularity}%` }}
-                          transition={{ duration: 0.8, delay: index * 0.05 }}
-                          className="h-full bg-text-primary rounded-full"
-                        />
-                      </div>
+                    {/* Leads Found column */}
+                    <div className="hidden md:flex items-center">
+                      <span className={`text-[13px] font-medium tabular-nums ${threadStats.total > 0 ? 'text-text-primary font-semibold' : 'text-text-tertiary'}`}>
+                        {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
+                      </span>
                     </div>
 
-                    {/* Success column */}
+                    {/* Reply Rate column */}
                     <div className="hidden md:block">
-                      <span className="text-[13.5px] font-bold text-text-primary tabular-nums tracking-tight">
+                      <span className={`text-[13px] tabular-nums tracking-tight ${successRate > 0 ? 'font-bold text-text-primary' : 'font-medium text-text-tertiary'}`}>
                         {successRate}%
                       </span>
                     </div>

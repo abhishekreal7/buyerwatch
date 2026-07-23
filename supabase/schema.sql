@@ -16,7 +16,7 @@ create table profiles (
   business_type text,
   writing_style text,
   reddit_username text,
-  plan text not null default 'free' check (plan in ('free', 'pro', 'business')),
+  plan text not null default 'free' check (plan in ('free', 'pro', 'growth')),
   auto_send_enabled boolean default false,
   auto_send_threshold integer default 85 check (auto_send_threshold >= 70),
   notification_preferences jsonb default '{"emailDigest": true, "highIntentAlerts": true, "weeklyReport": false}'::jsonb,

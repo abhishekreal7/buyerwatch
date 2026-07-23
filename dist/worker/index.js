@@ -154,12 +154,15 @@ serverAdapter.setBasePath('/admin/queues');
     serverAdapter,
 });
 const app = (0, express_1.default)();
-// Basic auth for Bull Board based on ADMIN_EMAILS or a simple secret
-const adminSecret = process.env.ADMIN_SECRET || 'scouto_admin';
+// Require ADMIN_SECRET — never fall back to a hardcoded default
+const adminSecret = process.env.ADMIN_SECRET;
+if (!adminSecret) {
+    logger_1.logger.error('ADMIN_SECRET env var is required. Refusing to start bull-board without it.');
+    throw new Error('ADMIN_SECRET environment variable is required');
+}
 app.use('/admin/queues', (req, res, next) => {
     const auth = req.headers.authorization;
     if (!auth || auth !== `Bearer ${adminSecret}`) {
-        // In production, you might want to use real Basic Auth or a session cookie
         // For a standalone worker on a non-public port, this acts as a first line of defense
         return res.status(401).send('Unauthorized');
     }

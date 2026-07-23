@@ -22,6 +22,10 @@ const redisAdapter = redisClient ? {
     eval: async (script, keys, args) => {
         // ioredis eval takes: script, numKeys, ...keys, ...args
         return redisClient.eval(script, keys.length, ...keys, ...args);
+    },
+    evalsha: async (sha, keys, args) => {
+        // ioredis evalsha takes: sha, numKeys, ...keys, ...args
+        return redisClient.evalsha(sha, keys.length, ...keys, ...args);
     }
 } : null;
 exports.authRateLimit = redisAdapter ? new ratelimit_1.Ratelimit({
