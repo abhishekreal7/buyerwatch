@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  CheckCircle, FileText, Send, AlertTriangle, Activity
+  CheckCircle, FileText, Send, AlertTriangle, Activity,
+  MousePointerClick, Target, DollarSign, ArrowUpRight, Zap
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -482,35 +483,84 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Feature 2: Attribution Pipeline Card (Positioned at bottom) */}
-          <div className="surface-ceramic border border-black/[0.04] p-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="surface-ceramic border border-black/5 p-6 md:p-8 rounded-2xl shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">
               <div>
-                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
-                <p className="text-[13px] text-text-secondary mt-0.5">Track clicks &amp; paid conversions originating from Scouto shortlinks</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-[17px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    UTM Tracking Active
+                  </span>
+                </div>
+                <p className="text-[13.5px] text-text-secondary">Track referral visitors, signups, and customer revenue attributed to your Scouto replies.</p>
               </div>
-              <Link href="/settings#notifications" className="text-[13px] font-medium text-blue-600 hover:underline">
-                Setup Conversion Webhook →
+              <Link
+                href="/settings#connections"
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-900 hover:text-black bg-gray-100 hover:bg-gray-200 px-3.5 py-2 rounded-xl transition-all duration-150 shrink-0 w-fit"
+              >
+                Configure Webhook
+                <ArrowUpRight className="w-3.5 h-3.5 text-gray-500" strokeWidth={2.2} />
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Shortlink Clicks</p>
-                <p className="text-[26px] font-bold text-text-primary tracking-tight">{data.attributionStats?.clicks || 0}</p>
-                <p className="text-[12px] text-text-secondary mt-1">Unique readers clicked</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Card 1: Referral Clicks */}
+              <div className="bg-surface border border-black/5 rounded-2xl p-5 hover:border-black/10 transition-all duration-200 group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Referral Clicks</span>
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <MousePointerClick className="w-4 h-4" strokeWidth={2} />
+                    </div>
+                  </div>
+                  <p className="text-[30px] font-bold text-text-primary tracking-tight leading-none mb-1">
+                    {data.attributionStats?.clicks || 0}
+                  </p>
+                </div>
+                <p className="text-[12.5px] text-text-tertiary mt-3">Unique visitors from reply links</p>
               </div>
-              <div className="bg-[#0A84FF]/[0.04] border border-[#0A84FF]/10 p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Conversions</p>
-                <p className="text-[26px] font-bold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
-                <p className="text-[12px] text-text-secondary mt-1">Attributed signups/payments</p>
+
+              {/* Card 2: Conversions */}
+              <div className="bg-surface border border-black/5 rounded-2xl p-5 hover:border-black/10 transition-all duration-200 group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Attributed Conversions</span>
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <Target className="w-4 h-4" strokeWidth={2} />
+                    </div>
+                  </div>
+                  <p className="text-[30px] font-bold text-text-primary tracking-tight leading-none mb-1">
+                    {data.attributionStats?.conversions || 0}
+                  </p>
+                </div>
+                <p className="text-[12.5px] text-text-tertiary mt-3">Verified signups &amp; paid conversions</p>
               </div>
-              <div className="bg-[#10B981]/[0.04] border border-[#10B981]/10 p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Attributed Revenue</p>
-                <p className="text-[26px] font-bold text-[#10B981] tracking-tight">
-                  ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-[12px] text-text-secondary mt-1">Total revenue generated</p>
+
+              {/* Card 3: Attributed Revenue */}
+              <div className="bg-surface border border-black/5 rounded-2xl p-5 hover:border-black/10 transition-all duration-200 group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Attributed Revenue</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <DollarSign className="w-4 h-4" strokeWidth={2} />
+                    </div>
+                  </div>
+                  <p className="text-[30px] font-bold text-emerald-600 tracking-tight leading-none mb-1">
+                    ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <p className="text-[12.5px] text-text-tertiary mt-3">Direct customer revenue generated</p>
               </div>
+            </div>
+
+            {/* Bottom Info Bar */}
+            <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-[12px] text-gray-500 border-t border-black/5">
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-500" strokeWidth={2} />
+                Tracking parameters: <code className="font-mono text-[11px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">?ref=scouto&amp;sid=...</code>
+              </span>
+              <span className="text-gray-400">Zero shortener risk • Uses your own brand domain</span>
             </div>
           </div>
 
