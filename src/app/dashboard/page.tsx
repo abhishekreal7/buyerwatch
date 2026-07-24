@@ -124,8 +124,11 @@ export default function DashboardPage() {
     }))
 
     setThreads(parsed)
-    if (parsed.length > 0) {
-      setSelectedThread(parsed[0])
+    const activeParsed = parsed.filter(t => t.status !== 'dismissed')
+    if (activeParsed.length > 0) {
+      setSelectedThread(activeParsed[0])
+    } else {
+      setSelectedThread(null)
     }
 
     // Feature 3: Load community health for all unique targets
@@ -275,9 +278,19 @@ export default function DashboardPage() {
     }
   }
 
-  const filtered = filterTab === 'high-intent'
-    ? threads.filter(t => t.score >= 80)
-    : threads
+  const filtered = filterTab === 'dismissed'
+    ? threads.filter(t => t.status === 'dismissed')
+    : filterTab === 'high-intent'
+    ? threads.filter(t => t.status !== 'dismissed' && t.score >= 80)
+    : threads.filter(t => t.status !== 'dismissed')
+
+  useEffect(() => {
+    if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
+      setSelectedThread(filtered[0] || null)
+    } else if (!selectedThread && filtered.length > 0) {
+      setSelectedThread(filtered[0])
+    }
+  }, [filterTab, threads])
 
   return (
     <div className="max-w-[1400px] mx-auto py-8">
