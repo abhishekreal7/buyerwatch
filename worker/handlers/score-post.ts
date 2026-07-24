@@ -7,6 +7,7 @@ import { evaluateAutoSend } from '../../src/lib/confidence-engine'
 import { NormalizedPost } from '../../src/lib/types'
 import * as dotenv from 'dotenv'
 import path from 'path'
+import { randomBytes } from 'crypto'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -32,7 +33,7 @@ export async function scorePostHandler(job: Job) {
     // 2. Fetch user profile for context and plan
     const { data: profile } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold')
+      .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
       .eq('id', userId)
       .single()
 
@@ -63,8 +64,14 @@ export async function scorePostHandler(job: Job) {
       return
     }
 
-    // 6. Draft Reply
-    const draftResult = await draftReply(post, profile, scoreResult.score)
+    // 6. Draft Reply — generate tracking SID before drafting so Claude can embed it naturally
+    const trackingEnabled = profile.referral_tracking_enabled !== false // default true
+    const trackingSid = trackingEnabled ? randomBytes(5).toString('base64url') : undefined // ~7-char URL-safe token
+    const trackingUrl = trackingEnabled && profile.business_url && trackingSid
+      ? `${profile.business_url.replace(/\/$/, '')}?ref=scouto&sid=${trackingSid}`
+      : undefined
+
+    const draftResult = await draftReply(post, profile, scoreResult.score, trackingUrl)
     const draftText = draftResult.text
 
     // 7. Auto-send decision — routed through the single unified gatekeeper.
@@ -80,7 +87,7 @@ export async function scorePostHandler(job: Job) {
 
     if (evaluation.approved) {
       // All gates cleared — save and enqueue for auto-send
-      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning)
+      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning, trackingSid)
       if (thread) {
         const { sendReplyQueue, notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
         await sendReplyQueue.add(`send-${thread.id}`, {
@@ -109,7 +116,7 @@ export async function scorePostHandler(job: Job) {
       }
     } else {
       // Any gate failed — route to manual review queue
-      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning)
+      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning, trackingSid)
       if (thread) {
         const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
         // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
@@ -160,7 +167,7 @@ async function checkBudget(userId: string, plan: string, service: 'gemini' | 'cl
   return data
 }
 
-async function saveThread(userId: string, keywordId: string, post: NormalizedPost, intentScore: number, status: string, draftText?: string, flag?: string, reasoning?: string) {
+async function saveThread(userId: string, keywordId: string, post: NormalizedPost, intentScore: number, status: string, draftText?: string, flag?: string, reasoning?: string, trackingSid?: string) {
   const { data: thread, error } = await supabase
     .from('monitored_threads')
     .insert({
@@ -175,6 +182,7 @@ async function saveThread(userId: string, keywordId: string, post: NormalizedPos
       status: status,
       flag: flag || null,
       score_reasoning: reasoning || null,
+      tracking_sid: trackingSid || null,
     })
     .select()
     .single()

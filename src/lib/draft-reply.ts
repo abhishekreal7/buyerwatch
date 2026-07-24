@@ -50,7 +50,8 @@ export function hasDisclosure(draftText: string): boolean {
 export async function draftReply(
   post: NormalizedPost,
   userProfile: UserProfile,
-  intentScore: number
+  intentScore: number,
+  trackingUrl?: string   // Optional referral URL — injected into Claude's prompt when referral_tracking_enabled
 ): Promise<{ text: string; mentionedProduct: boolean; flagged: boolean; hasDisclosure: boolean }> {
 
   if (process.env.USE_MOCK_DRAFTS === 'true') {
@@ -84,6 +85,10 @@ URL: ${userProfile.business_url}
 Your writing style:
 ${userProfile.writing_style}
 
+${trackingUrl ? `REFERRAL LINK INSTRUCTION:
+A referral link is available: ${trackingUrl}
+You MAY include it in the reply only if it flows naturally — for example, after a genuine recommendation or at the very end of a helpful reply. Do not force it in. Do not make it the focus. Do not use it as a call-to-action. If including the link would make the reply feel promotional or awkward, omit it entirely.
+` : ''}
 ${userProfile.tone_examples ? `CRITICAL - TONE EXAMPLES TO MIMIC:
 Please study these examples written by the user in the past. Your generated reply MUST perfectly match this vocabulary, cadence, and vibe:
 ${userProfile.tone_examples}

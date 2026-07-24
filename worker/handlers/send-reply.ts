@@ -75,16 +75,43 @@ export async function sendReplyHandler(job: Job<SendReplyData>) {
       permalink
     })
 
-    // Feature 2: Attribution — create a click-tracking row for this reply
-    const token = randomBytes(6).toString('base64url') // 8-char URL-safe token
-    await supabase.from('reply_attribution').insert({
-      user_id: userId,
-      thread_id: threadId,
-      attribution_token: token,
-    }).then(({ error }) => {
-      if (error) logger.warn({ error, threadId }, '[Attribution] Failed to create attribution row')
-      else logger.debug({ threadId, token }, '[Attribution] Attribution row created')
-    })
+    // Feature 2: Attribution — read the tracking_sid that was generated at draft time
+    // and write a complete attribution row so /r/[shortcode], /api/track/click, and
+    // the conversion webhook all have the data they need.
+    const { data: threadRow } = await supabase
+      .from('monitored_threads')
+      .select('tracking_sid')
+      .eq('id', threadId)
+      .single()
+
+    const trackingSid = threadRow?.tracking_sid
+    if (trackingSid) {
+      // Read user's business_url to build the destination
+      const { data: profileRow } = await supabase
+        .from('profiles')
+        .select('business_url')
+        .eq('id', userId)
+        .single()
+
+      const businessUrl = profileRow?.business_url || null
+      const destinationUrl = businessUrl
+        ? `${businessUrl.replace(/\/$/, '')}?ref=scouto&sid=${trackingSid}`
+        : null
+
+      await supabase.from('reply_attribution').insert({
+        user_id: userId,
+        thread_id: threadId,
+        attribution_token: trackingSid,
+        shortcode: trackingSid,
+        destination_url: destinationUrl,
+      }).then(({ error }) => {
+        if (error) logger.warn({ error, threadId }, '[Attribution] Failed to create attribution row')
+        else logger.debug({ threadId, trackingSid }, '[Attribution] Attribution row created with tracking URL')
+      })
+    } else {
+      logger.debug({ threadId }, '[Attribution] No tracking_sid — referral tracking disabled for this reply')
+    }
+
 
     logger.info({ jobId: job.id, permalink }, 'Successfully sent reply')
 

@@ -124,6 +124,7 @@ export default function SettingsPage() {
     redditUsername: '',
     autoSendEnabled: false,
     autoSendThreshold: 85,
+    referralTrackingEnabled: true,
   })
 
   const [connections, setConnections] = useState({ reddit: false, bluesky: false, redditUsername: '' })
@@ -170,6 +171,7 @@ export default function SettingsPage() {
           redditUsername: p.reddit_username || '',
           autoSendEnabled: p.auto_send_enabled || false,
           autoSendThreshold: p.auto_send_threshold || 85,
+          referralTrackingEnabled: p.referral_tracking_enabled !== false, // default true
         })
         if (p.notification_preferences) setNotifications(p.notification_preferences)
         setSlack({ webhookUrl: p.slack_webhook_url || '', threshold: p.slack_notify_threshold ?? 70 })
@@ -271,6 +273,7 @@ export default function SettingsPage() {
       reddit_username: profile.redditUsername,
       auto_send_enabled: profile.autoSendEnabled,
       auto_send_threshold: profile.autoSendThreshold,
+      referral_tracking_enabled: profile.referralTrackingEnabled,
       notification_preferences: notifications,
       slack_webhook_url: slack.webhookUrl || null,
       slack_notify_threshold: slack.threshold,
@@ -633,6 +636,25 @@ export default function SettingsPage() {
                             </motion.div>
                           )}
                         </AnimatePresence>
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard title="Reply Tracking" description="Control how Scouto attributes clicks and revenue from your replies.">
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="flex-1">
+                          <p className="text-[14px] font-semibold text-gray-900">Include referral tracking in replies</p>
+                          <p className="text-[13px] text-gray-500 mt-1">
+                            Appends <code className="text-[12px] bg-gray-100 px-1.5 py-0.5 rounded font-mono">?ref=scouto&amp;sid=…</code> to your business URL when Claude naturally includes it. Lets you measure clicks and revenue in Analytics without looking like a link shortener.
+                          </p>
+                        </div>
+                        <Toggle
+                          checked={profile.referralTrackingEnabled}
+                          onChange={v => setProfile(p => ({ ...p, referralTrackingEnabled: v }))}
+                        />
+                      </div>
+                      <div className="mt-4 p-3 bg-gray-50 border border-gray-100 rounded-xl text-[12px] text-gray-500 leading-relaxed">
+                        <span className="font-semibold text-gray-700">How it works: </span>
+                        The link uses your own domain (e.g. <span className="font-mono text-gray-700">{profile.businessUrl || 'yoursite.com'}?ref=scouto&sid=abc123</span>) — identical to standard UTM/referral tracking every business uses. Claude only includes it when it fits naturally; it will never be forced into a reply where it would read awkwardly.
                       </div>
                     </SectionCard>
 
