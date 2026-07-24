@@ -482,85 +482,98 @@ export default function AnalyticsPage() {
 
           </div>
 
-          {/* Feature 2: Attribution Pipeline Card (Positioned at bottom) */}
-          <div className="surface-ceramic border border-black/5 p-6 md:p-8 rounded-2xl shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-[17px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    UTM Tracking Active
-                  </span>
-                </div>
-                <p className="text-[13.5px] text-text-secondary">Track referral visitors, signups, and customer revenue attributed to your Scouto replies.</p>
-              </div>
-              <Link
-                href="/settings#connections"
-                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-900 hover:text-black bg-gray-100 hover:bg-gray-200 px-3.5 py-2 rounded-xl transition-all duration-150 shrink-0 w-fit"
-              >
-                Configure Webhook
-                <ArrowUpRight className="w-3.5 h-3.5 text-gray-500" strokeWidth={2.2} />
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* Card 1: Referral Clicks */}
-              <div className="bg-surface border border-black/5 rounded-2xl p-5 hover:border-black/10 transition-all duration-200 group flex flex-col justify-between">
+          {/* Feature 2: Attribution Pipeline Card (Rich, High-Contrast Design) */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-md overflow-hidden">
+            {/* Top Gradient Stripe */}
+            <div className="h-1 bg-gradient-to-r from-blue-600 via-purple-600 to-emerald-500" />
+            
+            <div className="p-6 md:p-8 space-y-6">
+              {/* Header Row */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Referral Clicks</span>
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <MousePointerClick className="w-4 h-4" strokeWidth={2} />
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <h3 className="text-[18px] font-bold text-slate-900 tracking-tight">Attribution Pipeline</h3>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/80 shadow-xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      Live UTM Engine
+                    </span>
+                  </div>
+                  <p className="text-[13.5px] font-medium text-slate-500">Track referral traffic, signups, and customer revenue attributed to your Scouto replies.</p>
+                </div>
+                <Link
+                  href="/settings#connections"
+                  className="inline-flex items-center gap-2 text-[13px] font-bold text-white bg-slate-900 hover:bg-slate-800 px-4 py-2.5 rounded-xl transition-all duration-150 shadow-sm hover:shadow-md shrink-0 w-fit cursor-pointer"
+                >
+                  Configure Webhook
+                  <ArrowUpRight className="w-4 h-4 text-slate-300" strokeWidth={2.5} />
+                </Link>
+              </div>
+
+              {/* 3 Rich Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Card 1: Referral Clicks */}
+                <div className="bg-gradient-to-br from-blue-50/80 via-white to-blue-50/30 border border-blue-200/90 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[11px] font-extrabold text-blue-900 uppercase tracking-wider">Referral Clicks</span>
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 group-hover:scale-110 transition-transform">
+                      <MousePointerClick className="w-5 h-5" strokeWidth={2.2} />
                     </div>
                   </div>
-                  <p className="text-[30px] font-bold text-text-primary tracking-tight leading-none mb-1">
-                    {data.attributionStats?.clicks || 0}
-                  </p>
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-[34px] font-black text-slate-900 tracking-tight leading-none">
+                      {data.attributionStats?.clicks || 0}
+                    </p>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700">0.0% CTR</span>
+                  </div>
+                  <p className="text-[13px] font-medium text-slate-600 mt-3 pt-3 border-t border-blue-100/60">Unique visitors from reply links</p>
                 </div>
-                <p className="text-[12.5px] text-text-tertiary mt-3">Unique visitors from reply links</p>
-              </div>
 
-              {/* Card 2: Conversions */}
-              <div className="bg-surface border border-black/5 rounded-2xl p-5 hover:border-black/10 transition-all duration-200 group flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Attributed Conversions</span>
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <Target className="w-4 h-4" strokeWidth={2} />
+                {/* Card 2: Conversions */}
+                <div className="bg-gradient-to-br from-purple-50/80 via-white to-purple-50/30 border border-purple-200/90 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200 relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[11px] font-extrabold text-purple-900 uppercase tracking-wider">Attributed Conversions</span>
+                    <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/25 group-hover:scale-110 transition-transform">
+                      <Target className="w-5 h-5" strokeWidth={2.2} />
                     </div>
                   </div>
-                  <p className="text-[30px] font-bold text-text-primary tracking-tight leading-none mb-1">
-                    {data.attributionStats?.conversions || 0}
-                  </p>
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-[34px] font-black text-slate-900 tracking-tight leading-none">
+                      {data.attributionStats?.conversions || 0}
+                    </p>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700">0 Signups</span>
+                  </div>
+                  <p className="text-[13px] font-medium text-slate-600 mt-3 pt-3 border-t border-purple-100/60">Verified signups &amp; paid conversions</p>
                 </div>
-                <p className="text-[12.5px] text-text-tertiary mt-3">Verified signups &amp; paid conversions</p>
-              </div>
 
-              {/* Card 3: Attributed Revenue */}
-              <div className="bg-surface border border-black/5 rounded-2xl p-5 hover:border-black/10 transition-all duration-200 group flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Attributed Revenue</span>
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <DollarSign className="w-4 h-4" strokeWidth={2} />
+                {/* Card 3: Attributed Revenue */}
+                <div className="bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/30 border border-emerald-200/90 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all duration-200 relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[11px] font-extrabold text-emerald-900 uppercase tracking-wider">Attributed Revenue</span>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 group-hover:scale-110 transition-transform">
+                      <DollarSign className="w-5 h-5" strokeWidth={2.2} />
                     </div>
                   </div>
-                  <p className="text-[30px] font-bold text-emerald-600 tracking-tight leading-none mb-1">
-                    ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-[34px] font-black text-emerald-600 tracking-tight leading-none">
+                      ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700">$0.00 LTV</span>
+                  </div>
+                  <p className="text-[13px] font-medium text-slate-600 mt-3 pt-3 border-t border-emerald-100/60">Direct customer revenue generated</p>
                 </div>
-                <p className="text-[12.5px] text-text-tertiary mt-3">Direct customer revenue generated</p>
               </div>
-            </div>
 
-            {/* Bottom Info Bar */}
-            <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-[12px] text-gray-500 border-t border-black/5">
-              <span className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-amber-500" strokeWidth={2} />
-                Tracking parameters: <code className="font-mono text-[11px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">?ref=scouto&amp;sid=...</code>
-              </span>
-              <span className="text-gray-400">Zero shortener risk • Uses your own brand domain</span>
+              {/* Bottom Info & Parameter Bar */}
+              <div className="p-4 bg-slate-900 rounded-xl flex flex-wrap items-center justify-between gap-3 text-[12.5px] text-slate-300 shadow-inner">
+                <span className="flex items-center gap-2 font-medium">
+                  <Zap className="w-4 h-4 text-amber-400 fill-amber-400" strokeWidth={2} />
+                  Active parameter template: <code className="font-mono text-[11.5px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded border border-slate-700">?ref=scouto&amp;sid=[TOKEN]</code>
+                </span>
+                <span className="text-slate-400 font-medium">🔒 100% Brand-Safe Domain Links • No Shorteners</span>
+              </div>
             </div>
           </div>
 
