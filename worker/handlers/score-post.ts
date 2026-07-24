@@ -50,7 +50,7 @@ export async function scorePostHandler(job: Job) {
     
     // Save thread early if score is low
     if (scoreResult.score < INTENT_THRESHOLD) {
-      await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed', undefined, scoreResult.flag)
+      await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed', undefined, scoreResult.flag, scoreResult.reasoning)
       return
     }
 
@@ -80,9 +80,9 @@ export async function scorePostHandler(job: Job) {
 
     if (evaluation.approved) {
       // All gates cleared — save and enqueue for auto-send
-      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag)
+      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning)
       if (thread) {
-        const { sendReplyQueue, notifySlackQueue } = await import('../../src/lib/queues/index.js')
+        const { sendReplyQueue, notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
         await sendReplyQueue.add(`send-${thread.id}`, {
           userId,
           threadExternalId: post.externalId,
@@ -91,6 +91,10 @@ export async function scorePostHandler(job: Job) {
           platform: post.platform,
           triggerType: 'auto'
         })
+        // Fire-and-forget: check if thread URL ranks on Google for this keyword (Feature 5)
+        if (post.url) {
+          checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url, matchedKeyword: post.sourceTarget }).catch(() => {})
+        }
         // Fire-and-forget Slack notification
         notifySlackQueue.add(`slack-${thread.id}`, {
           userId,
@@ -105,9 +109,13 @@ export async function scorePostHandler(job: Job) {
       }
     } else {
       // Any gate failed — route to manual review queue
-      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag)
+      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning)
       if (thread) {
-        const { notifySlackQueue } = await import('../../src/lib/queues/index.js')
+        const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
+        // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
+        if (post.url) {
+          checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url }).catch(() => {})
+        }
         // Fire-and-forget Slack notification
         notifySlackQueue.add(`slack-${thread.id}`, {
           userId,
@@ -152,7 +160,7 @@ async function checkBudget(userId: string, plan: string, service: 'gemini' | 'cl
   return data
 }
 
-async function saveThread(userId: string, keywordId: string, post: NormalizedPost, intentScore: number, status: string, draftText?: string, flag?: string) {
+async function saveThread(userId: string, keywordId: string, post: NormalizedPost, intentScore: number, status: string, draftText?: string, flag?: string, reasoning?: string) {
   const { data: thread, error } = await supabase
     .from('monitored_threads')
     .insert({
@@ -165,7 +173,8 @@ async function saveThread(userId: string, keywordId: string, post: NormalizedPos
       url: post.url,
       intent_score: intentScore,
       status: status,
-      flag: flag || null
+      flag: flag || null,
+      score_reasoning: reasoning || null,
     })
     .select()
     .single()

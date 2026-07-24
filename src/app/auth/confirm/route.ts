@@ -1,57 +1,49 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 
 /**
  * GET /auth/confirm
  *
- * Handles Supabase email confirmation links (signup verification, magic links).
- * Supabase sends: ?token_hash=...&type=signup (or type=magiclink etc.)
+ * Handles Supabase email confirmation redirects.
+ * Supabase sends users here after they click the confirmation link in their
+ * sign-up email. The URL carries a `code` query param (PKCE auth code) that
+ * must be exchanged for a session.
  *
- * This is separate from /auth/callback which handles OAuth (Google) PKCE flow.
+ * After confirming, routes the user:
+ *   - No profile / no business_name → /onboarding (new user)
+ *   - Profile exists with business_name → /dashboard (returning user)
+ *   - Any error → /login?error=... with a human-readable message
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
-  const tokenHash = requestUrl.searchParams.get('token_hash')
-  const type = requestUrl.searchParams.get('type') as
-    | 'signup'
-    | 'magiclink'
-    | 'recovery'
-    | 'invite'
-    | null
+  const code = requestUrl.searchParams.get('code')
 
-  if (tokenHash && type) {
-    const supabase = await createClient()
-
-    const { data: { user }, error } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type,
-    })
-
-    if (error) {
-      console.error('[auth/confirm] verifyOtp error:', error.message)
-      return NextResponse.redirect(
-        new URL(`/login?error=${encodeURIComponent('Verification link expired or invalid. Please try again.')}`, request.url)
-      )
-    }
-
-    if (user) {
-      // Check if the user has completed onboarding
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, business_name')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile || !profile.business_name) {
-        return NextResponse.redirect(new URL('/onboarding', request.url))
-      }
-
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+  if (!code) {
+    return NextResponse.redirect(
+      new URL('/login?error=Missing+confirmation+code', request.url)
+    )
   }
 
-  // Fallback — bad or missing params
-  return NextResponse.redirect(
-    new URL('/login?error=Invalid+confirmation+link', request.url)
-  )
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
+
+  if (error || !user) {
+    console.error('[auth/confirm] exchangeCodeForSession error:', error?.message)
+    return NextResponse.redirect(
+      new URL('/login?error=Email+confirmation+failed.+Please+try+again.', request.url)
+    )
+  }
+
+  // Check if the user has completed onboarding
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, business_name')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || !profile.business_name) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
+  return NextResponse.redirect(new URL('/dashboard', request.url))
 }

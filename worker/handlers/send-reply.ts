@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { postRedditReply, PlatformPostError } from '../../src/lib/reddit-post'
 import { postBlueskyReply } from '../../src/lib/bluesky-post'
 import { checkSendRateLimit } from '../../src/lib/send-limiter'
+import { randomBytes } from 'crypto'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -72,6 +73,17 @@ export async function sendReplyHandler(job: Job<SendReplyData>) {
       trigger_type: triggerType,
       status: 'success',
       permalink
+    })
+
+    // Feature 2: Attribution — create a click-tracking row for this reply
+    const token = randomBytes(6).toString('base64url') // 8-char URL-safe token
+    await supabase.from('reply_attribution').insert({
+      user_id: userId,
+      thread_id: threadId,
+      attribution_token: token,
+    }).then(({ error }) => {
+      if (error) logger.warn({ error, threadId }, '[Attribution] Failed to create attribution row')
+      else logger.debug({ threadId, token }, '[Attribution] Attribution row created')
     })
 
     logger.info({ jobId: job.id, permalink }, 'Successfully sent reply')

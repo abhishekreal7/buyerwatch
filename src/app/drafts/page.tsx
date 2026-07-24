@@ -71,7 +71,7 @@ export default function DraftsPage() {
         .from('monitored_threads')
         .select('*, reply_analytics(draft_text)')
         .eq('user_id', user.id)
-        .eq('status', 'drafted')
+        .in('status', ['drafted', 'needs_manual_reply'])
         .order('created_at', { ascending: false })
 
       if (data && data.length > 0) {

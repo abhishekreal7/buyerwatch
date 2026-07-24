@@ -11,7 +11,8 @@ import { scorePostHandler } from './handlers/score-post'
 import { sendDigestHandler } from './handlers/send-digest'
 import { sendReplyHandler } from './handlers/send-reply'
 import { notifySlackHandler } from './handlers/notify-slack'
-import { redditFetchQueue, blueskyFetchQueue, xFetchQueue, scorePostQueue, sendDigestQueue, sendReplyQueue, notifySlackQueue } from '../src/lib/queues'
+import { checkGoogleRankHandler } from './handlers/check-google-rank'
+import { redditFetchQueue, blueskyFetchQueue, xFetchQueue, scorePostQueue, sendDigestQueue, sendReplyQueue, notifySlackQueue, checkGoogleRankQueue } from '../src/lib/queues'
 import { logger } from '../src/lib/logger'
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -118,6 +119,17 @@ const notifySlackWorker = new Worker('notify-slack', notifySlackHandler, {
 notifySlackWorker.on('ready', () => logger.info('🎧 notify-slack worker is listening...'))
 notifySlackWorker.on('failed', captureJobError)
 
+const checkGoogleRankWorker = new Worker('check-google-rank', checkGoogleRankHandler, {
+  connection: redis as any,
+  concurrency: 5,
+  limiter: {
+    max: 10,      // Google CSE free tier: 100 queries/day; stay conservative
+    duration: 1000,
+  }
+})
+checkGoogleRankWorker.on('ready', () => logger.info('🎧 check-google-rank worker is listening...'))
+checkGoogleRankWorker.on('failed', captureJobError)
+
 // Worker Heartbeat (Healthchecks.io or similar)
 if (process.env.WORKER_HEALTHCHECK_URL) {
   setInterval(() => {
@@ -139,6 +151,7 @@ createBullBoard({
     new BullMQAdapter(sendDigestQueue),
     new BullMQAdapter(sendReplyQueue),
     new BullMQAdapter(notifySlackQueue),
+    new BullMQAdapter(checkGoogleRankQueue),
   ],
   serverAdapter,
 })

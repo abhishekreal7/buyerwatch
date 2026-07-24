@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:worker": "tsc -p tsconfig.worker.json",
+    "deploy:worker:gcp": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-worker-gcp.ps1",
     "start": "next start",
     "lint": "next lint"
   },
@@ -14,6 +15,7 @@
     "@atproto/api": "^0.20.25",
     "@bull-board/api": "^8.1.0",
     "@bull-board/express": "^8.1.0",
+    "@google-cloud/vertexai": "^1.12.0",
     "@google/generative-ai": "^0.24.1",
     "@react-email/components": "^1.0.12",
     "@sentry/nextjs": "^10.63.0",

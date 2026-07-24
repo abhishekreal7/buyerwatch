@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Zap, Bell, CreditCard, Save, Check, ChevronRight,
   Globe, FileText, AtSign, Briefcase, Palette, Shield,
-  Link, Unlink, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send
+  Link, Unlink, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
@@ -126,7 +126,7 @@ export default function SettingsPage() {
     autoSendThreshold: 85,
   })
 
-  const [connections, setConnections] = useState({ reddit: false, bluesky: false })
+  const [connections, setConnections] = useState({ reddit: false, bluesky: false, redditUsername: '' })
   const [bskyHandle, setBskyHandle] = useState('')
   const [bskyPassword, setBskyPassword] = useState('')
   const [bskyConnecting, setBskyConnecting] = useState(false)
@@ -175,8 +175,15 @@ export default function SettingsPage() {
         setSlack({ webhookUrl: p.slack_webhook_url || '', threshold: p.slack_notify_threshold ?? 70 })
       }
 
-      const { data: conns } = await supabase.from('platform_connections').select('platform').eq('user_id', user.id)
-      if (conns) setConnections({ reddit: conns.some(c => c.platform === 'reddit'), bluesky: conns.some(c => c.platform === 'bluesky') })
+      const { data: conns } = await supabase.from('platform_connections').select('platform, external_username').eq('user_id', user.id)
+      if (conns) {
+        const redditConn = conns.find(c => c.platform === 'reddit')
+        setConnections({
+          reddit: conns.some(c => c.platform === 'reddit'),
+          bluesky: conns.some(c => c.platform === 'bluesky'),
+          redditUsername: redditConn?.external_username || '',
+        })
+      }
 
       // Load Usage Data
       const now = new Date()
@@ -503,7 +510,11 @@ export default function SettingsPage() {
                         <PlatformRow
                           icon={<RedditIcon className="w-5 h-5 text-[#FF4500]" />}
                           name="Reddit"
-                          description="Post replies via OAuth. Requires a Reddit account."
+                          description={
+                            connections.reddit && connections.redditUsername
+                              ? `Connected as u/${connections.redditUsername}`
+                              : 'Post replies via OAuth. Requires a Reddit account.'
+                          }
                           connected={connections.reddit}
                           onConnect={handleConnectReddit}
                           onDisconnect={() => handleDisconnect('reddit')}
@@ -574,6 +585,17 @@ export default function SettingsPage() {
                           ) : (
                             <Toggle checked={profile.autoSendEnabled} onChange={v => setProfile(p => ({ ...p, autoSendEnabled: v }))} />
                           )}
+                        </div>
+
+                        {/* Feature 4: Educational Earn Auto-Send Callout */}
+                        <div className="p-4 bg-[#F8F9FA] border border-black/5 rounded-xl text-[12.5px] text-gray-600 leading-relaxed space-y-1">
+                          <p className="font-semibold text-gray-900 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                            How Auto-Send Earns Your Trust
+                          </p>
+                          <p>
+                            Scouto evaluates every reply against a dynamic confidence threshold. As you approve or edit drafts, our Confidence Engine measures your edit-distance history to adapt thresholds safely — guaranteeing your brand voice is never compromised.
+                          </p>
                         </div>
 
                         <AnimatePresence>
@@ -732,6 +754,46 @@ export default function SettingsPage() {
                             {slackTesting ? 'Sending...' : 'Send test message'}
                           </button>
                         )}
+                      </div>
+                    </SectionCard>
+
+                    {/* Feature 2: Conversion Webhook Integration Card */}
+                    <SectionCard
+                      title="Conversion Webhook Integration"
+                      description="Attribute paid conversions back to your Scouto replies by firing a webhook from Stripe, Paddle, or your payment system."
+                    >
+                      <div className="space-y-4">
+                        <Field
+                          label="Webhook Receiver Endpoint"
+                          hint="POST JSON payloads to this endpoint when a user who clicked a Scouto link converts."
+                        >
+                          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-[12px] text-gray-800 flex items-center justify-between">
+                            <span>http://localhost:3000/api/webhooks/conversion</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText('http://localhost:3000/api/webhooks/conversion')
+                                toast.success('Webhook URL copied')
+                              }}
+                              className="text-[12px] text-blue-600 font-sans font-semibold hover:underline"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </Field>
+
+                        <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-xl text-[12px] text-blue-900 leading-relaxed space-y-1.5">
+                          <p className="font-semibold text-blue-950 flex items-center gap-1.5">
+                            <Info className="w-3.5 h-3.5 text-blue-600" />
+                            Sample POST Payload
+                          </p>
+                          <pre className="font-mono text-[11px] bg-white/70 p-2.5 rounded-lg text-gray-800 border border-blue-200/50">
+{`{
+  "shortcode": "aB1cD2eF",
+  "revenue_usd": 99.00
+}`}
+                          </pre>
+                        </div>
                       </div>
                     </SectionCard>
 

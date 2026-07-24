@@ -96,6 +96,7 @@ export default function AnalyticsPage() {
     needsAttention: any[]
     replyRate: number
     platformData: any[]
+    attributionStats: { clicks: number; conversions: number; totalRevenue: number }
   } | null>(null)
 
   const supabase = createClient()
@@ -106,12 +107,13 @@ export default function AnalyticsPage() {
       if (!user) return
 
       // Parallel fetching for performance
-      const [profileRes, connsRes, threadsRes, analyticsRes, feedbackRes] = await Promise.all([
+      const [profileRes, connsRes, threadsRes, analyticsRes, feedbackRes, attributionRes] = await Promise.all([
         supabase.from('profiles').select('auto_send_enabled').eq('id', user.id).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', user.id),
         supabase.from('monitored_threads').select('*').eq('user_id', user.id),
         supabase.from('reply_analytics').select('was_sent, sent_at').eq('user_id', user.id),
-        supabase.from('draft_feedback').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50)
+        supabase.from('draft_feedback').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('reply_attribution').select('clicked_at, converted_at, revenue_usd').eq('user_id', user.id),
       ])
 
       const threads = threadsRes.data || []
@@ -231,14 +233,32 @@ export default function AnalyticsPage() {
         alerts.push({ id: 'autosend', type: 'warning', label: 'Auto-send paused', actionLabel: 'Resume →', href: '/settings' })
       }
 
+      // --- ATTRIBUTION STATS ---
+      const attributions = attributionRes.data || []
+      const clicks = attributions.filter(a => a.clicked_at).length
+      const conversions = attributions.filter(a => a.converted_at).length
+      const totalRevenue = attributions.reduce((sum, a) => sum + (Number(a.revenue_usd) || 0), 0)
+
+      // --- TOP KEYWORDS ---
+      const kwMap: Record<string, { term: string; count: number }> = {}
+      threads.forEach((t: any) => {
+        const term = t.matched_keyword || t.target || t.keyword_id
+        if (term) {
+          kwMap[term] = kwMap[term] || { term, count: 0 }
+          kwMap[term].count++
+        }
+      })
+      const topKeywords = Object.values(kwMap).sort((a, b) => b.count - a.count).slice(0, 5)
+
       setData({
         stats: { found, drafted: draftedCount, sent: totalSent, sentThisMonth, sentLastMonth },
         trendData,
         activity: recentActivity,
-        topKeywords: [],
+        topKeywords,
         needsAttention: alerts,
         replyRate,
-        platformData
+        platformData,
+        attributionStats: { clicks, conversions, totalRevenue }
       })
       setLoading(false)
     }
@@ -378,6 +398,39 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
+          </div>
+
+          {/* Feature 2: Attribution Pipeline Card */}
+          <div className="surface-ceramic border border-black/[0.04] p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
+                <p className="text-[13px] text-text-secondary mt-0.5">Track clicks &amp; paid conversions originating from Scouto shortlinks</p>
+              </div>
+              <Link href="/settings#notifications" className="text-[13px] font-medium text-blue-600 hover:underline">
+                Setup Conversion Webhook →
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
+                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Shortlink Clicks</p>
+                <p className="text-[26px] font-bold text-text-primary tracking-tight">{data.attributionStats?.clicks || 0}</p>
+                <p className="text-[12px] text-text-secondary mt-1">Unique readers clicked</p>
+              </div>
+              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
+                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Conversions</p>
+                <p className="text-[26px] font-bold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
+                <p className="text-[12px] text-text-secondary mt-1">Attributed signups/payments</p>
+              </div>
+              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
+                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Attributed Revenue</p>
+                <p className="text-[26px] font-bold text-[#10B981] tracking-tight">
+                  ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[12px] text-text-secondary mt-1">Total revenue generated</p>
+              </div>
+            </div>
           </div>
 
           {/* ════════════════════ ROW 2 ════════════════════ */}

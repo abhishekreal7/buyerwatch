@@ -41,3 +41,14 @@ export const notifySlackQueue = new Queue('notify-slack', {
     removeOnFail: 50,
   }
 })
+
+// Queue for Google rank enrichment (Feature 5: Thread Consequence Score)
+export const checkGoogleRankQueue = new Queue('check-google-rank', {
+  connection: redis as any,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 5000 },
+    removeOnComplete: true,
+    removeOnFail: 50,
+  }
+})

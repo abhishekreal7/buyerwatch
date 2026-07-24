@@ -569,11 +569,17 @@ export default function KeywordsPage() {
                       </div>
                     </div>
 
-                    {/* Leads Found column */}
-                    <div className="hidden md:flex items-center">
+                    {/* Leads Found column with Popularity Bar */}
+                    <div className="hidden md:flex flex-col justify-center">
                       <span className={`text-[13px] font-medium tabular-nums ${threadStats.total > 0 ? 'text-text-primary font-semibold' : 'text-text-tertiary'}`}>
                         {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
                       </span>
+                      <div className="w-20 h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1" title={`${threadStats.total} leads found`}>
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${threadStats.total > 0 ? 'bg-[#0A84FF]' : 'bg-gray-300 opacity-40'}`}
+                          style={{ width: `${Math.min(Math.max(threadStats.total * 20, 8), 100)}%` }}
+                        />
+                      </div>
                     </div>
 
                     {/* Reply Rate column */}

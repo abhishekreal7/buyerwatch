@@ -109,20 +109,12 @@ Write ONLY the reply text, nothing else.
   let draftText = ''
 
   try {
-    if (process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
-      const { generateKimiChat } = await import('./kimi.js')
-      draftText = await generateKimiChat({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.5,
-      })
-    } else {
+    if (process.env.ANTHROPIC_API_KEY) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       
+      const modelName = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5'
       let response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: modelName,
         max_tokens: 1000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }]
@@ -134,7 +126,7 @@ Write ONLY the reply text, nothing else.
 
       if (flagsAsPromotional(draftText)) {
         response = await anthropic.messages.create({
-          model: 'claude-3-5-sonnet-20241022',
+          model: modelName,
           max_tokens: 1000,
           system: systemPrompt,
           messages: [
@@ -147,7 +139,11 @@ Write ONLY the reply text, nothing else.
           draftText = response.content[0].text
         }
       }
+
+    } else {
+      throw new Error('ANTHROPIC_API_KEY is not configured, using fallback provider')
     }
+
   } catch (error) {
     console.warn('Primary LLM failed, falling back to Gemini...', error)
     try {

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { signInAction, signInWithGoogleAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Target, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 
-export default function LoginPage() {
+function LoginContent() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const searchParams = useSearchParams()
@@ -180,3 +180,14 @@ export default function LoginPage() {
   )
 }
 
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen w-full bg-[#FAFAFA] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-black/10 border-t-black/40 animate-spin" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  )
+}

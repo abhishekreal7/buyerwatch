@@ -131,7 +131,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   const CACHE_TTL = 300 // 5 minutes
 
   try {
-    const { redis } = await import('./redis')
+    const { redis } = await import('./redis.js')
     redisClient = redis
     const cached = await redis.get(cacheKey)
     if (cached) {

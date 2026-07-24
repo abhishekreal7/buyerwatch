@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { generateKimiChat } from '@/lib/kimi'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import Anthropic from '@anthropic-ai/sdk'
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,17 +61,37 @@ Rules:
 4. painPointKeywords: core problem statements users discuss on Reddit.
 5. NEVER append duplicate words like "reddit reddit". Keep phrases natural.`
 
-    const aiResponse = await generateKimiChat({
-      messages: [
-        { role: 'system', content: 'You output strictly valid JSON without explanation or formatting wrappers.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.3,
-    })
+    let aiResponse = ''
+
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+        const result = await model.generateContent(prompt)
+        aiResponse = result.response.text()
+      } catch (geminiErr) {
+        console.warn('[ai-suggest] Gemini failed, attempting Anthropic...', geminiErr)
+      }
+    }
+
+    if (!aiResponse && process.env.ANTHROPIC_API_KEY) {
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const response = await anthropic.messages.create({
+        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+        max_tokens: 1000,
+        system: 'You output strictly valid JSON without explanation or formatting wrappers.',
+        messages: [{ role: 'user', content: prompt }]
+      })
+      if (response.content[0].type === 'text') {
+        aiResponse = response.content[0].text
+      }
+    }
+
 
     // Clean JSON response string
     const jsonString = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim()
     const result = JSON.parse(jsonString)
+
 
     return NextResponse.json(result)
   } catch (err: any) {

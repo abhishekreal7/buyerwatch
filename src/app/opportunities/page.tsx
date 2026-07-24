@@ -59,7 +59,7 @@ export default function OpportunitiesPage() {
         .from('monitored_threads')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'drafted', 'needs_manual_reply', 'dismissed', 'replied'])
         .order('created_at', { ascending: false })
 
       if (data) {

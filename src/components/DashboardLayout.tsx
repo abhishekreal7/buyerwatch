@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Settings, Bell, Search, LogOut, Zap, ZapOff, HelpCircle, X, ArrowRight } from 'lucide-react'
+import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Settings, Bell, Search, LogOut, Zap, ZapOff, HelpCircle, X, ArrowRight, User } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 
@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { name: 'Posted', href: '/posted', icon: CheckCircle },
   { name: 'Analytics', href: '/analytics', icon: ChartNoAxesCombined },
   { name: 'Keywords', href: '/keywords', icon: Key },
-  { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -132,17 +131,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        {/* Footer - Sign Out pinned at bottom */}
-        <div className="px-3 pt-3 border-t border-black/[0.05] shrink-0 space-y-1">
-          <form action="/api/auth/signout" method="POST">
-            <button
-              type="submit"
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[12px] text-text-secondary hover:bg-black/5 hover:text-text-primary transition-all duration-200 text-[13.5px] font-medium cursor-pointer"
-            >
-              <LogOut className="w-[17px] h-[17px] shrink-0 text-text-tertiary" strokeWidth={2} />
-              <span>Sign out</span>
-            </button>
-          </form>
+        {/* Footer - Pinned User Profile & Sign Out */}
+        <div className="p-3 border-t border-black/[0.05] shrink-0">
+          <div className="flex items-center justify-between gap-2 p-1.5 rounded-[12px] hover:bg-black/5 transition-colors group">
+            <Link href="/settings" className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-7 h-7 rounded-full bg-gray-900 text-white flex items-center justify-center shrink-0">
+                <User className="w-3.5 h-3.5 text-white" strokeWidth={2} />
+              </div>
+              <span className="text-[13px] font-medium text-text-primary truncate group-hover:text-blue-600 transition-colors">Settings &amp; Profile</span>
+            </Link>
+            <form action="/api/auth/signout" method="POST">
+              <button
+                type="submit"
+                className="p-1.5 text-text-tertiary hover:text-red-600 rounded-md transition-colors cursor-pointer"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
         </div>
       </aside>
 
@@ -162,19 +169,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Auto-send toggle pill */}
+            {/* Clean Auto-send toggle */}
             {autoSend !== null && (
               <button
                 onClick={handleToggleAutoSend}
                 disabled={togglingAutoSend}
                 title={autoSend ? 'Auto-send is active — click to pause' : 'Auto-send is paused — click to resume'}
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-surface border border-black/5 hover:border-black/10 hover:bg-gray-50 transition-all duration-200 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+                className="flex items-center gap-2.5 px-2 py-1 rounded-lg hover:bg-black/5 transition-colors cursor-pointer"
               >
-                <span className={`text-[12.5px] font-medium transition-colors ${autoSend ? 'text-gray-900' : 'text-gray-500'}`}>
+                <span className="text-[13px] font-medium text-gray-700 select-none">
                   Auto-send
                 </span>
-                <div className={`relative w-[28px] h-[16px] rounded-full transition-colors duration-300 ${autoSend ? 'bg-[#0A84FF]' : 'bg-gray-200'}`}>
-                  <div className={`absolute top-[2px] left-[2px] w-[12px] h-[12px] bg-white rounded-full shadow-sm transition-transform duration-300 ${autoSend ? 'translate-x-[12px]' : 'translate-x-0'}`} />
+                <div className={`relative w-[34px] h-[20px] rounded-full transition-colors duration-200 ${autoSend ? 'bg-emerald-500' : 'bg-gray-200'}`}>
+                  <div className={`absolute top-[2px] left-[2px] w-[16px] h-[16px] bg-white rounded-full shadow-sm transition-transform duration-200 ${autoSend ? 'translate-x-[14px]' : 'translate-x-0'}`} />
                 </div>
               </button>
             )}
@@ -183,11 +190,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <button className="btn-icon" title="Notifications">
               <Bell className="w-[18px] h-[18px]" strokeWidth={2} />
             </button>
-
-            {/* User avatar */}
-            <div className="w-8 h-8 rounded-full bg-[#F4F5F7] border border-black/5 hover:border-black/15 shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer transition-colors duration-200 flex items-center justify-center">
-              <span className="text-[13px] font-semibold text-text-primary leading-none uppercase">{userInitial}</span>
-            </div>
           </div>
         </header>
 
