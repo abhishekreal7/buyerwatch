@@ -400,39 +400,6 @@ export default function AnalyticsPage() {
 
           </div>
 
-          {/* Feature 2: Attribution Pipeline Card */}
-          <div className="surface-ceramic border border-black/[0.04] p-6 mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
-                <p className="text-[13px] text-text-secondary mt-0.5">Track clicks &amp; paid conversions originating from Scouto shortlinks</p>
-              </div>
-              <Link href="/settings#notifications" className="text-[13px] font-medium text-blue-600 hover:underline">
-                Setup Conversion Webhook →
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Shortlink Clicks</p>
-                <p className="text-[26px] font-bold text-text-primary tracking-tight">{data.attributionStats?.clicks || 0}</p>
-                <p className="text-[12px] text-text-secondary mt-1">Unique readers clicked</p>
-              </div>
-              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Conversions</p>
-                <p className="text-[26px] font-bold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
-                <p className="text-[12px] text-text-secondary mt-1">Attributed signups/payments</p>
-              </div>
-              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Attributed Revenue</p>
-                <p className="text-[26px] font-bold text-[#10B981] tracking-tight">
-                  ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-[12px] text-text-secondary mt-1">Total revenue generated</p>
-              </div>
-            </div>
-          </div>
-
           {/* ════════════════════ ROW 2 ════════════════════ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -512,6 +479,39 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
+          </div>
+
+          {/* Feature 2: Attribution Pipeline Card (Positioned at bottom) */}
+          <div className="surface-ceramic border border-black/[0.04] p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
+                <p className="text-[13px] text-text-secondary mt-0.5">Track clicks &amp; paid conversions originating from Scouto shortlinks</p>
+              </div>
+              <Link href="/settings#notifications" className="text-[13px] font-medium text-blue-600 hover:underline">
+                Setup Conversion Webhook →
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
+                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Shortlink Clicks</p>
+                <p className="text-[26px] font-bold text-text-primary tracking-tight">{data.attributionStats?.clicks || 0}</p>
+                <p className="text-[12px] text-text-secondary mt-1">Unique readers clicked</p>
+              </div>
+              <div className="bg-[#0A84FF]/[0.04] border border-[#0A84FF]/10 p-4 rounded-xl">
+                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Conversions</p>
+                <p className="text-[26px] font-bold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
+                <p className="text-[12px] text-text-secondary mt-1">Attributed signups/payments</p>
+              </div>
+              <div className="bg-[#10B981]/[0.04] border border-[#10B981]/10 p-4 rounded-xl">
+                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Attributed Revenue</p>
+                <p className="text-[26px] font-bold text-[#10B981] tracking-tight">
+                  ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[12px] text-text-secondary mt-1">Total revenue generated</p>
+              </div>
+            </div>
           </div>
 
         </div>
