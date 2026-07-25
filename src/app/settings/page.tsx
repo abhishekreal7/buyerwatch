@@ -169,11 +169,22 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: p } = await supabase
+      const { data: extendedProfile } = await supabase
         .from('profiles')
         .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
         .eq('id', user.id)
         .single()
+      let p = extendedProfile
+      if (!p) {
+        const { data: legacyProfile } = await supabase
+          .from('profiles')
+          .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
+          .eq('id', user.id)
+          .single()
+        p = legacyProfile
+          ? { ...legacyProfile, tone_archetype: null, style_guardrails: [] }
+          : null
+      }
       if (p) {
         setProfile({
           businessName: p.business_name || '',
@@ -280,15 +291,12 @@ export default function SettingsPage() {
     if (!user) return
     setSaving(true)
 
-    const [{ error }, autoSendResponse] = await Promise.all([
-      supabase.from('profiles').update({
+    const baseProfileUpdates = {
       business_name: profile.businessName,
       business_description: profile.businessDescription,
       business_url: profile.businessUrl,
       business_type: profile.businessType,
       writing_style: profile.writingStyle,
-      tone_archetype: profile.toneArchetype,
-      style_guardrails: profile.styleGuardrails,
       competitors: profile.competitors.split(',').map(s => s.trim()).filter(Boolean),
       tone_examples: profile.toneExamples,
       reddit_username: profile.redditUsername,
@@ -296,7 +304,19 @@ export default function SettingsPage() {
       notification_preferences: notifications,
       slack_webhook_url: slack.webhookUrl || null,
       slack_notify_threshold: slack.threshold,
-      }).eq('id', user.id),
+    }
+    const saveProfile = async () => {
+      const extendedResult = await supabase.from('profiles').update({
+        ...baseProfileUpdates,
+        tone_archetype: profile.toneArchetype,
+        style_guardrails: profile.styleGuardrails,
+      }).eq('id', user.id)
+      if (!extendedResult.error) return extendedResult
+      return supabase.from('profiles').update(baseProfileUpdates).eq('id', user.id)
+    }
+
+    const [{ error }, autoSendResponse] = await Promise.all([
+      saveProfile(),
       fetch('/api/settings/autosend', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

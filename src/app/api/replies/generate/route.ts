@@ -35,11 +35,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
     }
 
-    const { data: profile } = await supabase
+    const { data: extendedProfile } = await supabase
       .from('profiles')
       .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, tone_examples, plan, referral_tracking_enabled')
       .eq('id', user.id)
       .single()
+    let profile = extendedProfile
+    if (!profile) {
+      const { data: legacyProfile } = await supabase
+        .from('profiles')
+        .select('business_name, business_description, business_url, business_type, writing_style, tone_examples, plan, referral_tracking_enabled')
+        .eq('id', user.id)
+        .single()
+      profile = legacyProfile
+        ? { ...legacyProfile, tone_archetype: null, style_guardrails: [] }
+        : null
+    }
 
     if (!profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })

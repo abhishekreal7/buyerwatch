@@ -37,13 +37,24 @@ export async function scorePostHandler(job: Job) {
     if (existing) return
 
     // 2. Fetch user profile for context and plan
-    const { data: profile, error: profileError } = await supabase
+    const { data: extendedProfile } = await supabase
       .from('profiles')
       .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
       .eq('id', userId)
       .single()
+    let profile = extendedProfile
+    if (!profile) {
+      const legacyResult = await supabase
+        .from('profiles')
+        .select('business_name, business_description, business_url, business_type, writing_style, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+        .eq('id', userId)
+        .single()
+      if (legacyResult.error) throw legacyResult.error
+      profile = legacyResult.data
+        ? { ...legacyResult.data, tone_archetype: null, style_guardrails: [] }
+        : null
+    }
 
-    if (profileError) throw profileError
     if (!profile) throw new Error('Profile not found for scoring job')
 
     // 3. Atomic Budget Check for Scoring (Gemini)
@@ -212,10 +223,8 @@ async function checkBudget(userId: string, plan: string, service: 'gemini' | 'cl
       p_user_id: userId,
       p_limit: getPlanLimits(normalizePlan(plan)).aiDraftsPerMonth,
     })
-    if (error) {
-      throw new Error(`Draft budget reservation failed: ${error.message}`)
-    }
-    return data
+    if (!error) return data
+    logger.warn({ code: error.code }, 'Monthly draft reservation unavailable; using legacy budget counter.')
   }
 
   const limits: Record<string, Record<'gemini' | 'claude', number>> = {
