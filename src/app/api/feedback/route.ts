@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     if (!threadId || !actionType) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
-    if (!['APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED'].includes(actionType)) {
+    if (!['APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED', 'COPIED'].includes(actionType)) {
       return NextResponse.json({ error: 'Invalid action type' }, { status: 400 })
     }
 

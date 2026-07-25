@@ -3,9 +3,10 @@
 import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Bell, Search, LogOut, User, ChevronRight, ChevronDown, Zap } from 'lucide-react'
+import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Bell, Search, LogOut, ChevronRight, Zap } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
+import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -24,6 +25,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [togglingAutoSend, setTogglingAutoSend] = useState(false)
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
   const [draftCount, setDraftCount] = useState<number | null>(null)
+  const [plan, setPlan] = useState<PlanTier>('free')
+  const [credits, setCredits] = useState<{ used: number; limit: number } | null>(null)
+  const [openingCheckout, setOpeningCheckout] = useState(false)
 
   useEffect(() => {
     async function loadSidebarData() {
@@ -33,10 +37,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       // Profile — auto-send state
       const { data: profile } = await supabase
         .from('profiles')
-        .select('auto_send_enabled')
+        .select('auto_send_enabled, plan, draft_count, draft_month')
         .eq('id', user.id)
         .single()
-      if (profile) setAutoSend(profile.auto_send_enabled ?? false)
+      if (profile) {
+        const normalizedPlan = normalizePlan(profile.plan)
+        const limit = getPlanLimits(normalizedPlan).aiDraftsPerMonth
+        const currentMonth = `${new Date().toISOString().slice(0, 7)}-01`
+        const used = profile.draft_month === currentMonth
+          ? Math.min(Math.max(profile.draft_count ?? 0, 0), limit)
+          : 0
+        setAutoSend(profile.auto_send_enabled ?? false)
+        setPlan(normalizedPlan)
+        setCredits({ used, limit })
+      }
 
       // Real badge counts
       const [opportunitiesRes, draftsRes] = await Promise.all([
@@ -55,6 +69,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       setDraftCount(draftsRes.count ?? 0)
     }
     loadSidebarData()
+    const refreshCredits = () => loadSidebarData()
+    const refreshInterval = window.setInterval(loadSidebarData, 60_000)
+    window.addEventListener('scouto:credits-changed', refreshCredits)
+    return () => {
+      window.clearInterval(refreshInterval)
+      window.removeEventListener('scouto:credits-changed', refreshCredits)
+    }
   }, [])
 
   async function handleToggleAutoSend() {
@@ -74,14 +95,44 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       toast.error('Failed to update auto-send setting')
     } else {
       toast.success(next ? 'Auto-send enabled' : 'Auto-send paused')
+      window.dispatchEvent(new CustomEvent('scouto:auto-send-changed', { detail: next }))
     }
     setTogglingAutoSend(false)
+  }
+
+  async function handleAddCredits() {
+    if (openingCheckout) return
+    if (plan === 'growth') {
+      window.location.href = '/pricing'
+      return
+    }
+
+    setOpeningCheckout(true)
+    try {
+      const response = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan === 'free' ? 'pro' : 'growth' }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.url) {
+        throw new Error(payload?.error || 'checkout_failed')
+      }
+      window.location.href = payload.url
+    } catch {
+      toast.error('Billing checkout is not available yet')
+      setOpeningCheckout(false)
+    }
   }
 
   const badges: Record<string, number | null> = {
     '/opportunities': opportunityCount,
     '/drafts': draftCount,
   }
+  const creditsRemaining = credits ? Math.max(credits.limit - credits.used, 0) : null
+  const creditsPercent = credits && credits.limit > 0
+    ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
+    : 0
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] relative selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
@@ -134,20 +185,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <span className="text-[11.5px] font-bold text-gray-900 tracking-tight">Credits</span>
               </div>
               <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                50 / 50 left
+                {credits ? `${creditsRemaining} / ${credits.limit} left` : 'Loading'}
               </span>
             </div>
 
             <div className="w-full bg-gray-200/70 rounded-full h-1.5 overflow-hidden">
-              <div className="bg-[#0A84FF] h-full rounded-full transition-all duration-300" style={{ width: '100%' }} />
+              <div
+                className="bg-[#0A84FF] h-full rounded-full transition-all duration-300"
+                style={{ width: `${creditsPercent}%` }}
+              />
             </div>
 
-            <Link
-              href="/pricing"
-              className="w-full py-1 rounded-xl bg-gray-900 hover:bg-black text-white text-[11px] font-semibold flex items-center justify-center gap-1 transition-all shadow-2xs"
+            <button
+              type="button"
+              onClick={handleAddCredits}
+              disabled={openingCheckout}
+              className="w-full py-1 rounded-xl bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white text-[11px] font-semibold flex items-center justify-center gap-1 transition-all shadow-2xs"
             >
-              + Add Credits
-            </Link>
+              {openingCheckout ? 'Opening checkout…' : plan === 'growth' ? 'View usage options' : '+ Add Credits'}
+            </button>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-2xs">
@@ -158,7 +214,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[12.5px] font-semibold text-gray-900 truncate leading-tight group-hover:text-[#0A84FF] transition-colors">Settings &amp; Profile</span>
-                  <span className="text-[10.5px] text-gray-400 truncate">Free Plan</span>
+                  <span className="text-[10.5px] text-gray-400 truncate">
+                    {plan.charAt(0).toUpperCase() + plan.slice(1)} Plan
+                  </span>
                 </div>
               </Link>
               <form action="/api/auth/signout" method="POST">

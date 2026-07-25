@@ -20,12 +20,14 @@ interface Thread {
   label: string
   matchedKeyword: string
   draft: string
+  originalDraft: string
   url: string | null
   flag?: string
   reasoning?: string         // Feature 1: Signal Trace
   googleRanked?: boolean     // Feature 5: Thread Consequence Score
   createdAt: string          // Feature 4: Approval-First window countdown
   status: string
+  reviewedAt: string | null
 }
 
 function formatTimeAgo(dateString: string) {
@@ -81,18 +83,31 @@ export default function DashboardPage() {
     if (!user) return
     setUserId(user.id)
 
-    const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, auto_send_enabled')
+      .eq('id', user.id)
+      .single()
     if (profile?.plan) {
       setPlan(profile.plan)
       setKeywordsMax(getPlanLimits(profile.plan).keywords)
     }
+    setAutoSendEnabled(profile?.auto_send_enabled ?? false)
 
-    // Load keyword count for upgrade banner logic
-    const { count: kwCount } = await supabase
-      .from('keywords')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+    // Load persisted setup progress rather than resetting the checklist per session.
+    const [{ count: kwCount }, { count: feedbackCount }] = await Promise.all([
+      supabase
+        .from('keywords')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id),
+      supabase
+        .from('draft_feedback')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('action_type', ['COPIED', 'APPROVED', 'EDITED_APPROVED', 'AUTO_SENT']),
+    ])
     setKeywordsCount(kwCount ?? 0)
+    setHasCopiedOrApproved((feedbackCount ?? 0) > 0)
 
     // Load threads including dismissed for audit tab
     const { data: threadData, error } = await supabase
@@ -123,15 +138,18 @@ export default function DashboardPage() {
       ),
       matchedKeyword: (t.keywords as unknown as { term?: string })?.term || '',
       draft: (t.reply_analytics as unknown as { draft_text?: string }[])?.[0]?.draft_text || '',
+      originalDraft: (t.reply_analytics as unknown as { draft_text?: string }[])?.[0]?.draft_text || '',
       url: t.url || null,
       flag: t.flag || undefined,
       reasoning: (t as any).score_reasoning || undefined,        // Feature 1
       googleRanked: (t as any).google_rank_position > 0,        // Feature 5
       createdAt: t.created_at,                                   // Feature 4
       status: t.status || 'pending',
+      reviewedAt: t.reviewed_at || null,
     }))
 
     setThreads(parsed)
+    setHasInspectedLead(parsed.some(thread => Boolean(thread.reviewedAt)))
     const activeParsed = parsed.filter(t => t.status !== 'dismissed')
     if (activeParsed.length > 0) {
       setSelectedThread(activeParsed[0])
@@ -191,6 +209,33 @@ export default function DashboardPage() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    const handleAutoSendChanged = (event: Event) => {
+      setAutoSendEnabled(Boolean((event as CustomEvent<boolean>).detail))
+    }
+    window.addEventListener('scouto:auto-send-changed', handleAutoSendChanged)
+    return () => window.removeEventListener('scouto:auto-send-changed', handleAutoSendChanged)
+  }, [])
+
+  const handleInspectThread = async (thread: Thread) => {
+    setSelectedThread(thread)
+    setHasInspectedLead(true)
+    if (thread.reviewedAt || !userId) return
+
+    const reviewedAt = new Date().toISOString()
+    setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, reviewedAt } : item))
+    setSelectedThread(prev => prev?.id === thread.id ? { ...prev, reviewedAt } : prev)
+    const { error } = await supabase.rpc('mark_thread_reviewed', {
+      p_user_id: userId,
+      p_thread_id: thread.id,
+    })
+    if (error) {
+      setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, reviewedAt: null } : item))
+      setSelectedThread(prev => prev?.id === thread.id ? { ...prev, reviewedAt: null } : prev)
+      setHasInspectedLead(threads.some(item => Boolean(item.reviewedAt)))
+    }
+  }
+
   const handleApproveAndSend = async () => {
     if (!selectedThread || !selectedThread.draft) return
 
@@ -206,6 +251,28 @@ export default function DashboardPage() {
         })
       })
       if (!res.ok) throw new Error('Failed to queue reply')
+
+      const actionType = selectedThread.originalDraft === selectedThread.draft
+        ? 'APPROVED'
+        : 'EDITED_APPROVED'
+      const feedbackResponse = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threadId: selectedThread.id,
+          originalDraft: selectedThread.originalDraft,
+          finalDraft: selectedThread.draft,
+          actionType,
+          platform: selectedThread.platform,
+          targetCommunity: selectedThread.target,
+          keywordCluster: selectedThread.matchedKeyword,
+        }),
+      })
+      if (!feedbackResponse.ok) {
+        toast.warning('Reply queued, but review history could not be updated.')
+      } else {
+        setHasCopiedOrApproved(true)
+      }
     } catch {
       toast.error('Failed to send reply')
       return
@@ -225,6 +292,32 @@ export default function DashboardPage() {
     }
 
     setTotalSent(prev => prev + 1)
+  }
+
+  const handleCopyDraft = async () => {
+    if (!selectedThread?.draft) return
+    try {
+      await navigator.clipboard.writeText(selectedThread.draft)
+      toast.success('Copied to clipboard')
+    } catch {
+      toast.error('Could not copy the draft')
+      return
+    }
+
+    const response = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threadId: selectedThread.id,
+        originalDraft: selectedThread.originalDraft,
+        finalDraft: selectedThread.draft,
+        actionType: 'COPIED',
+        platform: selectedThread.platform,
+        targetCommunity: selectedThread.target,
+        keywordCluster: selectedThread.matchedKeyword,
+      }),
+    }).catch(() => null)
+    if (response?.ok) setHasCopiedOrApproved(true)
   }
 
   const handleDismiss = async () => {
@@ -276,8 +369,9 @@ export default function DashboardPage() {
         }),
       }).catch(console.error)
 
-      setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, draft } : t))
-      setSelectedThread(prev => prev ? { ...prev, draft } : null)
+      setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, draft, originalDraft: draft } : t))
+      setSelectedThread(prev => prev ? { ...prev, draft, originalDraft: draft } : null)
+      window.dispatchEvent(new Event('scouto:credits-changed'))
       toast.success('Draft regenerated.')
     } catch {
       toast.error('Failed to request regeneration')
@@ -550,10 +644,7 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={thread.id}
-                      onClick={() => {
-                        setSelectedThread(thread)
-                        setHasInspectedLead(true)
-                      }}
+                      onClick={() => handleInspectThread(thread)}
                       className={`rounded-2xl p-5 bg-white cursor-pointer transition-all ${isSelected
                         ? 'border-2 border-[#0A84FF] shadow-sm'
                         : 'border border-black/5 hover:border-black/15'
@@ -844,12 +935,7 @@ export default function DashboardPage() {
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => {
-                            if (selectedThread.draft) {
-                              navigator.clipboard.writeText(selectedThread.draft)
-                              toast.success('Copied to clipboard')
-                            }
-                          }}
+                          onClick={handleCopyDraft}
                           className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                         >
                           <Copy className="w-3.5 h-3.5 text-gray-400" />

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Target, CheckCircle2, ChevronUp, ChevronDown, Sparkles, X, ArrowRight } from 'lucide-react'
+import { Target, CheckCircle2, ChevronUp, ChevronDown, X, ArrowRight } from 'lucide-react'
 
 interface RadarSetupBannerProps {
   keywordsCount: number

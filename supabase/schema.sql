@@ -16,6 +16,19 @@ create table profiles (
   business_url text,
   business_type text,
   writing_style text,
+  tone_archetype text check (
+    tone_archetype is null
+    or tone_archetype in ('consultative', 'casual', 'direct', 'problem_solver')
+  ),
+  style_guardrails text[] not null default '{}' check (
+    style_guardrails <@ array[
+      'no_emojis',
+      'casual_lowercase',
+      'include_affiliation_disclosure',
+      'lead_with_value_first',
+      'never_pitch_directly'
+    ]::text[]
+  ),
   reddit_username text,
   plan text not null default 'free' check (plan in ('free', 'pro', 'growth')),
   auto_send_enabled boolean default false,
@@ -50,6 +63,7 @@ create table monitored_threads (
   matched_signals text[] not null default '{}',
   quality_issues text[] not null default '{}',
   automation_reason text,
+  reviewed_at timestamptz,
   status text default 'pending' check (status in ('pending', 'drafted', 'sending', 'send_reconciliation_required', 'needs_manual_reply', 'dismissed', 'replied')),
   flag text,
   created_at timestamptz default now(),
@@ -93,12 +107,38 @@ create policy "profiles update own" on profiles for update
 revoke update on profiles from authenticated;
 grant update (
   business_name, business_description, business_url, business_type,
-  writing_style, reddit_username, notification_preferences
+  writing_style, tone_archetype, style_guardrails, reddit_username, notification_preferences
 ) on profiles to authenticated;
 create policy "own keywords" on keywords for all using (auth.uid() = user_id);
 create policy "own threads" on monitored_threads for all using (auth.uid() = user_id);
 create policy "own analytics" on reply_analytics for all using (auth.uid() = user_id);
 create policy "own usage" on usage_logs for all using (auth.uid() = user_id);
+
+create or replace function mark_thread_reviewed(
+  p_user_id uuid,
+  p_thread_id uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  update monitored_threads
+  set reviewed_at = coalesce(reviewed_at, now())
+  where id = p_thread_id and user_id = p_user_id;
+
+  if not found then
+    raise exception 'thread not found' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+revoke all on function mark_thread_reviewed(uuid, uuid) from public, anon;
+grant execute on function mark_thread_reviewed(uuid, uuid) to authenticated;
 
 -- Atomic budget check
 create or replace function increment_usage_if_under_limit(
@@ -232,7 +272,7 @@ create table draft_feedback (
   thread_id uuid references monitored_threads(id) on delete cascade,
   original_draft text,
   final_draft text,
-  action_type text check (action_type in ('APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED', 'AUTO_SENT')),
+  action_type text check (action_type in ('APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED', 'AUTO_SENT', 'COPIED')),
   edit_distance_score numeric(5,4), -- 1.0 = untouched, 0.0 = total rewrite
   platform text,
   target_community text,

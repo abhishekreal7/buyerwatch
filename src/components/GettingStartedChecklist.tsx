@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, X, Sparkles, Target, ArrowRight, Trophy } from 'lucide-react'
+import { CheckCircle2, X, Sparkles, ArrowRight, Trophy } from 'lucide-react'
 
 interface GettingStartedChecklistProps {
   keywordsCount: number

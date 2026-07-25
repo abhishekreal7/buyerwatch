@@ -12,6 +12,14 @@ import { createClient } from '@/utils/supabase/client'
 import { AppPage } from '@/components/AppPage'
 import { toast } from 'sonner'
 import { PLAN_LIMITS, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import {
+  STYLE_GUARDRAILS,
+  TONE_ARCHETYPES,
+  isToneArchetype,
+  normalizeStyleGuardrails,
+  type StyleGuardrail,
+  type ToneArchetype,
+} from '@/lib/writing-style'
 
 /* ─── Nav sections ────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -119,6 +127,8 @@ export default function SettingsPage() {
     businessUrl: '',
     businessType: 'saas',
     writingStyle: '',
+    toneArchetype: null as ToneArchetype | null,
+    styleGuardrails: [] as StyleGuardrail[],
     competitors: '',
     toneExamples: '',
     redditUsername: '',
@@ -161,7 +171,7 @@ export default function SettingsPage() {
 
       const { data: p } = await supabase
         .from('profiles')
-        .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
+        .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
         .eq('id', user.id)
         .single()
       if (p) {
@@ -171,6 +181,8 @@ export default function SettingsPage() {
           businessUrl: p.business_url || '',
           businessType: p.business_type || 'saas',
           writingStyle: p.writing_style || '',
+          toneArchetype: isToneArchetype(p.tone_archetype) ? p.tone_archetype : null,
+          styleGuardrails: normalizeStyleGuardrails(p.style_guardrails),
           competitors: (p.competitors || []).join(', '),
           toneExamples: p.tone_examples || '',
           redditUsername: p.reddit_username || '',
@@ -275,6 +287,8 @@ export default function SettingsPage() {
       business_url: profile.businessUrl,
       business_type: profile.businessType,
       writing_style: profile.writingStyle,
+      tone_archetype: profile.toneArchetype,
+      style_guardrails: profile.styleGuardrails,
       competitors: profile.competitors.split(',').map(s => s.trim()).filter(Boolean),
       tone_examples: profile.toneExamples,
       reddit_username: profile.redditUsername,
@@ -467,44 +481,22 @@ export default function SettingsPage() {
                         <div>
                           <label className="block text-[13px] font-semibold text-gray-900 mb-2">Tone Archetype</label>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {[
-                              {
-                                id: 'consultative',
-                                label: '🤝 Consultative Expert',
-                                desc: 'Informative, helpful, subtle product recommendation.',
-                                text: 'Informative, consultative expert. Shares practical advice first and mentions product naturally as a solution.',
-                              },
-                              {
-                                id: 'casual',
-                                label: '💬 Casual Peer',
-                                desc: 'Friendly, informal, conversational tone.',
-                                text: 'Casual, friendly peer tone. Informal, conversational, uses relaxed phrasing without buzzwords.',
-                              },
-                              {
-                                id: 'direct',
-                                label: '🎯 Direct & Concise',
-                                desc: 'Short, punchy, gets straight to the point.',
-                                text: 'Direct and concise. Keeps replies under 3 sentences, zero fluff, straight to the point.',
-                              },
-                              {
-                                id: 'problem_solver',
-                                label: '🛠️ Problem Solver',
-                                desc: 'Diagnoses technical pain points with clear steps.',
-                                text: 'Technical problem solver. Focuses on root-cause diagnosis and step-by-step resolution.',
-                              },
-                            ].map((archetype) => (
+                            {(Object.entries(TONE_ARCHETYPES) as [ToneArchetype, (typeof TONE_ARCHETYPES)[ToneArchetype]][]).map(([id, archetype]) => (
                               <button
-                                key={archetype.id}
+                                key={id}
                                 type="button"
-                                onClick={() => setProfile(p => ({ ...p, writingStyle: archetype.text }))}
+                                onClick={() => setProfile(p => ({
+                                  ...p,
+                                  toneArchetype: p.toneArchetype === id ? null : id,
+                                }))}
                                 className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                                  profile.writingStyle.includes(archetype.text.slice(0, 15))
+                                  profile.toneArchetype === id
                                     ? 'bg-blue-50/60 border-[#0A84FF] ring-2 ring-[#0A84FF]/10'
                                     : 'bg-white border-gray-200/80 hover:border-gray-300 hover:bg-gray-50/50'
                                 }`}
                               >
                                 <span className="text-xs font-bold text-gray-900 block">{archetype.label}</span>
-                                <span className="text-[11px] text-gray-500 mt-0.5 block leading-tight font-normal">{archetype.desc}</span>
+                                <span className="text-[11px] text-gray-500 mt-0.5 block leading-tight font-normal">{archetype.description}</span>
                               </button>
                             ))}
                           </div>
@@ -514,25 +506,18 @@ export default function SettingsPage() {
                         <div>
                           <label className="block text-[12px] font-medium text-gray-500 mb-2">Quick Style Guardrails</label>
                           <div className="flex flex-wrap gap-1.5">
-                            {[
-                              'No Emojis',
-                              'Casual Lowercase',
-                              'Include Affiliation Disclosure',
-                              'Lead with Value First',
-                              'Never Pitch Directly',
-                            ].map((pill) => {
-                              const active = profile.writingStyle.includes(pill)
+                            {(Object.entries(STYLE_GUARDRAILS) as [StyleGuardrail, (typeof STYLE_GUARDRAILS)[StyleGuardrail]][]).map(([id, guardrail]) => {
+                              const active = profile.styleGuardrails.includes(id)
                               return (
                                 <button
-                                  key={pill}
+                                  key={id}
                                   type="button"
                                   onClick={() => {
                                     setProfile(p => {
-                                      const current = p.writingStyle
-                                      const next = active
-                                        ? current.replace(new RegExp(`,?\\s*${pill}`, 'g'), '').trim()
-                                        : current ? `${current}, ${pill}` : pill
-                                      return { ...p, writingStyle: next }
+                                      const styleGuardrails = p.styleGuardrails.includes(id)
+                                        ? p.styleGuardrails.filter(item => item !== id)
+                                        : [...p.styleGuardrails, id]
+                                      return { ...p, styleGuardrails }
                                     })
                                   }}
                                   className={`text-[11px] font-semibold px-3 py-1 rounded-full border transition-all cursor-pointer ${
@@ -541,7 +526,7 @@ export default function SettingsPage() {
                                       : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                                   }`}
                                 >
-                                  {active ? `✓ ${pill}` : `+ ${pill}`}
+                                  {active ? `✓ ${guardrail.label}` : `+ ${guardrail.label}`}
                                 </button>
                               )
                             })}

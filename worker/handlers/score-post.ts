@@ -12,6 +12,7 @@ import { buildAttributionShortUrl } from '../../src/lib/attribution'
 import { matchedSignals } from '../../src/lib/buying-signal-filter'
 import { getAppUrl } from '../../src/lib/app-url'
 import { IntentLabel } from '../../src/lib/intent'
+import { getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -38,7 +39,7 @@ export async function scorePostHandler(job: Job) {
     // 2. Fetch user profile for context and plan
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
       .eq('id', userId)
       .single()
 
@@ -206,6 +207,17 @@ export async function scorePostHandler(job: Job) {
 }
 
 async function checkBudget(userId: string, plan: string, service: 'gemini' | 'claude') {
+  if (service === 'claude') {
+    const { data, error } = await supabase.rpc('reserve_monthly_draft', {
+      p_user_id: userId,
+      p_limit: getPlanLimits(normalizePlan(plan)).aiDraftsPerMonth,
+    })
+    if (error) {
+      throw new Error(`Draft budget reservation failed: ${error.message}`)
+    }
+    return data
+  }
+
   const limits: Record<string, Record<'gemini' | 'claude', number>> = {
     free:   { gemini: 50,   claude: 40 },   // 40 aligns with plan-limits.ts free.aiDraftsPerMonth
     pro:    { gemini: 500,  claude: 400 },
