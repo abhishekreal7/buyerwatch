@@ -43,6 +43,8 @@ const draft_reply_1 = require("../../src/lib/draft-reply");
 const confidence_engine_1 = require("../../src/lib/confidence-engine");
 const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
+const crypto_1 = require("crypto");
+const reply_jobs_1 = require("../../src/lib/reply-jobs");
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 const INTENT_THRESHOLD = 60;
@@ -50,23 +52,27 @@ async function scorePostHandler(job) {
     const { userId, keywordId, post } = job.data;
     try {
         // 1. Check if we already processed this exact post for this user
-        const { data: existing } = await supabase_1.supabaseWorker
+        const { data: existing, error: existingError } = await supabase_1.supabaseWorker
             .from('monitored_threads')
             .select('id')
             .eq('user_id', userId)
             .eq('platform', post.platform)
             .eq('external_id', post.externalId)
             .maybeSingle();
+        if (existingError)
+            throw existingError;
         if (existing)
             return;
         // 2. Fetch user profile for context and plan
-        const { data: profile } = await supabase_1.supabaseWorker
+        const { data: profile, error: profileError } = await supabase_1.supabaseWorker
             .from('profiles')
-            .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold')
+            .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
             .eq('id', userId)
             .single();
+        if (profileError)
+            throw profileError;
         if (!profile)
-            return;
+            throw new Error('Profile not found for scoring job');
         // 3. Atomic Budget Check for Scoring (Gemini)
         const canScore = await checkBudget(userId, profile.plan, 'gemini');
         if (!canScore) {
@@ -77,7 +83,7 @@ async function scorePostHandler(job) {
         const scoreResult = await (0, intent_scorer_1.scoreIntent)(post, profile);
         // Save thread early if score is low
         if (scoreResult.score < INTENT_THRESHOLD) {
-            await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed', undefined, scoreResult.flag);
+            await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed', undefined, scoreResult.flag, scoreResult.reasoning);
             return;
         }
         // 5. Atomic Budget Check for Drafting (Claude)
@@ -88,8 +94,13 @@ async function scorePostHandler(job) {
             await saveThread(userId, keywordId, post, scoreResult.score, 'needs_manual_reply', undefined, scoreResult.flag);
             return;
         }
-        // 6. Draft Reply
-        const draftResult = await (0, draft_reply_1.draftReply)(post, profile, scoreResult.score);
+        // 6. Draft Reply — generate tracking SID before drafting so Claude can embed it naturally
+        const trackingEnabled = profile.referral_tracking_enabled !== false; // default true
+        const trackingSid = trackingEnabled ? (0, crypto_1.randomBytes)(5).toString('base64url') : undefined; // ~7-char URL-safe token
+        const trackingUrl = trackingEnabled && profile.business_url && trackingSid
+            ? `${profile.business_url.replace(/\/$/, '')}?ref=scouto&sid=${trackingSid}`
+            : undefined;
+        const draftResult = await (0, draft_reply_1.draftReply)(post, profile, scoreResult.score, trackingUrl);
         const draftText = draftResult.text;
         // 7. Auto-send decision — routed through the single unified gatekeeper.
         //    All safeguards (disclosure, tone, cold-start, confidence threshold)
@@ -97,23 +108,56 @@ async function scorePostHandler(job) {
         const evaluation = await (0, confidence_engine_1.evaluateAutoSend)(userId, post.platform, draftResult, { auto_send_enabled: profile.auto_send_enabled, plan: profile.plan ?? 'free' }, post.sourceTarget ?? null);
         if (evaluation.approved) {
             // All gates cleared — save and enqueue for auto-send
-            const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag);
+            const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning, trackingSid);
             if (thread) {
-                const { sendReplyQueue } = await import('../../src/lib/queues/index.js');
-                await sendReplyQueue.add(`send-${thread.id}`, {
+                const { sendReplyQueue, notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js');
+                await sendReplyQueue.add('send', {
                     userId,
                     threadExternalId: post.externalId,
                     threadId: thread.id,
                     text: draftText,
                     platform: post.platform,
-                    triggerType: 'auto'
+                    triggerType: 'auto',
+                }, {
+                    jobId: (0, reply_jobs_1.getSendReplyJobId)(thread.id),
                 });
+                // Fire-and-forget: check if thread URL ranks on Google for this keyword (Feature 5)
+                if (post.url) {
+                    checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url, matchedKeyword: post.sourceTarget }).catch(() => { });
+                }
+                // Fire-and-forget Slack notification
+                notifySlackQueue.add(`slack-${thread.id}`, {
+                    userId,
+                    postUrl: post.url,
+                    postTitle: post.title || post.text?.slice(0, 100),
+                    postAuthor: post.author,
+                    intentScore: scoreResult.score,
+                    draftText,
+                    subreddit: post.sourceTarget || 'reddit',
+                }).catch(() => { }); // never block on Slack
                 logger_1.logger.info({ userId, threadId: thread.id, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Enqueued auto-send');
             }
         }
         else {
             // Any gate failed — route to manual review queue
-            await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag);
+            const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning, trackingSid);
+            if (thread) {
+                const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js');
+                // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
+                if (post.url) {
+                    checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url }).catch(() => { });
+                }
+                // Fire-and-forget Slack notification
+                notifySlackQueue.add(`slack-${thread.id}`, {
+                    userId,
+                    postUrl: post.url,
+                    postTitle: post.title || post.text?.slice(0, 100),
+                    postAuthor: post.author,
+                    intentScore: scoreResult.score,
+                    draftText,
+                    subreddit: post.sourceTarget || 'reddit',
+                }).catch(() => { }); // never block on Slack
+            }
             logger_1.logger.info({ userId, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Routed to manual review');
         }
     }
@@ -136,12 +180,11 @@ async function checkBudget(userId, plan, service) {
         p_limit: limit,
     });
     if (error) {
-        logger_1.logger.error({ error }, 'Error checking budget:');
-        return false; // Fail safe: don't spend if RPC fails
+        throw new Error(`Budget reservation failed: ${error.message}`);
     }
     return data;
 }
-async function saveThread(userId, keywordId, post, intentScore, status, draftText, flag) {
+async function saveThread(userId, keywordId, post, intentScore, status, draftText, flag, reasoning, trackingSid) {
     const { data: thread, error } = await supabase_1.supabaseWorker
         .from('monitored_threads')
         .insert({
@@ -154,13 +197,14 @@ async function saveThread(userId, keywordId, post, intentScore, status, draftTex
         url: post.url,
         intent_score: intentScore,
         status: status,
-        flag: flag || null
+        flag: flag || null,
+        score_reasoning: reasoning || null,
+        tracking_sid: trackingSid || null,
     })
         .select()
         .single();
     if (error) {
-        logger_1.logger.error({ error }, 'Error inserting monitored_thread:');
-        return;
+        throw new Error(`Failed to persist monitored thread: ${error.message}`);
     }
     if (draftText && thread) {
         const { error: analyticsError } = await supabase_1.supabaseWorker
@@ -171,7 +215,7 @@ async function saveThread(userId, keywordId, post, intentScore, status, draftTex
             draft_text: draftText,
         });
         if (analyticsError) {
-            logger_1.logger.error({ analyticsError }, 'Error inserting reply_analytics:');
+            throw new Error(`Failed to persist reply analytics: ${analyticsError.message}`);
         }
     }
     return thread;

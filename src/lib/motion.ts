@@ -1,5 +1,3 @@
-import { Variants } from 'framer-motion'
-
 export const springs = {
   /* Ultra-responsive, mimics mechanical switch or hard tap */
   snappy: { type: 'spring' as const, stiffness: 500, damping: 35, mass: 0.8 },
@@ -9,7 +7,7 @@ export const springs = {
   gentle: { type: 'spring' as const, stiffness: 200, damping: 25, mass: 1.2 },
 }
 
-export const staggers: any = {
+export const staggers = {
   container: { 
     animate: { 
       transition: { staggerChildren: 0.04 } /* Slightly faster stagger for physical cascading */
@@ -24,4 +22,3 @@ export const staggers: any = {
     } 
   }
 }
-

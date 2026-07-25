@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Target, Lock, Eye, EyeOff, AlertTriangle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import { useRouter } from 'next/navigation'
 
 export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +32,7 @@ export default function ResetPasswordPage() {
     })
 
     return () => subscription.unsubscribe()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -225,4 +224,3 @@ export default function ResetPasswordPage() {
     </div>
   )
 }
-

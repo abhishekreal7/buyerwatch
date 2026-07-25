@@ -3,6 +3,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { timingSafeEqual } from 'crypto'
 import { encrypt } from '@/lib/encryption'
+import { fetchWithTimeout } from '@/lib/http'
+import { getAppUrl } from '@/lib/app-url'
 
 const OAUTH_STATE_COOKIE = 'reddit_oauth_state'
 
@@ -55,15 +57,15 @@ export async function GET(req: Request) {
 
   const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim()
   const clientSecret = (process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET || '').trim()
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/reddit/callback`
+  const redirectUri = `${getAppUrl()}/api/auth/reddit/callback`
 
   // Developer Bypass
-  if (code === 'developer_code' || ((!clientId || clientId.includes('TODO')) && process.env.NODE_ENV === 'development')) {
+  if (process.env.NODE_ENV === 'development' && code === 'developer_code') {
     const accessObj = {
       token: 'developer_access_token',
       expires_at: Date.now() + 3600 * 1000
     }
-    await supabase.from('platform_connections').upsert({
+    const { error: bypassError } = await supabase.from('platform_connections').upsert({
       user_id: user.id,
       platform: 'reddit',
       access_token: encrypt(JSON.stringify(accessObj)),
@@ -71,13 +73,19 @@ export async function GET(req: Request) {
       external_username: 'developer_reddit_user',
       connected_at: new Date().toISOString()
     }, { onConflict: 'user_id, platform' })
+    if (bypassError) {
+      return NextResponse.redirect(new URL('/settings?error=reddit_save_failed', req.url))
+    }
 
     return NextResponse.redirect(new URL('/settings?success=reddit_connected', req.url))
   }
 
+  if (!clientId || !clientSecret) {
+    return NextResponse.redirect(new URL('/settings?error=reddit_credentials_missing', req.url))
+  }
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
 
-  const tokenRes = await fetch('https://www.reddit.com/api/v1/access_token', {
+  const tokenRes = await fetchWithTimeout('https://www.reddit.com/api/v1/access_token', {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${basicAuth}`,
@@ -89,7 +97,7 @@ export async function GET(req: Request) {
       code,
       redirect_uri: redirectUri
     })
-  })
+  }, 10_000)
 
   if (!tokenRes.ok) {
     return NextResponse.redirect(new URL('/settings?error=reddit_token_failed', req.url))
@@ -98,12 +106,15 @@ export async function GET(req: Request) {
   const tokenData = await tokenRes.json()
 
   // get identity
-  const meRes = await fetch('https://oauth.reddit.com/api/v1/me', {
+  const meRes = await fetchWithTimeout('https://oauth.reddit.com/api/v1/me', {
     headers: { 
       'Authorization': `Bearer ${tokenData.access_token}`,
       'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
     }
-  })
+  }, 10_000)
+  if (!meRes.ok) {
+    return NextResponse.redirect(new URL('/settings?error=reddit_identity_failed', req.url))
+  }
   const meData = await meRes.json()
 
   // Save to DB
@@ -112,7 +123,7 @@ export async function GET(req: Request) {
     expires_at: Date.now() + tokenData.expires_in * 1000
   }
 
-  await supabase.from('platform_connections').upsert({
+  const { error: saveError } = await supabase.from('platform_connections').upsert({
     user_id: user.id,
     platform: 'reddit',
     access_token: encrypt(JSON.stringify(accessObj)),
@@ -120,6 +131,9 @@ export async function GET(req: Request) {
     external_username: meData.name,
     connected_at: new Date().toISOString()
   }, { onConflict: 'user_id, platform' })
+  if (saveError) {
+    return NextResponse.redirect(new URL('/settings?error=reddit_save_failed', req.url))
+  }
 
   return NextResponse.redirect(new URL('/settings?success=reddit_connected', req.url))
 }

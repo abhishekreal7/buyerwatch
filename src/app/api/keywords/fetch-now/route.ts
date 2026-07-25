@@ -68,9 +68,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, platform, target, watcherCount: sorted.length })
-  } catch (error: any) {
+  } catch (error) {
     logger.error({ error }, 'Error in fetch-now endpoint')
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'fetch_enqueue_failed' }, { status: 500 })
   }
 }
-

@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  User, Zap, Bell, CreditCard, Save, Check, ChevronRight,
-  Globe, FileText, AtSign, Briefcase, Palette, Shield,
-  Link, Unlink, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info
+  User, Bell, CreditCard, Save, Check,
+  Globe, AtSign, Shield,
+  Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
@@ -262,7 +262,8 @@ export default function SettingsPage() {
     if (!user) return
     setSaving(true)
 
-    const { error } = await supabase.from('profiles').update({
+    const [{ error }, autoSendResponse] = await Promise.all([
+      supabase.from('profiles').update({
       business_name: profile.businessName,
       business_description: profile.businessDescription,
       business_url: profile.businessUrl,
@@ -271,16 +272,23 @@ export default function SettingsPage() {
       competitors: profile.competitors.split(',').map(s => s.trim()).filter(Boolean),
       tone_examples: profile.toneExamples,
       reddit_username: profile.redditUsername,
-      auto_send_enabled: profile.autoSendEnabled,
-      auto_send_threshold: profile.autoSendThreshold,
       referral_tracking_enabled: profile.referralTrackingEnabled,
       notification_preferences: notifications,
       slack_webhook_url: slack.webhookUrl || null,
       slack_notify_threshold: slack.threshold,
-    }).eq('id', user.id)
+      }).eq('id', user.id),
+      fetch('/api/settings/autosend', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auto_send_enabled: profile.autoSendEnabled,
+          auto_send_threshold: profile.autoSendThreshold,
+        }),
+      }),
+    ])
 
     setSaving(false)
-    if (error) { toast.error('Failed to save'); return }
+    if (error || !autoSendResponse.ok) { toast.error('Failed to save'); return }
     setSaveSuccess(true)
     toast.success('Settings saved')
     setTimeout(() => setSaveSuccess(false), 2500)
@@ -343,8 +351,6 @@ export default function SettingsPage() {
     { value: 'creator', label: 'Creator / Content' },
     { value: 'other', label: 'Other' },
   ]
-
-  const currentSection = SECTIONS.find(s => s.id === activeSection)
 
   return (
     <AppPage>
@@ -790,11 +796,11 @@ export default function SettingsPage() {
                           hint="POST JSON payloads to this endpoint when a user who clicked a Scouto link converts."
                         >
                           <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-[12px] text-gray-800 flex items-center justify-between">
-                            <span>http://localhost:3000/api/webhooks/conversion</span>
+                            <span>{process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion</span>
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText('http://localhost:3000/api/webhooks/conversion')
+                                navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion`)
                                 toast.success('Webhook URL copied')
                               }}
                               className="text-[12px] text-blue-600 font-sans font-semibold hover:underline"

@@ -33,7 +33,7 @@ export const WeeklyDigest = ({
   totalFound = 0,
   totalDrafts = 0,
   totalReplies = 0,
-  dashboardUrl = 'https://scouto.com/dashboard'
+  dashboardUrl = 'https://app.example.com/dashboard'
 }: WeeklyDigestProps) => (
   <Html>
     <Head />

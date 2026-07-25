@@ -2,10 +2,19 @@ import * as Sentry from '@sentry/nextjs';
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-
-  // Adjust this value in production, or use tracesSampler for greater control
-  tracesSampleRate: 0.2,
-
-  // Setting this option to true will print useful information to the console while you're setting up Sentry.
+  environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
+  release: process.env.NEXT_PUBLIC_SENTRY_RELEASE,
+  tracesSampleRate: Number(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? '0.05'),
+  sendDefaultPii: false,
+  beforeSend(event) {
+    delete event.user
+    if (event.request) {
+      delete event.request.cookies
+      delete event.request.data
+      delete event.request.headers
+      delete event.request.query_string
+    }
+    return event
+  },
   debug: false,
 });

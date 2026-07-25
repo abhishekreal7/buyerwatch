@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { cookies } from 'next/headers'
+import { getAppUrl } from '@/lib/app-url'
 
 const OAUTH_STATE_COOKIE = 'reddit_oauth_state'
 
 export async function GET() {
   const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim()
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/reddit/callback`
+  const redirectUri = `${getAppUrl()}/api/auth/reddit/callback`
 
   // Cryptographically random state, validated in the OAuth callback
   const state = randomBytes(32).toString('hex')

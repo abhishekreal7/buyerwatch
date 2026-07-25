@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, MessageCircle } from 'lucide-react'
+import { Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -156,7 +156,7 @@ export default function DraftsPage() {
         body: JSON.stringify({ threadId: threadIdToSend, platform: platformToSend, text: replyTextToSend, triggerType: 'manual' })
       })
       if (!res.ok) throw new Error('Network response was not ok')
-    } catch (err: unknown) {
+    } catch {
       toast.error('Failed to send reply')
     } finally {
       setIsSending(false)

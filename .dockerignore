@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.git
+.github
+.next
+node_modules
+coverage
+npm-debug.log*
+*.key
+*.pem

@@ -1,55 +1,64 @@
 import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
 import { headers } from 'next/headers'
-
-// Requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in env
-// Since we only have UPSTASH_REDIS_URL right now, we can use ioredis with upstash ratelimit or we need upstash redis rest tokens.
-// But upstash/ratelimit actually supports standard Redis clients via adapter, or we can just use upstash/redis if rest url is provided.
-// Let's create an ioredis adapter for @upstash/ratelimit
 import IORedis from 'ioredis'
 
-let redisClient: IORedis | null = null
-if (process.env.UPSTASH_REDIS_URL) {
-  redisClient = new IORedis(process.env.UPSTASH_REDIS_URL)
+type LimitResult = { success: boolean }
+type Limiter = { limit(key: string): Promise<LimitResult> }
+
+class MemoryLimiter implements Limiter {
+  private readonly entries = new Map<string, number[]>()
+
+  constructor(
+    private readonly maximum: number,
+    private readonly windowMs: number,
+  ) {}
+
+  async limit(key: string): Promise<LimitResult> {
+    const now = Date.now()
+    const recent = (this.entries.get(key) ?? []).filter((timestamp) => now - timestamp < this.windowMs)
+    if (recent.length >= this.maximum) return { success: false }
+    recent.push(now)
+    this.entries.set(key, recent)
+    return { success: true }
+  }
 }
 
-// Minimal adapter for Upstash Ratelimit using ioredis
-const redisAdapter = redisClient ? {
-  sadd: async (key: string, ...members: string[]) => redisClient!.sadd(key, ...members),
-  eval: async (script: string, keys: string[], args: string[]) => {
-    // ioredis eval takes: script, numKeys, ...keys, ...args
-    return redisClient!.eval(script, keys.length, ...keys, ...args)
-  },
-  evalsha: async (sha: string, keys: string[], args: string[]) => {
-    // ioredis evalsha takes: sha, numKeys, ...keys, ...args
-    return redisClient!.evalsha(sha, keys.length, ...keys, ...args)
-  }
-} : null
+const redisClient = process.env.UPSTASH_REDIS_URL
+  ? new IORedis(process.env.UPSTASH_REDIS_URL, {
+      lazyConnect: true,
+      tls: process.env.UPSTASH_REDIS_URL.startsWith('rediss://') ? {} : undefined,
+    })
+  : null
 
-export const authRateLimit = redisAdapter ? new Ratelimit({
-  redis: redisAdapter as any,
-  limiter: Ratelimit.slidingWindow(5, '15 m'),
-  analytics: false,
-}) : null
+const redisAdapter = redisClient
+  ? {
+      sadd: async (key: string, ...members: string[]) => redisClient.sadd(key, ...members),
+      eval: async (script: string, keys: string[], args: string[]) =>
+        redisClient.eval(script, keys.length, ...keys, ...args),
+      evalsha: async (sha: string, keys: string[], args: string[]) =>
+        redisClient.evalsha(sha, keys.length, ...keys, ...args),
+    }
+  : null
 
-export const actionRateLimit = redisAdapter ? new Ratelimit({
-  redis: redisAdapter as any,
-  limiter: Ratelimit.slidingWindow(10, '1 m'),
-  analytics: false,
-}) : null
+export const authRateLimit: Limiter = redisAdapter
+  ? new Ratelimit({
+      redis: redisAdapter as never,
+      limiter: Ratelimit.slidingWindow(5, '15 m'),
+      analytics: false,
+    })
+  : new MemoryLimiter(5, 15 * 60_000)
+
+export const actionRateLimit: Limiter = redisAdapter
+  ? new Ratelimit({
+      redis: redisAdapter as never,
+      limiter: Ratelimit.slidingWindow(10, '1 m'),
+      analytics: false,
+    })
+  : new MemoryLimiter(10, 60_000)
 
 export async function getIp() {
   const headersList = await headers()
   const forwardedFor = headersList.get('x-forwarded-for')
   const realIp = headersList.get('x-real-ip')
-
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim()
-  }
-
-  if (realIp) {
-    return realIp.trim()
-  }
-
-  return '127.0.0.1'
+  return forwardedFor?.split(',')[0]?.trim() || realIp?.trim() || 'unknown'
 }

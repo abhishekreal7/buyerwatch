@@ -46,21 +46,26 @@ const path_1 = __importDefault(require("path"));
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 async function xFetchHandler(job) {
-    const { target } = job.data;
+    const { target, keywordMappings: preloadedMappings } = job.data;
     try {
         const posts = await (0, x_1.fetchXPosts)(target);
         if (!posts || posts.length === 0)
             return;
         // Find all users watching this specific X target
-        const { data: keywordMappings, error } = await supabase_1.supabaseWorker
-            .from('keywords')
-            .select('id, user_id, term')
-            .eq('platform', 'x')
-            .eq('target', target)
-            .eq('is_active', true);
+        let keywordMappings = preloadedMappings;
+        let error = null;
+        if (!keywordMappings) {
+            const result = await supabase_1.supabaseWorker
+                .from('keywords')
+                .select('id, user_id, term')
+                .eq('platform', 'x')
+                .eq('target', target)
+                .eq('is_active', true);
+            keywordMappings = result.data;
+            error = result.error;
+        }
         if (error) {
-            logger_1.logger.error({ error }, 'Supabase error fetching keywords:');
-            return;
+            throw new Error(`Failed to load X keyword mappings: ${error.message}`);
         }
         if (!keywordMappings || keywordMappings.length === 0)
             return;
@@ -92,11 +97,13 @@ async function xFetchHandler(job) {
     }
 }
 async function checkXSpendBudget(userId) {
-    const { data: profile } = await supabase_1.supabaseWorker
+    const { data: profile, error: profileError } = await supabase_1.supabaseWorker
         .from('profiles')
         .select('plan')
         .eq('id', userId)
         .single();
+    if (profileError)
+        throw new Error(`Failed to load X budget profile: ${profileError.message}`);
     if (!profile)
         return false;
     const limit = plan_limits_1.X_DAILY_SPEND_LIMIT_CENTS[profile.plan] || 0;
@@ -110,8 +117,7 @@ async function checkXSpendBudget(userId) {
         p_daily_limit_cents: limit,
     });
     if (error) {
-        logger_1.logger.error({ error }, 'Error checking X spend budget:');
-        return false;
+        throw new Error(`Failed to reserve X spend budget: ${error.message}`);
     }
     return data;
 }

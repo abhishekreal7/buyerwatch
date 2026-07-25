@@ -1,11 +1,11 @@
-# Automated Deployment Script for MatchSignal Background Worker on GCP Cloud Run
+# Automated Deployment Script for Scouto Background Worker on GCP Cloud Run
 Param(
     [string]$ProjectId = "scouto-501307",
     [string]$Region = "us-central1",
-    [string]$ServiceName = "matchsignal-worker"
+    [string]$ServiceName = "scouto-worker"
 )
 
-Write-Host "🚀 Deploying MatchSignal Background Worker to GCP ($ProjectId / $Region)..." -ForegroundColor Cyan
+Write-Host "🚀 Deploying Scouto Background Worker to GCP ($ProjectId / $Region)..." -ForegroundColor Cyan
 
 # 1. Enable required GCP Services
 Write-Host "1. Enabling Google Cloud Run & Container Registry APIs..." -ForegroundColor Yellow

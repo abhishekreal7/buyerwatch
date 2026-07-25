@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt } from './encryption'
+import { fetchWithTimeout } from './http'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,7 +55,7 @@ async function refreshRedditToken(userId: string, refreshToken: string) {
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
   
-  const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+  const response = await fetchWithTimeout('https://www.reddit.com/api/v1/access_token', {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${basicAuth}`,
@@ -65,7 +66,7 @@ async function refreshRedditToken(userId: string, refreshToken: string) {
       grant_type: 'refresh_token',
       refresh_token: refreshToken
     })
-  })
+  }, 10_000)
 
   if (!response.ok) {
     // If the refresh token is revoked or invalid, we clear it from DB to force reconnect
@@ -126,7 +127,7 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
   
   if (redditApisKey && !redditApisKey.includes('TODO')) {
     console.log(`[reddit] Posting reply using redditapis.com proxy for thread ${threadExternalId}`)
-    const response = await fetch('https://api.redditapis.com/api/comment', {
+    const response = await fetchWithTimeout('https://api.redditapis.com/api/comment', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${redditApisKey}`,
@@ -138,7 +139,7 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
         thing_id: threadExternalId,
         text
       })
-    })
+    }, 10_000)
 
     handleRedditRateLimits(response.headers)
 
@@ -163,7 +164,9 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
     return { permalink: `https://reddit.com/r/developer/comments/${threadExternalId}/dev_reply` }
   }
 
-  let { accessToken, refreshToken, expiresAt } = await getDecryptedRedditConnection(userId)
+  const connection = await getDecryptedRedditConnection(userId)
+  let accessToken = connection.accessToken
+  const { refreshToken, expiresAt } = connection
 
   // Proactive Refresh: refresh if token expires in less than 5 minutes
   if (expiresAt && Date.now() + 300_000 >= expiresAt) {
@@ -175,7 +178,7 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
   }
 
   const tryPost = async (token: string) => {
-    return await fetch('https://oauth.reddit.com/api/comment', {
+    return await fetchWithTimeout('https://oauth.reddit.com/api/comment', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -187,7 +190,7 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
         thing_id: threadExternalId,
         text
       })
-    })
+    }, 10_000)
   }
 
   let response = await tryPost(accessToken)
@@ -226,7 +229,7 @@ export async function submitRedditPost(userId: string, subreddit: string, title:
 
   if (redditApisKey && !redditApisKey.includes('TODO')) {
     console.log(`[reddit] Submitting post using redditapis.com proxy to r/${subreddit}`)
-    const response = await fetch('https://api.redditapis.com/api/submit', {
+    const response = await fetchWithTimeout('https://api.redditapis.com/api/submit', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${redditApisKey}`,
@@ -240,7 +243,7 @@ export async function submitRedditPost(userId: string, subreddit: string, title:
         title,
         text
       })
-    })
+    }, 10_000)
 
     handleRedditRateLimits(response.headers)
 
@@ -265,7 +268,9 @@ export async function submitRedditPost(userId: string, subreddit: string, title:
     return { permalink: `https://reddit.com/r/developer/submit_mock` }
   }
 
-  let { accessToken, refreshToken, expiresAt } = await getDecryptedRedditConnection(userId)
+  const connection = await getDecryptedRedditConnection(userId)
+  let accessToken = connection.accessToken
+  const { refreshToken, expiresAt } = connection
 
   if (expiresAt && Date.now() + 300_000 >= expiresAt) {
     try {
@@ -276,7 +281,7 @@ export async function submitRedditPost(userId: string, subreddit: string, title:
   }
 
   const trySubmit = async (token: string) => {
-    return await fetch('https://oauth.reddit.com/api/submit', {
+    return await fetchWithTimeout('https://oauth.reddit.com/api/submit', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -290,7 +295,7 @@ export async function submitRedditPost(userId: string, subreddit: string, title:
         title,
         text
       })
-    })
+    }, 10_000)
   }
 
   let response = await trySubmit(accessToken)

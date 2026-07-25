@@ -5,6 +5,7 @@ const api_1 = require("@atproto/api");
 const supabase_js_1 = require("@supabase/supabase-js");
 const encryption_1 = require("./encryption");
 const reddit_post_1 = require("./reddit-post");
+const http_1 = require("./http");
 const supabase = (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 async function getDecryptedBlueskyConnection(userId) {
     const { data, error } = await supabase
@@ -23,7 +24,10 @@ async function getDecryptedBlueskyConnection(userId) {
 }
 async function postBlueskyReply(userId, threadExternalId, text) {
     const { password, identifier } = await getDecryptedBlueskyConnection(userId);
-    const agent = new api_1.BskyAgent({ service: 'https://bsky.social' });
+    const agent = new api_1.BskyAgent({
+        service: 'https://bsky.social',
+        fetch: (0, http_1.createTimeoutFetch)(15_000),
+    });
     try {
         await agent.login({ identifier, password });
     }

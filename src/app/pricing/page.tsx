@@ -1,10 +1,13 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import { Target, Check, ArrowRight } from 'lucide-react'
+import { getProviderCapabilities } from '@/lib/env'
 
 export const metadata = {
   title: 'Pricing — Scouto',
   description: 'Simple, transparent pricing. Start free, upgrade when you need more signal coverage.',
 }
+
+export const dynamic = 'force-dynamic'
 
 const PLANS = [
   {
@@ -61,6 +64,8 @@ const PLANS = [
 ]
 
 export default function PricingPage() {
+  const billingEnabled = getProviderCapabilities().billing
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-black selection:text-white">
       {/* Nav */}
@@ -91,7 +96,10 @@ export default function PricingPage() {
 
       {/* Plans */}
       <div className="max-w-5xl mx-auto px-6 pb-24 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {PLANS.map((plan) => (
+        {PLANS.map((plan) => {
+          const paidPlan = plan.name !== 'Free'
+          const checkoutAvailable = !paidPlan || billingEnabled
+          return (
           <div
             key={plan.name}
             className={`rounded-2xl p-7 flex flex-col border ${
@@ -128,18 +136,19 @@ export default function PricingPage() {
             </ul>
 
             <Link
-              href={plan.href}
+              href={checkoutAvailable ? plan.href : '/contact'}
               className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[14px] font-semibold transition-all duration-200 ${
                 plan.highlight
                   ? 'bg-white text-[#0A0A0A] hover:bg-white/90'
                   : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
               }`}
             >
-              {plan.cta}
+              {checkoutAvailable ? plan.cta : 'Join the paid-plan waitlist'}
               <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
             </Link>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Footer */}

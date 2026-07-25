@@ -1,13 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PLAN_LIMITS = exports.X_DAILY_SPEND_LIMIT_CENTS = void 0;
+exports.PLAN_LIMITS = exports.PLAN_POLL_INTERVAL_MINUTES = exports.X_DAILY_SPEND_LIMIT_CENTS = void 0;
 exports.normalizePlan = normalizePlan;
 exports.getPlanLimits = getPlanLimits;
 exports.isPaidPlan = isPaidPlan;
+exports.isPollingDue = isPollingDue;
 exports.X_DAILY_SPEND_LIMIT_CENTS = {
     free: 0,
     pro: 0,
     growth: 0,
+};
+exports.PLAN_POLL_INTERVAL_MINUTES = {
+    free: 360,
+    pro: 30,
+    growth: 15,
 };
 exports.PLAN_LIMITS = {
     free: {
@@ -49,4 +55,12 @@ function getPlanLimits(plan) {
 /** Returns true if the plan is any paid tier (pro or growth). */
 function isPaidPlan(plan) {
     return normalizePlan(plan) !== 'free';
+}
+function isPollingDue(plan, lastPolledAt, now = Date.now()) {
+    if (!lastPolledAt)
+        return true;
+    const timestamp = Date.parse(lastPolledAt);
+    if (!Number.isFinite(timestamp))
+        return true;
+    return now - timestamp >= exports.PLAN_POLL_INTERVAL_MINUTES[normalizePlan(plan)] * 60_000;
 }

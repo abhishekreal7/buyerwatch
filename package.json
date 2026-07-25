@@ -1,5 +1,5 @@
 {
-  "name": "matchsignal",
+  "name": "scouto",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,13 @@
     "build:worker": "tsc -p tsconfig.worker.json",
     "deploy:worker:gcp": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-worker-gcp.ps1",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint src worker tests e2e playwright.config.ts --max-warnings=0",
+    "typecheck": "tsc --noEmit --incremental false && tsc -p tsconfig.worker.json --noEmit --incremental false",
+    "test": "vitest run tests",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "verify": "npm run typecheck && npm run lint && npm test && npm audit --audit-level=high"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -35,7 +41,7 @@
     "lenis": "^1.3.25",
     "lucide-react": "^1.23.0",
     "multiformats": "^14.0.4",
-    "next": "16.2.10",
+    "next": "^16.2.11",
     "openai": "^6.48.0",
     "pino": "^10.3.1",
     "react": "19.2.4",
@@ -45,18 +51,37 @@
     "resend": "^6.16.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
-    "twitter-api-v2": "^1.29.0"
+    "twitter-api-v2": "^1.29.0",
+    "undici": "^8.9.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/express": "^5.0.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "^16.2.11",
     "pino-pretty": "^13.1.3",
+    "postcss": "^8.5.22",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.22",
+      "sharp": "0.35.3"
+    },
+    "ajv@8.20.0": {
+      "fast-uri": "4.1.1"
+    },
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.16"
+    },
+    "gaxios@6.7.1": {
+      "uuid": "11.1.1"
+    }
   }
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Target, Edit3, CheckCircle, Filter, ChevronDown, MessageCircle, ArrowUp, ExternalLink, X, RefreshCcw, Copy, ArrowRight, FileText, Lock, Sparkles, ChevronUp, Globe, Info, Activity } from 'lucide-react'
+import { Search, Target, CheckCircle, ChevronDown, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, ChevronUp, Globe } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { UpgradeModal } from '@/components/UpgradeModal'
@@ -179,7 +179,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     loadData()
   }, [])
 
@@ -198,7 +198,7 @@ export default function DashboardPage() {
         })
       })
       if (!res.ok) throw new Error('Failed to queue reply')
-    } catch (err) {
+    } catch {
       toast.error('Failed to send reply')
       return
     }

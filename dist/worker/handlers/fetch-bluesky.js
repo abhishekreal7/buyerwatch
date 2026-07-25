@@ -45,21 +45,26 @@ const path_1 = __importDefault(require("path"));
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 async function blueskyFetchHandler(job) {
-    const { target } = job.data; // e.g. "email marketing tool"
+    const { target, keywordMappings: preloadedMappings } = job.data;
     try {
         const posts = await (0, bluesky_1.searchBlueskyPosts)(target);
         if (!posts || posts.length === 0)
             return;
         // Find all users watching this specific bluesky query
-        const { data: keywordMappings, error } = await supabase_1.supabaseWorker
-            .from('keywords')
-            .select('id, user_id, term')
-            .eq('platform', 'bluesky')
-            .eq('target', target)
-            .eq('is_active', true);
+        let keywordMappings = preloadedMappings;
+        let error = null;
+        if (!keywordMappings) {
+            const result = await supabase_1.supabaseWorker
+                .from('keywords')
+                .select('id, user_id, term')
+                .eq('platform', 'bluesky')
+                .eq('target', target)
+                .eq('is_active', true);
+            keywordMappings = result.data;
+            error = result.error;
+        }
         if (error) {
-            logger_1.logger.error({ error }, 'Supabase error fetching bluesky keywords:');
-            return;
+            throw new Error(`Failed to load Bluesky keyword mappings: ${error.message}`);
         }
         if (!keywordMappings || keywordMappings.length === 0)
             return;

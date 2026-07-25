@@ -81,11 +81,11 @@ export async function POST(req: Request) {
           { status: 403 }
         )
       }
-      return NextResponse.json({ error: error.message || 'Failed to save keyword' }, { status: 500 })
+      return NextResponse.json({ error: 'keyword_save_failed' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, keyword: data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal error' }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 })
   }
 }

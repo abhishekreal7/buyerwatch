@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchSubredditNew = fetchSubredditNew;
+const http_1 = require("./http");
 let cachedToken = null;
 let tokenExpiry = 0;
 async function getRedditToken() {
@@ -13,7 +14,7 @@ async function getRedditToken() {
         throw new Error('Reddit OAuth credentials missing');
     }
     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+    const response = await (0, http_1.fetchWithTimeout)('https://www.reddit.com/api/v1/access_token', {
         method: 'POST',
         headers: {
             'Authorization': `Basic ${authString}`,
@@ -21,7 +22,7 @@ async function getRedditToken() {
             'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
         },
         body: 'grant_type=client_credentials'
-    });
+    }, 10_000);
     if (!response.ok) {
         throw new Error(`Reddit auth failed: ${response.statusText}`);
     }
@@ -102,25 +103,76 @@ async function fetchSubredditNew(subreddit, limit = 25) {
     const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim();
     const isApproved = process.env.REDDIT_API_APPROVED === 'true';
     const forceLive = process.env.REDDITAPIS_FORCE_LIVE === 'true';
+    // ── Redis cache key ────────────────────────────────────────────────
+    // Prevents hammering the same subreddit RSS endpoint within a 5-min window.
+    // The cache stores the serialised NormalizedPost[] array.
+    let redisClient = null;
+    const cacheKey = `rss:r:${subreddit}`;
+    const CACHE_TTL = 300; // 5 minutes
+    try {
+        const { redis } = await import('./redis.js');
+        redisClient = redis;
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+            const posts = JSON.parse(cached);
+            console.log(`[reddit] Cache HIT for r/${subreddit} (${posts.length} posts)`);
+            return posts;
+        }
+    }
+    catch (cacheErr) {
+        console.warn(`[reddit] Redis cache unavailable, continuing without cache:`, cacheErr);
+    }
     // ── PRIMARY: Reddit public RSS feed (free, no auth, no per-call cost) ──────
-    // Provides all fields the pipeline uses. Upvote/comment counts are not in the
-    // NormalizedPost type and are never used by the intent scorer or drafting logic.
     try {
         const rssUrl = `https://www.reddit.com/r/${subreddit}/new/.rss?limit=${limit}`;
         console.log(`[reddit] RSS fetch for r/${subreddit}`);
-        const rssResponse = await fetch(rssUrl, {
+        const rssResponse = await (0, http_1.fetchWithTimeout)(rssUrl, {
             headers: {
-                'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0',
+                'User-Agent': process.env.REDDIT_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
             }
-        });
+        }, 10_000);
         if (rssResponse.ok) {
             const xml = await rssResponse.text();
             const posts = parseRedditRss(xml, subreddit);
             if (posts.length > 0) {
                 console.log(`[reddit] RSS: ${posts.length} posts from r/${subreddit}`);
+                // Cache the result
+                if (redisClient) {
+                    await redisClient.set(cacheKey, JSON.stringify(posts), 'EX', CACHE_TTL).catch(() => { });
+                }
                 return posts;
             }
             console.warn(`[reddit] RSS returned 0 parseable posts for r/${subreddit}, falling back`);
+        }
+        else if (rssResponse.status === 429) {
+            console.warn(`[reddit] RSS 429 for r/${subreddit} — rate limited. Waiting 2s and retrying with search RSS...`);
+            // Wait 2 seconds then try search-based RSS as alternative
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+                const searchUrl = `https://www.reddit.com/r/${subreddit}/new/.rss?limit=${limit}&after=`;
+                const retryResponse = await (0, http_1.fetchWithTimeout)(searchUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        'Accept': 'application/rss+xml, application/xml;q=0.9',
+                    }
+                }, 10_000);
+                if (retryResponse.ok) {
+                    const xml = await retryResponse.text();
+                    const posts = parseRedditRss(xml, subreddit);
+                    if (posts.length > 0) {
+                        console.log(`[reddit] RSS retry: ${posts.length} posts from r/${subreddit}`);
+                        if (redisClient) {
+                            await redisClient.set(cacheKey, JSON.stringify(posts), 'EX', CACHE_TTL).catch(() => { });
+                        }
+                        return posts;
+                    }
+                }
+            }
+            catch (retryErr) {
+                console.warn(`[reddit] RSS retry also failed for r/${subreddit}:`, retryErr);
+            }
         }
         else {
             console.warn(`[reddit] RSS ${rssResponse.status} for r/${subreddit}, falling back`);
@@ -130,22 +182,20 @@ async function fetchSubredditNew(subreddit, limit = 25) {
         console.warn(`[reddit] RSS failed for r/${subreddit}:`, rssErr);
     }
     // ── FALLBACK 1: redditapis.com proxy ($0.002/call) ─────────────────────────
-    // Only reached if RSS is unavailable (rare). Keeps existing behavior as safety net.
-    // NOTE: Do not promote this back to primary — RSS failure should be exceptional.
     if (redditApisKey && !redditApisKey.includes('TODO') && (process.env.NODE_ENV !== 'development' || forceLive)) {
         try {
             console.log(`[reddit] Falling back to redditapis.com proxy for r/${subreddit}`);
             const url = `https://api.redditapis.com/r/${subreddit}/new?limit=${limit}`;
-            const response = await fetch(url, {
+            const response = await (0, http_1.fetchWithTimeout)(url, {
                 headers: {
                     'Authorization': `Bearer ${redditApisKey}`,
                     'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
                 }
-            });
+            }, 10_000);
             if (response.ok) {
                 const json = await response.json();
                 const posts = json.data?.children?.map((child) => child.data) || [];
-                return posts.map((post) => ({
+                const normalized = posts.map((post) => ({
                     platform: 'reddit',
                     externalId: post.id,
                     author: post.author,
@@ -154,6 +204,10 @@ async function fetchSubredditNew(subreddit, limit = 25) {
                     createdAt: new Date(post.created_utc * 1000).toISOString(),
                     sourceTarget: subreddit
                 }));
+                if (redisClient && normalized.length > 0) {
+                    await redisClient.set(cacheKey, JSON.stringify(normalized), 'EX', CACHE_TTL).catch(() => { });
+                }
+                return normalized;
             }
         }
         catch (proxyErr) {
@@ -166,16 +220,16 @@ async function fetchSubredditNew(subreddit, limit = 25) {
             console.log(`[reddit] Falling back to OAuth API for r/${subreddit}`);
             const token = await getRedditToken();
             const url = `https://oauth.reddit.com/r/${subreddit}/new?limit=${limit}`;
-            const response = await fetch(url, {
+            const response = await (0, http_1.fetchWithTimeout)(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
                 }
-            });
+            }, 10_000);
             if (response.ok) {
                 const json = await response.json();
                 const posts = json.data?.children?.map((child) => child.data) || [];
-                return posts.map((post) => ({
+                const normalized = posts.map((post) => ({
                     platform: 'reddit',
                     externalId: post.id,
                     author: post.author,
@@ -184,6 +238,10 @@ async function fetchSubredditNew(subreddit, limit = 25) {
                     createdAt: new Date(post.created_utc * 1000).toISOString(),
                     sourceTarget: subreddit
                 }));
+                if (redisClient && normalized.length > 0) {
+                    await redisClient.set(cacheKey, JSON.stringify(normalized), 'EX', CACHE_TTL).catch(() => { });
+                }
+                return normalized;
             }
         }
         catch (oauthErr) {
@@ -195,15 +253,15 @@ async function fetchSubredditNew(subreddit, limit = 25) {
         try {
             console.log(`[reddit] Attempting public JSON feed for r/${subreddit}`);
             const url = `https://www.reddit.com/r/${subreddit}/new.json?limit=${limit}`;
-            const response = await fetch(url, {
+            const response = await (0, http_1.fetchWithTimeout)(url, {
                 headers: {
-                    'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0',
+                    'User-Agent': process.env.REDDIT_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 }
-            });
+            }, 10_000);
             if (response.ok) {
                 const json = await response.json();
                 const posts = json.data?.children?.map((child) => child.data) || [];
-                return posts.map((post) => ({
+                const normalized = posts.map((post) => ({
                     platform: 'reddit',
                     externalId: post.id,
                     author: post.author,
@@ -212,23 +270,15 @@ async function fetchSubredditNew(subreddit, limit = 25) {
                     createdAt: new Date(post.created_utc * 1000).toISOString(),
                     sourceTarget: subreddit
                 }));
+                if (redisClient && normalized.length > 0) {
+                    await redisClient.set(cacheKey, JSON.stringify(normalized), 'EX', CACHE_TTL).catch(() => { });
+                }
+                return normalized;
             }
         }
         catch (jsonErr) {
             console.warn(`[reddit] Public JSON fallback failed for r/${subreddit}:`, jsonErr);
         }
     }
-    // ── FINAL FALLBACK: mock data ──────────────────────────────────────────────
-    console.warn(`[reddit] All fetch paths exhausted for r/${subreddit}, returning mock`);
-    return [
-        {
-            platform: 'reddit',
-            externalId: `mock-${Date.now()}`,
-            author: 'mock_user',
-            text: 'This is a mock post about needing an email marketing tool (Fallback).',
-            url: 'https://reddit.com/r/mock/mock_post',
-            createdAt: new Date().toISOString(),
-            sourceTarget: subreddit
-        }
-    ];
+    throw new Error(`All Reddit fetch paths failed for r/${subreddit}`);
 }

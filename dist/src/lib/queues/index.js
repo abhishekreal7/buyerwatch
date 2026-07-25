@@ -1,31 +1,48 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendReplyQueue = exports.sendDigestQueue = exports.scorePostQueue = exports.xFetchQueue = exports.blueskyFetchQueue = exports.redditFetchQueue = void 0;
+exports.deadLetterQueue = exports.sendReplyQueue = exports.checkGoogleRankQueue = exports.notifySlackQueue = exports.sendDigestQueue = exports.scorePostQueue = exports.xFetchQueue = exports.blueskyFetchQueue = exports.redditFetchQueue = void 0;
 const bullmq_1 = require("bullmq");
 const redis_1 = require("../redis");
-exports.redditFetchQueue = new bullmq_1.Queue('fetch-reddit', { connection: redis_1.redis });
-exports.blueskyFetchQueue = new bullmq_1.Queue('fetch-bluesky', { connection: redis_1.redis });
-exports.xFetchQueue = new bullmq_1.Queue('fetch-x', { connection: redis_1.redis });
-// score-post queue uses the same redis connection
-exports.scorePostQueue = new bullmq_1.Queue('score-post', { connection: redis_1.redis });
-// Queue for reliable email delivery via Resend
-exports.sendDigestQueue = new bullmq_1.Queue('send-digest', {
-    connection: redis_1.redis,
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-            type: 'exponential',
-            delay: 5000,
-        }
-    }
+const reliableDefaults = {
+    attempts: 4,
+    backoff: { type: 'exponential', delay: 5_000 },
+    removeOnComplete: 1_000,
+    removeOnFail: 2_000,
+};
+function queue(name, defaults = reliableDefaults) {
+    let instance;
+    const getInstance = () => {
+        instance ??= new bullmq_1.Queue(name, {
+            connection: redis_1.redis,
+            defaultJobOptions: defaults,
+        });
+        return instance;
+    };
+    // Route modules are evaluated during `next build`. Defer BullMQ construction
+    // until a handler or the standalone worker actually touches the queue, so a
+    // production build never attempts an outbound Redis connection.
+    return new Proxy({}, {
+        get(_target, property) {
+            const value = Reflect.get(getInstance(), property, getInstance());
+            return typeof value === 'function' ? value.bind(getInstance()) : value;
+        },
+    });
+}
+exports.redditFetchQueue = queue('fetch-reddit');
+exports.blueskyFetchQueue = queue('fetch-bluesky');
+exports.xFetchQueue = queue('fetch-x');
+exports.scorePostQueue = queue('score-post');
+exports.sendDigestQueue = queue('send-digest');
+exports.notifySlackQueue = queue('notify-slack');
+exports.checkGoogleRankQueue = queue('check-google-rank');
+exports.sendReplyQueue = queue('send-reply', {
+    attempts: 5,
+    backoff: { type: 'fixed', delay: 5 * 60_000 },
+    removeOnComplete: 2_000,
+    removeOnFail: 2_000,
 });
-// Queue for automated or manual reply posting
-exports.sendReplyQueue = new bullmq_1.Queue('send-reply', {
-    connection: redis_1.redis,
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 10000 },
-        removeOnComplete: true,
-        removeOnFail: 100
-    }
+exports.deadLetterQueue = queue('dead-letter', {
+    attempts: 1,
+    removeOnComplete: 5_000,
+    removeOnFail: 5_000,
 });

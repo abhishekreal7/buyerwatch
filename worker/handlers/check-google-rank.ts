@@ -1,6 +1,7 @@
 import { Job } from 'bullmq'
 import { logger } from '../../src/lib/logger'
 import { supabaseWorker as supabase } from '../lib/supabase'
+import { fetchWithTimeout } from '../../src/lib/http'
 
 /**
  * check-google-rank — Feature 5: Thread Consequence Score
@@ -19,7 +20,7 @@ async function validateGoogleCseConfig(apiKey: string, cx: string) {
   if (cseValidated) return
   try {
     const testQuery = encodeURIComponent('site:reddit.com software')
-    const res = await fetch(`https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${testQuery}&num=3`)
+    const res = await fetchWithTimeout(`https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${testQuery}&num=3`, {}, 10_000)
     if (res.ok) {
       const data = await res.json() as { items?: any[]; error?: any }
       if (!data.items || data.items.length === 0) {
@@ -58,10 +59,10 @@ export async function checkGoogleRankHandler(job: Job) {
     const query = encodeURIComponent(searchQuery)
     const endpoint = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${query}&num=10`
 
-    const response = await fetch(endpoint)
+    const response = await fetchWithTimeout(endpoint, {}, 10_000)
     if (!response.ok) {
       logger.warn({ threadId, status: response.status }, '[GoogleRank] CSE API returned non-OK status')
-      return
+      throw new Error(`Google CSE returned HTTP ${response.status}`)
     }
 
     const data = await response.json() as {
@@ -71,7 +72,7 @@ export async function checkGoogleRankHandler(job: Job) {
 
     if (data.error) {
       logger.warn({ threadId, error: data.error.message }, '[GoogleRank] CSE API error')
-      return
+      throw new Error(`Google CSE error: ${data.error.message}`)
     }
 
     let rankPosition = 0 // 0 = searched but not found on page 1
@@ -97,12 +98,12 @@ export async function checkGoogleRankHandler(job: Job) {
       .eq('id', threadId)
 
     if (error) {
-      logger.error({ error, threadId }, '[GoogleRank] Failed to update rank position')
+      throw new Error(`Failed to update rank position: ${error.message}`)
     } else {
       logger.info({ threadId, rankPosition }, `[GoogleRank] Rank stored: position=${rankPosition}`)
     }
   } catch (err) {
-    // Never throw — this is a fire-and-forget enrichment job
-    logger.warn({ err, threadId }, '[GoogleRank] Unexpected error during rank check')
+    logger.warn({ err, threadId }, '[GoogleRank] Rank check failed')
+    throw err
   }
 }

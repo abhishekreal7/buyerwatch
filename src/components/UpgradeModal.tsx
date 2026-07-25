@@ -47,7 +47,7 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
     // Small delay so the dashboard loads first — avoids flash-of-modal on slow connections
     const t = setTimeout(() => setVisible(true), 600)
     return () => clearTimeout(t)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [userId, plan])
 
   function dismiss() {

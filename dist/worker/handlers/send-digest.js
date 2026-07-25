@@ -5,10 +5,15 @@ const resend_1 = require("resend");
 const WeeklyDigest_1 = require("../../src/emails/WeeklyDigest");
 const logger_1 = require("../../src/lib/logger");
 const supabase_js_1 = require("@supabase/supabase-js");
-const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
+const http_1 = require("../../src/lib/http");
 const supabase = (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 async function sendDigestHandler(job) {
     const { userId, email, items } = job.data;
+    if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+        logger_1.logger.info('Digest skipped: email provider is not configured');
+        return { success: true, reason: 'email disabled' };
+    }
+    const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
     if (!email) {
         logger_1.logger.warn({ userId }, 'Digest skipped: no email provided');
         return { success: false, reason: 'no email' };
@@ -26,8 +31,8 @@ async function sendDigestHandler(job) {
             supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr).not('draft_text', 'is', null),
             supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr).eq('was_sent', true)
         ]);
-        const data = await resend.emails.send({
-            from: 'Scouto <hello@scouto.com>',
+        const data = await (0, http_1.withTimeout)(resend.emails.send({
+            from: process.env.RESEND_FROM_EMAIL,
             to: [email],
             subject: `Scouto found ${threadsCount || items.length} opportunities for you this week`,
             react: (0, WeeklyDigest_1.WeeklyDigest)({
@@ -37,7 +42,7 @@ async function sendDigestHandler(job) {
                 totalReplies: sentCount || 0,
                 dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
             })
-        });
+        }), 15_000, 'digest email delivery');
         logger_1.logger.info({ userId, messageId: data?.data?.id }, 'Digest sent successfully');
         return { success: true, messageId: data?.data?.id };
     }

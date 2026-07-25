@@ -1,54 +1,51 @@
-import { Queue } from 'bullmq'
+import { Queue, type JobsOptions } from 'bullmq'
 import { redis } from '../redis'
 
-export const redditFetchQueue = new Queue('fetch-reddit', { connection: redis as any })
-export const blueskyFetchQueue = new Queue('fetch-bluesky', { connection: redis as any })
-export const xFetchQueue = new Queue('fetch-x', { connection: redis as any })
+const reliableDefaults: JobsOptions = {
+  attempts: 4,
+  backoff: { type: 'exponential', delay: 5_000 },
+  removeOnComplete: 1_000,
+  removeOnFail: 2_000,
+}
 
-// score-post queue uses the same redis connection
-export const scorePostQueue = new Queue('score-post', { connection: redis as any })
-
-// Queue for reliable email delivery via Resend
-export const sendDigestQueue = new Queue('send-digest', { 
-  connection: redis as any,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000,
-    }
+function queue(name: string, defaults: JobsOptions = reliableDefaults) {
+  let instance: Queue | undefined
+  const getInstance = () => {
+    instance ??= new Queue(name, {
+      connection: redis as never,
+      defaultJobOptions: defaults,
+    })
+    return instance
   }
+
+  // Route modules are evaluated during `next build`. Defer BullMQ construction
+  // until a handler or the standalone worker actually touches the queue, so a
+  // production build never attempts an outbound Redis connection.
+  return new Proxy({} as Queue, {
+    get(_target, property) {
+      const value = Reflect.get(getInstance(), property, getInstance())
+      return typeof value === 'function' ? value.bind(getInstance()) : value
+    },
+  })
+}
+
+export const redditFetchQueue = queue('fetch-reddit')
+export const blueskyFetchQueue = queue('fetch-bluesky')
+export const xFetchQueue = queue('fetch-x')
+export const scorePostQueue = queue('score-post')
+export const sendDigestQueue = queue('send-digest')
+export const notifySlackQueue = queue('notify-slack')
+export const checkGoogleRankQueue = queue('check-google-rank')
+
+export const sendReplyQueue = queue('send-reply', {
+  attempts: 5,
+  backoff: { type: 'fixed', delay: 5 * 60_000 },
+  removeOnComplete: 2_000,
+  removeOnFail: 2_000,
 })
 
-// Queue for automated or manual reply posting
-export const sendReplyQueue = new Queue('send-reply', {
-  connection: redis as any,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 10000 },
-    removeOnComplete: true,
-    removeOnFail: 100
-  }
-})
-
-// Queue for Slack webhook push notifications
-export const notifySlackQueue = new Queue('notify-slack', {
-  connection: redis as any,
-  defaultJobOptions: {
-    attempts: 2,
-    backoff: { type: 'exponential', delay: 3000 },
-    removeOnComplete: true,
-    removeOnFail: 50,
-  }
-})
-
-// Queue for Google rank enrichment (Feature 5: Thread Consequence Score)
-export const checkGoogleRankQueue = new Queue('check-google-rank', {
-  connection: redis as any,
-  defaultJobOptions: {
-    attempts: 2,
-    backoff: { type: 'fixed', delay: 5000 },
-    removeOnComplete: true,
-    removeOnFail: 50,
-  }
+export const deadLetterQueue = queue('dead-letter', {
+  attempts: 1,
+  removeOnComplete: 5_000,
+  removeOnFail: 5_000,
 })

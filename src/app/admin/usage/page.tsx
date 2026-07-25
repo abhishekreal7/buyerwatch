@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,11 @@ export default async function AdminUsagePage() {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const dateStr = sevenDaysAgo.toISOString().split('T')[0]
 
-  const { data: usageLogs, error } = await supabase
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  const { data: usageLogs, error } = await admin
     .from('usage_logs')
     .select(`
       date,
@@ -52,10 +57,16 @@ export default async function AdminUsagePage() {
   }
 
   // Aggregate by user
-  const userStats: Record<string, any> = {}
+  const userStats: Record<string, {
+    name: string
+    plan: string
+    gemini: number
+    claude: number
+    x_spend: number
+  }> = {}
   
   usageLogs?.forEach(log => {
-    const profile = log.profiles as any
+    const profile = Array.isArray(log.profiles) ? log.profiles[0] : log.profiles
     if (!profile) return
     
     if (!userStats[profile.id]) {
@@ -105,12 +116,12 @@ export default async function AdminUsagePage() {
                     </td>
                   </tr>
                 ) : (
-                  Object.values(userStats).map((stats: any, i) => (
-                    <tr key={i} className="hover:bg-black/10 transition-colors">
+                  Object.entries(userStats).map(([userId, stats]) => (
+                    <tr key={userId} className="hover:bg-black/10 transition-colors">
                       <td className="px-6 py-4 font-medium">{stats.name}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                          stats.plan === 'business' ? 'bg-[#0A84FF]/10 text-[#0A84FF] border-[#0A84FF]/20' :
+                          stats.plan === 'growth' ? 'bg-[#0A84FF]/10 text-[#0A84FF] border-[#0A84FF]/20' :
                           stats.plan === 'pro' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
                           'bg-white/10 text-text-secondary border-border'
                         }`}>

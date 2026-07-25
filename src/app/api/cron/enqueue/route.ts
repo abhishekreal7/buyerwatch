@@ -1,139 +1,110 @@
+import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { redditFetchQueue, blueskyFetchQueue, xFetchQueue } from '../../../../lib/queues'
-import { X_DAILY_SPEND_LIMIT_CENTS } from '../../../../lib/plan-limits'
-import { logger } from '../../../../lib/logger'
+import { redditFetchQueue, blueskyFetchQueue, xFetchQueue } from '@/lib/queues'
+import { X_DAILY_SPEND_LIMIT_CENTS, isPollingDue, normalizePlan } from '@/lib/plan-limits'
+import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
+import { fetchWithTimeout } from '@/lib/http'
+import { logger } from '@/lib/logger'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
-// Returns current hour bucket like "2026-07-03T12" — ISO format avoids month off-by-one
-// from getUTCMonth() which returns 0-indexed months (Jan=0).
-function getHourBucket() {
-  return new Date().toISOString().slice(0, 13)
+type KeywordRow = {
+  id: string
+  platform: 'reddit' | 'bluesky' | 'x' | 'threads'
+  target: string
+  term: string
+  user_id: string
+  profiles: { plan?: string; last_polled_at?: string | null } | Array<{ plan?: string; last_polled_at?: string | null }>
+}
+
+function jobBucket(now: Date): string {
+  return `${now.toISOString().slice(0, 14)}${Math.floor(now.getUTCMinutes() / 15)}`
+}
+
+function targetId(platform: string, target: string, bucket: string): string {
+  const digest = createHash('sha256').update(`${platform}\0${target}`).digest('hex').slice(0, 20)
+  return `${platform}-${digest}-${bucket}`
 }
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  
-  // Strict security to ensure only Vercel Cron or admin hits this
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request.headers.get('authorization'), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Define poll intervals (in minutes) per plan
-  const pollIntervalMin: Record<string, number> = {
-    free: 360,     // every 6 hours
-    pro: 30,       // every 30 mins
-  }
-
   try {
-    // 1. Get all active keywords for all users
-    const { data: keywords, error } = await supabase
+    const { data, error } = await supabase
       .from('keywords')
-      .select('platform, target, user_id, profiles!inner(plan, last_polled_at)')
+      .select('id, platform, target, term, user_id, profiles!inner(plan, last_polled_at)')
       .eq('is_active', true)
 
     if (error) throw error
-    if (!keywords || keywords.length === 0) {
-      return NextResponse.json({ enqueued: true, message: 'No active keywords found' })
-    }
 
-    // 2. Filter users due for a poll
     const now = new Date()
     const dueUsers = new Set<string>()
-    const targetsByPlatform: Record<string, Set<string>> = {
-      reddit: new Set(),
-      bluesky: new Set(),
-      x: new Set(),
-      threads: new Set()
-    }
+    const jobs = new Map<string, { platform: KeywordRow['platform']; target: string; mappings: Array<{ id: string; user_id: string; term: string }> }>()
 
-    for (const kw of keywords) {
-      const plan = (kw.profiles as any).plan || 'free'
-      const lastPolledAt = (kw.profiles as any).last_polled_at
-      
-      const intervalMs = pollIntervalMin[plan] * 60 * 1000
-      
-      const isDue = !lastPolledAt || (now.getTime() - new Date(lastPolledAt).getTime()) >= intervalMs
-      
-      if (isDue) {
-        dueUsers.add(kw.user_id)
-        
-        // Explicitly filter X targets by business tier (or plan limit > 0)
-        if (kw.platform === 'x' && (X_DAILY_SPEND_LIMIT_CENTS[plan] || 0) === 0) {
-          continue // skip x targets for free/pro users
-        }
+    for (const keyword of (data ?? []) as KeywordRow[]) {
+      const profile = Array.isArray(keyword.profiles) ? keyword.profiles[0] : keyword.profiles
+      const plan = normalizePlan(profile?.plan)
+      if (!isPollingDue(plan, profile?.last_polled_at, now.getTime())) continue
+      if (keyword.platform === 'threads') continue
+      if (keyword.platform === 'x' && X_DAILY_SPEND_LIMIT_CENTS[plan] === 0) continue
 
-        if (targetsByPlatform[kw.platform]) {
-          targetsByPlatform[kw.platform].add(kw.target)
-        }
+      dueUsers.add(keyword.user_id)
+      const key = `${keyword.platform}\0${keyword.target}`
+      const job = jobs.get(key) ?? {
+        platform: keyword.platform,
+        target: keyword.target,
+        mappings: [],
       }
+      job.mappings.push({ id: keyword.id, user_id: keyword.user_id, term: keyword.term })
+      jobs.set(key, job)
     }
 
-    if (dueUsers.size === 0) {
-      return NextResponse.json({ enqueued: true, message: 'No users due for polling' })
+    const bucket = jobBucket(now)
+    for (const job of jobs.values()) {
+      const queue =
+        job.platform === 'reddit'
+          ? redditFetchQueue
+          : job.platform === 'bluesky'
+            ? blueskyFetchQueue
+            : xFetchQueue
+
+      await queue.add(
+        'fetch',
+        { target: job.target, keywordMappings: job.mappings },
+        { jobId: targetId(job.platform, job.target, bucket) },
+      )
     }
 
-    const hourBucket = getHourBucket()
-
-    // 3. Enqueue fetch jobs by target (not per user)
-    // Reddit
-    for (const target of targetsByPlatform.reddit) {
-      await redditFetchQueue.add('fetch', { target }, {
-        jobId: `reddit-${target}-${hourBucket}`
-      })
+    const userIds = [...dueUsers]
+    if (userIds.length > 0) {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ last_polled_at: now.toISOString() })
+        .in('id', userIds)
+      if (updateError) throw updateError
     }
 
-    // Bluesky
-    for (const target of targetsByPlatform.bluesky) {
-      await blueskyFetchQueue.add('fetch', { target }, {
-        jobId: `bluesky-${target}-${hourBucket}`
-      })
-    }
-
-    // X
-    for (const target of targetsByPlatform.x) {
-      await xFetchQueue.add('fetch', { target }, {
-        jobId: `x-${target}-${hourBucket}`
-      })
-    }
-
-    // Threads: log skipped count
-    logger.info(`Skipped Threads targets: ${targetsByPlatform.threads.size}`)
-
-    // 4. Update last_polled_at for due users
-    const userIds = Array.from(dueUsers)
-    // Supabase JS doesn't have an 'in' update for multiple rows directly easily in one call without rpc or matching.
-    // We can do a quick rpc or just an in-filter update
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ last_polled_at: now.toISOString() })
-      .in('id', userIds)
-
-    if (updateError) {
-      logger.error({ updateError }, 'Error updating last_polled_at')
-    }
-
-    // 5. Healthcheck dead-man's switch
     if (process.env.HEALTHCHECK_PING_URL) {
-      fetch(process.env.HEALTHCHECK_PING_URL).catch(e => logger.error({ e }, 'Healthcheck ping failed'))
+      try {
+        await fetchWithTimeout(process.env.HEALTHCHECK_PING_URL, {}, 5_000)
+      } catch (error) {
+        logger.warn({ error }, 'Monitor healthcheck ping failed')
+      }
     }
 
-    return NextResponse.json({ 
-      enqueued: true, 
-      stats: {
-        redditTargets: targetsByPlatform.reddit.size,
-        blueskyTargets: targetsByPlatform.bluesky.size,
-        xTargets: targetsByPlatform.x.size,
-        usersPolled: userIds.length
-      }
+    return NextResponse.json({
+      enqueued: true,
+      jobs: jobs.size,
+      usersPolled: userIds.length,
     })
-
-  } catch (error: any) {
-    logger.error({ error }, 'Monitor cron error')
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    logger.error({ error }, 'Monitor cron failed')
+    return NextResponse.json({ error: 'monitor_enqueue_failed' }, { status: 500 })
   }
 }

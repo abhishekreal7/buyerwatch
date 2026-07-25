@@ -1,4 +1,5 @@
 import OnboardingWizard from '@/components/OnboardingWizard'
+import { normalizePlan } from '@/lib/plan-limits'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -22,8 +23,8 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pt-16 items-center px-4">
-      <OnboardingWizard plan={profile?.plan || 'free'} />
+    <div className="h-dvh bg-background flex flex-col items-center overflow-hidden px-4 pt-8 pb-8 md:pt-10 md:pb-10">
+      <OnboardingWizard plan={normalizePlan(profile?.plan)} />
     </div>
   )
 }

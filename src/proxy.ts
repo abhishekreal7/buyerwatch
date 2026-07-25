@@ -1,8 +1,62 @@
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 
+const SESSION_ROUTES = [
+  '/dashboard',
+  '/onboarding',
+  '/opportunities',
+  '/drafts',
+  '/posted',
+  '/analytics',
+  '/keywords',
+  '/settings',
+  '/admin',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/auth',
+]
+
+function isSessionRoute(pathname: string): boolean {
+  return SESSION_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+}
+
+function strictContentSecurityPolicy(nonce: string): string {
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ''}`,
+    // The existing UI uses React style attributes extensively. Script execution
+    // is nonce-protected; style-src remains inline-compatible until those styles
+    // are migrated to classes.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "worker-src 'self' blob:",
+    'upgrade-insecure-requests',
+  ].join('; ')
+}
+
 export async function proxy(request: NextRequest) {
-  return await updateSession(request)
+  if (!isSessionRoute(request.nextUrl.pathname)) {
+    return NextResponse.next()
+  }
+
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const contentSecurityPolicy = strictContentSecurityPolicy(nonce)
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('content-security-policy', contentSecurityPolicy)
+
+  const response = await updateSession(request, requestHeaders)
+  response.headers.set('Content-Security-Policy', contentSecurityPolicy)
+  return response
 }
 
 export const config = {

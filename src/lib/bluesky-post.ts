@@ -2,6 +2,7 @@ import { BskyAgent } from '@atproto/api'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt } from './encryption'
 import { PlatformPostError } from './reddit-post'
+import { createTimeoutFetch } from './http'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +30,10 @@ async function getDecryptedBlueskyConnection(userId: string) {
 export async function postBlueskyReply(userId: string, threadExternalId: string, text: string) {
   const { password, identifier } = await getDecryptedBlueskyConnection(userId)
   
-  const agent = new BskyAgent({ service: 'https://bsky.social' })
+  const agent = new BskyAgent({
+    service: 'https://bsky.social',
+    fetch: createTimeoutFetch(15_000),
+  })
   
   try {
     await agent.login({ identifier, password })

@@ -1,6 +1,8 @@
 import { Job } from 'bullmq'
 import { logger } from '../../src/lib/logger'
 import { supabaseWorker as supabase } from '../lib/supabase'
+import { fetchWithTimeout } from '../../src/lib/http'
+import { isAllowedSlackWebhookUrl } from '../../src/lib/security/outbound-url'
 
 /**
  * Sends a Slack Block Kit notification to the user's configured webhook URL
@@ -18,15 +20,16 @@ export async function notifySlackHandler(job: Job) {
     .eq('id', userId)
     .single()
 
-  if (error || !profile) {
-    logger.warn({ userId }, '[Slack] Could not fetch profile, skipping notification')
-    return { success: false, reason: 'no_profile' }
-  }
+  if (error) throw new Error(`Unable to load Slack notification settings: ${error.message}`)
+  if (!profile) return { success: false, reason: 'no_profile' }
 
   const { slack_webhook_url, slack_notify_threshold, business_name } = profile
 
   if (!slack_webhook_url) {
     return { success: false, reason: 'no_webhook' }
+  }
+  if (!isAllowedSlackWebhookUrl(slack_webhook_url)) {
+    throw new Error('Stored Slack webhook URL is not an allowed Slack endpoint')
   }
 
   const threshold = slack_notify_threshold ?? 70
@@ -107,16 +110,16 @@ export async function notifySlackHandler(job: Job) {
 
   // 3. POST to Slack webhook
   try {
-    const response = await fetch(slack_webhook_url, {
+    const response = await fetchWithTimeout(slack_webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    })
+    }, 8_000)
 
     if (!response.ok) {
       const body = await response.text()
       logger.error({ userId, status: response.status, body }, '[Slack] Webhook POST failed')
-      return { success: false, reason: `slack_error_${response.status}` }
+      throw new Error(`Slack webhook returned HTTP ${response.status}`)
     }
 
     logger.info({ userId, intentScore, subreddit }, '[Slack] Notification sent successfully')

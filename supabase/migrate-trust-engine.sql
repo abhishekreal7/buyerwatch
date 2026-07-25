@@ -11,7 +11,7 @@ create table if not exists draft_feedback (
   thread_id uuid references monitored_threads(id) on delete cascade,
   original_draft text,
   final_draft text,
-  action_type text check (action_type in ('APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'AUTO_SENT')),
+  action_type text check (action_type in ('APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED', 'AUTO_SENT')),
   edit_distance_score numeric(5,4),
   platform text,
   target_community text,
@@ -82,10 +82,24 @@ create or replace function log_draft_feedback(
   p_platform text,
   p_target_community text,
   p_keyword_cluster text
-) returns void language plpgsql security definer as $$
+) returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   v_score numeric(5,4);
 begin
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if not exists (
+    select 1 from monitored_threads
+    where id = p_thread_id and user_id = p_user_id
+  ) then
+    raise exception 'thread not found' using errcode = 'P0002';
+  end if;
+
   -- 1. Calculate edit distance score (1.0 = untouched, 0.0 = total rewrite)
   if p_original_draft is not null and p_final_draft is not null and length(p_original_draft) > 0 then
     declare
@@ -107,7 +121,7 @@ begin
     edit_distance_score = excluded.edit_distance_score;
 
   -- 3. Update User Trust Metrics (skip REJECTED/SKIPPED for edit_distance)
-  if p_action_type not in ('REJECTED', 'SKIPPED') then
+  if p_action_type not in ('REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED') then
     insert into user_trust_metrics (user_id, total_drafts_reviewed, total_approved, approval_rate, avg_edit_distance)
     values (
       p_user_id, 1,
@@ -146,3 +160,8 @@ begin
   end if;
 end;
 $$;
+
+revoke all on function log_draft_feedback(uuid, uuid, text, text, text, text, text, text)
+  from public, anon;
+grant execute on function log_draft_feedback(uuid, uuid, text, text, text, text, text, text)
+  to authenticated;

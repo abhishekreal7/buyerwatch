@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Target, ArrowLeft } from 'lucide-react'
 
+const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'support@example.com'
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 pb-20">
@@ -44,7 +46,7 @@ export default function TermsPage() {
             <ul className="list-disc pl-5 space-y-2">
               <li>To comply with the target platform's policies, terms, and API guidelines.</li>
               <li>Not to use the service to conduct automated spam, target individuals with malicious content, or post low-quality boilerplate text.</li>
-              <li>That you are entirely responsible for reviewing, checking the tone of, and manually approving all posts made from your authenticated accounts.</li>
+              <li>That manual review is the default, and that you remain responsible for any content sent after you explicitly enable confidence-gated auto-send.</li>
             </ul>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
@@ -58,7 +60,7 @@ export default function TermsPage() {
               3. Payments, Subscriptions, and Refunds
             </h2>
             <p>
-              All purchases and plan subscriptions (including billing, payments, and invoices) are handled exclusively via <strong>Lemon Squeezy</strong>. Subscriptions are billed in advance on a recurring monthly or annual basis. You may cancel your subscription at any time through your Lemon Squeezy dashboard or profile links. Refunds are handled in accordance with Lemon Squeezy's billing policies.
+              When paid plans are available, purchases, subscriptions, invoices, cancellations, and refunds are processed by <strong>Dodo Payments</strong> under the terms shown during checkout. Scouto does not collect or store full card numbers.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
@@ -79,7 +81,7 @@ export default function TermsPage() {
               6. Contact Us
             </h2>
             <p>
-              If you have any questions or require support regarding these Terms of Service, please contact us at <a href="mailto:support@scouto.com" className="text-[#0A84FF] hover:underline font-semibold">support@scouto.com</a>.
+              If you have any questions or require support regarding these Terms of Service, please contact us at <a href={`mailto:${supportEmail}`} className="text-[#0A84FF] hover:underline font-semibold">{supportEmail}</a>.
             </p>
           </div>
         </motion.div>

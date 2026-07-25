@@ -48,7 +48,7 @@ const supabase_1 = require("../lib/supabase");
 async function redditFetchHandler(job) {
     const { target, keywordMappings: preloadedMappings } = job.data;
     if (process.env.REDDIT_API_APPROVED !== 'true') {
-        logger_1.logger.info({ job: job.id, subreddit: target }, 'Reddit fetch running in mock mode — pending API approval');
+        logger_1.logger.info({ job: job.id, subreddit: target }, 'Reddit fetch using public-feed fallbacks — OAuth API approval pending');
     }
     try {
         const posts = await (0, reddit_1.fetchSubredditNew)(target);
@@ -64,17 +64,18 @@ async function redditFetchHandler(job) {
                 .eq('target', target)
                 .eq('is_active', true);
             if (error) {
-                logger_1.logger.error({ error }, 'Supabase error fetching keywords:');
-                return;
+                throw new Error(`Failed to load Reddit keyword mappings: ${error.message}`);
             }
             keywordMappings = data;
         }
         else if (keywordMappings.length > 0) {
             const ids = keywordMappings.map((m) => m.id);
-            const { data: kwData } = await supabase_1.supabaseWorker
+            const { data: kwData, error: kwError } = await supabase_1.supabaseWorker
                 .from('keywords')
                 .select('id, user_id, term')
                 .in('id', ids);
+            if (kwError)
+                throw new Error(`Failed to validate Reddit keyword mappings: ${kwError.message}`);
             if (kwData)
                 keywordMappings = kwData;
         }

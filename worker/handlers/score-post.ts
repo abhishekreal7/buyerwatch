@@ -1,6 +1,5 @@
 import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
 import { scoreIntent } from '../../src/lib/intent-scorer'
 import { draftReply } from '../../src/lib/draft-reply'
 import { evaluateAutoSend } from '../../src/lib/confidence-engine'
@@ -8,6 +7,7 @@ import { NormalizedPost } from '../../src/lib/types'
 import * as dotenv from 'dotenv'
 import path from 'path'
 import { randomBytes } from 'crypto'
+import { getSendReplyJobId } from '../../src/lib/reply-jobs'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -20,7 +20,7 @@ export async function scorePostHandler(job: Job) {
 
   try {
     // 1. Check if we already processed this exact post for this user
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('monitored_threads')
       .select('id')
       .eq('user_id', userId)
@@ -28,16 +28,18 @@ export async function scorePostHandler(job: Job) {
       .eq('external_id', post.externalId)
       .maybeSingle()
 
+    if (existingError) throw existingError
     if (existing) return
 
     // 2. Fetch user profile for context and plan
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('business_name, business_description, business_url, business_type, writing_style, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
       .eq('id', userId)
       .single()
 
-    if (!profile) return
+    if (profileError) throw profileError
+    if (!profile) throw new Error('Profile not found for scoring job')
 
     // 3. Atomic Budget Check for Scoring (Gemini)
     const canScore = await checkBudget(userId, profile.plan, 'gemini')
@@ -90,13 +92,15 @@ export async function scorePostHandler(job: Job) {
       const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning, trackingSid)
       if (thread) {
         const { sendReplyQueue, notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
-        await sendReplyQueue.add(`send-${thread.id}`, {
+        await sendReplyQueue.add('send', {
           userId,
           threadExternalId: post.externalId,
           threadId: thread.id,
           text: draftText,
           platform: post.platform,
-          triggerType: 'auto'
+          triggerType: 'auto',
+        }, {
+          jobId: getSendReplyJobId(thread.id),
         })
         // Fire-and-forget: check if thread URL ranks on Google for this keyword (Feature 5)
         if (post.url) {
@@ -160,8 +164,7 @@ async function checkBudget(userId: string, plan: string, service: 'gemini' | 'cl
   })
 
   if (error) {
-    logger.error({ error }, 'Error checking budget:')
-    return false // Fail safe: don't spend if RPC fails
+    throw new Error(`Budget reservation failed: ${error.message}`)
   }
 
   return data
@@ -188,8 +191,7 @@ async function saveThread(userId: string, keywordId: string, post: NormalizedPos
     .single()
 
   if (error) {
-    logger.error({ error }, 'Error inserting monitored_thread:')
-    return
+    throw new Error(`Failed to persist monitored thread: ${error.message}`)
   }
 
   if (draftText && thread) {
@@ -202,7 +204,7 @@ async function saveThread(userId: string, keywordId: string, post: NormalizedPos
       })
       
     if (analyticsError) {
-      logger.error({ analyticsError }, 'Error inserting reply_analytics:')
+      throw new Error(`Failed to persist reply analytics: ${analyticsError.message}`)
     }
   }
 

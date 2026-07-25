@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import DodoPayments from 'dodopayments'
+import { createHash } from 'node:crypto'
+import { getAppUrl } from '@/lib/app-url'
 
 /**
  * POST /api/billing/checkout
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
     const proProductId = process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
     const growthProductId = process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
 
-    if (!apiKey || !proProductId) {
+    if (!apiKey || !proProductId || !growthProductId) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
 
@@ -40,11 +42,13 @@ export async function POST(req: Request) {
       // no body is fine
     }
     const requestedPlan = body.plan === 'growth' ? 'growth' : 'pro'
-    const productId = requestedPlan === 'growth' ? (growthProductId ?? proProductId) : proProductId
+    const productId = requestedPlan === 'growth' ? growthProductId : proProductId
 
     const dodo = new DodoPayments({
       bearerToken: apiKey,
       environment: process.env.NODE_ENV === 'production' ? 'live_mode' : 'test_mode',
+      timeout: 15_000,
+      maxRetries: 1,
     })
 
     const session = await dodo.checkoutSessions.create({
@@ -58,7 +62,11 @@ export async function POST(req: Request) {
         user_id: user.id,
         plan: requestedPlan,
       },
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/dashboard`,
+      return_url: `${getAppUrl()}/dashboard`,
+    }, {
+      idempotencyKey: createHash('sha256')
+        .update(`${user.id}:${requestedPlan}:${new Date().toISOString().slice(0, 10)}`)
+        .digest('hex'),
     })
 
     const checkoutUrl = (session as any).checkout_url ?? (session as any).url
@@ -70,8 +78,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: checkoutUrl })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('[billing/checkout] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'checkout_failed' }, { status: 500 })
   }
 }

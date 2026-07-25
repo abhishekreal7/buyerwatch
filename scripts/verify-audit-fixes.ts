@@ -14,7 +14,7 @@ async function runAuditVerification() {
   }
   const dummyDraft = {
     score: 85,
-    text: 'Check out our solution at matchsignal.com for automated keyword monitoring. Founder disclosure: I built MatchSignal.',
+    text: 'Check out our solution at scouto.com for automated keyword monitoring. Founder disclosure: I built Scouto.',
     flagged: false,
     hasDisclosure: true
   }

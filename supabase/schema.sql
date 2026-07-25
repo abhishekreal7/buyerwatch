@@ -1,6 +1,7 @@
 -- Drop existing tables to start fresh
 drop table if exists send_audit_log cascade;
 drop table if exists platform_connections cascade;
+drop table if exists ingestion_events cascade;
 drop table if exists reply_analytics cascade;
 drop table if exists monitored_threads cascade;
 drop table if exists keywords cascade;
@@ -44,10 +45,10 @@ create table monitored_threads (
   text_content text,
   url text,
   intent_score numeric,
-  status text default 'pending' check (status in ('pending', 'drafted', 'needs_manual_reply', 'dismissed', 'replied')),
+  status text default 'pending' check (status in ('pending', 'drafted', 'sending', 'send_reconciliation_required', 'needs_manual_reply', 'dismissed', 'replied')),
   flag text,
   created_at timestamptz default now(),
-  unique (platform, external_id)
+  unique (user_id, platform, external_id)
 );
 
 create table reply_analytics (
@@ -78,7 +79,16 @@ alter table monitored_threads enable row level security;
 alter table reply_analytics enable row level security;
 alter table usage_logs enable row level security;
 
-create policy "own profile" on profiles for all using (auth.uid() = id);
+create policy "profiles select own" on profiles for select using (auth.uid() = id);
+create policy "profiles insert own" on profiles for insert
+  with check (auth.uid() = id and plan = 'free' and auto_send_enabled = false);
+create policy "profiles update own" on profiles for update
+  using (auth.uid() = id) with check (auth.uid() = id);
+revoke update on profiles from authenticated;
+grant update (
+  business_name, business_description, business_url, business_type,
+  writing_style, reddit_username, notification_preferences
+) on profiles to authenticated;
 create policy "own keywords" on keywords for all using (auth.uid() = user_id);
 create policy "own threads" on monitored_threads for all using (auth.uid() = user_id);
 create policy "own analytics" on reply_analytics for all using (auth.uid() = user_id);
@@ -153,14 +163,40 @@ create table send_audit_log (
   thread_id uuid references monitored_threads(id) on delete cascade,
   platform text not null,
   trigger_type text not null check (trigger_type in ('manual', 'auto')),
-  status text not null check (status in ('success', 'failed_retryable', 'failed_permanent')),
+  status text not null check (status in ('success', 'failed_retryable', 'failed_permanent', 'reconciliation_required', 'resolved_replied', 'resolved_not_sent')),
   error_message text,
   permalink text,
+  resolved_at timestamptz,
+  resolved_by uuid,
+  resolution_note text,
   created_at timestamptz default now()
 );
 
 alter table send_audit_log enable row level security;
 create policy "own audit logs" on send_audit_log for all using (auth.uid() = user_id);
+
+create table ingestion_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  source text not null check (source in ('chrome_extension', 'manual_import')),
+  source_event_id text not null,
+  source_url text not null check (source_url ~ '^https?://[^[:space:]]+$'),
+  title text,
+  body text not null,
+  author text,
+  community text,
+  captured_at timestamptz not null default now(),
+  processed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (user_id, source, source_event_id)
+);
+
+alter table ingestion_events enable row level security;
+create policy "own ingestion events select"
+  on ingestion_events for select to authenticated
+  using (auth.uid() = user_id);
+revoke insert, update, delete on ingestion_events from anon, authenticated;
+grant select on ingestion_events to authenticated;
 
 -- Saved Views
 create table saved_views (
@@ -190,7 +226,7 @@ create table draft_feedback (
   thread_id uuid references monitored_threads(id) on delete cascade,
   original_draft text,
   final_draft text,
-  action_type text check (action_type in ('APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'AUTO_SENT')),
+  action_type text check (action_type in ('APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED', 'AUTO_SENT')),
   edit_distance_score numeric(5,4), -- 1.0 = untouched, 0.0 = total rewrite
   platform text,
   target_community text,
@@ -243,12 +279,23 @@ create or replace function log_draft_feedback(
   p_keyword_cluster text
 ) returns void
 language plpgsql security definer
+set search_path = public, pg_temp
 as $$
 declare
   v_dist int;
   v_max_len int;
   v_score numeric(5,4);
 begin
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if not exists (
+    select 1 from monitored_threads
+    where id = p_thread_id and user_id = p_user_id
+  ) then
+    raise exception 'thread not found' using errcode = 'P0002';
+  end if;
+
   -- 1. Calculate normalized edit distance score (1.0 = identical, 0.0 = entirely different)
   if p_original_draft is null or p_final_draft is null then
     v_score := 1.0;
@@ -270,7 +317,7 @@ begin
   end if;
 
   -- Force score on pure rejection/skips to not mess up edit distance (or skip it entirely)
-  if p_action_type in ('REJECTED', 'SKIPPED') then
+  if p_action_type in ('REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED') then
     v_score := null;
   end if;
 
@@ -324,3 +371,8 @@ begin
   end if;
 end;
 $$;
+
+revoke all on function log_draft_feedback(uuid, uuid, text, text, text, text, text, text)
+  from public, anon;
+grant execute on function log_draft_feedback(uuid, uuid, text, text, text, text, text, text)
+  to authenticated;

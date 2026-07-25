@@ -1,11 +1,16 @@
 import { NormalizedPost } from './types'
+import { isDevelopmentMockEnabled } from './env'
+import { createTimeoutFetch } from './http'
 let agent: any = null
 
 async function getBlueskyAgent(): Promise<any> {
   if (agent) return agent
 
   const { BskyAgent } = await import('@atproto/api')
-  agent = new BskyAgent({ service: 'https://bsky.social' })
+  agent = new BskyAgent({
+    service: 'https://bsky.social',
+    fetch: createTimeoutFetch(15_000),
+  })
   
   const handle = process.env.BLUESKY_HANDLE
   const password = process.env.BLUESKY_APP_PASSWORD
@@ -20,7 +25,7 @@ async function getBlueskyAgent(): Promise<any> {
 }
 
 export async function searchBlueskyPosts(query: string, limit: number = 25): Promise<NormalizedPost[]> {
-  if (process.env.USE_MOCK_BLUESKY === 'true') {
+  if (isDevelopmentMockEnabled('USE_MOCK_BLUESKY')) {
     return [
       {
         platform: 'bluesky',

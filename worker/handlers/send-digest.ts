@@ -3,8 +3,8 @@ import { Resend } from 'resend'
 import { WeeklyDigest } from '../../src/emails/WeeklyDigest'
 import { logger } from '../../src/lib/logger'
 import { createClient } from '@supabase/supabase-js'
+import { withTimeout } from '../../src/lib/http'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -12,6 +12,12 @@ const supabase = createClient(
 
 export async function sendDigestHandler(job: Job) {
   const { userId, email, items } = job.data
+
+  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+    logger.info('Digest skipped: email provider is not configured')
+    return { success: true, reason: 'email disabled' }
+  }
+  const resend = new Resend(process.env.RESEND_API_KEY)
   
   if (!email) {
     logger.warn({ userId }, 'Digest skipped: no email provided')
@@ -38,8 +44,8 @@ export async function sendDigestHandler(job: Job) {
       supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr).eq('was_sent', true)
     ])
 
-    const data = await resend.emails.send({
-      from: 'Scouto <hello@scouto.com>',
+    const data = await withTimeout(resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL!,
       to: [email],
       subject: `Scouto found ${threadsCount || items.length} opportunities for you this week`,
       react: WeeklyDigest({
@@ -49,7 +55,7 @@ export async function sendDigestHandler(job: Job) {
         totalReplies: sentCount || 0,
         dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
       })
-    })
+    }), 15_000, 'digest email delivery')
 
     logger.info({ userId, messageId: data?.data?.id }, 'Digest sent successfully')
     

@@ -1,21 +1,15 @@
 'use client'
-import React, { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence, useInView, useScroll, useTransform, useMotionValue, useSpring } from 'framer-motion'
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, YAxis } from 'recharts'
-import { GaugeMeter } from '@/components/GaugeMeter'
+import React, { useState, useRef } from 'react'
+import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'framer-motion'
 import { RadialGauge } from '@/components/RadialGauge'
 import Link from 'next/link'
 import {
   Target, Plus, Minus,
-  ScanSearch, BrainCircuit, MessageSquareText, Zap,
-  MessageSquare, BarChart3, BellRing, TrendingUp,
-  ChevronRight, Radar, Gauge, PenLine, Layers, Check as CheckIcon, Sparkles
+  ChevronRight, Radar, Layers
 } from 'lucide-react'
-import { springs, staggers } from '@/lib/motion'
+import { springs } from '@/lib/motion'
 import EyebrowBadge from '@/components/EyebrowBadge'
 import { StickyFeatureScroll } from '@/components/StickyFeatureScroll'
-import { FaReddit } from 'react-icons/fa6'
-import { AnimatedIcon } from '@/components/AnimatedIcon'
 import {
   CustomKeywordRulesIcon,
   ToneMatchingIcon,
@@ -24,55 +18,31 @@ import {
   InsightsHubIcon,
   ConfidenceEngineIcon
 } from '@/components/CustomFeatureIcons'
+import {
+  CacheLiveWaveChart,
+  Avatar,
+  InfraLiveQueue,
+  IntentTextCycler,
+  NumberTicker,
+  PlatformSourcesWidget,
+  PrefilterSignalMarquee,
+  SectionBadge,
+  WordFadeIn,
+} from '@/components/landing/HomeVisuals'
+import {
+  BentoPlatformSourcesWidget,
+  BentoTrafficWidget,
+  ChatSimulation,
+  LeadDiscoveryWidget,
+  RetryStackAlertCycler,
+} from '@/components/landing/HomeWidgets'
+import { LandingFooter } from '@/components/landing/LandingFooter'
 
-
-const pathVariants = {
-  hidden: { pathLength: 0, opacity: 0 },
-  show: {
-    pathLength: 1,
-    opacity: 1,
-    transition: {
-      duration: 0.8,
-      ease: [0.16, 1, 0.3, 1],
-      delay: 0.15
-    }
-  }
-}
-
-const platformData = [
-  { name: 'Reddit', count: 847, color: '#FF6B35' },
-  { name: 'LinkedIn', count: 1428, color: '#0A66C2' }
-]
-
-const analyticsData = [
-  { day: 'Mon', found: 28, drafted: 18 },
-  { day: 'Tue', found: 42, drafted: 31 },
-  { day: 'Wed', found: 35, drafted: 24 },
-  { day: 'Thu', found: 67, drafted: 48 },
-  { day: 'Fri', found: 51, drafted: 38 },
-  { day: 'Sat', found: 38, drafted: 27 },
-  { day: 'Sun', found: 44, drafted: 32 },
-]
-
-const faqs = [
-  { q: 'What is Scouto?', a: 'It monitors Reddit, X, and Bluesky for people looking for solutions like yours, scores their intent, and drafts a reply. You just review and send.' },
-  { q: 'Will Reddit ban my account?', a: 'No. Scouto never posts without your approval. Since you review and send every reply, it complies with platform rules.' },
-  { q: 'Does it work for non-SaaS businesses?', a: 'Yes. As long as your customers talk about their problems online, Scouto can find them.' },
-  { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. Scouto finds active buying intent from people who don\'t know you yet.' },
-  { q: 'How accurate is the intent scoring?', a: 'We classify posts into Buying, Researching, Complaining, and Other. It has a 94% accuracy rate on confirmed buyers.' },
-  { q: 'Can I try it for free?', a: 'Yes. Start with 1 keyword and up to 50 conversations per month. No card required.' },
-  { q: 'Does this violate Reddit, X, or Bluesky terms of service?', a: 'No. We use public APIs and never auto-post. You are just a human replying to public conversations.' },
-  { q: 'Won\'t these replies feel like AI spam?', a: 'Only if you let them. Scouto drafts replies using your product context and voice. If a draft feels off, edit it or skip it.' }
-]
 
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
   show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] as any } }
-}
-const fadeIn = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { duration: 0.5, ease: 'easeOut' } }
 }
 const staggerContainer = {
   hidden: {},
@@ -80,535 +50,6 @@ const staggerContainer = {
 }
 
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-const SectionBadge = ({ color, text }: { color: string; text: string }) => (
-  <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-surface border border-black/[0.08] rounded-full px-4 py-[6px] shadow-sm mb-5">
-    <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-    <span className="text-[13px] font-[500] text-[#0A0A0A] tracking-[-0.01em]">{text}</span>
-  </motion.div>
-)
-
-// Feature icon
-const FeatureIcon = ({ icon: Icon }: { icon: React.ElementType }) => (
-  <div className="w-12 h-12 bg-[#0A0A0A] rounded-[12px] flex items-center justify-center mb-4 flex-shrink-0"
-    style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
-    <Icon className="w-5 h-5 text-white" strokeWidth={1.8} />
-  </div>
-)
-
-// Avatar initials
-const Avatar = ({ initials, color }: { initials: string; color: string }) => (
-  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[13px] font-[700]"
-    style={{ background: color, color: '#fff', letterSpacing: '-0.02em' }}>
-    {initials}
-  </div>
-)
-
-// Check icon for pricing lists
-const Check = () => (
-  <svg className="w-4 h-4 flex-shrink-0 text-[#0A0A0A]" fill="none" viewBox="0 0 16 16">
-    <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.3" />
-    <path d="M5 8.5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
-
-const GreenCheck = () => (
-  <svg className="w-4 h-4 flex-shrink-0 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-)
-
-const OrangeCheck = () => (
-  <svg className="w-[18px] h-[18px] flex-shrink-0 text-[#FF5101]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-)
-
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload?.length) {
-    return (
-      <div className="bg-surface border border-black/[0.08] shadow-lg rounded-xl px-3 py-1.5">
-        <span className="text-[12px] font-bold text-[#0A0A0A]">{payload[0].value} found</span>
-      </div>
-    )
-  }
-  return null
-}
-
-// ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-const RedditSVG = () => <FaReddit className="w-full h-full text-[#FF4500]" />
-const BlueskySVG = () => (
-  <svg viewBox="0 0 600 530" fill="none" className="w-full h-full">
-    <path d="M135.72 44.03C202.216 93.848 273.74 195.17 300 249.49c26.262-54.316 97.782-155.638 164.28-205.46C512.26 8.009 590-19.862 590 68.825c0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.707-7.896-.017-2.936-1.193.516-3.707 7.896-13.714 40.255-67.233 197.356-189.63 71.766-64.444-66.128-34.605-132.256 82.697-152.22-67.108 11.421-142.549-7.449-163.25-81.433C20.156 217.613 10 86.535 10 68.825c0-88.687 77.742-60.816 125.72-24.795z" fill="#0085FF" />
-  </svg>
-)
-const XSVG = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#0A0A0A]">
-    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.732-8.845L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
-  </svg>
-)
-
-const sourcePlatforms = [
-  { name: 'Reddit', sub: 'r/startups + 12,400 more', color: '#FF4500', bg: '#FFF0EB', Icon: RedditSVG, count: '847', textColor: undefined },
-  { name: 'Bluesky', sub: '#saas, #buildinpublic', color: '#0085FF', bg: '#EBF4FF', Icon: BlueskySVG, count: '312', textColor: undefined },
-  { name: 'X (Twitter)', sub: '#indiehackers, #nocode', color: '#0F1419', bg: '#F0F0F0', Icon: XSVG, count: '523' }
-]
-
-const PlatformSourcesWidget = () => {
-  return (
-    <div className="flex flex-col items-center gap-5 w-full">
-      {/* Label */}
-      <div style={{ fontSize: '11px', fontFamily: 'var(--font-inter)', fontWeight: 600, letterSpacing: '0.08em', color: '#ADADAD', textTransform: 'uppercase', textAlign: 'center' }}>
-        Monitors intent signals on
-      </div>
-
-      <div className="flex items-center justify-center gap-8 md:gap-12 px-4">
-        {/* Reddit */}
-        <div className="flex items-center gap-2.5 opacity-75 hover:opacity-100 transition-opacity duration-200">
-          <div className="w-6 h-6 flex-shrink-0">
-            <RedditSVG />
-          </div>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Reddit</span>
-        </div>
-
-        <span style={{ color: '#D1D1D1', fontSize: '18px' }}>•</span>
-
-        {/* Bluesky */}
-        <div className="flex items-center gap-2.5 opacity-75 hover:opacity-100 transition-opacity duration-200">
-          <div className="w-6 h-6 flex-shrink-0">
-            <BlueskySVG />
-          </div>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Bluesky</span>
-        </div>
-
-        <span style={{ color: '#D1D1D1', fontSize: '18px' }}>•</span>
-
-        {/* X */}
-        <div className="flex items-center gap-2.5 opacity-75 hover:opacity-100 transition-opacity duration-200">
-          <div className="w-[22px] h-[22px] flex-shrink-0 flex items-center justify-center">
-            <XSVG />
-          </div>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>X (Twitter)</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
-const WordFadeIn = ({ text, delay = 0, className = '' }: { text: string; delay?: number; className?: string }) => {
-  const words = text.split(' ')
-  return (
-    <span className={`inline-block ${className}`}>
-      {words.map((word, i) => (
-        <span key={i} className="inline-block overflow-hidden mr-[0.3em] pb-[0.1em] -mb-[0.1em]">
-          <motion.span
-            className="inline-block"
-            initial={{ y: '100%', opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{
-              type: 'spring',
-              damping: 24,
-              stiffness: 200,
-              delay: delay + i * 0.06
-            }}
-          >
-            {word}
-          </motion.span>
-        </span>
-      ))}
-    </span>
-  )
-}
-
-const NumberTicker = ({ value, suffix = '' }: { value: number; suffix?: string }) => {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: '-50px' })
-  const spring = useSpring(0, { bounce: 0, duration: 2000 })
-  const [display, setDisplay] = useState('0')
-
-  useEffect(() => {
-    if (inView) {
-      spring.set(value)
-    }
-  }, [inView, spring, value])
-
-  useEffect(() => {
-    return spring.on('change', (latest) => {
-      setDisplay(Math.round(latest).toString())
-    })
-  }, [spring])
-
-  return <span ref={ref}>{display}{suffix}</span>
-}
-const RedditChatSimulation = () => {
-  const [messages, setMessages] = useState<number[]>([])
-
-  useEffect(() => {
-    const firstTimer = setTimeout(() => {
-      setMessages([0])
-    }, 200)
-
-    const timer = setInterval(() => {
-      setMessages(prev => {
-        if (prev.length === 0) return [0]
-        if (prev.length >= 3) return []
-        return [...prev, prev.length]
-      })
-    }, 600)
-
-    return () => {
-      clearTimeout(firstTimer)
-      clearInterval(timer)
-    }
-  }, [])
-
-  const content = [
-    {
-      sender: "u/startup_guy",
-      avatar: "https://i.pravatar.cc/100?img=11",
-      text: "Any good alternatives to Jira for a small team?",
-      time: "10:20",
-      isAgent: false,
-      color: "#F9A885" // Myniq peach
-    },
-    {
-      sender: "Drafted Reply",
-      text: "Check out Linear! Super fast, keyboard shortcuts, clean UI.",
-      time: "10:21",
-      isAgent: true,
-      color: "#4CA9DF" // Myniq blue
-    },
-    {
-      sender: "u/startup_guy",
-      avatar: "https://i.pravatar.cc/100?img=11",
-      text: "Awesome, will check it out. Thanks!",
-      time: "10:22",
-      isAgent: false,
-      color: "#F9A885" // Myniq peach
-    }
-  ]
-
-  return (
-    <div className="flex flex-col gap-2.5 h-[290px] justify-start w-full mb-3 relative z-10 pt-1">
-      <AnimatePresence>
-        {messages.map((i) => {
-          const msg = content[i]
-          const isAgent = msg.isAgent
-          return (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: -12, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-              className={`flex flex-col gap-1 ${isAgent ? 'items-end' : 'items-start'}`}
-            >
-              <div className="flex items-center gap-1.5">
-                {!isAgent ? (
-                  <img src={msg.avatar} alt="avatar" className="w-[24px] h-[24px] rounded-full object-cover shadow-sm" />
-                ) : (
-                  <div className="w-[24px] h-[24px] rounded-full bg-gradient-to-tr from-[#FF5E3A] to-[#FF9500] flex items-center justify-center shadow-sm">
-                    <div className="w-[14px] h-[14px] rounded-full border-[1px] border-white flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                    </div>
-                  </div>
-                )}
-                <span style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', fontWeight: 600, color: '#1C1C1E' }}>
-                  {msg.sender}
-                </span>
-              </div>
-              <div
-                style={{ backgroundColor: msg.color }}
-                className="px-3 py-2 text-white rounded-[16px] shadow-[0_1px_4px_rgba(0,0,0,0.02)] max-w-[88%]"
-              >
-                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', fontWeight: 500, lineHeight: 1.45 }}>
-                  {msg.text}
-                </div>
-              </div>
-              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '10px', color: '#ADADAD', fontWeight: 500, paddingLeft: isAgent ? '0' : '2px', paddingRight: isAgent ? '2px' : '0', marginTop: '-2px' }}>
-                {msg.time}
-              </div>
-            </motion.div>
-          )
-        })}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-const ChatSimulation = () => {
-  const [messages, setMessages] = useState<number[]>([0])
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setMessages(prev => {
-        if (prev.length >= 3) return [0]
-        return [...prev, prev.length]
-      })
-    }, 2800)
-    return () => clearInterval(timer)
-  }, [])
-
-  const content = [
-    { text: "Found a high-intent match on r/SaaS", time: "08:14" },
-    { text: "Drafted reply for 'looking for alternatives'", time: "08:15" },
-    { text: "Score: 94/100 (Buying Intent)", time: "08:15" }
-  ]
-
-  return (
-    <div className="flex flex-col gap-3 min-h-[160px] justify-end w-full mb-6 relative z-10">
-      <AnimatePresence mode="popLayout">
-        {messages.map((i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 15, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={springs.snappy}
-            className="bg-surface border border-black/[0.06] rounded-[16px] rounded-tl-[4px] p-3 shadow-[0_4px_12px_rgba(0,0,0,0.04)] self-start max-w-[92%]"
-          >
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#1C1C1E', fontWeight: 500, marginBottom: '2px', lineHeight: 1.4 }}>
-              {content[i].text}
-            </div>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '10px', color: '#ADADAD', fontWeight: 600 }}>
-              {content[i].time}
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-const leadDiscoveryData = [
-  { name: 'Jan', discovered: 120, qualified: 40 },
-  { name: 'Jan-mid', discovered: 240, qualified: 90 },
-  { name: 'Feb', discovered: 450, qualified: 180 },
-  { name: 'Feb-mid', discovered: 380, qualified: 120 },
-  { name: 'Mar', discovered: 550, qualified: 210 },
-  { name: 'Mar-mid', discovered: 510, qualified: 190 },
-  { name: 'Apr', discovered: 847, qualified: 289 },
-  { name: 'Apr-mid', discovered: 680, qualified: 210 },
-  { name: 'May', discovered: 620, qualified: 190 },
-  { name: 'May-mid', discovered: 790, qualified: 240 }
-]
-
-const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const cleanLabel = label.split('-')[0] + ' 2025'
-    return (
-      <div style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0,0,0,0.07)',
-        borderRadius: '14px',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.10)',
-        padding: '12px 16px',
-        minWidth: '168px',
-        fontFamily: 'var(--font-inter), sans-serif',
-      }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: '#0A0A0A', marginBottom: '10px', letterSpacing: '-0.01em' }}>
-          {cleanLabel}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B35', flexShrink: 0 }} />
-              Threads Found
-            </span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B35' }}>{payload[0]?.value}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0 }} />
-              High-Intent
-            </span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0A84FF' }}>{payload[1]?.value}</span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-  return null
-}
-
-const LeadDiscoveryWidget = () => {
-  return (
-    <div className="w-full h-full flex flex-col justify-between">
-      {/* Header row: title + legend */}
-      <div className="flex items-center justify-between mb-4">
-        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>
-          Lead Discovery
-        </h4>
-        {/* Legend pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontFamily: 'var(--font-inter), sans-serif', fontSize: '12px',
-            color: '#9B9B9B', fontWeight: 500,
-          }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B35', flexShrink: 0, display: 'inline-block' }} />
-            Threads Found
-          </span>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontFamily: 'var(--font-inter), sans-serif', fontSize: '12px',
-            color: '#9B9B9B', fontWeight: 500,
-          }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0, display: 'inline-block' }} />
-            High-Intent
-          </span>
-        </div>
-      </div>
-
-      <div className="flex-1 w-full min-h-[220px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={leadDiscoveryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-            <defs>
-              {/* Primary: #FF6B35 orange, 15% → 0% */}
-              <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#FF6B35" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#FF6B35" stopOpacity={0.0} />
-              </linearGradient>
-              {/* Secondary: #0A84FF blue, 10% → 0% */}
-              <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.10} />
-                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0} />
-              </linearGradient>
-            </defs>
-
-            {/* No gridlines — clean design-system spec */}
-            <XAxis
-              dataKey="name"
-              tickFormatter={(tick) => (tick.includes('-') ? '' : tick)}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: '#9B9B9B', fontSize: 12, fontFamily: 'var(--font-inter), sans-serif' }}
-            />
-            <YAxis
-              ticks={[0, 250, 500, 1000]}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: '#9B9B9B', fontSize: 12, fontFamily: 'var(--font-inter), sans-serif' }}
-            />
-            <Tooltip content={<LeadDiscoveryTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
-
-            {/* Primary series — Threads Found — #FF6B35 orange */}
-            <Area
-              type="monotone"
-              dataKey="discovered"
-              stroke="#FF6B35"
-              strokeWidth={2}
-              fill="url(#colorDiscovered)"
-              activeDot={{ r: 5, fill: '#FF6B35', stroke: '#fff', strokeWidth: 2 }}
-            />
-            {/* Secondary series — High-Intent Matches — #0A84FF blue (intentional) */}
-            <Area
-              type="monotone"
-              dataKey="qualified"
-              stroke="#0A84FF"
-              strokeWidth={2}
-              fill="url(#colorQualified)"
-              activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  )
-}
-
-const BentoPlatformSourcesWidget = () => {
-  return (
-    <div className="flex flex-col gap-3 w-full px-1">
-      {sourcePlatforms.map((p, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, x: -8 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
-          viewport={{ once: true }}
-          className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-black/[0.03] bg-[#F9F9FB] shadow-[0_1px_2px_rgba(0,0,0,0.01)] hover:border-black/[0.06] transition-all"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center p-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]" style={{ backgroundColor: p.bg }}>
-              <p.Icon />
-            </div>
-            <div className="flex flex-col text-left">
-              <span style={{ fontFamily: 'var(--font-jakarta), sans-serif', fontSize: '13px', fontWeight: 700, color: '#0A0A0A', letterSpacing: '-0.01em' }}>{p.name}</span>
-              <span style={{ fontFamily: 'var(--font-inter), sans-serif', fontSize: '11px', color: '#6B6B6B' }}>{p.sub}</span>
-            </div>
-          </div>
-          <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontSize: '12px', fontWeight: 700, color: '#0A0A0A' }}>
-            {p.count} matches
-          </span>
-        </motion.div>
-      ))}
-    </div>
-  )
-}
-
-const BentoTrafficWidget = () => {
-  return (
-    <div className="w-full h-full flex flex-col justify-between relative min-h-[280px]">
-      <div className="flex items-center justify-between mb-2 z-10">
-        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>Traffic</h4>
-      </div>
-
-      <div className="flex-1 relative flex flex-col justify-center gap-5 px-1 py-2 z-10">
-        {/* Grid lines background */}
-        <div className="absolute inset-0 flex justify-between pointer-events-none opacity-[0.06] px-1">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="w-[1px] border-r border-dashed border-[#0A0A0A] h-full" />
-          ))}
-        </div>
-
-        {/* Bar 1: Google */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[10px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[10px]" style={{ width: '40%' }} />
-            <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">40%</span>
-          </div>
-        </div>
-
-        {/* Bar 2: Facebook */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[10px] bg-[#FFF0EB] border border-[#FF6B35]/20 flex items-center relative shadow-sm overflow-hidden">
-            <div className="h-full bg-[#FF6B35] rounded-[10px] flex items-center justify-end pr-1.5 transition-all duration-500 shadow-sm" style={{ width: '80%' }}>
-              <div className="bg-white border border-[#FF6B35]/30 rounded-full px-2 py-0.5 text-[11px] font-bold text-[#0A0A0A] shadow-sm mr-1">
-                80%
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bar 3: X */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[10px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[10px]" style={{ width: '20%' }} />
-            <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">20%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center justify-start gap-8 mt-2 text-[13px] font-medium z-10" style={{ fontFamily: 'var(--font-inter)' }}>
-        <div className="flex items-center gap-2 text-[#ADADAD]">
-          <span className="w-2 h-2 rounded-full bg-black/[0.08]" />
-          Google
-        </div>
-        <div className="flex items-center gap-2 text-[#0A0A0A]">
-          <span className="w-2 h-2 rounded-full bg-[#FF6B35]" />
-          Facebook
-        </div>
-        <div className="flex items-center gap-2 text-[#ADADAD]">
-          <span className="w-2 h-2 rounded-full bg-black/[0.08]" />
-          X
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // Section wrapper that triggers whileInView
 
 function Section({ children, className = '', delay = 0, id }: { children: React.ReactNode; className?: string; delay?: number; id?: string }) {
@@ -634,7 +75,6 @@ function Section({ children, className = '', delay = 0, id }: { children: React.
 export default function LandingPage() {
   const [activeAccordion, setActiveAccordion] = useState(0)
   const [isYearly, setIsYearly] = useState(false)
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   // Navbar scroll animation
   const { scrollY } = useScroll()
@@ -665,7 +105,7 @@ export default function LandingPage() {
             <Link href="/login" className="text-[14px] font-[450] text-[#6B6B6B] hover:text-[#0A0A0A] transition-colors duration-150">Log in</Link>
           </div>
           <Link href="/signup" className="text-[14px] font-[600] bg-[#0A0A0A] text-white px-5 py-2.5 rounded-full hover:bg-[#222] transition-colors duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)]">
-            Start Free Trial
+            Start for free
           </Link>
         </div>
       </motion.nav>
@@ -696,7 +136,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="max-w-[520px] mb-10" style={{ fontFamily: 'var(--font-inter), sans-serif', fontWeight: 400, fontSize: '17px', lineHeight: 1.65, color: '#6B6B6B' }}>
-            Monitor professional channels 24/7. Detect high-intent conversations, draft personalized replies, and acquire customers organically.
+            Monitor Reddit and Bluesky on a predictable plan cadence, detect high-intent conversations, and draft personalized replies for review.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
@@ -705,7 +145,7 @@ export default function LandingPage() {
                 href="/signup"
                 className="w-full sm:w-auto bg-[#0A0A0A] text-white text-[15px] font-[600] flex items-center justify-center px-8 py-[14px] rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.1)] hover:bg-[#1C1C1E] transition-colors duration-200"
               >
-                Start 14-Day Free Trial
+                Start for free
               </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.975 }} transition={springs.snappy}>
@@ -784,7 +224,7 @@ export default function LandingPage() {
                       Set your keywords
                     </h4>
                     <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Competitor names, pain points, and buying signals. Scouto monitors Reddit, X, and Bluesky 24/7.
+                      Competitor names, pain points, and buying signals. Scouto monitors Reddit and Bluesky on your plan&apos;s polling cadence.
                     </p>
                   </div>
 
@@ -826,7 +266,7 @@ export default function LandingPage() {
                       Review and post
                     </h4>
                     <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Read the draft, edit if needed, and hit send. Nothing posts without your manual approval.
+                      Read the draft, edit if needed, and send. Manual review is the default; eligible paid accounts can opt into guarded auto-send later.
                     </p>
                   </div>
                 </div>
@@ -837,7 +277,7 @@ export default function LandingPage() {
                   Acquire buyers organically
                 </span>
                 <Link href="/signup" className="flex items-center gap-2 bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-[600] px-8 py-3.5 rounded-full transition-all duration-200 shadow-[0_4px_14px_rgba(0,0,0,0.18)]">
-                  Start 14-Day Free Trial
+                  Start for free
                 </Link>
               </div>
             </motion.div>
@@ -847,7 +287,7 @@ export default function LandingPage() {
         {/* FEATURES */}
 
 
-        <Section id="features" className="bg-white pt-[50px] pb-[100px]">
+        <Section id="product-overview" className="bg-white pt-[50px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <SectionBadge color="#0A84FF" text="Features" />
 
@@ -863,11 +303,17 @@ export default function LandingPage() {
                 <div className="w-full">
                   {[
                     { title: 'Buyer Intent Scoring', body: 'Every conversation scored 0-100 for purchase likelihood. No more wading through noise — you see only the conversations that matter.' },
-                    { title: 'AI Reply Drafting', body: 'Replies written in your exact voice. Context-aware, helpful, never spammy. Review, edit, post. Done.' },
-                    { title: '24/7 Keyword Monitoring', body: 'LinkedIn, Reddit, Hacker News, X, and more scanned continuously. Competitor mentions, pain-point keywords, and buying signals.' }
+                    { title: 'AI Reply Drafting', body: 'Context-aware replies based on your product details and voice examples. Review, edit, and send.' },
+                    { title: 'Scheduled Keyword Monitoring', body: 'Reddit and Bluesky are monitored at the polling interval included with your plan.' }
                   ].map((item, i) => (
                     <motion.div key={i} variants={fadeUp} className="border-b border-black/[0.07] overflow-hidden">
-                      <button onClick={() => setActiveAccordion(i)} className="w-full text-left py-6 flex items-center justify-between gap-4">
+                      <button
+                        onClick={() => setActiveAccordion(i)}
+                        className="w-full text-left py-6 flex items-center justify-between gap-4"
+                        aria-expanded={activeAccordion === i}
+                        aria-controls={`feature-panel-${i}`}
+                        id={`feature-trigger-${i}`}
+                      >
                         <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '19px', letterSpacing: '-0.02em', color: activeAccordion === i ? '#0A0A0A' : '#ADADAD', transition: 'color 0.2s' }}>
                           {item.title}
                         </h3>
@@ -882,6 +328,9 @@ export default function LandingPage() {
                       <AnimatePresence>
                         {activeAccordion === i && (
                           <motion.div
+                            id={`feature-panel-${i}`}
+                            role="region"
+                            aria-labelledby={`feature-trigger-${i}`}
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
@@ -1048,7 +497,7 @@ export default function LandingPage() {
                     <BentoPlatformSourcesWidget />
                   </div>
                   <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '5px' }}>Multi-Platform Coverage</h4>
-                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>Signals from LinkedIn, Reddit, Hacker News, X, and more — all in one place, always live.</p>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>Signals from Reddit and Bluesky — in one place and continuously refreshed.</p>
                 </motion.div>
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
@@ -1122,9 +571,9 @@ export default function LandingPage() {
             >
               {[
                 { icon: CustomKeywordRulesIcon, title: 'Custom Keyword Rules', body: 'Exact-match, negative keywords, subreddit filters. You decide what counts as a lead.' },
-                { icon: ToneMatchingIcon, title: 'Tone Matching', body: "Drafts sound like you wrote them — not like a bot dropped a link and left." },
+                { icon: ToneMatchingIcon, title: 'Tone & Language AI', body: "Detects post language automatically and drafts authentic, natural replies in over 30 languages." },
                 { icon: ApprovalQueueIcon, title: 'Approval Queue', body: 'Nothing posts without you clicking approve first. Full control, every time.' },
-                { icon: DailyDigestIcon, title: 'Daily Digest', body: 'One morning summary of every match, already scored and ready to review.' },
+                { icon: DailyDigestIcon, title: 'Scheduled Monitoring', body: 'Background workers scan Reddit and Bluesky at the polling interval included with your plan.' },
                 { icon: InsightsHubIcon, title: 'Insights Hub', body: "Get clear reports on activity, progress, and bottlenecks—instantly." },
                 { icon: ConfidenceEngineIcon, title: 'Confidence Engine', body: 'AI intent scoring filters noise to auto-post high-confidence matches.' },
               ].map(({ icon: Icon, title, body }, i) => (
@@ -1158,7 +607,7 @@ export default function LandingPage() {
 
 
         {/* ━ ━ ━ ━  section separator: STICKY FEATURE SCROLL (HOW IT WORKS) ━ ━ ━ ━  */}
-        <div id="how-it-works">
+        <div id="workflow">
           <StickyFeatureScroll />
         </div>
 
@@ -1195,9 +644,9 @@ export default function LandingPage() {
 
               {/* Stat */}
               <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col justify-end min-h-[200px]">
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '56px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A', marginBottom: '6px' }}>3x</div>
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '3px' }}>More organic traffic</div>
-                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#ADADAD' }}>vs. manual Reddit outreach</div>
+                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '56px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A', marginBottom: '6px' }}>0–100</div>
+                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '3px' }}>Intent confidence score</div>
+                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#ADADAD' }}>for every qualified opportunity</div>
               </motion.div>
 
               {/* Small quote */}
@@ -1221,8 +670,8 @@ export default function LandingPage() {
 
               {/* Stat 2 */}
               <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col justify-end min-h-[190px]">
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '56px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A', marginBottom: '6px' }}>94%</div>
-                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A' }}>Buying intent accuracy</div>
+                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '56px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A', marginBottom: '6px' }}>4</div>
+                <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A' }}>Intent classifications</div>
               </motion.div>
 
               {/* Small quote 2 */}
@@ -1261,6 +710,294 @@ export default function LandingPage() {
                 </div>
               </motion.div>
             </motion.div>
+          </div>
+        </Section>
+
+        {/* ━ ━ ━ ━  section separator: INFRASTRUCTURE (FintechX Bento Grid Style) ━ ━ ━ ━  */}
+        <Section className="bg-[#F8F8FA] pt-[120px] pb-[140px] border-t border-black/[0.06] relative overflow-hidden">
+          <div className="max-w-[1200px] mx-auto px-[24px]">
+
+            {/* Header: Left Aligned Title + Right Description & CTA */}
+            <motion.div
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: '-80px' }}
+              variants={staggerContainer}
+              className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-[56px]"
+            >
+              <div>
+                <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-white border border-black/[0.08] rounded-full px-3.5 py-[5px] shadow-sm mb-4">
+                  <span className="w-[7px] h-[7px] rounded-full flex-shrink-0 bg-[#30D158] animate-pulse" />
+                  <span className="text-[12px] font-semibold text-[#0A0A0A] tracking-[0.03em] uppercase" style={{ fontFamily: 'var(--font-inter)' }}>
+                    System Architecture
+                  </span>
+                </motion.div>
+                <motion.h2
+                  variants={fadeUp}
+                  style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(36px, 4.2vw, 56px)', letterSpacing: '-0.04em', lineHeight: 1.08, color: '#0A0A0A', maxWidth: '600px' }}
+                >
+                  Everything you need to monitor intent confidently
+                </motion.h2>
+              </div>
+
+              <motion.div variants={fadeUp} className="flex flex-col items-start lg:items-end gap-4 max-w-[360px]">
+                <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.6 }} className="lg:text-right">
+                  Professional worker infrastructure designed for real-time social intent scanning under scale.
+                </p>
+                <a
+                  href="/signup"
+                  className="bg-[#0A0A0A] hover:bg-[#222] text-white text-[13.5px] font-semibold px-6 py-3 rounded-full flex items-center gap-2.5 transition-all duration-200 shadow-[0_4px_14px_rgba(0,0,0,0.15)] group"
+                >
+                  <span>Explore architecture</span>
+                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
+                    <ChevronRight className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+                  </div>
+                </a>
+              </motion.div>
+            </motion.div>
+
+            {/* FintechX 5-Card Bento Grid */}
+            <motion.div
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: '-60px' }}
+              variants={staggerContainer}
+              className="grid lg:grid-cols-12 gap-5 items-stretch"
+            >
+
+              {/* ── TOP LEFT CARD (4 Cols): Light Gray 3D Pre-Filter ── */}
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6, scale: 1.01 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+                className="lg:col-span-4 bg-[#EFEFF3] rounded-[28px] p-7 md:p-8 flex flex-col justify-between min-h-[380px] relative overflow-hidden group cursor-default"
+              >
+                <div className="text-center">
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#0A0A0A' }}>
+                    Deterministic Pre-filter
+                  </h3>
+                </div>
+
+                {/* Animated 3D Funnel Icon + Infinite Signal Marquee */}
+                <PrefilterSignalMarquee />
+
+                <div className="text-center">
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#6B6B6B', lineHeight: 1.5 }}>
+                    Zero-cost filter eliminates chatter before model calls.
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* ── TOP MIDDLE CARD (4 Cols): Scenic Glassmorphic Subreddit Cache ── */}
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6, scale: 1.01 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+                className="lg:col-span-4 rounded-[28px] p-7 md:p-8 flex flex-col justify-between min-h-[380px] relative overflow-hidden group cursor-default"
+                style={{
+                  background: 'linear-gradient(135deg, #78B3EA 0%, #A4D4FF 40%, #BFE5A2 100%)',
+                }}
+              >
+                <div className="text-center relative z-10">
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#0A0A0A' }}>
+                    Subreddit Redis Cache
+                  </h3>
+                </div>
+
+                {/* Live Animated SVG Wave Chart Window */}
+                <CacheLiveWaveChart />
+
+                <div className="text-center text-[12.5px] font-medium text-[#0A0A0A]/80 relative z-10">
+                  Shared feed responses prevent API rate limits under scale.
+                </div>
+              </motion.div>
+
+              {/* ── TOP RIGHT CARD (4 Cols, Spans Height): Pitch Black BUYING Intent ── */}
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6, scale: 1.01 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+                className="lg:col-span-4 bg-[#0A0A0A] rounded-[28px] p-8 md:p-9 flex flex-col justify-between min-h-[380px] relative overflow-hidden group cursor-default"
+              >
+                <div className="text-center">
+                  <span className="text-[12px] font-semibold text-[#8E8E93] uppercase tracking-wider block mb-2" style={{ fontFamily: 'var(--font-inter)' }}>
+                    Intent Classification
+                  </span>
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#FFFFFF' }}>
+                    AI-powered scoring
+                  </h3>
+                </div>
+
+                {/* Animated Intent Text Cycler (BUYING / HIGH INTENT / HOT LEAD) */}
+                <IntentTextCycler />
+
+                <div className="text-center">
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '13.5px', color: '#A1A1AA', lineHeight: 1.5 }}>
+                    Real-time buying intent data and predictive scoring.
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* ── BOTTOM LEFT CARD (8 Cols): Wide Sky-Gradient Queue Isolation ── */}
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6, scale: 1.005 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+                className="lg:col-span-8 rounded-[28px] p-8 md:p-10 flex flex-col justify-between min-h-[380px] relative overflow-hidden group cursor-default"
+                style={{
+                  background: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 50%, #F0F9FF 100%)',
+                }}
+              >
+                <div className="mb-6 max-w-[480px]">
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '24px', letterSpacing: '-0.025em', color: '#0A0A0A', marginBottom: '8px' }}>
+                    Background Queue Isolation
+                  </h3>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14.5px', color: '#475569', lineHeight: 1.6 }}>
+                    Seven decoupled BullMQ worker threads run Reddit, Bluesky, scoring, and reply delivery independently. High memory load on one worker never impacts the rest.
+                  </p>
+                </div>
+
+                {/* Floating Live Queue Window */}
+                <div className="mt-2 bg-white/90 backdrop-blur-md rounded-2xl p-2 border border-white shadow-[0_12px_32px_rgba(0,0,0,0.06)]">
+                  <InfraLiveQueue />
+                </div>
+              </motion.div>
+
+              {/* ── BOTTOM RIGHT CARD (4 Cols): Soft Light Smart Alert Retry ── */}
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ y: -6, scale: 1.01 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+                className="lg:col-span-4 bg-[#EFEFF3] rounded-[28px] p-7 md:p-8 flex flex-col justify-between min-h-[380px] relative overflow-hidden group cursor-default"
+              >
+                <div className="text-center">
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.02em', color: '#0A0A0A' }}>
+                    Smart Retry Recovery
+                  </h3>
+                </div>
+
+                {/* Animated Alert Stack Cycler */}
+                <RetryStackAlertCycler />
+
+                <div className="text-center">
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#6B6B6B', lineHeight: 1.5 }}>
+                    Network timeouts automatically recover before triggering Sentry alerts.
+                  </p>
+                </div>
+              </motion.div>
+
+            </motion.div>
+
+          </div>
+        </Section>
+
+        {/* ━ ━ ━ ━  section separator: BEFORE vs AFTER (FintechX Style Comparison Section) ━ ━ ━ ━  */}
+        <Section className="bg-white pt-[100px] pb-[130px] border-t border-black/[0.05] relative overflow-hidden">
+          <div className="max-w-[1100px] mx-auto px-[24px]">
+
+            {/* Header Title */}
+            <motion.div
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: '-80px' }}
+              variants={fadeUp}
+              className="text-center mb-16"
+            >
+              <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(36px, 4.5vw, 56px)', letterSpacing: '-0.04em', lineHeight: 1.06, color: '#0A0A0A' }}>
+                Smarter lead generation<br />starts with real-time data
+              </h2>
+            </motion.div>
+
+            {/* Main Card Container with Central Emblem Badge */}
+            <motion.div
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: '-60px' }}
+              variants={fadeUp}
+              className="relative mt-8"
+            >
+              {/* Before Scouto / After Scouto Top Label Pills */}
+              <div className="flex items-center justify-center gap-16 mb-[-24px] relative z-20">
+                <span className="text-[13px] font-semibold text-[#8E8E93] tracking-wide" style={{ fontFamily: 'var(--font-inter)' }}>
+                  Before Scouto
+                </span>
+                <span className="text-[13px] font-semibold text-[#0A0A0A] tracking-wide" style={{ fontFamily: 'var(--font-inter)' }}>
+                  After Scouto
+                </span>
+              </div>
+
+              {/* Central Glowing 3D Emblem Badge */}
+              <div className="flex justify-center relative z-30 mb-[-36px]">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-b from-[#30D158] to-[#0A0A0A] p-1 shadow-[0_0_36px_rgba(48,209,88,0.45)] flex items-center justify-center relative">
+                  <div className="w-full h-full rounded-full bg-[#0A0A0A] flex items-center justify-center border border-white/20">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#30D158" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="16 18 22 12 16 6" />
+                      <polyline points="8 6 2 12 8 18" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pitch-Black Card Surface */}
+              <div className="bg-[#0A0A0A] rounded-[36px] p-8 md:p-14 shadow-[0_20px_50px_rgba(0,0,0,0.2)] text-white grid lg:grid-cols-12 gap-10 items-center relative overflow-hidden">
+                {/* Background Ambient Glow */}
+                <div
+                  aria-hidden="true"
+                  className="absolute bottom-0 right-0 w-[400px] h-[300px] rounded-full pointer-events-none opacity-20"
+                  style={{ background: 'radial-gradient(circle, rgba(48,209,88,0.4) 0%, transparent 70%)' }}
+                />
+
+                {/* Left Column: Checkmark Feature List */}
+                <div className="lg:col-span-7 flex flex-col justify-center relative z-10">
+                  <h3 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(26px, 3vw, 36px)', letterSpacing: '-0.03em', lineHeight: 1.15, color: '#FFFFFF', marginBottom: '28px' }}>
+                    Smarter way to find &amp;<br />convert buyers
+                  </h3>
+
+                  <div className="flex flex-col gap-4">
+                    {[
+                      'Get pre-scored intent leads in real time based on buying signals',
+                      'Filter out 95% of social chatter before AI model calls',
+                      'Duplicate-safe tracking across Reddit and Bluesky',
+                      'Make consistent, informed outreach with authentic AI drafts',
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-start gap-3.5">
+                        <div className="w-5 h-5 rounded-full bg-[#30D158]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#30D158" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#E4E4E7', lineHeight: 1.5, fontWeight: 500 }}>
+                          {item}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Column: 2 Stat Callout Cards */}
+                <div className="lg:col-span-5 flex flex-col gap-4 relative z-10">
+                  <div className="bg-[#131D17] border border-[#30D158]/25 rounded-2xl p-6 flex flex-col gap-1 shadow-inner">
+                    <div className="text-[34px] font-black text-white tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                      0–100
+                    </div>
+                    <div className="text-[13px] font-medium text-[#30D158]" style={{ fontFamily: 'var(--font-inter)' }}>
+                      Buying-intent confidence score
+                    </div>
+                  </div>
+
+                  <div className="bg-[#131D17] border border-[#30D158]/25 rounded-2xl p-6 flex flex-col gap-1 shadow-inner">
+                    <div className="text-[34px] font-black text-white tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                      15m–6h
+                    </div>
+                    <div className="text-[13px] font-medium text-[#30D158]" style={{ fontFamily: 'var(--font-inter)' }}>
+                      Plan-based monitoring cadence
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </motion.div>
+
           </div>
         </Section>
 
@@ -1482,132 +1219,7 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ━ ━ ━ ━  section separator: FAQ ━ ━ ━ ━  */}
-        <Section id="faq" className="bg-white pt-[100px] pb-[100px]">
-          <div className="max-w-[680px] mx-auto px-[24px]">
-            <motion.div variants={fadeUp} className="text-center mb-[52px]">
-              <h2 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(32px, 4vw, 48px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A', marginBottom: '10px' }}>
-                Common questions
-              </h2>
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: '16px', color: '#6B6B6B', lineHeight: 1.6 }}>
-                Everything you need to know about Scouto
-              </p>
-            </motion.div>
-
-            <div className="flex flex-col">
-              {faqs.map((faq, i) => (
-                <motion.div key={i} variants={fadeUp} className="border-b border-black/[0.08] overflow-hidden">
-                  <button onClick={() => setOpenFaq(openFaq === i ? null : i)} className="w-full text-left py-5 flex items-center justify-between gap-4">
-                    <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '16px', letterSpacing: '-0.02em', color: '#0A0A0A' }}>{faq.q}</span>
-                    <motion.div
-                      animate={{ rotate: openFaq === i ? 45 : 0 }}
-                      transition={springs.snappy}
-                      className="flex-shrink-0 w-6 h-6 rounded-full bg-black/[0.06] flex items-center justify-center"
-                    >
-                      <Plus className="w-3 h-3 text-[#0A0A0A]" strokeWidth={2.5} />
-                    </motion.div>
-                  </button>
-                  <AnimatePresence>
-                    {openFaq === i && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                        className="overflow-hidden"
-                      >
-                        <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.65, paddingBottom: '20px' }}>
-                          {faq.a}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </Section>
-
-        {/* ━ ━ ━ ━  section separator: FOOTER CTA ━ ━ ━ ━  */}
-        <Section className="bg-white pt-[100px] pb-[100px]">
-          <div className="max-w-[640px] mx-auto px-[24px] text-center">
-            <motion.h2 variants={fadeUp} className="mb-4"
-              style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 52px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A' }}>
-              Stop hunting.<br />Start converting.
-            </motion.h2>
-            <motion.p variants={fadeUp} className="mb-10" style={{ fontFamily: 'var(--font-inter)', fontSize: '17px', color: '#6B6B6B', lineHeight: 1.65 }}>
-              Join founders using Scouto to find warm leads on Reddit every single day.
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link href="/signup" className="w-full sm:w-auto bg-[#0A0A0A] hover:bg-[#222] text-white text-[15px] font-[600] px-8 py-4 rounded-full transition-colors duration-150 shadow-[0_2px_12px_rgba(0,0,0,0.15)] flex items-center justify-center gap-2">
-                Start for free <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
-              </Link>
-              <Link href="#how-it-works" className="w-full sm:w-auto bg-transparent border border-black/[0.10] hover:bg-black/[0.04] text-[#0A0A0A] text-[15px] font-[500] px-8 py-4 rounded-full transition-colors duration-150 flex items-center justify-center">
-                See how it works
-              </Link>
-            </motion.div>
-          </div>
-        </Section>
-
-        {/* ━ ━ ━ ━  section separator: FOOTER ━ ━ ━ ━  */}
-        <footer className="bg-[#0A0A0A] text-white py-20 px-6">
-          <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-            <div className="md:col-span-1">
-              <div className="flex items-center gap-2 mb-4" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.025em' }}>
-                <Target className="w-4.5 h-4.5 text-[#0A84FF]" strokeWidth={2.2} />
-                Scouto
-              </div>
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.42)', lineHeight: 1.65 }}>
-                Find your customers where they're already talking.
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-8 md:col-span-2">
-              {[
-                {
-                  label: 'Product',
-                  links: [
-                    { name: 'Features', href: '#features' },
-                    { name: 'Pricing', href: '#pricing' },
-                    { name: 'How it Works', href: '#how-it-works' },
-                  ],
-                },
-                {
-                  label: 'Company',
-                  links: [
-                    { name: 'About', href: '/about' },
-                    { name: 'Contact', href: '/contact' },
-                  ],
-                },
-                {
-                  label: 'Legal',
-                  links: [
-                    { name: 'Privacy', href: '/privacy' },
-                    { name: 'Terms', href: '/terms' },
-                  ],
-                },
-              ].map(({ label, links }) => (
-                <div key={label}>
-                  <div style={{ fontFamily: 'var(--font-inter)', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-                  <div className="flex flex-col gap-3">
-                    {links.map(({ name, href }) => (
-                      <Link key={name} href={href} style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.38)' }} className="hover:text-white transition-colors duration-150">{name}</Link>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="md:col-span-1">
-              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Stay in the loop</div>
-              <div className="flex gap-2">
-                <input type="email" placeholder="your@email.com" className="bg-white/[0.07] border border-white/[0.10] rounded-xl px-4 py-2.5 text-[14px] text-white placeholder-white/25 focus:outline-none focus:border-white/25 w-full transition-colors" />
-                <button className="bg-white text-black px-4 py-2.5 rounded-xl text-[13px] font-[700] hover:bg-surface-secondary/90 transition-colors duration-150 whitespace-nowrap">Subscribe</button>
-              </div>
-            </div>
-          </div>
-          <div className="max-w-[1200px] mx-auto border-t border-white/[0.07] pt-7 flex items-center justify-between">
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: 'rgba(255,255,255,0.25)' }}>© 2026 Scouto. All rights reserved.</div>
-          </div>
-        </footer>
+        <LandingFooter />
 
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { TwitterApi } from 'twitter-api-v2'
 import { NormalizedPost } from './types'
+import { isDevelopmentMockEnabled } from './env'
 
 // Instantiate client if environment variables are available (allows the app to build without them)
 const client = (process.env.X_API_KEY && process.env.X_API_SECRET) ? new TwitterApi({
@@ -10,7 +11,7 @@ const client = (process.env.X_API_KEY && process.env.X_API_SECRET) ? new Twitter
 }) : null
 
 export async function fetchXPosts(query: string): Promise<NormalizedPost[]> {
-  if (process.env.USE_MOCK_X === 'true') {
+  if (isDevelopmentMockEnabled('USE_MOCK_X')) {
     return [
       {
         platform: 'x',
@@ -28,12 +29,24 @@ export async function fetchXPosts(query: string): Promise<NormalizedPost[]> {
     throw new Error('X API keys missing in environment')
   }
 
-  const results = await client.v2.search(query, {
-    max_results: 25,
-    'tweet.fields': ['created_at', 'author_id', 'text'],
-  })
+  const results = await client.get<{
+    data?: Array<{
+      id: string
+      author_id?: string
+      text: string
+      created_at?: string
+    }>
+  }>(
+    'https://api.x.com/2/tweets/search/recent',
+    {
+      query,
+      max_results: 25,
+      'tweet.fields': 'created_at,author_id,text',
+    },
+    { timeout: 15_000 },
+  )
 
-  return (results.data.data || []).map(tweet => ({
+  return (results.data || []).map(tweet => ({
     platform: 'x' as const,
     externalId: tweet.id,
     author: tweet.author_id ?? 'unknown',

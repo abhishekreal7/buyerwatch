@@ -5,6 +5,7 @@ exports.postRedditReply = postRedditReply;
 exports.submitRedditPost = submitRedditPost;
 const supabase_js_1 = require("@supabase/supabase-js");
 const encryption_1 = require("./encryption");
+const http_1 = require("./http");
 const supabase = (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 class PlatformPostError extends Error {
     platform;
@@ -53,7 +54,7 @@ async function refreshRedditToken(userId, refreshToken) {
         return 'developer_access_token';
     }
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+    const response = await (0, http_1.fetchWithTimeout)('https://www.reddit.com/api/v1/access_token', {
         method: 'POST',
         headers: {
             'Authorization': `Basic ${basicAuth}`,
@@ -64,7 +65,7 @@ async function refreshRedditToken(userId, refreshToken) {
             grant_type: 'refresh_token',
             refresh_token: refreshToken
         })
-    });
+    }, 10_000);
     if (!response.ok) {
         // If the refresh token is revoked or invalid, we clear it from DB to force reconnect
         if (response.status === 400 || response.status === 401) {
@@ -115,7 +116,7 @@ async function postRedditReply(userId, threadExternalId, text) {
     const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim();
     if (redditApisKey && !redditApisKey.includes('TODO')) {
         console.log(`[reddit] Posting reply using redditapis.com proxy for thread ${threadExternalId}`);
-        const response = await fetch('https://api.redditapis.com/api/comment', {
+        const response = await (0, http_1.fetchWithTimeout)('https://api.redditapis.com/api/comment', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${redditApisKey}`,
@@ -127,7 +128,7 @@ async function postRedditReply(userId, threadExternalId, text) {
                 thing_id: threadExternalId,
                 text
             })
-        });
+        }, 10_000);
         handleRedditRateLimits(response.headers);
         if (!response.ok) {
             const errorText = await response.text();
@@ -146,7 +147,9 @@ async function postRedditReply(userId, threadExternalId, text) {
         await getDecryptedRedditConnection(userId);
         return { permalink: `https://reddit.com/r/developer/comments/${threadExternalId}/dev_reply` };
     }
-    let { accessToken, refreshToken, expiresAt } = await getDecryptedRedditConnection(userId);
+    const connection = await getDecryptedRedditConnection(userId);
+    let accessToken = connection.accessToken;
+    const { refreshToken, expiresAt } = connection;
     // Proactive Refresh: refresh if token expires in less than 5 minutes
     if (expiresAt && Date.now() + 300_000 >= expiresAt) {
         try {
@@ -157,7 +160,7 @@ async function postRedditReply(userId, threadExternalId, text) {
         }
     }
     const tryPost = async (token) => {
-        return await fetch('https://oauth.reddit.com/api/comment', {
+        return await (0, http_1.fetchWithTimeout)('https://oauth.reddit.com/api/comment', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -169,7 +172,7 @@ async function postRedditReply(userId, threadExternalId, text) {
                 thing_id: threadExternalId,
                 text
             })
-        });
+        }, 10_000);
     };
     let response = await tryPost(accessToken);
     // Automatic Refresh on 401
@@ -201,7 +204,7 @@ async function submitRedditPost(userId, subreddit, title, text) {
     const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim();
     if (redditApisKey && !redditApisKey.includes('TODO')) {
         console.log(`[reddit] Submitting post using redditapis.com proxy to r/${subreddit}`);
-        const response = await fetch('https://api.redditapis.com/api/submit', {
+        const response = await (0, http_1.fetchWithTimeout)('https://api.redditapis.com/api/submit', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${redditApisKey}`,
@@ -215,7 +218,7 @@ async function submitRedditPost(userId, subreddit, title, text) {
                 title,
                 text
             })
-        });
+        }, 10_000);
         handleRedditRateLimits(response.headers);
         if (!response.ok) {
             const errorText = await response.text();
@@ -234,7 +237,9 @@ async function submitRedditPost(userId, subreddit, title, text) {
         await getDecryptedRedditConnection(userId);
         return { permalink: `https://reddit.com/r/developer/submit_mock` };
     }
-    let { accessToken, refreshToken, expiresAt } = await getDecryptedRedditConnection(userId);
+    const connection = await getDecryptedRedditConnection(userId);
+    let accessToken = connection.accessToken;
+    const { refreshToken, expiresAt } = connection;
     if (expiresAt && Date.now() + 300_000 >= expiresAt) {
         try {
             accessToken = await refreshRedditToken(userId, refreshToken);
@@ -244,7 +249,7 @@ async function submitRedditPost(userId, subreddit, title, text) {
         }
     }
     const trySubmit = async (token) => {
-        return await fetch('https://oauth.reddit.com/api/submit', {
+        return await (0, http_1.fetchWithTimeout)('https://oauth.reddit.com/api/submit', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -258,7 +263,7 @@ async function submitRedditPost(userId, subreddit, title, text) {
                 title,
                 text
             })
-        });
+        }, 10_000);
     };
     let response = await trySubmit(accessToken);
     if (response.status === 401) {

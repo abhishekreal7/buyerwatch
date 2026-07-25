@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
 import { useRouter } from 'next/navigation'
-import { Search, Settings, Home, Target, Edit3, MessageCircle, FileText, LayoutDashboard } from 'lucide-react'
+import { Search, Settings, Target, Edit3, FileText, LayoutDashboard } from 'lucide-react'
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)

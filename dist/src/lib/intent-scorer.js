@@ -2,8 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scoreIntent = scoreIntent;
 const generative_ai_1 = require("@google/generative-ai");
+const env_1 = require("./env");
+const logger_1 = require("./logger");
 async function scoreIntent(post, userProfile) {
-    if (process.env.USE_MOCK_DRAFTS === 'true') {
+    if ((0, env_1.isDevelopmentMockEnabled)('USE_MOCK_DRAFTS')) {
         return {
             score: Math.floor(Math.random() * 100),
             label: 'buying',
@@ -39,38 +41,50 @@ Respond ONLY with this JSON (no markdown formatting, just pure JSON):
 `;
     try {
         let responseText = '';
-        if (process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
+        // 1. Try Google Vertex AI only when a project is explicitly configured.
+        const gcpProject = process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+        const gcpLocation = process.env.GCP_LOCATION || 'us-central1';
+        if (gcpProject) {
             try {
-                const { generateKimiChat } = await import('./kimi.js');
-                responseText = await generateKimiChat({
-                    messages: [{ role: 'user', content: prompt }],
-                    temperature: 0.1,
-                });
+                const { VertexAI } = await import('@google-cloud/vertexai');
+                const vertexAI = new VertexAI({ project: gcpProject, location: gcpLocation });
+                const generativeModel = vertexAI.getGenerativeModel({ model: process.env.GEMINI_VERTEX_MODEL || 'gemini-2.0-flash-001' }, { timeout: 20_000 });
+                const result = await generativeModel.generateContent(prompt);
+                const response = await result.response;
+                if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    responseText = response.candidates[0].content.parts[0].text;
+                }
             }
-            catch (kimiErr) {
-                console.warn('Kimi API failed, falling back to Gemini...', kimiErr);
-                const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-                const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-                const result = await model.generateContent(prompt);
-                responseText = result.response.text();
+            catch (error) {
+                logger_1.logger.warn({ error }, 'Vertex intent scoring failed; trying API-key Gemini');
             }
         }
-        else {
+        // 2. Fallback to standard API Key if Vertex AI is not configured
+        if (!responseText && process.env.GEMINI_API_KEY) {
             const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-            const result = await model.generateContent(prompt);
+            const model = genAI.getGenerativeModel({
+                model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+            });
+            const result = await model.generateContent(prompt, { timeout: 20_000 });
             responseText = result.response.text();
+        }
+        if (!responseText) {
+            throw new Error('No response generated from Vertex AI or Gemini');
         }
         // Strip possible markdown formatting if the model still adds it
         const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanJson);
+        const parsed = JSON.parse(cleanJson);
+        if (typeof parsed.score !== 'number'
+            || parsed.score < 0
+            || parsed.score > 100
+            || !['buying', 'researching', 'complaining', 'other'].includes(String(parsed.label))
+            || typeof parsed.reasoning !== 'string') {
+            throw new Error('Intent provider returned an invalid response');
+        }
+        return parsed;
     }
     catch (error) {
-        console.error('Scoring failed:', error);
-        return {
-            score: 0,
-            label: 'other',
-            reasoning: 'Error during scoring.'
-        };
+        logger_1.logger.error({ error }, 'Intent scoring failed');
+        throw new Error('All configured intent scoring providers failed');
     }
 }

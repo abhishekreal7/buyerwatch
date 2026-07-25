@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Target, ArrowLeft, Mail, MessageSquare } from 'lucide-react'
 
+const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'support@example.com'
+
 export default function ContactPage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 pb-20">
@@ -46,11 +48,11 @@ export default function ContactPage() {
                 Send us a direct inquiry. We normally reply to all founder requests within a few hours.
               </p>
               <a
-                href="mailto:support@scouto.com?subject=Inquiry%20from%20Scouto"
+                href={`mailto:${supportEmail}?subject=Inquiry%20from%20Scouto`}
                 className="inline-flex items-center gap-2 bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-bold px-6 py-3 rounded-full transition-colors duration-150 shadow-[0_2px_12px_rgba(0,0,0,0.1)]"
                 style={{ fontFamily: 'var(--font-inter), sans-serif' }}
               >
-                support@scouto.com
+                {supportEmail}
               </a>
             </div>
 

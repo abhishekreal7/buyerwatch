@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { fetchWithTimeout } from '@/lib/http'
+import { isAllowedSlackWebhookUrl } from '@/lib/security/outbound-url'
 
 export async function POST(req: NextRequest) {
   // Auth check
@@ -8,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { webhookUrl } = await req.json()
-  if (!webhookUrl || !webhookUrl.startsWith('https://hooks.slack.com/')) {
+  if (!webhookUrl || !isAllowedSlackWebhookUrl(webhookUrl)) {
     return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
   }
 
@@ -54,11 +56,11 @@ export async function POST(req: NextRequest) {
     ],
   }
 
-  const response = await fetch(webhookUrl, {
+  const response = await fetchWithTimeout(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  })
+  }, 8_000)
 
   if (!response.ok) {
     return NextResponse.json({ error: 'Slack rejected the webhook' }, { status: 400 })

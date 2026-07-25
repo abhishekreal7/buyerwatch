@@ -4,6 +4,12 @@ export const X_DAILY_SPEND_LIMIT_CENTS: Record<string, number> = {
   growth: 0,
 }
 
+export const PLAN_POLL_INTERVAL_MINUTES: Record<PlanTier, number> = {
+  free: 360,
+  pro: 30,
+  growth: 15,
+}
+
 export const PLAN_LIMITS = {
   free: {
     keywords: 1,            // Primary felt constraint — 1 keyword rule
@@ -47,4 +53,15 @@ export function getPlanLimits(plan: string | null | undefined) {
 /** Returns true if the plan is any paid tier (pro or growth). */
 export function isPaidPlan(plan: string | null | undefined): boolean {
   return normalizePlan(plan) !== 'free'
+}
+
+export function isPollingDue(
+  plan: string | null | undefined,
+  lastPolledAt: string | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (!lastPolledAt) return true
+  const timestamp = Date.parse(lastPolledAt)
+  if (!Number.isFinite(timestamp)) return true
+  return now - timestamp >= PLAN_POLL_INTERVAL_MINUTES[normalizePlan(plan)] * 60_000
 }

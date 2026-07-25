@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
 import {
   CheckCircle, FileText, Send, AlertTriangle, Activity
 } from 'lucide-react'
@@ -125,7 +124,6 @@ export default function AnalyticsPage() {
       const now = new Date()
       const thirtyDaysAgo = subDays(now, 30)
       const sixtyDaysAgo = subDays(now, 60)
-      const sevenDaysAgo = subDays(now, 7)
 
       // --- STATS ---
       const found = threads.length
@@ -276,13 +274,6 @@ export default function AnalyticsPage() {
       </AppPage>
     )
   }
-
-  // Delta calculation
-  const delta = data.stats.sentThisMonth - data.stats.sentLastMonth
-  const deltaPct = data.stats.sentLastMonth > 0
-    ? Math.round((delta / data.stats.sentLastMonth) * 100)
-    : (data.stats.sentThisMonth > 0 ? 100 : 0)
-  const isPositive = deltaPct >= 0
 
   return (
     <AppPage>

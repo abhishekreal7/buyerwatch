@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import { completeOnboardingAction } from '@/app/actions/onboarding'
 import {
   Monitor, ShoppingBag, Briefcase, User, Edit3, MessageSquare, Package,
-  HelpCircle, Plus, X, Search, Sparkles, Target, Zap, ShieldAlert, Check, ArrowRight
+  HelpCircle, Plus, X, Check, ArrowRight
 } from 'lucide-react'
 import { springs } from '@/lib/motion'
+import { getPlanLimits, type PlanTier } from '@/lib/plan-limits'
 
 const BUSINESS_TYPES = [
   { id: 'saas', label: 'SaaS', icon: Monitor },
@@ -20,10 +22,12 @@ const BUSINESS_TYPES = [
   { id: 'other', label: 'Other', icon: HelpCircle },
 ]
 
-export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
+export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [analyzingUrl, setAnalyzingUrl] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const keywordLimit = getPlanLimits(plan).keywords
 
   // Form State
   const [businessName, setBusinessName] = useState('')
@@ -42,11 +46,10 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
     painPoint: string[];
   } | null>(null)
 
-  const [redditTargets, setRedditTargets] = useState<string[]>(['SaaS', 'startups', 'Entrepreneur'])
-  const [blueskyTargets, setBlueskyTargets] = useState<string[]>([])
-  const [xTargets, setXTargets] = useState<string[]>([])
+  const [redditTargets, setRedditTargets] = useState<string[]>(['SaaS'])
+  const blueskyTargets: string[] = []
   const [targetInput, setTargetInput] = useState('')
-  const [activeTab, setActiveTab] = useState<'reddit' | 'bluesky' | 'x'>('reddit')
+  const activeTab = 'reddit'
 
   const [writingStyle, setWritingStyle] = useState('')
   const [redditUsername, setRedditUsername] = useState('')
@@ -56,35 +59,57 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
 
   // AI Auto-Analyze URL or Inputs
   const handleAiAnalyze = async () => {
-    if (!businessUrl && !businessName) return
+    const trimmedUrl = businessUrl.trim()
+    if (!trimmedUrl) return
+
+    const normalizedUrl = /^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : `https://${trimmedUrl}`
+    try {
+      const parsedUrl = new URL(normalizedUrl)
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('Unsupported protocol')
+    } catch {
+      toast.error('Enter a valid website URL.')
+      return
+    }
+
+    setBusinessUrl(normalizedUrl)
     setAnalyzingUrl(true)
     try {
       const res = await fetch('/api/onboarding/ai-suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: businessUrl, businessName, businessDescription })
+        body: JSON.stringify({ url: normalizedUrl, businessName, businessDescription })
       })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.description && !businessDescription) setBusinessDescription(data.description)
-        if (data.subreddits && data.subreddits.length > 0) setRedditTargets(data.subreddits)
-
-        const suggestedKeywords: { term: string; platforms: string[] }[] = []
-        if (data.buyerKeywords) data.buyerKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
-        if (data.competitorKeywords) data.competitorKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
-        if (data.painPointKeywords) data.painPointKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
-
-        if (suggestedKeywords.length > 0) setKeywords(suggestedKeywords)
-
-        setAiSuggestions({
-          subreddits: data.subreddits || [],
-          buyer: data.buyerKeywords || [],
-          competitor: data.competitorKeywords || [],
-          painPoint: data.painPointKeywords || [],
-        })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data) {
+        toast.error(data?.error || 'Auto-fill failed. Try again in a moment.')
+        return
       }
+
+      if (data.businessName && !businessName) setBusinessName(data.businessName)
+      if (data.description && !businessDescription) setBusinessDescription(data.description)
+      const suggestedTargets = data.subreddits?.length > 0 ? data.subreddits : redditTargets
+      if (data.subreddits && data.subreddits.length > 0) setRedditTargets(data.subreddits)
+
+      const suggestedKeywords: { term: string; platforms: string[] }[] = []
+      if (data.buyerKeywords) data.buyerKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
+      if (data.competitorKeywords) data.competitorKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
+      if (data.painPointKeywords) data.painPointKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
+
+      if (suggestedKeywords.length > 0) {
+        const selectedPhraseLimit = Math.max(1, Math.floor(keywordLimit / Math.max(1, suggestedTargets.length)))
+        setKeywords(suggestedKeywords.slice(0, selectedPhraseLimit))
+      }
+
+      setAiSuggestions({
+        subreddits: data.subreddits || [],
+        buyer: data.buyerKeywords || [],
+        competitor: data.competitorKeywords || [],
+        painPoint: data.painPointKeywords || [],
+      })
+      toast.success(data.source === 'fallback' ? 'Website details added.' : 'Website analyzed successfully.')
     } catch (err) {
       console.error('[onboarding] AI analyze failed:', err)
+      toast.error('Auto-fill failed. Check the URL and try again.')
     } finally {
       setAnalyzingUrl(false)
     }
@@ -109,33 +134,41 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
 
   const handleSubmit = async () => {
     setLoading(true)
+    setSubmitError('')
     const validTerms = keywords.filter(k => k.term.trim() !== '')
 
     // Construct the rows for the `keywords` table
-    const dbKeywords: any[] = []
+    const requestedRules: { term: string; platform: string; target: string }[] = []
     for (const k of validTerms) {
       if (k.platforms.includes('reddit')) {
         const targets = redditTargets.length > 0 ? redditTargets : ['all']
-        targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'reddit', target: t }))
+        targets.forEach(t => requestedRules.push({ term: k.term, platform: 'reddit', target: t }))
       }
       if (k.platforms.includes('bluesky')) {
         const targets = blueskyTargets.length > 0 ? blueskyTargets : [k.term]
-        targets.forEach(t => dbKeywords.push({ term: k.term, platform: 'bluesky', target: t }))
+        targets.forEach(t => requestedRules.push({ term: k.term, platform: 'bluesky', target: t }))
       }
     }
+    const dbKeywords = requestedRules.slice(0, keywordLimit)
 
-    const res = await completeOnboardingAction({
-      business_name: businessName,
-      business_description: businessDescription,
-      business_url: businessUrl,
-      business_type: businessType,
-      writing_style: writingStyle,
-      reddit_username: redditUsername,
-      keywords: dbKeywords
-    })
+    try {
+      const res = await completeOnboardingAction({
+        business_name: businessName,
+        business_description: businessDescription,
+        business_url: businessUrl,
+        business_type: businessType,
+        writing_style: writingStyle,
+        reddit_username: redditUsername,
+        keywords: dbKeywords
+      })
 
-    if (res?.error) {
-      alert(res.error)
+      if (res?.error) {
+        setSubmitError(res.error)
+      }
+    } catch (error) {
+      console.error('[onboarding] launch failed:', error)
+      setSubmitError('We could not launch monitoring. Check your connection and try again.')
+    } finally {
       setLoading(false)
     }
   }
@@ -159,10 +192,14 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
     setTargetInput('')
   }
 
+  const selectedRuleCount = keywords.filter((keyword) => keyword.term.trim()).length * Math.max(1, redditTargets.length)
+  const activeRuleCount = Math.min(keywordLimit, selectedRuleCount)
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
+
   return (
-    <div className="w-full max-w-2xl">
+    <div className="flex h-full min-h-0 w-full max-w-[600px] flex-col">
       {/* Progress Steps */}
-      <div className="flex items-center justify-center gap-2 mb-10">
+      <div className="flex items-center justify-center gap-2 mb-6">
         {[1, 2, 3, 4].map(i => (
           <div
             key={i}
@@ -178,13 +215,13 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={springs.smooth}
-          className="glass rounded-2xl p-8 md:p-10 border border-border"
+          className="glass flex-1 min-h-0 overflow-y-auto rounded-2xl p-7 md:p-8 border border-border"
         >
           {/* STEP 1: PRODUCT INFO + INSTANT AI EXTRACT */}
           {step === 1 && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div>
-                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">What is your product?</h2>
+                <h2 className="text-xl font-extrabold mb-1.5 tracking-tight text-gray-900">What is your product?</h2>
                 <p className="text-text-secondary text-sm">Enter your website URL — our AI will automatically extract your positioning and target buyers.</p>
               </div>
 
@@ -199,24 +236,22 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Website URL</label>
-                    <span className="text-xs text-[#0A84FF] font-medium">Auto-Extracts Intelligence</span>
-                  </div>
-                  <div className="flex gap-2">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700">Website URL</label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                       value={businessUrl} onChange={e => setBusinessUrl(e.target.value)}
-                      type="url" placeholder="https://yourproduct.com"
-                      className="flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
+                      type="url" inputMode="url" autoCapitalize="none" autoCorrect="off"
+                      placeholder="yourproduct.com"
+                      className="min-w-0 flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
                     />
                     <button
                       type="button"
                       onClick={handleAiAnalyze}
-                      disabled={analyzingUrl || (!businessUrl && !businessName)}
-                      className="flex items-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50 shrink-0"
+                      disabled={analyzingUrl || !businessUrl.trim()}
+                      aria-busy={analyzingUrl}
+                      className="h-[50px] shrink-0 rounded-xl border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-surface-elevated disabled:text-text-secondary disabled:opacity-60 sm:w-auto"
                     >
-                      <Sparkles className="w-4 h-4" />
-                      {analyzingUrl ? 'Analyzing...' : 'AI Auto-Fill'}
+                      {analyzingUrl ? 'Analyzing...' : 'Analyze website'}
                     </button>
                   </div>
                 </div>
@@ -264,8 +299,8 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                   {/* Category 1: Direct Buyer */}
                   {aiSuggestions.buyer.length > 0 && (
                     <div>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">
-                        <Zap className="w-3.5 h-3.5" /> Direct Buyer Intent
+                      <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">
+                        Direct Buyer Intent
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {aiSuggestions.buyer.map(phrase => {
@@ -289,8 +324,8 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                   {/* Category 2: Competitor Hijack */}
                   {aiSuggestions.competitor.length > 0 && (
                     <div>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">
-                        <Target className="w-3.5 h-3.5" /> Competitor Hijack Signals
+                      <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-amber-700">
+                        Competitor Hijack Signals
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {aiSuggestions.competitor.map(phrase => {
@@ -314,8 +349,8 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
                   {/* Category 3: Pain Point */}
                   {aiSuggestions.painPoint.length > 0 && (
                     <div>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700 uppercase tracking-wider mb-2">
-                        <ShieldAlert className="w-3.5 h-3.5" /> Pain-Point Discussions
+                      <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-blue-700">
+                        Pain-Point Discussions
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {aiSuggestions.painPoint.map(phrase => {
@@ -464,11 +499,11 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
 
                 {/* Instant Signal Summary Card */}
                 <div className="p-4 bg-[#0A84FF]/5 border border-[#0A84FF]/20 rounded-2xl space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#0A84FF] uppercase tracking-wider">
-                    <Sparkles className="w-4 h-4" /> Ready to Launch Monitoring Pipeline
+                  <div className="text-xs font-bold text-[#0A84FF] uppercase tracking-wider">
+                    Ready to launch
                   </div>
                   <p className="text-xs text-gray-600">
-                    Scouto will monitor <span className="font-semibold text-gray-900">{redditTargets.length} subreddits</span> for <span className="font-semibold text-gray-900">{keywords.length} high-intent phrases</span>. High-scoring leads will automatically draft replies and notify you in real-time.
+                    Your {planLabel} plan will activate <span className="font-semibold text-gray-900">{activeRuleCount} monitoring {activeRuleCount === 1 ? 'rule' : 'rules'}</span>. High-scoring leads will automatically draft replies and notify you in real time.
                   </p>
                 </div>
               </div>
@@ -478,7 +513,7 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
       </AnimatePresence>
 
       {/* Navigation Buttons */}
-      <div className="flex justify-between mt-8">
+      <div className="mt-6 flex shrink-0 items-center justify-between gap-4">
         {step > 1 ? (
           <button
             type="button"
@@ -499,14 +534,21 @@ export default function OnboardingWizard({ plan = 'free' }: { plan?: string }) {
             Continue <ArrowRight className="w-4 h-4" />
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex items-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50"
-          >
-            {loading ? 'Launching Scouto...' : 'Launch Monitoring Pipeline 🔥'}
-          </button>
+          <div className="flex max-w-sm flex-col items-end gap-2">
+            {submitError && (
+              <p role="alert" aria-live="polite" className="text-right text-xs font-medium text-red-600">
+                {submitError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading}
+              className="flex items-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            >
+              {loading ? 'Launching...' : 'Launch monitoring'}
+            </button>
+          </div>
         )}
       </div>
     </div>

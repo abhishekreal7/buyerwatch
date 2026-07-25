@@ -8,6 +8,7 @@ exports.hasDisclosure = hasDisclosure;
 exports.draftReply = draftReply;
 const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const generative_ai_1 = require("@google/generative-ai");
+const env_1 = require("./env");
 exports.PROMOTIONAL_PHRASES = [
     /check out/i,
     /you should try/i,
@@ -39,8 +40,9 @@ exports.DISCLOSURE_PATTERNS = [
 function hasDisclosure(draftText) {
     return exports.DISCLOSURE_PATTERNS.some(pattern => pattern.test(draftText));
 }
-async function draftReply(post, userProfile, intentScore) {
-    if (process.env.USE_MOCK_DRAFTS === 'true') {
+async function draftReply(post, userProfile, intentScore, trackingUrl // Optional referral URL — injected into Claude's prompt when referral_tracking_enabled
+) {
+    if ((0, env_1.isDevelopmentMockEnabled)('USE_MOCK_DRAFTS')) {
         const mockDraft = getMockDraft(post, userProfile);
         return {
             text: mockDraft,
@@ -70,6 +72,10 @@ URL: ${userProfile.business_url}
 Your writing style:
 ${userProfile.writing_style}
 
+${trackingUrl ? `REFERRAL LINK INSTRUCTION:
+A referral link is available: ${trackingUrl}
+You MAY include it in the reply only if it flows naturally — for example, after a genuine recommendation or at the very end of a helpful reply. Do not force it in. Do not make it the focus. Do not use it as a call-to-action. If including the link would make the reply feel promotional or awkward, omit it entirely.
+` : ''}
 ${userProfile.tone_examples ? `CRITICAL - TONE EXAMPLES TO MIMIC:
 Please study these examples written by the user in the past. Your generated reply MUST perfectly match this vocabulary, cadence, and vibe:
 ${userProfile.tone_examples}
@@ -90,20 +96,15 @@ Write ONLY the reply text, nothing else.
 `;
     let draftText = '';
     try {
-        if (process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY) {
-            const { generateKimiChat } = await import('./kimi.js');
-            draftText = await generateKimiChat({
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                temperature: 0.5,
+        if (process.env.ANTHROPIC_API_KEY) {
+            const anthropic = new sdk_1.default({
+                apiKey: process.env.ANTHROPIC_API_KEY,
+                timeout: 20_000,
+                maxRetries: 1,
             });
-        }
-        else {
-            const anthropic = new sdk_1.default({ apiKey: process.env.ANTHROPIC_API_KEY });
+            const modelName = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
             let response = await anthropic.messages.create({
-                model: 'claude-3-5-sonnet-20241022',
+                model: modelName,
                 max_tokens: 1000,
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userPrompt }]
@@ -113,7 +114,7 @@ Write ONLY the reply text, nothing else.
             }
             if (flagsAsPromotional(draftText)) {
                 response = await anthropic.messages.create({
-                    model: 'claude-3-5-sonnet-20241022',
+                    model: modelName,
                     max_tokens: 1000,
                     system: systemPrompt,
                     messages: [
@@ -127,19 +128,24 @@ Write ONLY the reply text, nothing else.
                 }
             }
         }
+        else {
+            throw new Error('ANTHROPIC_API_KEY is not configured, using fallback provider');
+        }
     }
     catch (error) {
         console.warn('Primary LLM failed, falling back to Gemini...', error);
         try {
+            if (!process.env.GEMINI_API_KEY)
+                throw new Error('GEMINI_API_KEY is not configured');
             const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
             const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-            const result = await model.generateContent(combinedPrompt);
+            const result = await model.generateContent(combinedPrompt, { timeout: 20_000 });
             draftText = result.response.text();
         }
         catch (fallbackError) {
             console.error('Gemini fallback failed to draft:', fallbackError);
-            draftText = getMockDraft(post, userProfile);
+            throw new Error('All configured drafting providers failed');
         }
     }
     return {

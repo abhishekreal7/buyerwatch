@@ -67,7 +67,7 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
 
       {/* Percentage label centered in the lower arc area */}
       <div
-        className="absolute flex items-center justify-center"
+        className="absolute flex flex-col items-center justify-center"
         style={{ bottom: 15, left: 0, right: 0 }}
       >
         <span
@@ -82,6 +82,7 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
         >
           {safePercentage}%
         </span>
+        <span className="mt-2 text-xs font-medium text-gray-500">{label}</span>
       </div>
     </div>
   )

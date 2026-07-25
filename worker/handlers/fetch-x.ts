@@ -1,6 +1,5 @@
 import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
 import { fetchXPosts } from '../../src/lib/x'
 import { scorePostQueue } from '../../src/lib/queues'
 import { X_DAILY_SPEND_LIMIT_CENTS } from '../../src/lib/plan-limits'
@@ -12,7 +11,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 import { supabaseWorker as supabase } from '../lib/supabase'
 
 export async function xFetchHandler(job: Job) {
-  const { target } = job.data
+  const { target, keywordMappings: preloadedMappings } = job.data
 
   try {
     const posts = await fetchXPosts(target)
@@ -20,16 +19,21 @@ export async function xFetchHandler(job: Job) {
     if (!posts || posts.length === 0) return
 
     // Find all users watching this specific X target
-    const { data: keywordMappings, error } = await supabase
-      .from('keywords')
-      .select('id, user_id, term')
-      .eq('platform', 'x')
-      .eq('target', target)
-      .eq('is_active', true)
+    let keywordMappings = preloadedMappings
+    let error = null
+    if (!keywordMappings) {
+      const result = await supabase
+        .from('keywords')
+        .select('id, user_id, term')
+        .eq('platform', 'x')
+        .eq('target', target)
+        .eq('is_active', true)
+      keywordMappings = result.data
+      error = result.error
+    }
 
     if (error) {
-      logger.error({ error }, 'Supabase error fetching keywords:')
-      return
+      throw new Error(`Failed to load X keyword mappings: ${error.message}`)
     }
 
     if (!keywordMappings || keywordMappings.length === 0) return
@@ -64,12 +68,13 @@ export async function xFetchHandler(job: Job) {
 }
 
 async function checkXSpendBudget(userId: string) {
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('plan')
     .eq('id', userId)
     .single()
 
+  if (profileError) throw new Error(`Failed to load X budget profile: ${profileError.message}`)
   if (!profile) return false
   const limit = X_DAILY_SPEND_LIMIT_CENTS[profile.plan] || 0
   if (limit === 0) return false
@@ -84,8 +89,7 @@ async function checkXSpendBudget(userId: string) {
   })
 
   if (error) {
-    logger.error({ error }, 'Error checking X spend budget:')
-    return false
+    throw new Error(`Failed to reserve X spend budget: ${error.message}`)
   }
 
   return data

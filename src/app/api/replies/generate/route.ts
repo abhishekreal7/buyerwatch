@@ -43,22 +43,15 @@ export async function POST(req: Request) {
     // 2. Enforce monthly AI draft limit
     const plan = normalizePlan(profile.plan)
     const limits = getPlanLimits(plan)
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
+    const { data: reserved, error: reserveError } = await supabase.rpc('reserve_monthly_draft', {
+      p_user_id: user.id,
+      p_limit: limits.aiDraftsPerMonth,
+    })
 
-    const { count: draftsThisMonth, error: countError } = await supabase
-      .from('reply_analytics')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', monthStart.toISOString())
-      .not('draft_text', 'is', null)
-
-    if (countError) {
-      return NextResponse.json({ error: 'Failed to check draft usage' }, { status: 500 })
+    if (reserveError) {
+      return NextResponse.json({ error: 'draft_usage_check_failed' }, { status: 500 })
     }
-
-    if ((draftsThisMonth ?? 0) >= limits.aiDraftsPerMonth) {
+    if (!reserved) {
       return NextResponse.json(
         { error: 'plan_limit_reached', limit: 'ai_drafts' },
         { status: 403 }
@@ -80,22 +73,18 @@ export async function POST(req: Request) {
     const draftResult = await draftReply(post, profile, thread.intent_score || 0)
     
     // 5. Update thread status and save draft
-    await supabase
-      .from('monitored_threads')
-      .update({ status: 'drafted' })
-      .eq('id', threadId)
-
-    await supabase
-      .from('reply_analytics')
-      .insert({
-        user_id: user.id,
-        thread_id: threadId,
-        draft_text: draftResult.text,
-      })
+    const { error: saveError } = await supabase.rpc('save_generated_draft', {
+      p_user_id: user.id,
+      p_thread_id: threadId,
+      p_draft_text: draftResult.text,
+    })
+    if (saveError) {
+      return NextResponse.json({ error: 'draft_save_failed' }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true, draft: draftResult.text })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error generating draft:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'draft_generation_failed' }, { status: 502 })
   }
 }

@@ -1,4 +1,5 @@
 import { NormalizedPost } from './types'
+import { fetchWithTimeout } from './http'
 
 let cachedToken: string | null = null
 let tokenExpiry: number = 0
@@ -17,7 +18,7 @@ async function getRedditToken(): Promise<string> {
 
   const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
 
-  const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+  const response = await fetchWithTimeout('https://www.reddit.com/api/v1/access_token', {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${authString}`,
@@ -25,7 +26,7 @@ async function getRedditToken(): Promise<string> {
       'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
     },
     body: 'grant_type=client_credentials'
-  })
+  }, 10_000)
 
   if (!response.ok) {
     throw new Error(`Reddit auth failed: ${response.statusText}`)
@@ -147,13 +148,13 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   try {
     const rssUrl = `https://www.reddit.com/r/${subreddit}/new/.rss?limit=${limit}`
     console.log(`[reddit] RSS fetch for r/${subreddit}`)
-    const rssResponse = await fetch(rssUrl, {
+    const rssResponse = await fetchWithTimeout(rssUrl, {
       headers: {
         'User-Agent': process.env.REDDIT_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       }
-    })
+    }, 10_000)
 
     if (rssResponse.ok) {
       const xml = await rssResponse.text()
@@ -173,12 +174,12 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
       await new Promise(r => setTimeout(r, 2000))
       try {
         const searchUrl = `https://www.reddit.com/r/${subreddit}/new/.rss?limit=${limit}&after=`
-        const retryResponse = await fetch(searchUrl, {
+        const retryResponse = await fetchWithTimeout(searchUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept': 'application/rss+xml, application/xml;q=0.9',
           }
-        })
+        }, 10_000)
         if (retryResponse.ok) {
           const xml = await retryResponse.text()
           const posts = parseRedditRss(xml, subreddit)
@@ -205,12 +206,12 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     try {
       console.log(`[reddit] Falling back to redditapis.com proxy for r/${subreddit}`)
       const url = `https://api.redditapis.com/r/${subreddit}/new?limit=${limit}`
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         headers: {
           'Authorization': `Bearer ${redditApisKey}`,
           'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
         }
-      })
+      }, 10_000)
       if (response.ok) {
         const json = await response.json() as any
         const posts = json.data?.children?.map((child: any) => child.data) || []
@@ -239,12 +240,12 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
       console.log(`[reddit] Falling back to OAuth API for r/${subreddit}`)
       const token = await getRedditToken()
       const url = `https://oauth.reddit.com/r/${subreddit}/new?limit=${limit}`
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
         }
-      })
+      }, 10_000)
       if (response.ok) {
         const json = await response.json() as any
         const posts = json.data?.children?.map((child: any) => child.data) || []
@@ -272,11 +273,11 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     try {
       console.log(`[reddit] Attempting public JSON feed for r/${subreddit}`)
       const url = `https://www.reddit.com/r/${subreddit}/new.json?limit=${limit}`
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         headers: {
           'User-Agent': process.env.REDDIT_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         }
-      })
+      }, 10_000)
       if (response.ok) {
         const json = await response.json() as any
         const posts = json.data?.children?.map((child: any) => child.data) || []
@@ -299,18 +300,5 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     }
   }
 
-  // ── FINAL FALLBACK: mock data ──────────────────────────────────────────────
-  console.warn(`[reddit] All fetch paths exhausted for r/${subreddit}, returning mock`)
-  return [
-    {
-      platform: 'reddit',
-      externalId: `mock-${Date.now()}`,
-      author: 'mock_user',
-      text: 'This is a mock post about needing an email marketing tool (Fallback).',
-      url: 'https://reddit.com/r/mock/mock_post',
-      createdAt: new Date().toISOString(),
-      sourceTarget: subreddit
-    }
-  ]
+  throw new Error(`All Reddit fetch paths failed for r/${subreddit}`)
 }
-

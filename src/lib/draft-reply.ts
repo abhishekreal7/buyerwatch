@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NormalizedPost } from './types'
+import { isDevelopmentMockEnabled } from './env'
 
 export interface UserProfile {
   business_name: string
@@ -54,7 +55,7 @@ export async function draftReply(
   trackingUrl?: string   // Optional referral URL — injected into Claude's prompt when referral_tracking_enabled
 ): Promise<{ text: string; mentionedProduct: boolean; flagged: boolean; hasDisclosure: boolean }> {
 
-  if (process.env.USE_MOCK_DRAFTS === 'true') {
+  if (isDevelopmentMockEnabled('USE_MOCK_DRAFTS')) {
     const mockDraft = getMockDraft(post, userProfile)
     return {
       text: mockDraft,
@@ -115,7 +116,11 @@ Write ONLY the reply text, nothing else.
 
   try {
     if (process.env.ANTHROPIC_API_KEY) {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        timeout: 20_000,
+        maxRetries: 1,
+      })
       
       const modelName = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5'
       let response = await anthropic.messages.create({
@@ -152,14 +157,15 @@ Write ONLY the reply text, nothing else.
   } catch (error) {
     console.warn('Primary LLM failed, falling back to Gemini...', error)
     try {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+      if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured')
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`
-      const result = await model.generateContent(combinedPrompt)
+      const result = await model.generateContent(combinedPrompt, { timeout: 20_000 })
       draftText = result.response.text()
     } catch (fallbackError) {
       console.error('Gemini fallback failed to draft:', fallbackError)
-      draftText = getMockDraft(post, userProfile)
+      throw new Error('All configured drafting providers failed')
     }
   }
 

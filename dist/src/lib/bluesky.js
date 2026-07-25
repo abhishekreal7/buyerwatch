@@ -1,12 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.searchBlueskyPosts = searchBlueskyPosts;
+const env_1 = require("./env");
+const http_1 = require("./http");
 let agent = null;
 async function getBlueskyAgent() {
     if (agent)
         return agent;
     const { BskyAgent } = await import('@atproto/api');
-    agent = new BskyAgent({ service: 'https://bsky.social' });
+    agent = new BskyAgent({
+        service: 'https://bsky.social',
+        fetch: (0, http_1.createTimeoutFetch)(15_000),
+    });
     const handle = process.env.BLUESKY_HANDLE;
     const password = process.env.BLUESKY_APP_PASSWORD;
     if (!handle || !password) {
@@ -16,7 +21,7 @@ async function getBlueskyAgent() {
     return agent;
 }
 async function searchBlueskyPosts(query, limit = 25) {
-    if (process.env.USE_MOCK_BLUESKY === 'true') {
+    if ((0, env_1.isDevelopmentMockEnabled)('USE_MOCK_BLUESKY')) {
         return [
             {
                 platform: 'bluesky',

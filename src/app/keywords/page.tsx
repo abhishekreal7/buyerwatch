@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, MoreHorizontal, Check, X, Pause, Play,
-  Trash2, Target, ChevronDown, Radio, Rss, Sparkles, ArrowRight
+  Trash2, Target, Rss, Sparkles, ArrowRight
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -34,32 +34,6 @@ const PLATFORM_META: Record<Platform, { label: string; color: string; bg: string
 const PLATFORMS_AVAILABLE: Platform[] = ['reddit', 'bluesky']
 
 /* ─── Tiny primitives ────────────────────────────────────────────── */
-function PlatformChip({ platform }: { platform: Platform }) {
-  let imgSrc = ''
-  let label = ''
-
-  if (platform === 'reddit') {
-    imgSrc = 'https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png'
-    label = 'Reddit'
-  } else if (platform === 'bluesky') {
-    imgSrc = 'https://bsky.app/static/apple-touch-icon.png'
-    label = 'Bluesky'
-  } else if (platform === 'x') {
-    imgSrc = 'https://abs.twimg.com/favicons/twitter.3.ico'
-    label = 'X'
-  } else if (platform === 'threads') {
-    imgSrc = 'https://static.cdninstagram.com/rsrc.php/v3/y6/r/a0qE7WIVw-q.png'
-    label = 'Threads'
-  }
-
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#F4F5F7] w-fit">
-      <img src={imgSrc} alt={label} className="w-[16px] h-[16px] rounded-full shadow-sm object-cover" />
-      <span className="font-medium text-text-secondary text-[13px] tracking-tight">{label}</span>
-    </div>
-  )
-}
-
 function StatusPill({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
     <button
@@ -80,13 +54,6 @@ function StatusPill({ active, onClick }: { active: boolean; onClick: () => void 
 }
 
 // Real metric calculations based strictly on monitored threads
-const getPopularity = (kwId: string, threadCount: number) => {
-  if (threadCount > 0) {
-    return Math.min(Math.round((threadCount / 15) * 100), 100)
-  }
-  return 0
-}
-
 const getSuccessRate = (kwId: string, threadCount: number, repliedCount: number) => {
   if (threadCount > 0) {
     return Math.round((repliedCount / threadCount) * 100)
@@ -184,7 +151,7 @@ export default function KeywordsPage() {
     setLoading(false)
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -195,7 +162,7 @@ export default function KeywordsPage() {
       await load()
     }
     init()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [])
 
   const handleAdd = async () => {

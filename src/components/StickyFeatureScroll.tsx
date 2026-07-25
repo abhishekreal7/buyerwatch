@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence, useInView } from 'framer-motion'
 import { Sparkles, Clock, Workflow, Quote } from 'lucide-react'
 
 // Sleek vector line-art icons for the Orange Metric Showcase Card
@@ -41,7 +41,7 @@ const features = [
     id: 0,
     icon: Sparkles,
     title: 'Match Detected',
-    description: 'Scouto scans Reddit, X, and Bluesky 24/7. When someone describes the exact problem you solve, it flags it.',
+    description: 'Scouto scans Reddit and Bluesky at your plan cadence. When someone describes the exact problem you solve, it flags it.',
     leftTitle: 'TIME TO DETECT',
     leftMetric: '< 9 min',
     leftDescription: 'A post asking for cold email alternatives was detected and flagged in under 9 minutes.',
@@ -53,8 +53,8 @@ const features = [
     title: 'Intent Scored',
     description: 'Not just keyword matching. The model reads the post context to verify the user is actually looking to buy.',
     leftTitle: 'BUYING CONFIDENCE',
-    leftMetric: '94%',
-    leftDescription: 'The classifier scored the lead 94/100, filtering out generic chatter and spam.',
+    leftMetric: '0–100',
+    leftDescription: 'The classifier assigns a confidence score so generic chatter can be filtered before review.',
     metricIcon: IntentScoreIcon
   },
   {
@@ -71,26 +71,29 @@ const features = [
     id: 3,
     icon: Quote,
     title: 'Approved & Sent',
-    description: 'You review the draft, edit anything you want, and post it. Scouto never auto-posts without your click.',
+    description: 'You review and send by default. Eligible paid accounts can explicitly enable guarded auto-send after trust-building reviews.',
     leftTitle: 'REPLY RATE',
-    leftMetric: '18%',
-    leftDescription: 'Warm replies to active searchers convert at 18%, compared to less than 1% for cold outreach.',
+    leftMetric: 'Opt-in',
+    leftDescription: 'Manual review is the default, with guarded auto-send available only to eligible paid accounts.',
     metricIcon: ReplyRateIcon
   }
 ]
 
 export const StickyFeatureScroll = () => {
   const [activeIndex, setActiveIndex] = useState(0)
+  const sectionRef = useRef<HTMLElement>(null)
+  const inView = useInView(sectionRef, { margin: '160px' })
 
   useEffect(() => {
+    if (!inView) return
     const timer = setTimeout(() => {
       setActiveIndex((prev) => (prev + 1) % features.length)
     }, 6000)
     return () => clearTimeout(timer)
-  }, [activeIndex])
+  }, [activeIndex, inView])
 
   return (
-    <section id="features" className="relative w-full py-28" style={{ backgroundColor: '#FFFFFF' }}>
+    <section ref={sectionRef} id="features" className="relative w-full py-28" style={{ backgroundColor: '#FFFFFF' }}>
       <div className="max-w-[1200px] mx-auto px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-[62px] items-start">
           
@@ -190,10 +193,12 @@ export const StickyFeatureScroll = () => {
               const Icon = feature.icon
 
               return (
-                <div
+                <button
+                  type="button"
                   key={feature.id}
                   onClick={() => setActiveIndex(index)}
-                  className="group relative pb-7 border-b border-black/[0.08] cursor-pointer text-left transition-colors duration-300"
+                  className="group relative w-full pb-7 border-b border-black/[0.08] cursor-pointer text-left transition-colors duration-300"
+                  aria-pressed={isActive}
                 >
                   <div className="flex items-start gap-4.5">
                     {/* Circle-wrapped icon wrapper */}
@@ -253,7 +258,7 @@ export const StickyFeatureScroll = () => {
                       </AnimatePresence>
                     </div>
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>

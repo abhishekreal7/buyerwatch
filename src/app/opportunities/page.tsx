@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Target, Filter, MessageCircle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { Target, MessageCircle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'

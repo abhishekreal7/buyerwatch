@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Target, ArrowLeft } from 'lucide-react'
 
+const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'support@example.com'
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 pb-20">
@@ -55,15 +57,15 @@ export default function PrivacyPage() {
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li><strong>Social Listening:</strong> We monitor public posts and comments matching your specified keywords.</li>
-              <li><strong>AI Processing:</strong> Matching posts are analyzed using advanced AI models (Gemini for intent scoring and Claude for drafting). <em>Note:</em> We do not use your customer data, profiles, or private templates to train general-purpose public models.</li>
-              <li><strong>Gated Posting Flow:</strong> Scouto operates under a strict manual-review framework. The AI generates drafts stored in your dashboard, and we will <strong>never</strong> publish or post to Reddit or any other platform without your explicit manual approval.</li>
+              <li><strong>AI Processing:</strong> Matching posts are analyzed by the AI providers configured for the service. We do not use your customer data, profiles, or private templates to train our own general-purpose public model.</li>
+              <li><strong>Gated Posting Flow:</strong> Manual review is the default. Paid accounts may explicitly enable confidence-gated auto-send after completing the required trust-building reviews, and may disable it at any time.</li>
             </ul>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
               3. Payment Processing
             </h2>
             <p>
-              All payments, billing details, and subscription management are securely processed by our third-party merchant provider, <strong>Lemon Squeezy</strong>. Scouto never collects or stores credit card numbers. Your billing relationship is governed by Lemon Squeezy's privacy terms.
+              When paid plans are enabled, payments, billing details, and subscription management are processed by our merchant provider, <strong>Dodo Payments</strong>. Scouto does not collect or store full card numbers.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
@@ -77,7 +79,7 @@ export default function PrivacyPage() {
               5. Contact Us
             </h2>
             <p>
-              If you have any questions or concerns about our privacy practices, please contact us at <a href="mailto:support@scouto.com" className="text-[#0A84FF] hover:underline font-semibold">support@scouto.com</a>.
+              If you have any questions or concerns about our privacy practices, please contact us at <a href={`mailto:${supportEmail}`} className="text-[#0A84FF] hover:underline font-semibold">{supportEmail}</a>.
             </p>
           </div>
         </motion.div>

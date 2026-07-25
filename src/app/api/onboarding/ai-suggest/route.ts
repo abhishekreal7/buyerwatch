@@ -2,6 +2,93 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import Anthropic from '@anthropic-ai/sdk'
+import { fetchPublicText } from '@/lib/security/outbound-url'
+
+type SuggestionResult = {
+  businessName?: string
+  description: string
+  subreddits: string[]
+  buyerKeywords: string[]
+  competitorKeywords: string[]
+  painPointKeywords: string[]
+  source?: 'ai' | 'fallback'
+}
+
+function cleanApiKey(value: string | undefined): string {
+  const trimmed = value?.trim() ?? ''
+  return trimmed && !trimmed.startsWith('#') && !trimmed.toLowerCase().includes('todo') ? trimmed : ''
+}
+
+function normalizeWebsiteUrl(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+}
+
+function titleCase(value: string): string {
+  return value
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
+    .trim()
+}
+
+function deriveBusinessName(url: string, fallback: string): string {
+  if (fallback.trim()) return fallback.trim()
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    return titleCase(host.split('.')[0] || 'Product')
+  } catch {
+    return 'Product'
+  }
+}
+
+function buildFallbackSuggestions(params: {
+  url: string
+  businessName: string
+  businessDescription: string
+  webpageTitle: string
+  webpageDescription: string
+}): SuggestionResult {
+  const name = deriveBusinessName(params.url, params.businessName)
+  const pageSummary = params.webpageDescription || params.webpageTitle
+  const description = params.businessDescription.trim()
+    || (pageSummary ? `${name} helps customers with ${pageSummary.toLowerCase()}. Use this summary as a starting point and refine it with your positioning.` : `${name} helps customers solve a specific business problem. Add a sharper positioning line to improve monitoring suggestions.`)
+
+  return {
+    businessName: name,
+    description,
+    subreddits: ['SaaS', 'startups', 'Entrepreneur', 'smallbusiness', 'marketing', 'webdev'],
+    buyerKeywords: [
+      `looking for ${name}`,
+      `best tool for ${name}`,
+      `recommend ${name}`,
+    ],
+    competitorKeywords: [
+      `alternative to ${name}`,
+      `switching from ${name}`,
+    ],
+    painPointKeywords: [
+      'need a better way to find leads',
+      'struggling to monitor reddit',
+      'how to find buying intent',
+    ],
+    source: 'fallback',
+  }
+}
+
+function parseAiJson(value: string): SuggestionResult | null {
+  const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim()
+  if (!jsonString) return null
+  try {
+    const parsed = JSON.parse(jsonString) as SuggestionResult
+    return {
+      ...parsed,
+      source: 'ai',
+    }
+  } catch {
+    return null
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,22 +96,34 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { url, businessName, businessDescription } = await req.json()
+    const payload = await req.json()
+    const url = normalizeWebsiteUrl(typeof payload.url === 'string' ? payload.url : '')
+    const businessName = typeof payload.businessName === 'string' ? payload.businessName.trim() : ''
+    const businessDescription = typeof payload.businessDescription === 'string' ? payload.businessDescription.trim() : ''
+
+    if (!url && !businessName) {
+      return NextResponse.json({ error: 'Enter a website URL or business name.' }, { status: 400 })
+    }
 
     let webpageText = ''
-    if (url && url.startsWith('http')) {
+    let webpageTitle = ''
+    let webpageDescription = ''
+    if (url) {
       try {
-        const fetchRes = await fetch(url, {
+        const { response: fetchRes, text: html } = await fetchPublicText(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           },
-          signal: AbortSignal.timeout(5000),
+          timeoutMs: 5_000,
+          maxBytes: 200_000,
+          maxRedirects: 3,
         })
         if (fetchRes.ok) {
-          const html = await fetchRes.text()
           // Extract text from title, meta description, and body headers
           const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? ''
           const metaDesc = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)?.[1] ?? ''
+          webpageTitle = title.trim()
+          webpageDescription = metaDesc.trim()
           const bodySnippet = html.replace(/<script[\s\S]*?<\/script>/gi, '')
             .replace(/<style[\s\S]*?<\/style>/gi, '')
             .replace(/<[^>]+>/g, ' ')
@@ -47,6 +146,7 @@ Product Info:
 
 Return ONLY a raw valid JSON object (no markdown, no backticks, no markdown fence):
 {
+  "businessName": "Detected product or company name",
   "description": "A concise 2-sentence summary of what the product does and its primary value proposition.",
   "subreddits": ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8"],
   "buyerKeywords": ["phrase 1", "phrase 2", "phrase 3"],
@@ -62,47 +162,52 @@ Rules:
 5. NEVER append duplicate words like "reddit reddit". Keep phrases natural.`
 
     let aiResponse = ''
+    const geminiKey = cleanApiKey(process.env.GEMINI_API_KEY)
+    const anthropicKey = cleanApiKey(process.env.ANTHROPIC_API_KEY)
 
-    if (process.env.GEMINI_API_KEY) {
+    if (geminiKey) {
       try {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+        const genAI = new GoogleGenerativeAI(geminiKey)
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-        const result = await model.generateContent(prompt)
+        const result = await model.generateContent(prompt, { timeout: 20_000 })
         aiResponse = result.response.text()
       } catch (geminiErr) {
         console.warn('[ai-suggest] Gemini failed, attempting Anthropic...', geminiErr)
       }
     }
 
-    if (!aiResponse && process.env.ANTHROPIC_API_KEY) {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-      const response = await anthropic.messages.create({
-        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
-        max_tokens: 1000,
-        system: 'You output strictly valid JSON without explanation or formatting wrappers.',
-        messages: [{ role: 'user', content: prompt }]
-      })
-      if (response.content[0].type === 'text') {
-        aiResponse = response.content[0].text
+    if (!aiResponse && anthropicKey) {
+      try {
+        const anthropic = new Anthropic({
+          apiKey: anthropicKey,
+          timeout: 20_000,
+          maxRetries: 1,
+        })
+        const response = await anthropic.messages.create({
+          model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+          max_tokens: 1000,
+          system: 'You output strictly valid JSON without explanation or formatting wrappers.',
+          messages: [{ role: 'user', content: prompt }]
+        })
+        if (response.content[0].type === 'text') {
+          aiResponse = response.content[0].text
+        }
+      } catch (anthropicErr) {
+        console.warn('[ai-suggest] Anthropic failed, using fallback suggestions:', anthropicErr)
       }
     }
 
-
-    // Clean JSON response string
-    const jsonString = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim()
-    const result = JSON.parse(jsonString)
-
+    const result = parseAiJson(aiResponse) ?? buildFallbackSuggestions({
+      url,
+      businessName,
+      businessDescription,
+      webpageTitle,
+      webpageDescription,
+    })
 
     return NextResponse.json(result)
-  } catch (err: any) {
+  } catch (err) {
     console.error('[ai-suggest] Error generating suggestions:', err)
-    // Fallback default suggestions if AI fails
-    return NextResponse.json({
-      description: 'AI intelligence tool for automated lead discovery and growth.',
-      subreddits: ['SaaS', 'startups', 'Entrepreneur', 'smallbusiness', 'marketing', 'webdev'],
-      buyerKeywords: ['best tool for lead generation', 'looking for alternative'],
-      competitorKeywords: ['alternative to hubspot', 'leaving salesforce'],
-      painPointKeywords: ['how to find early SaaS customers', 'struggling with outreach'],
-    })
+    return NextResponse.json({ error: 'suggestion_generation_failed' }, { status: 502 })
   }
 }

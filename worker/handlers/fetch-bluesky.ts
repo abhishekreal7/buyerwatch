@@ -1,6 +1,5 @@
 import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
-import { createClient } from '@supabase/supabase-js'
 import { searchBlueskyPosts } from '../../src/lib/bluesky'
 import { scorePostQueue } from '../../src/lib/queues'
 import * as dotenv from 'dotenv'
@@ -11,7 +10,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 import { supabaseWorker as supabase } from '../lib/supabase'
 
 export async function blueskyFetchHandler(job: Job) {
-  const { target } = job.data // e.g. "email marketing tool"
+  const { target, keywordMappings: preloadedMappings } = job.data
 
   try {
     const posts = await searchBlueskyPosts(target)
@@ -19,16 +18,21 @@ export async function blueskyFetchHandler(job: Job) {
     if (!posts || posts.length === 0) return
 
     // Find all users watching this specific bluesky query
-    const { data: keywordMappings, error } = await supabase
-      .from('keywords')
-      .select('id, user_id, term')
-      .eq('platform', 'bluesky')
-      .eq('target', target)
-      .eq('is_active', true) 
+    let keywordMappings = preloadedMappings
+    let error = null
+    if (!keywordMappings) {
+      const result = await supabase
+        .from('keywords')
+        .select('id, user_id, term')
+        .eq('platform', 'bluesky')
+        .eq('target', target)
+        .eq('is_active', true)
+      keywordMappings = result.data
+      error = result.error
+    }
 
     if (error) {
-      logger.error({ error }, 'Supabase error fetching bluesky keywords:')
-      return
+      throw new Error(`Failed to load Bluesky keyword mappings: ${error.message}`)
     }
 
     if (!keywordMappings || keywordMappings.length === 0) return

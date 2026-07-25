@@ -24,6 +24,9 @@ export async function POST(request: Request) {
     if (!threadId || !actionType) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+    if (!['APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED'].includes(actionType)) {
+      return NextResponse.json({ error: 'Invalid action type' }, { status: 400 })
+    }
 
     // Call the Postgres function we created in schema.sql
     const { error } = await supabase.rpc('log_draft_feedback', {

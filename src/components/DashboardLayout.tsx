@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Settings, Bell, Search, LogOut, Zap, ZapOff, HelpCircle, X, ArrowRight, User } from 'lucide-react'
+import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Bell, Search, LogOut, User } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 
@@ -24,18 +24,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [togglingAutoSend, setTogglingAutoSend] = useState(false)
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
   const [draftCount, setDraftCount] = useState<number | null>(null)
-  const [userInitial, setUserInitial] = useState('')
-  const [showWalkthrough, setShowWalkthrough] = useState(false)
 
   useEffect(() => {
     async function loadSidebarData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
-      // User initial
-      setUserInitial(
-        (user.user_metadata?.full_name?.[0] || user.email?.[0] || '?').toUpperCase()
-      )
 
       // Profile — auto-send state
       const { data: profile } = await supabase
