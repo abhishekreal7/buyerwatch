@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
+import { randomBytes } from 'node:crypto'
 import { createClient } from '@/utils/supabase/server'
 import { draftReply } from '@/lib/draft-reply'
 import { NormalizedPost } from '@/lib/types'
 import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { buildAttributionShortUrl } from '@/lib/attribution'
+import { ensureAttributionMapping } from '@/lib/attribution-store'
+import { getAppUrl } from '@/lib/app-url'
+import { getServiceRoleClient } from '@/lib/admin'
 
 export async function POST(req: Request) {
   try {
@@ -21,7 +26,7 @@ export async function POST(req: Request) {
     // 1. Fetch thread and user profile
     const { data: thread } = await supabase
       .from('monitored_threads')
-      .select('*')
+      .select('id, external_id, platform, author, title, text_content, url, created_at, intent_score, tracking_sid, keywords(term, target)')
       .eq('id', threadId)
       .eq('user_id', user.id)
       .single()
@@ -32,7 +37,7 @@ export async function POST(req: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_examples, plan, referral_tracking_enabled')
       .eq('id', user.id)
       .single()
 
@@ -63,14 +68,41 @@ export async function POST(req: Request) {
       externalId: thread.external_id,
       platform: thread.platform,
       author: thread.author,
+      title: thread.title || undefined,
       text: thread.text_content,
       url: thread.url,
       createdAt: thread.created_at || new Date().toISOString(),
-      sourceTarget: thread.keyword_text || thread.subreddit || '',
+      sourceTarget: (thread.keywords as unknown as { target?: string } | null)?.target || '',
     }
 
     // 4. Draft reply
-    const draftResult = await draftReply(post, profile, thread.intent_score || 0)
+    let trackingSid = thread.tracking_sid as string | null
+    if (profile.referral_tracking_enabled !== false && profile.business_url && !trackingSid) {
+      trackingSid = randomBytes(5).toString('base64url')
+      const { error: trackingError } = await supabase
+        .from('monitored_threads')
+        .update({ tracking_sid: trackingSid })
+        .eq('id', threadId)
+        .eq('user_id', user.id)
+      if (trackingError) {
+        return NextResponse.json({ error: 'tracking_setup_failed' }, { status: 500 })
+      }
+    }
+
+    const trackingUrl = profile.referral_tracking_enabled !== false
+      && profile.business_url
+      && trackingSid
+      ? buildAttributionShortUrl(getAppUrl(), trackingSid)
+      : undefined
+    if (trackingUrl && trackingSid) {
+      await ensureAttributionMapping(getServiceRoleClient(), {
+        userId: user.id,
+        threadId,
+        token: trackingSid,
+        businessUrl: profile.business_url,
+      })
+    }
+    const draftResult = await draftReply(post, profile, thread.intent_score || 0, trackingUrl)
     
     // 5. Update thread status and save draft
     const { error: saveError } = await supabase.rpc('save_generated_draft', {

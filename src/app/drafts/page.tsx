@@ -2,24 +2,28 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink } from 'lucide-react'
+import { AlertTriangle, Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { PageHeader } from '@/components/PageHeader'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
+import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
+import { evaluateReplyQuality } from '@/lib/reply-quality'
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
   const isHigh = score >= 80
   const isMid = score >= 60 && score < 80
+
   return (
     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold ${
       isHigh ? 'bg-success/10 text-success border border-success/20' : 
       isMid ? 'bg-accent/10 text-accent border border-accent/20' : 
       'bg-black/[0.05] text-black/60 border border-black/[0.08]'
     }`}>
-      {isHigh ? '🟢' : isMid ? '🔵' : '⚫'} <span className="tabular-nums">{score}</span> · {label}
+      <span className={`h-1.5 w-1.5 rounded-full ${isHigh ? 'bg-success' : isMid ? 'bg-accent' : 'bg-black/35'}`} />
+      <span className="tabular-nums">{score}</span> · {label}
     </div>
   )
 }
@@ -57,6 +61,7 @@ export default function DraftsPage() {
   const [isSending, setIsSending] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [connections, setConnections] = useState<string[]>([])
+  const [businessName, setBusinessName] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -66,21 +71,42 @@ export default function DraftsPage() {
       
       const { data: conns } = await supabase.from('platform_connections').select('platform').eq('user_id', user.id)
       if (conns) setConnections(conns.map(c => c.platform))
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('business_name')
+        .eq('id', user.id)
+        .single()
+      setBusinessName(profile?.business_name || '')
 
       const { data } = await supabase
         .from('monitored_threads')
-        .select('*, reply_analytics(draft_text)')
+        .select('*, reply_analytics(draft_text), keywords(term, target)')
         .eq('user_id', user.id)
         .in('status', ['drafted', 'needs_manual_reply'])
         .order('created_at', { ascending: false })
 
       if (data && data.length > 0) {
-        const parsed = data.map(t => ({
-          id: t.id, platform: t.platform, target: t.author || 'unknown', timeAgo: formatTimeAgo(t.created_at),
-          title: '', content: t.text_content, score: Number(t.intent_score) || 0, label: Number(t.intent_score) >= 80 ? 'Buying' : 'Researching',
-          draft: t.reply_analytics?.[0]?.draft_text || '', matchedKeyword: t.keyword_id || '',
-          url: t.url || null,
-        }))
+        const parsed = data.map(t => {
+          const keyword = Array.isArray(t.keywords) ? t.keywords[0] : t.keywords
+          const score = Number(t.intent_score) || 0
+          return {
+            id: t.id,
+            platform: t.platform,
+            target: t.author || 'unknown',
+            community: keyword?.target || t.platform,
+            timeAgo: formatTimeAgo(t.created_at),
+            title: t.title || '',
+            content: t.text_content,
+            score,
+            label: getIntentDisplayLabel(t.intent_label as IntentLabel | undefined, score),
+            draft: t.reply_analytics?.[0]?.draft_text || '',
+            matchedKeyword: keyword?.term || 'Monitoring rule',
+            url: t.url || null,
+            qualityIssues: Array.isArray(t.quality_issues) ? t.quality_issues : [],
+            automationReason: t.automation_reason || '',
+            reasoning: t.score_reasoning || '',
+          }
+        })
         setDrafts(parsed)
         setSelected(parsed[0])
         setDraftContent(parsed[0].draft)
@@ -113,6 +139,14 @@ export default function DraftsPage() {
 
   const handleApproveAndSend = async () => {
     if (!selected) return
+    const quality = evaluateReplyQuality(draftContent, {
+      businessName,
+      platform: selected.platform,
+    })
+    if (quality.blocksAutomation) {
+      toast.error(quality.issues[0]?.message || 'Resolve the publishing checks before posting.')
+      return
+    }
     if (!connections.includes(selected.platform)) {
       toast.error(`Please connect your ${selected.platform} account in Settings first.`)
       return
@@ -125,18 +159,20 @@ export default function DraftsPage() {
     // between drafts before approving.
     const originalReplyText = originalDraftRef.current
     const replyTextToSend = draftContent
-    
-    setDrafts(prev => prev.filter(d => d.id !== threadIdToSend))
-    const nextSelected = drafts.find(d => d.id !== threadIdToSend) || null
-    setSelected(nextSelected)
-    if (nextSelected) setDraftContent(nextSelected.draft)
-    toast.success('Reply queued for posting')
 
-    // Reset ref after send — next draft selection will re-populate it
-    originalDraftRef.current = ''
     try {
+      const res = await fetch('/api/replies/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: threadIdToSend, platform: platformToSend, text: replyTextToSend, triggerType: 'manual' })
+      })
+      const payload = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(payload?.issues?.[0]?.message || payload?.error || 'Failed to queue reply')
+      }
+
       const actionType = originalReplyText === replyTextToSend ? 'APPROVED' : 'EDITED_APPROVED'
-      fetch('/api/feedback', {
+      const feedbackResponse = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -145,19 +181,22 @@ export default function DraftsPage() {
           finalDraft: replyTextToSend,
           actionType,
           platform: platformToSend,
-          targetCommunity: selected.target,
-          keywordCluster: selected.matchedKeyword
-        })
-      }).catch(console.error)
-
-      const res = await fetch('/api/replies/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId: threadIdToSend, platform: platformToSend, text: replyTextToSend, triggerType: 'manual' })
+          targetCommunity: selected.community,
+          keywordCluster: selected.matchedKeyword,
+        }),
       })
-      if (!res.ok) throw new Error('Network response was not ok')
-    } catch {
-      toast.error('Failed to send reply')
+      if (!feedbackResponse.ok) {
+        toast.warning('Reply queued, but review history could not be updated.')
+      }
+
+      setDrafts(prev => prev.filter(d => d.id !== threadIdToSend))
+      const nextSelected = drafts.find(d => d.id !== threadIdToSend) || null
+      setSelected(nextSelected)
+      setDraftContent(nextSelected?.draft || '')
+      originalDraftRef.current = nextSelected?.draft || ''
+      toast.success('Reply queued for posting')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to send reply')
     } finally {
       setIsSending(false)
     }
@@ -224,6 +263,13 @@ export default function DraftsPage() {
       setIsRegenerating(false)
     }
   }
+
+  const currentQuality = selected
+    ? evaluateReplyQuality(draftContent, {
+        businessName,
+        platform: selected.platform,
+      })
+    : null
 
   return (
     <AppPage>
@@ -313,14 +359,24 @@ export default function DraftsPage() {
                 />
               </div>
 
-              {/* Why it works */}
               <div>
-                <div className="text-[13px] font-semibold text-text-primary mb-4">Why this reply works:</div>
-                <ul className="space-y-3 text-[14px] text-text-secondary font-medium">
-                  <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">Leads with genuine value and shared experience</span></li>
-                  <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">Includes required founder disclosure</span></li>
-                  <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">Contextually relevant, not promotional in tone</span></li>
-                </ul>
+                <div className="text-[13px] font-semibold text-text-primary mb-4">Publishing checks</div>
+                {currentQuality?.blocksAutomation ? (
+                  <ul className="space-y-3 text-[13px] font-medium text-amber-800">
+                    {currentQuality.issues.map(issue => (
+                      <li key={issue.code} className="flex min-w-0 items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+                        <AlertTriangle className="mt-0.5 h-[17px] w-[17px] shrink-0 text-amber-600" />
+                        <span className="min-w-0 break-words">{issue.message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="space-y-3 text-[14px] text-text-secondary font-medium">
+                    <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">No deterministic promotional or call-to-action language detected</span></li>
+                    <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">Commercial references include an affiliation disclosure</span></li>
+                    <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">Platform length limit is satisfied; final relevance remains your decision</span></li>
+                  </ul>
+                )}
               </div>
             </div>
 
@@ -348,7 +404,7 @@ export default function DraftsPage() {
               {/* Approve & Post */}
               <button 
                 onClick={handleApproveAndSend}
-                disabled={isSending}
+                disabled={isSending || currentQuality?.blocksAutomation}
                 className="btn-primary !rounded-[12px] px-6 flex items-center gap-2 flex-1 sm:flex-none justify-center"
               >
                 {isSending ? (

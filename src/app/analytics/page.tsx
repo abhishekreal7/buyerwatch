@@ -109,7 +109,7 @@ export default function AnalyticsPage() {
       const [profileRes, connsRes, threadsRes, analyticsRes, feedbackRes, attributionRes] = await Promise.all([
         supabase.from('profiles').select('auto_send_enabled').eq('id', user.id).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', user.id),
-        supabase.from('monitored_threads').select('*').eq('user_id', user.id),
+        supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', user.id),
         supabase.from('reply_analytics').select('was_sent, sent_at').eq('user_id', user.id),
         supabase.from('draft_feedback').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('reply_attribution').select('clicked_at, converted_at, revenue_usd').eq('user_id', user.id),
@@ -240,7 +240,8 @@ export default function AnalyticsPage() {
       // --- TOP KEYWORDS ---
       const kwMap: Record<string, { term: string; count: number }> = {}
       threads.forEach((t: any) => {
-        const term = t.matched_keyword || t.target || t.keyword_id
+        const relation = Array.isArray(t.keywords) ? t.keywords[0] : t.keywords
+        const term = relation?.term
         if (term) {
           kwMap[term] = kwMap[term] || { term, count: 0 }
           kwMap[term].count++
@@ -477,7 +478,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
-                <p className="text-[13px] text-text-secondary mt-0.5">Track clicks &amp; paid conversions originating from Scouto shortlinks</p>
+                <p className="text-[13px] text-text-secondary mt-0.5">Track replies that generated a verified click, conversion, or payment.</p>
               </div>
               <Link href="/settings#notifications" className="text-[13px] font-medium text-blue-600 hover:underline">
                 Setup Conversion Webhook →
@@ -486,9 +487,9 @@ export default function AnalyticsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Shortlink Clicks</p>
+                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Replies Clicked</p>
                 <p className="text-[26px] font-bold text-text-primary tracking-tight">{data.attributionStats?.clicks || 0}</p>
-                <p className="text-[12px] text-text-secondary mt-1">Unique readers clicked</p>
+                <p className="text-[12px] text-text-secondary mt-1">Tracked replies with at least one verified click</p>
               </div>
               <div className="bg-[#0A84FF]/[0.04] border border-[#0A84FF]/10 p-4 rounded-xl">
                 <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Conversions</p>

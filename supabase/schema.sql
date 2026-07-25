@@ -19,7 +19,7 @@ create table profiles (
   reddit_username text,
   plan text not null default 'free' check (plan in ('free', 'pro', 'growth')),
   auto_send_enabled boolean default false,
-  auto_send_threshold integer default 85 check (auto_send_threshold >= 70),
+  auto_send_threshold integer default 85 check (auto_send_threshold between 70 and 100),
   notification_preferences jsonb default '{"emailDigest": true, "highIntentAlerts": true, "weeklyReport": false}'::jsonb,
   last_polled_at timestamptz,
   created_at timestamptz default now()
@@ -42,9 +42,14 @@ create table monitored_threads (
   platform text not null check (platform in ('reddit', 'bluesky', 'x', 'threads')),
   external_id text not null,
   author text,
+  title text,
   text_content text,
   url text,
   intent_score numeric,
+  intent_label text check (intent_label in ('buying', 'researching', 'complaining', 'other')),
+  matched_signals text[] not null default '{}',
+  quality_issues text[] not null default '{}',
+  automation_reason text,
   status text default 'pending' check (status in ('pending', 'drafted', 'sending', 'send_reconciliation_required', 'needs_manual_reply', 'dismissed', 'replied')),
   flag text,
   created_at timestamptz default now(),
@@ -59,7 +64,8 @@ create table reply_analytics (
   edited_text text,
   was_sent boolean default false,
   sent_at timestamptz,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  unique (thread_id)
 );
 
 -- AI usage budgeting (see Section 4.3)

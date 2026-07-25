@@ -12,6 +12,10 @@ const readinessMigration = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260726_production_readiness.sql'),
   'utf8',
 )
+const qualityMigration = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260727_product_quality_hardening.sql'),
+  'utf8',
+)
 
 describe('plan and scheduler contracts', () => {
   it('applies explicit polling intervals to every plan', () => {
@@ -48,6 +52,19 @@ describe('plan and scheduler contracts', () => {
     expect(readinessMigration).toContain(
       'revoke insert, update, delete on ingestion_events from anon, authenticated',
     )
+  })
+
+  it('persists explainable intent evidence and one canonical draft per thread', () => {
+    expect(qualityMigration).toContain('intent_label text')
+    expect(qualityMigration).toContain("matched_signals text[] not null default '{}'")
+    expect(qualityMigration).toContain("quality_issues text[] not null default '{}'")
+    expect(qualityMigration).toContain('automation_reason text')
+    expect(qualityMigration).toContain('reply_analytics_thread_uidx')
+    expect(qualityMigration).toContain('on conflict (thread_id) do update')
+  })
+
+  it('enforces the user automation threshold as a bounded database value', () => {
+    expect(qualityMigration).toContain('auto_send_threshold between 70 and 100')
   })
 })
 

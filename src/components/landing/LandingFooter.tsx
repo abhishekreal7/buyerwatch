@@ -4,19 +4,20 @@ import type { ReactNode } from 'react'
 import { useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import Link from 'next/link'
-import { ChevronRight, Plus, Target } from 'lucide-react'
+import { Plus, Target } from 'lucide-react'
 import { springs } from '@/lib/motion'
 import { NewsletterForm } from '@/components/NewsletterForm'
+import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
 
 const faqs = [
   { q: 'What is Scouto?', a: 'It monitors Reddit and Bluesky for people looking for solutions like yours, scores their intent, and drafts a reply for review.' },
   { q: 'Does Scouto post automatically?', a: 'Manual review is the default. Paid accounts can explicitly enable guarded auto-send only after completing the required trust-building reviews.' },
-  { q: 'Does it work for non-SaaS businesses?', a: 'Yes. As long as your customers talk about their problems online, Scouto can find them.' },
+  { q: 'Does it work for non-SaaS businesses?', a: 'Yes. You can monitor configured Reddit communities and Bluesky searches for conversations relevant to any product or service.' },
   { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. Scouto finds active buying intent from people who don\'t know you yet.' },
   { q: 'How does intent scoring work?', a: 'We classify posts into Buying, Researching, Complaining, and Other, then attach a 0–100 confidence score for review.' },
   { q: 'Can I try it for free?', a: 'Yes. Start with 1 keyword and up to 50 conversations per month. No card required.' },
-  { q: 'Does this violate platform terms of service?', a: 'Scouto uses supported public integrations and keeps manual review as the default. If you enable auto-send, you remain responsible for complying with each platform\'s rules.' },
-  { q: 'Won\'t these replies feel like AI spam?', a: 'Only if you let them. Scouto drafts replies using your product context and voice. If a draft feels off, edit it or skip it.' }
+  { q: 'Does this violate platform terms of service?', a: 'Scouto uses public-feed access and authenticated connections where configured. Manual review is the default, and you remain responsible for each platform\'s rules.' },
+  { q: 'How does Scouto reduce promotional replies?', a: 'Drafts include an affiliation disclosure, are checked for promotional phrasing, and stay in manual review until the confidence engine has enough trust evidence.' }
 ]
 
 const fadeUp = {
@@ -98,18 +99,15 @@ export function LandingFooter() {
           <div className="max-w-[640px] mx-auto px-[24px] text-center">
             <motion.h2 variants={fadeUp} className="mb-4"
               style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 52px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A' }}>
-              Stop hunting.<br />Start converting.
+              See the right conversation.<br />Decide what happens next.
             </motion.h2>
             <motion.p variants={fadeUp} className="mb-10" style={{ fontFamily: 'var(--font-inter)', fontSize: '17px', color: '#6B6B6B', lineHeight: 1.65 }}>
-              Join founders using Scouto to find warm leads on Reddit and Bluesky.
+              Start monitoring Reddit and Bluesky with one free keyword rule.
             </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link href="/signup" className="w-full sm:w-auto bg-[#0A0A0A] hover:bg-[#222] text-white text-[15px] font-[600] px-8 py-4 rounded-full transition-colors duration-150 shadow-[0_2px_12px_rgba(0,0,0,0.15)] flex items-center justify-center gap-2">
-                Start for free <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
-              </Link>
-              <Link href="#how-it-works" className="w-full sm:w-auto bg-transparent border border-black/[0.10] hover:bg-black/[0.04] text-[#0A0A0A] text-[15px] font-[500] px-8 py-4 rounded-full transition-colors duration-150 flex items-center justify-center">
-                See how it works
-              </Link>
+            <motion.div variants={fadeUp} className="flex items-center justify-center">
+              <PremiumCtaButton href="/signup" className="w-full sm:w-auto">
+                Start for free
+              </PremiumCtaButton>
             </motion.div>
           </div>
         </Section>

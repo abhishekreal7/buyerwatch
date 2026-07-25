@@ -8,9 +8,9 @@ import { springs } from '@/lib/motion'
 
 export const RetryStackAlertCycler = () => {
   const alerts = [
-    { title: 'Exponential Retry Backoff', status: '10s → 20s → 40s', color: '#FF3B30' },
-    { title: 'API Timeout Caught', status: 'Attempt 1 Recovered', color: '#FF9F0A' },
-    { title: 'Sentry Monitor Guarded', status: 'Zero Data Loss', color: '#30D158' }
+    { title: 'Exponential Retry Backoff', status: '5s → 10s → 20s', color: '#EF4444' },
+    { title: 'API Timeout Caught', status: 'Retry Scheduled', color: '#F59E0B' },
+    { title: 'Failed Job Recorded', status: 'Visible for Review', color: '#0A84FF' }
   ]
   const [idx, setIdx] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
@@ -33,7 +33,7 @@ export const RetryStackAlertCycler = () => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -14 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="w-full bg-white rounded-2xl p-4 border border-black/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex items-center gap-3.5 relative z-10"
+          className="w-full bg-white rounded-[16px] p-4 border border-black/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex items-center gap-3.5 relative z-10"
         >
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${alerts[idx].color}15`, color: alerts[idx].color }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -51,7 +51,7 @@ export const RetryStackAlertCycler = () => {
           </div>
         </motion.div>
       </AnimatePresence>
-      <div className="absolute top-2.5 inset-x-3 h-full bg-white/60 rounded-2xl border border-black/[0.04] -z-10 transform scale-95" />
+      <div className="absolute top-2.5 inset-x-3 h-full bg-white/60 rounded-[16px] border border-black/[0.04] -z-10 transform scale-95" />
     </div>
   )
 }
@@ -87,7 +87,7 @@ export const ChatSimulation = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={springs.snappy}
-            className="bg-surface border border-black/[0.06] rounded-[16px] rounded-tl-[4px] p-3 shadow-[0_4px_12px_rgba(0,0,0,0.04)] self-start max-w-[92%]"
+            className="bg-surface border border-black/[0.06] rounded-[16px] rounded-tl-[8px] p-3 shadow-[0_4px_12px_rgba(0,0,0,0.04)] self-start max-w-[92%]"
           >
             <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#1C1C1E', fontWeight: 500, marginBottom: '2px', lineHeight: 1.4 }}>
               {content[i].text}
@@ -123,7 +123,7 @@ const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
         background: '#ffffff',
         border: '1px solid rgba(0,0,0,0.07)',
         borderRadius: '14px',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.10)',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
         padding: '12px 16px',
         minWidth: '168px',
         fontFamily: 'var(--font-inter), sans-serif',
@@ -134,10 +134,10 @@ const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B35', flexShrink: 0 }} />
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0 }} />
               Threads Found
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF6B35' }}>{payload[0]?.value}</span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0A84FF' }}>{payload[0]?.value}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
@@ -168,7 +168,7 @@ export const LeadDiscoveryWidget = () => {
             fontFamily: 'var(--font-inter), sans-serif', fontSize: '12px',
             color: '#9B9B9B', fontWeight: 500,
           }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B35', flexShrink: 0, display: 'inline-block' }} />
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0, display: 'inline-block' }} />
             Threads Found
           </span>
           <span style={{
@@ -186,10 +186,10 @@ export const LeadDiscoveryWidget = () => {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={leadDiscoveryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
             <defs>
-              {/* Primary: #FF6B35 orange, 15% → 0% */}
+              {/* Primary series area fill */}
               <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#FF6B35" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#FF6B35" stopOpacity={0.0} />
+                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0} />
               </linearGradient>
               {/* Secondary: #0A84FF blue, 10% → 0% */}
               <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
@@ -214,14 +214,14 @@ export const LeadDiscoveryWidget = () => {
             />
             <Tooltip content={<LeadDiscoveryTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
 
-            {/* Primary series — Threads Found — #FF6B35 orange */}
+            {/* Primary series — Threads Found */}
             <Area
               type="monotone"
               dataKey="discovered"
-              stroke="#FF6B35"
+              stroke="#0A84FF"
               strokeWidth={2}
               fill="url(#colorDiscovered)"
-              activeDot={{ r: 5, fill: '#FF6B35', stroke: '#fff', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
             />
             {/* Secondary series — High-Intent Matches — #0A84FF blue (intentional) */}
             <Area
@@ -249,7 +249,7 @@ export const BentoPlatformSourcesWidget = () => {
           whileInView={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
           viewport={{ once: true }}
-          className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-black/[0.03] bg-[#F9F9FB] shadow-[0_1px_2px_rgba(0,0,0,0.01)] hover:border-black/[0.06] transition-all"
+          className="w-full flex items-center justify-between p-3.5 rounded-[16px] border border-black/[0.03] bg-[#F8F8F8] shadow-[0_1px_2px_rgba(0,0,0,0.01)] hover:border-black/[0.06] transition-all"
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center p-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]" style={{ backgroundColor: p.bg }}>
@@ -284,19 +284,19 @@ export const BentoTrafficWidget = () => {
           ))}
         </div>
 
-        {/* Bar 1: Google */}
+        {/* Bar 1: Reddit */}
         <div className="relative w-full">
-          <div className="w-full h-10 rounded-[10px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[10px]" style={{ width: '40%' }} />
+          <div className="w-full h-10 rounded-[12px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
+            <div className="h-full bg-black/[0.015] rounded-l-[12px]" style={{ width: '40%' }} />
             <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">40%</span>
           </div>
         </div>
 
-        {/* Bar 2: Facebook */}
+        {/* Bar 2: X */}
         <div className="relative w-full">
-          <div className="w-full h-10 rounded-[10px] bg-[#FFF0EB] border border-[#FF6B35]/20 flex items-center relative shadow-sm overflow-hidden">
-            <div className="h-full bg-[#FF6B35] rounded-[10px] flex items-center justify-end pr-1.5 transition-all duration-500 shadow-sm" style={{ width: '80%' }}>
-              <div className="bg-white border border-[#FF6B35]/30 rounded-full px-2 py-0.5 text-[11px] font-bold text-[#0A0A0A] shadow-sm mr-1">
+          <div className="w-full h-10 rounded-[12px] bg-[#F0F7FF] border border-[#0A84FF]/20 flex items-center relative shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="h-full bg-[#0A84FF] rounded-[12px] flex items-center justify-end pr-1.5 transition-all duration-500 shadow-[0_1px_3px_rgba(0,0,0,0.05)]" style={{ width: '80%' }}>
+              <div className="bg-white border border-[#0A84FF]/30 rounded-full px-2 py-0.5 text-[11px] font-bold text-[#0A0A0A] shadow-[0_1px_3px_rgba(0,0,0,0.05)] mr-1">
                 80%
               </div>
             </div>
@@ -305,8 +305,8 @@ export const BentoTrafficWidget = () => {
 
         {/* Bar 3: Bluesky */}
         <div className="relative w-full">
-          <div className="w-full h-10 rounded-[10px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[10px]" style={{ width: '20%' }} />
+          <div className="w-full h-10 rounded-[12px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
+            <div className="h-full bg-black/[0.015] rounded-l-[12px]" style={{ width: '20%' }} />
             <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">20%</span>
           </div>
         </div>
@@ -316,11 +316,11 @@ export const BentoTrafficWidget = () => {
       <div className="flex items-center justify-start gap-8 mt-2 text-[13px] font-medium z-10" style={{ fontFamily: 'var(--font-inter)' }}>
         <div className="flex items-center gap-2 text-[#ADADAD]">
           <span className="w-2 h-2 rounded-full bg-black/[0.08]" />
-          Google
+          Reddit
         </div>
         <div className="flex items-center gap-2 text-[#0A0A0A]">
-          <span className="w-2 h-2 rounded-full bg-[#FF6B35]" />
-          Facebook
+          <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
+          X
         </div>
         <div className="flex items-center gap-2 text-[#ADADAD]">
           <span className="w-2 h-2 rounded-full bg-black/[0.08]" />

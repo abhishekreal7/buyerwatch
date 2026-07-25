@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { getPlanLimits } from '@/lib/plan-limits'
+import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 
 interface Thread {
   id: string
@@ -109,10 +110,13 @@ export default function DashboardPage() {
       platform: t.platform,
       target: (t.keywords as unknown as { target?: string })?.target || t.platform,
       timeAgo: formatTimeAgo(t.created_at),
-      title: '',
+      title: t.title || '',
       content: t.text_content || '',
       score: Number(t.intent_score) || 0,
-      label: Number(t.intent_score) >= 80 ? 'Buying' : Number(t.intent_score) >= 60 ? 'Exploring' : 'Researching',
+      label: getIntentDisplayLabel(
+        t.intent_label as IntentLabel | undefined,
+        Number(t.intent_score) || 0,
+      ),
       matchedKeyword: (t.keywords as unknown as { term?: string })?.term || '',
       draft: (t.reply_analytics as unknown as { draft_text?: string }[])?.[0]?.draft_text || '',
       url: t.url || null,
@@ -592,8 +596,8 @@ export default function DashboardPage() {
                               Competitor Risk
                             </span>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1.5 ${thread.label === 'Buying' ? 'bg-emerald-100 text-emerald-700' : 'bg-[#e2e4e9] text-text-secondary'}`}>
-                              <div className={`w-1.5 h-1.5 rounded-full ${thread.label === 'Buying' ? 'bg-emerald-500' : 'bg-text-tertiary'}`} />
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1.5 ${thread.score >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-[#e2e4e9] text-text-secondary'}`}>
+                              <div className={`w-1.5 h-1.5 rounded-full ${thread.score >= 80 ? 'bg-emerald-500' : 'bg-text-tertiary'}`} />
                               {thread.score} · {thread.label}
                             </span>
                           )}

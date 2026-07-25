@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { springs } from '@/lib/motion'
 import { getPlanLimits, type PlanTier } from '@/lib/plan-limits'
+import { normalizeWebsiteUrl, validateProductContext } from '@/lib/onboarding-validation'
 
 const BUSINESS_TYPES = [
   { id: 'saas', label: 'SaaS', icon: Monitor },
@@ -54,7 +55,25 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
   const [writingStyle, setWritingStyle] = useState('')
   const [redditUsername, setRedditUsername] = useState('')
 
-  const handleNext = () => setStep(s => Math.min(4, s + 1))
+  const handleNext = () => {
+    setSubmitError('')
+    if (step === 1) {
+      const productError = validateProductContext({ businessName, businessDescription })
+      if (productError) {
+        setSubmitError(productError)
+        return
+      }
+    }
+    if (step === 2 && !keywords.some(keyword => keyword.term.trim())) {
+      setSubmitError('Select or add at least one monitoring phrase.')
+      return
+    }
+    if (step === 3 && redditTargets.length === 0) {
+      setSubmitError('Select or add at least one community to monitor.')
+      return
+    }
+    setStep(current => Math.min(4, current + 1))
+  }
   const handlePrev = () => setStep(s => Math.max(1, s - 1))
 
   // AI Auto-Analyze URL or Inputs
@@ -62,7 +81,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
     const trimmedUrl = businessUrl.trim()
     if (!trimmedUrl) return
 
-    const normalizedUrl = /^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : `https://${trimmedUrl}`
+    const normalizedUrl = normalizeWebsiteUrl(trimmedUrl)
     try {
       const parsedUrl = new URL(normalizedUrl)
       if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('Unsupported protocol')
@@ -88,14 +107,17 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
       if (data.businessName && !businessName) setBusinessName(data.businessName)
       if (data.description && !businessDescription) setBusinessDescription(data.description)
       const suggestedTargets = data.subreddits?.length > 0 ? data.subreddits : redditTargets
-      if (data.subreddits && data.subreddits.length > 0) setRedditTargets(data.subreddits)
+      const shouldAutoApplySuggestions = data.source === 'ai'
+      if (shouldAutoApplySuggestions && data.subreddits?.length > 0) {
+        setRedditTargets(data.subreddits)
+      }
 
       const suggestedKeywords: { term: string; platforms: string[] }[] = []
       if (data.buyerKeywords) data.buyerKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
       if (data.competitorKeywords) data.competitorKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
       if (data.painPointKeywords) data.painPointKeywords.forEach((k: string) => suggestedKeywords.push({ term: k, platforms: ['reddit'] }))
 
-      if (suggestedKeywords.length > 0) {
+      if (shouldAutoApplySuggestions && suggestedKeywords.length > 0) {
         const selectedPhraseLimit = Math.max(1, Math.floor(keywordLimit / Math.max(1, suggestedTargets.length)))
         setKeywords(suggestedKeywords.slice(0, selectedPhraseLimit))
       }
@@ -106,7 +128,11 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
         competitor: data.competitorKeywords || [],
         painPoint: data.painPointKeywords || [],
       })
-      toast.success(data.source === 'fallback' ? 'Website details added.' : 'Website analyzed successfully.')
+      toast.success(
+        data.source === 'ai'
+          ? 'Website analyzed. Review the suggested monitoring phrases.'
+          : 'Website details added. Suggestions are ready for your review.',
+      )
     } catch (err) {
       console.error('[onboarding] AI analyze failed:', err)
       toast.error('Auto-fill failed. Check the URL and try again.')
@@ -150,12 +176,13 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
       }
     }
     const dbKeywords = requestedRules.slice(0, keywordLimit)
+    const normalizedBusinessUrl = normalizeWebsiteUrl(businessUrl)
 
     try {
       const res = await completeOnboardingAction({
         business_name: businessName,
         business_description: businessDescription,
-        business_url: businessUrl,
+        business_url: normalizedBusinessUrl,
         business_type: businessType,
         writing_style: writingStyle,
         reddit_username: redditUsername,
@@ -222,7 +249,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
             <div className="space-y-5">
               <div>
                 <h2 className="text-xl font-extrabold mb-1.5 tracking-tight text-gray-900">What is your product?</h2>
-                <p className="text-text-secondary text-sm">Enter your website URL — our AI will automatically extract your positioning and target buyers.</p>
+                <p className="text-text-secondary text-sm">Add your website to extract product context and prepare monitoring suggestions for your review.</p>
               </div>
 
               <div className="space-y-4">
@@ -325,7 +352,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                   {aiSuggestions.competitor.length > 0 && (
                     <div>
                       <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-amber-700">
-                        Competitor Hijack Signals
+                        Competitor Replacement Signals
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {aiSuggestions.competitor.map(phrase => {
@@ -512,6 +539,12 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
         </motion.div>
       </AnimatePresence>
 
+      {submitError && (
+        <p role="alert" aria-live="polite" className="mt-4 text-right text-xs font-medium text-red-600">
+          {submitError}
+        </p>
+      )}
+
       {/* Navigation Buttons */}
       <div className="mt-6 flex shrink-0 items-center justify-between gap-4">
         {step > 1 ? (
@@ -528,18 +561,13 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
           <button
             type="button"
             onClick={handleNext}
-            disabled={step === 1 && !businessName}
+            disabled={step === 1 && (!businessName.trim() || businessDescription.trim().length < 12)}
             className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50"
           >
             Continue <ArrowRight className="w-4 h-4" />
           </button>
         ) : (
           <div className="flex max-w-sm flex-col items-end gap-2">
-            {submitError && (
-              <p role="alert" aria-live="polite" className="text-right text-xs font-medium text-red-600">
-                {submitError}
-              </p>
-            )}
             <button
               type="button"
               onClick={handleSubmit}

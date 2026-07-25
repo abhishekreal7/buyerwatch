@@ -11,10 +11,12 @@
     "lint": "eslint src worker tests e2e playwright.config.ts --max-warnings=0",
     "typecheck": "tsc --noEmit --incremental false && tsc -p tsconfig.worker.json --noEmit --incremental false",
     "test": "vitest run tests",
+    "test:offline": "vitest run tests",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "smoke:production": "node scripts/smoke-production.mjs",
-    "verify": "npm run typecheck && npm run lint && npm test && npm audit --audit-level=high"
+    "verify": "npm run typecheck && npm run lint && npm test && npm audit --audit-level=high",
+    "verify:offline": "npm run typecheck && npm run lint && npm run test:offline && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

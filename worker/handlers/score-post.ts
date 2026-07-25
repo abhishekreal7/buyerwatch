@@ -8,6 +8,10 @@ import * as dotenv from 'dotenv'
 import path from 'path'
 import { randomBytes } from 'crypto'
 import { getSendReplyJobId } from '../../src/lib/reply-jobs'
+import { buildAttributionShortUrl } from '../../src/lib/attribution'
+import { matchedSignals } from '../../src/lib/buying-signal-filter'
+import { getAppUrl } from '../../src/lib/app-url'
+import { IntentLabel } from '../../src/lib/intent'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -50,10 +54,22 @@ export async function scorePostHandler(job: Job) {
 
     // 4. Score intent
     const scoreResult = await scoreIntent(post, profile)
+    const evidenceSignals = matchedSignals(`${post.title ?? ''} ${post.text ?? ''}`)
     
     // Save thread early if score is low
     if (scoreResult.score < INTENT_THRESHOLD) {
-      await saveThread(userId, keywordId, post, scoreResult.score, 'dismissed', undefined, scoreResult.flag, scoreResult.reasoning)
+      await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'dismissed',
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        evidenceSignals,
+        automationReason: 'draft_budget_exhausted',
+      })
       return
     }
 
@@ -62,7 +78,17 @@ export async function scorePostHandler(job: Job) {
     if (!canDraft) {
       logger.info(`[Budget] User ${userId} exceeded claude limit.`)
       // Save as needs manual reply
-      await saveThread(userId, keywordId, post, scoreResult.score, 'needs_manual_reply', undefined, scoreResult.flag)
+      await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'needs_manual_reply',
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        evidenceSignals,
+      })
       return
     }
 
@@ -70,7 +96,7 @@ export async function scorePostHandler(job: Job) {
     const trackingEnabled = profile.referral_tracking_enabled !== false // default true
     const trackingSid = trackingEnabled ? randomBytes(5).toString('base64url') : undefined // ~7-char URL-safe token
     const trackingUrl = trackingEnabled && profile.business_url && trackingSid
-      ? `${profile.business_url.replace(/\/$/, '')}?ref=scouto&sid=${trackingSid}`
+      ? buildAttributionShortUrl(getAppUrl(), trackingSid)
       : undefined
 
     const draftResult = await draftReply(post, profile, scoreResult.score, trackingUrl)
@@ -83,13 +109,31 @@ export async function scorePostHandler(job: Job) {
       userId,
       post.platform,
       draftResult,
-      { auto_send_enabled: profile.auto_send_enabled, plan: profile.plan ?? 'free' },
+      {
+        auto_send_enabled: profile.auto_send_enabled,
+        auto_send_threshold: profile.auto_send_threshold,
+        plan: profile.plan ?? 'free',
+      },
       post.sourceTarget ?? null
     )
 
     if (evaluation.approved) {
       // All gates cleared — save and enqueue for auto-send
-      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning, trackingSid)
+      const thread = await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'drafted',
+        draftText,
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        trackingSid,
+        evidenceSignals,
+        qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
+        automationReason: evaluation.reason,
+      })
       if (thread) {
         const { sendReplyQueue, notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
         await sendReplyQueue.add('send', {
@@ -120,7 +164,21 @@ export async function scorePostHandler(job: Job) {
       }
     } else {
       // Any gate failed — route to manual review queue
-      const thread = await saveThread(userId, keywordId, post, scoreResult.score, 'drafted', draftText, scoreResult.flag, scoreResult.reasoning, trackingSid)
+      const thread = await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'drafted',
+        draftText,
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        trackingSid,
+        evidenceSignals,
+        qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
+        automationReason: evaluation.reason,
+      })
       if (thread) {
         const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
         // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
@@ -170,7 +228,36 @@ async function checkBudget(userId: string, plan: string, service: 'gemini' | 'cl
   return data
 }
 
-async function saveThread(userId: string, keywordId: string, post: NormalizedPost, intentScore: number, status: string, draftText?: string, flag?: string, reasoning?: string, trackingSid?: string) {
+async function saveThread(input: {
+  userId: string
+  keywordId: string
+  post: NormalizedPost
+  intentScore: number
+  intentLabel: IntentLabel
+  status: string
+  draftText?: string
+  flag?: string
+  reasoning?: string
+  trackingSid?: string
+  evidenceSignals: string[]
+  qualityIssues?: string[]
+  automationReason?: string
+}) {
+  const {
+    userId,
+    keywordId,
+    post,
+    intentScore,
+    intentLabel,
+    status,
+    draftText,
+    flag,
+    reasoning,
+    trackingSid,
+    evidenceSignals,
+    qualityIssues,
+    automationReason,
+  } = input
   const { data: thread, error } = await supabase
     .from('monitored_threads')
     .insert({
@@ -179,12 +266,17 @@ async function saveThread(userId: string, keywordId: string, post: NormalizedPos
       platform: post.platform,
       external_id: post.externalId,
       author: post.author,
+      title: post.title || null,
       text_content: post.text,
       url: post.url,
       intent_score: intentScore,
+      intent_label: intentLabel,
       status: status,
       flag: flag || null,
       score_reasoning: reasoning || null,
+      matched_signals: evidenceSignals,
+      quality_issues: qualityIssues ?? [],
+      automation_reason: automationReason || null,
       tracking_sid: trackingSid || null,
     })
     .select()

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
-import { Sparkles, Clock, Workflow, Quote } from 'lucide-react'
+import { BadgeCheck, Gauge, History, ShieldCheck } from 'lucide-react'
 
 // Sleek vector line-art icons for the Orange Metric Showcase Card
 const DetectionSpeedIcon = () => (
@@ -39,42 +39,42 @@ const ReplyRateIcon = () => (
 const features = [
   {
     id: 0,
-    icon: Sparkles,
-    title: 'Match Detected',
-    description: 'Scouto scans Reddit and Bluesky at your plan cadence. When someone describes the exact problem you solve, it flags it.',
-    leftTitle: 'TIME TO DETECT',
-    leftMetric: '< 9 min',
-    leftDescription: 'A post asking for cold email alternatives was detected and flagged in under 9 minutes.',
+    icon: BadgeCheck,
+    title: 'Paid plan and explicit opt-in',
+    description: 'Guarded auto-send starts disabled. It is available only on paid plans and only after the account owner enables it.',
+    leftTitle: 'ACCOUNT GATE',
+    leftMetric: '2 checks',
+    leftDescription: 'The plan entitlement and the account-level auto-send setting must both allow automation.',
     metricIcon: DetectionSpeedIcon
   },
   {
     id: 1,
-    icon: Clock,
-    title: 'Intent Scored',
-    description: 'Not just keyword matching. The model reads the post context to verify the user is actually looking to buy.',
-    leftTitle: 'BUYING CONFIDENCE',
-    leftMetric: '0–100',
-    leftDescription: 'The classifier assigns a confidence score so generic chatter can be filtered before review.',
+    icon: ShieldCheck,
+    title: 'Content safeguards',
+    description: 'A draft is blocked from auto-send if it lacks an affiliation disclosure or trips the promotional-language check.',
+    leftTitle: 'CONTENT GATE',
+    leftMetric: '2 rules',
+    leftDescription: 'Disclosure is mandatory and promotional phrasing fails closed.',
     metricIcon: IntentScoreIcon
   },
   {
     id: 2,
-    icon: Workflow,
-    title: 'Reply Drafted',
-    description: 'A draft is generated instantly using your product details, voice examples, and the specific thread context.',
-    leftTitle: 'DRAFT TIME',
-    leftMetric: '< 60s',
-    leftDescription: 'A customized, helpful reply is drafted immediately without using generic templates.',
+    icon: History,
+    title: 'Trust-building review floor',
+    description: 'New accounts remain manual until at least ten drafts have been reviewed or sufficient community evidence exists.',
+    leftTitle: 'PERSONAL HISTORY',
+    leftMetric: '10 reviews',
+    leftDescription: 'Without enough history, the confidence engine routes the draft to manual review.',
     metricIcon: DraftTimeIcon
   },
   {
     id: 3,
-    icon: Quote,
-    title: 'Approved & Sent',
-    description: 'You review and send by default. Eligible paid accounts can explicitly enable guarded auto-send after trust-building reviews.',
-    leftTitle: 'REPLY RATE',
-    leftMetric: 'Opt-in',
-    leftDescription: 'Manual review is the default, with guarded auto-send available only to eligible paid accounts.',
+    icon: Gauge,
+    title: 'Dynamic confidence threshold',
+    description: 'User edit history contributes 70% and community rejection data contributes 30% to the final automation confidence.',
+    leftTitle: 'CONFIDENCE BLEND',
+    leftMetric: '70 / 30',
+    leftDescription: 'Automation proceeds only when the blended confidence clears the account-specific threshold.',
     metricIcon: ReplyRateIcon
   }
 ]
@@ -99,33 +99,21 @@ export const StickyFeatureScroll = () => {
           
           {/* Left Column: Premium Showcase Showcase Column (Sticky) */}
           <div className="w-full lg:w-[48%] lg:sticky top-[10vh] flex justify-center">
-            <div className="relative w-full max-w-[460px] min-h-[730px] rounded-[28px] overflow-hidden flex flex-col items-center justify-between p-7" style={{
+            <div className="relative w-full max-w-[460px] min-h-[730px] rounded-[20px] overflow-hidden flex flex-col items-center justify-between p-7" style={{
               backgroundColor: '#09090B',
               border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 40px 80px -20px rgba(0,0,0,0.6), 0 8px 32px rgba(0,0,0,0.3)'
+              boxShadow: '0 16px 40px rgba(0,0,0,0.08)'
             }}>
-              {/* Dot matrix background grid */}
-              <div className="absolute inset-0 opacity-[0.025] pointer-events-none z-0" style={{
-                backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                backgroundSize: '16px 16px'
-              }} />
-              
-              {/* Radial orange glow aura */}
-              <div className="absolute inset-0 pointer-events-none z-0" style={{
-                background: 'radial-gradient(circle at 50% 50%, rgba(255, 81, 1, 0.12) 0%, transparent 65%)',
-                filter: 'blur(40px)'
-              }} />
-
               {/* Orbit track background concentric circular rings */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-0">
                 <div className="absolute w-[200px] h-[200px] rounded-full border border-white/[0.04]" />
                 <div className="absolute w-[300px] h-[300px] rounded-full border border-dashed border-white/[0.04]" />
-                <div className="absolute w-[400px] h-[400px] rounded-full border border-dashed border-[#FF5101]/[0.08]" />
+                <div className="absolute w-[400px] h-[400px] rounded-full border border-dashed border-[#FF5101]/[0.10]" />
                 
                 {/* Micro-nodes on the circular rings */}
                 <div className="absolute w-[300px] h-[300px] rounded-full pointer-events-none animate-[spin_80s_linear_infinite]">
                   <div className="absolute top-[14.6%] left-[14.6%] w-1.5 h-1.5 rounded-full bg-white/20" />
-                  <div className="absolute bottom-[14.6%] right-[14.6%] w-1.5 h-1.5 rounded-full bg-[#FF5101]/30" />
+                  <div className="absolute bottom-[14.6%] right-[14.6%] w-1.5 h-1.5 rounded-full bg-[#FF5101]/40" />
                 </div>
               </div>
 
@@ -138,10 +126,10 @@ export const StickyFeatureScroll = () => {
                     animate={{ y: 0, opacity: 1, scale: 1 }}
                     exit={{ y: -12, opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                    className="w-[240px] h-[270px] rounded-[22px] p-6 flex flex-col items-center justify-center text-center relative z-20 border border-white/20"
+                    className="w-[240px] h-[270px] rounded-[20px] p-6 flex flex-col items-center justify-center text-center relative z-20 border border-white/20"
                     style={{
                       backgroundColor: '#FF5101',
-                      boxShadow: '0 25px 50px -12px rgba(255, 81, 1, 0.38), inset 0 1px 0 rgba(255,255,255,0.3)'
+                      boxShadow: '0 12px 28px rgba(0,0,0,0.08)'
                     }}
                   >
                     <div className="w-10 h-10 rounded-full bg-white/15 border border-white/20 flex items-center justify-center mb-4">
@@ -166,7 +154,7 @@ export const StickyFeatureScroll = () => {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: -16, opacity: 0 }}
                     transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                    className="w-full max-w-[380px] bg-[#111113]/90 backdrop-blur-xl rounded-[18px] p-5 border border-white/10 shadow-2xl flex items-start gap-4 text-left"
+                    className="w-full max-w-[380px] bg-[#111113] rounded-[16px] p-5 border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.08)] flex items-start gap-4 text-left"
                     style={{ minHeight: '110px' }}
                   >
                     <div className="w-8 h-8 rounded-full bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0 text-white mt-0.5">

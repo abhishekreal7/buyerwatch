@@ -7,7 +7,7 @@ import { FaReddit } from 'react-icons/fa6'
 const fadeUp = { hidden: { opacity: 0, y: 28 }, visible: { opacity: 1, y: 0 } }
 
 export const SectionBadge = ({ color, text }: { color: string; text: string }) => (
-  <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-surface border border-black/[0.08] rounded-full px-4 py-[6px] shadow-sm mb-5">
+  <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-surface border border-black/[0.08] rounded-full px-4 py-[6px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] mb-5">
     <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
     <span className="text-[13px] font-[500] text-[#0A0A0A] tracking-[-0.01em]">{text}</span>
   </motion.div>
@@ -134,11 +134,10 @@ export const InfraLiveQueue = () => {
   }, [inView])
 
   return (
-    <div ref={containerRef} className="w-full overflow-hidden rounded-[18px]"
-      style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04), 0 12px 36px rgba(0,0,0,0.07)', background: '#fff' }}>
+    <div ref={containerRef} className="w-full overflow-hidden rounded-[16px]"
+      style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.06)', background: '#fff', border: '1px solid rgba(0,0,0,0.07)' }}>
       {/* Header row */}
-      <div className="grid grid-cols-[1fr_auto_auto] items-center px-5 py-3 border-b border-black/[0.06]"
-        style={{ background: 'linear-gradient(180deg,#FAFAFA 0%,#F5F5F5 100%)' }}>
+      <div className="grid grid-cols-[1fr_auto_auto] items-center px-5 py-3 border-b border-black/[0.06] bg-[#F5F5F5]">
         <span style={{ fontFamily: 'var(--font-inter)', fontSize: '10.5px', fontWeight: 700, color: '#9B9B9B', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Queue</span>
         <span style={{ fontFamily: 'var(--font-inter)', fontSize: '10.5px', fontWeight: 700, color: '#9B9B9B', letterSpacing: '0.08em', textTransform: 'uppercase', marginRight: '32px' }}>Worker</span>
         <span style={{ fontFamily: 'var(--font-inter)', fontSize: '10.5px', fontWeight: 700, color: '#9B9B9B', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Status</span>
@@ -188,7 +187,7 @@ export const InfraLiveQueue = () => {
                 className="flex items-center gap-[6px]"
                 style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', fontWeight: 500, color: '#ADADAD' }}
               >
-                <span className="w-[6px] h-[6px] rounded-full bg-[#30D158] flex-shrink-0 opacity-60" />
+                <span className="w-[6px] h-[6px] rounded-full bg-[#FF5101] flex-shrink-0 opacity-70" />
                 idle
               </motion.span>
             )}
@@ -196,10 +195,9 @@ export const InfraLiveQueue = () => {
         </motion.div>
       ))}
       {/* Footer: live counter */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-black/[0.06]"
-        style={{ background: 'linear-gradient(180deg,#F7F7F8 0%,#F2F2F4 100%)' }}>
+      <div className="flex items-center justify-between px-5 py-3 border-t border-black/[0.06] bg-[#F0F0F0]">
         <span style={{ fontFamily: 'var(--font-inter)', fontSize: '11px', fontWeight: 600, color: '#ADADAD', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-          Jobs processed today
+          Illustrative jobs processed
         </span>
         <motion.span
           key={processed}
@@ -229,9 +227,9 @@ export const PrefilterSignalMarquee = () => {
         <motion.div
           animate={{ y: [-5, 5, -5] }}
           transition={{ repeat: Infinity, duration: 3.6, ease: 'easeInOut' }}
-          className="w-22 h-22 rounded-3xl bg-gradient-to-b from-[#0A84FF] to-[#0055FF] flex items-center justify-center shadow-[0_12px_32px_rgba(10,132,255,0.38)] relative z-10"
+          className="w-22 h-22 rounded-[20px] bg-[#0A84FF] flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.08)] relative z-10"
         >
-          <div className="absolute inset-0 rounded-3xl bg-white/20 backdrop-blur-sm border border-white/30" />
+          <div className="absolute inset-0 rounded-[20px] border border-white/30" />
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="relative z-10">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
           </svg>
@@ -266,19 +264,19 @@ export const CacheLiveWaveChart = () => {
     <motion.div
       animate={{ y: [-3, 3, -3] }}
       transition={{ repeat: Infinity, duration: 4.5, ease: 'easeInOut' }}
-      className="my-3 relative z-10 bg-white/75 backdrop-blur-md rounded-2xl p-4 border border-white/80 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+      className="my-3 relative z-10 bg-white rounded-[16px] p-4 border border-black/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-bold text-[#30D158] bg-[#30D158]/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#30D158] animate-pulse" /> Live 5m TTL
+        <span className="text-[11px] font-bold text-[#C43E00] bg-[#FF5101]/15 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#FF5101] animate-pulse" /> Live 5m TTL
         </span>
-        <span className="text-[11px] font-semibold text-[#0A0A0A] bg-white/80 px-2 py-0.5 rounded-md border border-black/[0.04]">
+        <span className="text-[11px] font-semibold text-[#0A0A0A] bg-white px-2 py-0.5 rounded-[8px] border border-black/[0.04]">
           +99.4% Hit Rate
         </span>
       </div>
 
       {/* Animated Wave SVG Graph */}
-      <div className="w-full h-14 relative my-2 overflow-hidden rounded-lg bg-white/40 p-1">
+      <div className="w-full h-14 relative my-2 overflow-hidden rounded-[16px] bg-white/40 p-1">
         <svg className="w-full h-full" viewBox="0 0 200 50" preserveAspectRatio="none">
           <motion.path
             d="M 0 35 Q 40 10, 80 30 T 160 15 T 200 25"
@@ -292,13 +290,13 @@ export const CacheLiveWaveChart = () => {
         <motion.div
           animate={{ x: [0, 180, 0] }}
           transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-          className="w-2.5 h-2.5 rounded-full bg-[#0A84FF] border-2 border-white shadow-sm absolute top-4 left-1"
+          className="w-2.5 h-2.5 rounded-full bg-[#0A84FF] border-2 border-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] absolute top-4 left-1"
         />
       </div>
 
       <div className="flex items-center justify-between text-[12px] font-medium text-[#1C1C1E] bg-white/80 rounded-xl p-2 border border-black/[0.04]">
         <span>r/startups &bull; r/saas</span>
-        <span className="text-[#30D158] font-bold">Cached</span>
+        <span className="text-[#0A84FF] font-bold">Cached</span>
       </div>
     </motion.div>
   )
@@ -307,7 +305,7 @@ export const CacheLiveWaveChart = () => {
 // ── Card 3: Pitch Black BUYING / HIGH INTENT Cycler ──
 export const IntentTextCycler = () => {
   const words = ['BUYING', 'HIGH INTENT', 'HOT LEAD']
-  const colors = ['#30D158', '#0A84FF', '#FF6B35']
+  const colors = ['#FF5101', '#0A84FF', '#FF5101']
   const [idx, setIdx] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
   const inView = useInView(ref, { margin: '120px' })

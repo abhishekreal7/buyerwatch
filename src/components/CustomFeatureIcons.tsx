@@ -140,7 +140,7 @@ export function ApprovalQueueIcon({ size = 24, color = '#0A0A0A', strokeWidth = 
 }
 
 // ─── 4. Daily Digest ──────────────────────────────────────────────────────────
-// Unsealing & Resealing Daily Envelope: Non-overlapping 2-stage flap handoff (Zero duplication distortion)
+// A two-stage hinged flap opens behind the report, then closes over the pocket.
 export function DailyDigestIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.9, style }: CustomIconProps) {
   const [angles, setAngles] = React.useState({ minute: 0, hour: 0 });
 
@@ -170,33 +170,42 @@ export function DailyDigestIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.
       <rect x="3" y="7" width="18" height="13" rx="2" fill="white" stroke={color} strokeWidth={strokeWidth} />
 
       <g clipPath="url(#digest-card-clip)">
-        {/* Layer 2: Open Top Flap (Only rises UP after front flap has folded down!) */}
+        {/* Rear-facing triangle rises only after the front flap reaches its hinge. */}
         <motion.path
-          d="M 3 7 L 12 1 L 21 7 Z"
-          fill="white"
+          d="M 3 7 L 12 7 L 21 7 Z"
+          fill="#F7F7F7"
           stroke={color}
           strokeWidth={strokeWidth}
-          style={{ transformOrigin: "50% 100%", transformBox: "fill-box" }}
           animate={{
-            scaleY: [0, 0, 1, 1, 0, 0],
-            opacity: [0, 0, 1, 1, 0, 0]
+            d: [
+              "M 3 7 L 12 7 L 21 7 Z",
+              "M 3 7 L 12 7 L 21 7 Z",
+              "M 3 7 L 12 0.7 L 21 7 Z",
+              "M 3 7 L 12 0.7 L 21 7 Z",
+              "M 3 7 L 12 7 L 21 7 Z",
+              "M 3 7 L 12 7 L 21 7 Z",
+            ],
+            opacity: [0, 0, 1, 1, 0, 0],
           }}
           transition={{
-            duration: 3.2,
+            duration: 4.4,
             repeat: Infinity,
-            times: [0, 0.22, 0.4, 0.72, 0.88, 1],
-            ease: "easeInOut"
+            times: [0, 0.27, 0.4, 0.7, 0.84, 1],
+            ease: "easeInOut",
           }}
         />
 
-        {/* Layer 3: Rising Scored Summary Report Card */}
+        {/* The report rises only while the rear flap is fully open. */}
         <motion.g
-          animate={{ y: [6, 6, -4, -4, 6, 6] }}
+          animate={{
+            y: [7, 7, -1.5, -1.5, 7, 7],
+            opacity: [0, 0, 1, 1, 0, 0],
+          }}
           transition={{
-            duration: 3.2,
+            duration: 4.4,
             repeat: Infinity,
-            times: [0, 0.22, 0.45, 0.7, 0.9, 1],
-            ease: [0.35, 0, 0.25, 1]
+            times: [0, 0.34, 0.47, 0.66, 0.78, 1],
+            ease: [0.35, 0, 0.25, 1],
           }}
         >
           {/* Card Body */}
@@ -208,7 +217,7 @@ export function DailyDigestIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.
           <line x1="8.5" y1="13.8" x2="12.5" y2="13.8" stroke={color} strokeWidth={strokeWidth} />
         </motion.g>
 
-        {/* Layer 4: Front Envelope V-Pocket (Masks bottom half of card & draws front V-opening) */}
+        {/* Fixed front pocket masks the report and provides the only closed V seam. */}
         <path
           d="M 3 7 L 12 13.5 L 21 7 V 18 A 2 2 0 0 1 19 20 H 5 A 2 2 0 0 1 3 18 Z"
           fill="white"
@@ -218,27 +227,33 @@ export function DailyDigestIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.
         <line x1="3" y1="20" x2="9.5" y2="14" stroke={color} strokeWidth={strokeWidth} />
         <line x1="21" y1="20" x2="14.5" y2="14" stroke={color} strokeWidth={strokeWidth} />
 
-        {/* Layer 5: Closed Front Flap (Folds DOWN to seal envelope, folds UP to 0 before back flap rises!) */}
+        {/* Front-facing triangle folds down from the hinge after the report returns. */}
         <motion.path
           d="M 3 7 L 12 13.5 L 21 7 Z"
           fill="white"
           stroke={color}
           strokeWidth={strokeWidth}
-          style={{ transformOrigin: "50% 0%", transformBox: "fill-box" }}
           animate={{
-            scaleY: [1, 0, 0, 0, 0, 1],
-            opacity: [1, 0, 0, 0, 0, 1]
+            d: [
+              "M 3 7 L 12 13.5 L 21 7 Z",
+              "M 3 7 L 12 13.5 L 21 7 Z",
+              "M 3 7 L 12 7 L 21 7 Z",
+              "M 3 7 L 12 7 L 21 7 Z",
+              "M 3 7 L 12 13.5 L 21 7 Z",
+              "M 3 7 L 12 13.5 L 21 7 Z",
+            ],
+            opacity: [1, 1, 0, 0, 1, 1],
           }}
           transition={{
-            duration: 3.2,
+            duration: 4.4,
             repeat: Infinity,
-            times: [0, 0.22, 0.4, 0.72, 0.88, 1],
-            ease: "easeInOut"
+            times: [0, 0.17, 0.3, 0.82, 0.95, 1],
+            ease: "easeInOut",
           }}
         />
       </g>
 
-      {/* Layer 6: Ticking Clock Badge Overlay at Bottom Right */}
+      {/* Ticking clock badge overlay */}
       <circle cx="17.5" cy="16.5" r="3.8" stroke={color} strokeWidth={strokeWidth} fill="white" />
       <line
         x1="17.5" y1="16.5" x2="17.5" y2="14.2"

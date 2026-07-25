@@ -8,19 +8,14 @@ import { logger } from '@/lib/logger'
 import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { redditFetchQueue, blueskyFetchQueue, xFetchQueue } from '@/lib/queues'
+import {
+  normalizeWebsiteUrl,
+  validateOnboardingData,
+  type OnboardingData,
+  type OnboardingKeyword,
+} from '@/lib/onboarding-validation'
 
-type OnboardingKeyword = { term: string; platform: string; target: string }
 type InsertedKeyword = OnboardingKeyword & { id: string }
-
-type OnboardingData = {
-  business_name: string
-  business_description: string
-  business_url: string
-  business_type: string
-  writing_style: string
-  reddit_username: string
-  keywords: OnboardingKeyword[]
-}
 
 type ProfileSnapshot = {
   business_name: string | null
@@ -30,47 +25,6 @@ type ProfileSnapshot = {
   writing_style: string | null
   reddit_username: string | null
   plan: string | null
-}
-
-function validateOnboardingData(data: OnboardingData): string | null {
-  const businessName = data.business_name?.trim()
-  if (!businessName) return 'Enter your business name before launching.'
-  if (businessName.length > 120) return 'Business name must be 120 characters or fewer.'
-  if (data.business_description?.trim().length > 5000) return 'Product description is too long.'
-  if (data.business_url?.trim().length > 2048) return 'Website URL is too long.'
-  if (data.writing_style?.trim().length > 2000) return 'Writing style is too long.'
-  if (data.reddit_username?.trim().length > 100) return 'Reddit username is too long.'
-
-  const businessTypes = new Set([
-    'saas',
-    'ecommerce',
-    'agency',
-    'freelancer',
-    'creator',
-    'coach',
-    'physical_product',
-    'other',
-  ])
-  if (!businessTypes.has(data.business_type)) return 'Select a valid business category.'
-  if (!Array.isArray(data.keywords) || data.keywords.length === 0) {
-    return 'Add at least one monitoring rule before launching.'
-  }
-  if (data.keywords.length > 50) return 'Too many monitoring rules were selected.'
-
-  const allowedPlatforms = new Set(['reddit', 'bluesky', 'x'])
-  const invalidKeyword = data.keywords.some((keyword) => (
-    !keyword
-    || typeof keyword.term !== 'string'
-    || typeof keyword.target !== 'string'
-    || typeof keyword.platform !== 'string'
-    || !keyword.term.trim()
-    || !keyword.target.trim()
-    || keyword.term.trim().length > 200
-    || keyword.target.trim().length > 200
-    || !allowedPlatforms.has(keyword.platform)
-  ))
-
-  return invalidKeyword ? 'One or more monitoring rules are invalid. Go back and review your selections.' : null
 }
 
 async function completeWithoutRpc(
@@ -168,6 +122,7 @@ export async function completeOnboardingAction(data: OnboardingData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  data = { ...data, business_url: normalizeWebsiteUrl(data.business_url) }
   const validationError = validateOnboardingData(data)
   if (validationError) return { error: validationError }
 

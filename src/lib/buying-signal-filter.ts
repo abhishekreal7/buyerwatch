@@ -109,26 +109,52 @@ const PURCHASE_SIGNALS = [
   'roi',
 ]
 
-const ALL_SIGNALS = [
-  ...SEEKING_SIGNALS,
-  ...RESEARCH_SIGNALS,
-  ...PAIN_SIGNALS,
-  ...PURCHASE_SIGNALS,
+export type BuyingSignalCategory = 'seeking' | 'research' | 'pain' | 'purchase'
+
+export type BuyingSignalAnalysis = {
+  matchedSignals: string[]
+  categories: BuyingSignalCategory[]
+}
+
+const SIGNAL_GROUPS: Array<{
+  category: BuyingSignalCategory
+  signals: readonly string[]
+}> = [
+  { category: 'seeking', signals: SEEKING_SIGNALS },
+  { category: 'research', signals: RESEARCH_SIGNALS },
+  { category: 'pain', signals: PAIN_SIGNALS },
+  { category: 'purchase', signals: PURCHASE_SIGNALS },
 ]
+
+export function analyzeBuyingSignals(text: string): BuyingSignalAnalysis {
+  const lower = text.toLocaleLowerCase()
+  const matches: string[] = []
+  const categories: BuyingSignalCategory[] = []
+
+  for (const group of SIGNAL_GROUPS) {
+    const groupMatches = group.signals.filter(signal => lower.includes(signal))
+    if (groupMatches.length === 0) continue
+    categories.push(group.category)
+    matches.push(...groupMatches)
+  }
+
+  return {
+    matchedSignals: [...new Set(matches)],
+    categories,
+  }
+}
 
 /**
  * Returns true if the post text contains at least one buying signal.
  * Always pass `title + ' ' + body` as the input for maximum coverage.
  */
 export function hasBuyingSignal(text: string): boolean {
-  const lower = text.toLowerCase()
-  return ALL_SIGNALS.some(signal => lower.includes(signal))
+  return analyzeBuyingSignals(text).matchedSignals.length > 0
 }
 
 /**
  * Returns which signals were matched (useful for logging / debugging).
  */
 export function matchedSignals(text: string): string[] {
-  const lower = text.toLowerCase()
-  return ALL_SIGNALS.filter(signal => lower.includes(signal))
+  return analyzeBuyingSignals(text).matchedSignals
 }

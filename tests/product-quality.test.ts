@@ -1,0 +1,275 @@
+import { describe, expect, it } from 'vitest'
+import {
+  buildAttributionDestinationUrl,
+  buildAttributionShortUrl,
+} from '../src/lib/attribution'
+import {
+  analyzeBuyingSignals,
+  hasBuyingSignal,
+} from '../src/lib/buying-signal-filter'
+import {
+  calculateAutomationDecision,
+  evaluateAutoSendContentPolicy,
+} from '../src/lib/confidence-engine'
+import {
+  getIntentDisplayLabel,
+  parseIntentResult,
+} from '../src/lib/intent'
+import {
+  buildFallbackSuggestions,
+  sanitizeOnboardingSuggestions,
+} from '../src/lib/onboarding-intelligence'
+import {
+  normalizeWebsiteUrl,
+  validateOnboardingData,
+  validateProductContext,
+  validateWebsiteUrl,
+} from '../src/lib/onboarding-validation'
+import { evaluateReplyQuality } from '../src/lib/reply-quality'
+
+describe('buying-signal evidence', () => {
+  it('returns the exact evidence and categories behind a commercial match', () => {
+    expect(analyzeBuyingSignals(
+      'I am looking for a replacement. The current pricing is too expensive.',
+    )).toEqual({
+      matchedSignals: ['looking for', 'too expensive', 'pricing'],
+      categories: ['seeking', 'pain', 'purchase'],
+    })
+  })
+
+  it('recognizes research and competitor replacement language', () => {
+    const analysis = analyzeBuyingSignals('Any good alternative to Acme? Is it worth paying for?')
+    expect(analysis.categories).toContain('research')
+    expect(analysis.matchedSignals).toContain('alternative to')
+    expect(analysis.matchedSignals).toContain('any good')
+  })
+
+  it('does not classify ordinary discussion as a buying signal', () => {
+    expect(hasBuyingSignal('Here is a photo of the dashboard I made last weekend.')).toBe(false)
+  })
+})
+
+describe('intent result validation', () => {
+  it('normalizes a valid provider response', () => {
+    expect(parseIntentResult({
+      score: 88.4,
+      label: 'buying',
+      reasoning: 'The author is actively requesting a replacement product.',
+      flag: 'COMPETITOR_RISK',
+    })).toEqual({
+      score: 88,
+      label: 'buying',
+      reasoning: 'The author is actively requesting a replacement product.',
+      flag: 'COMPETITOR_RISK',
+    })
+  })
+
+  it.each([
+    null,
+    { score: 101, label: 'buying', reasoning: 'Clearly invalid score.' },
+    { score: 80, label: 'urgent', reasoning: 'Unknown label is rejected.' },
+    { score: 80, label: 'buying', reasoning: 'short' },
+  ])('rejects malformed model output', candidate => {
+    expect(() => parseIntentResult(candidate)).toThrow()
+  })
+
+  it('keeps display labels faithful to the model category', () => {
+    expect(getIntentDisplayLabel('complaining', 72)).toBe('Pain signal')
+    expect(getIntentDisplayLabel('other', 20)).toBe('Low relevance')
+  })
+})
+
+describe('reply-quality policy', () => {
+  it('allows a useful non-commercial reply without a disclosure', () => {
+    const result = evaluateReplyQuality(
+      'Start by checking whether the queue is backing up before replacing the database.',
+      { businessName: 'Scouto', platform: 'reddit' },
+    )
+    expect(result.blocksAutomation).toBe(false)
+    expect(result.mentionedProduct).toBe(false)
+  })
+
+  it('requires disclosure when the product is mentioned', () => {
+    const result = evaluateReplyQuality(
+      'Scouto can monitor those conversations and summarize the relevant ones.',
+      { businessName: 'Scouto', platform: 'reddit' },
+    )
+    expect(result.issues.map(issue => issue.code)).toContain('missing_disclosure')
+  })
+
+  it('allows a relevant, disclosed product mention', () => {
+    const result = evaluateReplyQuality(
+      "Scouto can monitor those conversations. Disclosure: I'm affiliated with Scouto.",
+      { businessName: 'Scouto', platform: 'reddit' },
+    )
+    expect(result.blocksAutomation).toBe(false)
+    expect(result.hasDisclosure).toBe(true)
+  })
+
+  it('blocks promotional language and direct calls to action', () => {
+    const result = evaluateReplyQuality(
+      "You should try Scouto, it is a game-changer. Sign up today! Disclosure: I'm affiliated with Scouto.",
+      { businessName: 'Scouto', platform: 'reddit' },
+    )
+    expect(result.issues.map(issue => issue.code)).toEqual(
+      expect.arrayContaining(['promotional_language', 'call_to_action']),
+    )
+  })
+
+  it('blocks invented numerical outcomes', () => {
+    const result = evaluateReplyQuality(
+      'We increased conversions by 70% in one week.',
+      { businessName: 'Scouto', platform: 'reddit' },
+    )
+    expect(result.issues.map(issue => issue.code)).toContain('unsupported_claim')
+  })
+
+  it('enforces platform-specific reply limits', () => {
+    const result = evaluateReplyQuality('a'.repeat(301), {
+      businessName: 'Scouto',
+      platform: 'bluesky',
+    })
+    expect(result.issues.map(issue => issue.code)).toContain('too_long')
+  })
+})
+
+describe('auto-send policy', () => {
+  const safeDraft = {
+    flagged: false,
+    hasDisclosure: false,
+    mentionedProduct: false,
+    hasCommercialLink: false,
+  }
+
+  it('blocks free plans and disabled automation before trust evaluation', () => {
+    expect(evaluateAutoSendContentPolicy(safeDraft, {
+      plan: 'free',
+      auto_send_enabled: true,
+    })?.reason).toBe('auto_send_requires_paid_plan')
+    expect(evaluateAutoSendContentPolicy(safeDraft, {
+      plan: 'pro',
+      auto_send_enabled: false,
+    })?.reason).toBe('auto_send_disabled')
+  })
+
+  it('blocks deterministic quality failures', () => {
+    expect(evaluateAutoSendContentPolicy({
+      ...safeDraft,
+      flagged: true,
+    }, {
+      plan: 'pro',
+      auto_send_enabled: true,
+    })?.reason).toBe('reply_quality_blocked')
+  })
+
+  it('requires disclosure only for a commercial reference', () => {
+    expect(evaluateAutoSendContentPolicy(safeDraft, {
+      plan: 'pro',
+      auto_send_enabled: true,
+    })).toBeNull()
+    expect(evaluateAutoSendContentPolicy({
+      ...safeDraft,
+      mentionedProduct: true,
+    }, {
+      plan: 'pro',
+      auto_send_enabled: true,
+    })?.reason).toBe('missing_disclosure')
+  })
+
+  it('never weakens the user-configured threshold', () => {
+    const strict = calculateAutomationDecision({
+      userTrust: 95,
+      communityTrust: 95,
+      learnedThreshold: 82,
+      configuredThreshold: 97,
+    })
+    expect(strict.dynamicThreshold).toBe(97)
+    expect(strict.approved).toBe(false)
+
+    const learned = calculateAutomationDecision({
+      userTrust: 90,
+      communityTrust: 90,
+      learnedThreshold: 90,
+      configuredThreshold: 70,
+    })
+    expect(learned.dynamicThreshold).toBe(90)
+    expect(learned.approved).toBe(true)
+  })
+})
+
+describe('attribution URLs', () => {
+  it('builds a first-party application redirect without leaking old query data', () => {
+    expect(buildAttributionShortUrl(
+      'https://app.example.com/base?debug=true',
+      'abc_123',
+    )).toBe('https://app.example.com/base/r/abc_123')
+  })
+
+  it('preserves customer query parameters and appends attribution safely', () => {
+    expect(buildAttributionDestinationUrl(
+      'https://customer.example/pricing?campaign=summer',
+      'abc-123',
+    )).toBe('https://customer.example/pricing?campaign=summer&ref=scouto&sid=abc-123')
+  })
+
+  it('rejects unsafe tokens and destinations', () => {
+    expect(() => buildAttributionShortUrl('https://app.example', '../admin')).toThrow()
+    expect(() => buildAttributionDestinationUrl('javascript:alert(1)', 'abc123')).toThrow()
+  })
+})
+
+describe('onboarding intelligence', () => {
+  it('deduplicates and bounds untrusted provider suggestions', () => {
+    const result = sanitizeOnboardingSuggestions({
+      businessName: '  Scouto  ',
+      description: '  Finds relevant conversations. ',
+      subreddits: ['r/SaaS', 'saas', 'not valid!', 'startups'],
+      buyerKeywords: ['looking for a tool', 'Looking for a tool', '', 'recommend a tool'],
+      competitorKeywords: [],
+      painPointKeywords: [],
+    }, 'ai')
+
+    expect(result.businessName).toBe('Scouto')
+    expect(result.subreddits).toEqual(['SaaS', 'startups'])
+    expect(result.buyerKeywords).toEqual(['looking for a tool', 'recommend a tool'])
+  })
+
+  it('uses honest generic intent patterns instead of treating the product as its own competitor', () => {
+    const result = buildFallbackSuggestions({
+      businessName: 'Scouto',
+      description: 'Software for monitoring online buying intent.',
+      webpageTitle: '',
+      webpageDescription: '',
+    })
+    expect(result.competitorKeywords).not.toContain('alternative to Scouto')
+    expect(result.buyerKeywords).toContain('looking for a tool')
+  })
+})
+
+describe('onboarding validation', () => {
+  it('requires enough product context for meaningful scoring', () => {
+    expect(validateProductContext({
+      businessName: 'Scouto',
+      businessDescription: 'short',
+    })).toMatch(/short description/i)
+  })
+
+  it('accepts only public HTTP website URLs', () => {
+    expect(validateWebsiteUrl('https://example.com/product')).toBeNull()
+    expect(normalizeWebsiteUrl('example.com/product')).toBe('https://example.com/product')
+    expect(validateWebsiteUrl('https://user:pass@example.com')).toMatch(/valid public/i)
+    expect(validateWebsiteUrl('javascript:alert(1)')).toMatch(/valid public/i)
+  })
+
+  it('validates the complete server payload without provider credentials', () => {
+    expect(validateOnboardingData({
+      business_name: 'Scouto',
+      business_description: 'Finds relevant buying conversations online.',
+      business_url: 'https://scouto.example',
+      business_type: 'saas',
+      writing_style: 'Direct and helpful.',
+      reddit_username: '',
+      keywords: [{ term: 'looking for a tool', platform: 'reddit', target: 'SaaS' }],
+    })).toBeNull()
+  })
+})

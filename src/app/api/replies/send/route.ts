@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { sendReplyQueue } from '@/lib/queues'
 import { getSendReplyJobId } from '@/lib/reply-jobs'
+import { evaluateReplyQuality } from '@/lib/reply-quality'
 
 /**
  * POST /api/replies/send
@@ -54,12 +55,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Thread is not sendable' }, { status: 409 })
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('business_name')
+    .eq('id', user.id)
+    .single()
+  if (!profile?.business_name) {
+    return NextResponse.json({ error: 'Profile is incomplete' }, { status: 409 })
+  }
+
+  const replyText = text.trim()
+  const quality = evaluateReplyQuality(replyText, {
+    businessName: profile.business_name,
+    platform: thread.platform,
+  })
+  if (quality.blocksAutomation) {
+    return NextResponse.json({
+      error: 'reply_quality_check_failed',
+      issues: quality.issues,
+    }, { status: 422 })
+  }
+
   // Enqueue the send job. Rate limiting is enforced downstream inside send-reply.ts worker.
   await sendReplyQueue.add('send', {
     userId: user.id,
     threadExternalId: thread.external_id,
     threadId,
-    text: text.trim(),
+    text: replyText,
     platform: thread.platform,
     triggerType: 'manual',
   }, {

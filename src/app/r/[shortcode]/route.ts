@@ -31,17 +31,29 @@ export async function GET(
     }
 
     const userAgent = req.headers.get('user-agent') ?? ''
-    const sourceIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    const visitorHash = createHash('sha256').update(sourceIp).digest('hex').slice(0, 24)
-    const dedupKey = `click:${shortcode}:${visitorHash}`
-    const firstRecentClick = await redis.set(dedupKey, '1', 'EX', 600, 'NX')
+    const referrer = req.headers.get('referer')
+    const isInternalPreview = (() => {
+      if (!referrer) return false
+      try {
+        return new URL(referrer).origin === req.nextUrl.origin
+      } catch {
+        return false
+      }
+    })()
 
-    if (!BOT_REGEX.test(userAgent) && firstRecentClick && !data?.clicked_at) {
-      await supabase
-        .from('reply_attribution')
-        .update({ clicked_at: new Date().toISOString() })
-        .eq('shortcode', shortcode)
-        .is('clicked_at', null)
+    if (!BOT_REGEX.test(userAgent) && !isInternalPreview && !data?.clicked_at) {
+      const sourceIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const visitorHash = createHash('sha256').update(sourceIp).digest('hex').slice(0, 24)
+      const dedupKey = `click:${shortcode}:${visitorHash}`
+      const firstRecentClick = await redis.set(dedupKey, '1', 'EX', 600, 'NX')
+
+      if (firstRecentClick) {
+        await supabase
+          .from('reply_attribution')
+          .update({ clicked_at: new Date().toISOString() })
+          .eq('shortcode', shortcode)
+          .is('clicked_at', null)
+      }
     }
 
     return NextResponse.redirect(destination, { status: 302 })

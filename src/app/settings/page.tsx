@@ -134,6 +134,7 @@ export default function SettingsPage() {
 
   const [slack, setSlack] = useState({ webhookUrl: '', threshold: 70 })
   const [slackTesting, setSlackTesting] = useState(false)
+  const [webhookSecret, setWebhookSecret] = useState('')
 
   const [notifications, setNotifications] = useState({
     emailDigest: true,
@@ -158,7 +159,11 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
+        .eq('id', user.id)
+        .single()
       if (p) {
         setProfile({
           businessName: p.business_name || '',
@@ -175,6 +180,7 @@ export default function SettingsPage() {
         })
         if (p.notification_preferences) setNotifications(p.notification_preferences)
         setSlack({ webhookUrl: p.slack_webhook_url || '', threshold: p.slack_notify_threshold ?? 70 })
+        setWebhookSecret(p.webhook_secret || '')
       }
 
       const { data: conns } = await supabase.from('platform_connections').select('platform, external_username').eq('user_id', user.id)
@@ -603,7 +609,7 @@ export default function SettingsPage() {
                             How Auto-Send Earns Your Trust
                           </p>
                           <p>
-                            Scouto evaluates every reply against a dynamic confidence threshold. As you approve or edit drafts, our Confidence Engine measures your edit-distance history to adapt thresholds safely — guaranteeing your brand voice is never compromised.
+                            Scouto combines your review history with community rejection data. Your selected threshold remains the minimum: learned risk can make sending stricter, but never more permissive than your setting.
                           </p>
                         </div>
 
@@ -624,7 +630,7 @@ export default function SettingsPage() {
                                 </div>
                                 <div>
                                   <div className="flex items-center justify-between mb-2">
-                                    <label className="text-[13px] font-medium text-gray-700">Confidence threshold</label>
+                                    <label className="text-[13px] font-medium text-gray-700">Minimum confidence threshold</label>
                                     <span className="text-[13px] font-bold text-gray-900 tabular-nums">{profile.autoSendThreshold}</span>
                                   </div>
                                   <input
@@ -634,7 +640,7 @@ export default function SettingsPage() {
                                     className="w-full accent-gray-900 cursor-pointer"
                                   />
                                   <div className="flex justify-between text-[11px] text-gray-400 mt-1">
-                                    <span>70 — Permissive</span>
+                                    <span>70 — Learned floor applies</span>
                                     <span>99 — Strict</span>
                                   </div>
                                 </div>
@@ -650,7 +656,7 @@ export default function SettingsPage() {
                         <div className="flex-1">
                           <p className="text-[14px] font-semibold text-gray-900">Include referral tracking in replies</p>
                           <p className="text-[13px] text-gray-500 mt-1">
-                            Appends <code className="text-[12px] bg-gray-100 px-1.5 py-0.5 rounded font-mono">?ref=scouto&amp;sid=…</code> to your business URL when Claude naturally includes it. Lets you measure clicks and revenue in Analytics without looking like a link shortener.
+                            Gives each relevant reply a unique tracked link. Scouto records the click, then immediately redirects the reader to your website with its attribution token preserved.
                           </p>
                         </div>
                         <Toggle
@@ -660,7 +666,7 @@ export default function SettingsPage() {
                       </div>
                       <div className="mt-4 p-3 bg-gray-50 border border-gray-100 rounded-xl text-[12px] text-gray-500 leading-relaxed">
                         <span className="font-semibold text-gray-700">How it works: </span>
-                        The link uses your own domain (e.g. <span className="font-mono text-gray-700">{profile.businessUrl || 'yoursite.com'}?ref=scouto&sid=abc123</span>) — identical to standard UTM/referral tracking every business uses. Claude only includes it when it fits naturally; it will never be forced into a reply where it would read awkwardly.
+                        A link such as <span className="font-mono text-gray-700">{process.env.NEXT_PUBLIC_APP_URL || 'https://app.scouto.co'}/r/abc123</span> redirects to <span className="font-mono text-gray-700">{profile.businessUrl || 'https://yoursite.com'}?ref=scouto&amp;sid=abc123</span>. It is included only when the product is directly relevant and the affiliation is disclosed.
                       </div>
                     </SectionCard>
 
@@ -810,6 +816,27 @@ export default function SettingsPage() {
                           </div>
                         </Field>
 
+                        <Field
+                          label="Authorization Secret"
+                          hint="Send this value as a Bearer token. Keep it server-side and rotate it if it is ever exposed."
+                        >
+                          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800">
+                            <span>{webhookSecret ? `${'•'.repeat(16)}${webhookSecret.slice(-8)}` : 'Secret unavailable until migrations are applied'}</span>
+                            {webhookSecret && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(webhookSecret)
+                                  toast.success('Webhook secret copied')
+                                }}
+                                className="font-sans text-[12px] font-semibold text-blue-600 hover:underline"
+                              >
+                                Copy
+                              </button>
+                            )}
+                          </div>
+                        </Field>
+
                         <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-xl text-[12px] text-blue-900 leading-relaxed space-y-1.5">
                           <p className="font-semibold text-blue-950 flex items-center gap-1.5">
                             <Info className="w-3.5 h-3.5 text-blue-600" />
@@ -819,7 +846,9 @@ export default function SettingsPage() {
 {`{
   "shortcode": "aB1cD2eF",
   "revenue_usd": 99.00
-}`}
+}
+
+Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                           </pre>
                         </div>
                       </div>

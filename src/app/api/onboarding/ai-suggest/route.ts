@@ -3,26 +3,16 @@ import { createClient } from '@/utils/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import Anthropic from '@anthropic-ai/sdk'
 import { fetchPublicText } from '@/lib/security/outbound-url'
-
-type SuggestionResult = {
-  businessName?: string
-  description: string
-  subreddits: string[]
-  buyerKeywords: string[]
-  competitorKeywords: string[]
-  painPointKeywords: string[]
-  source?: 'ai' | 'fallback'
-}
+import {
+  buildFallbackSuggestions,
+  sanitizeOnboardingSuggestions,
+  type OnboardingSuggestions,
+} from '@/lib/onboarding-intelligence'
+import { normalizeWebsiteUrl } from '@/lib/onboarding-validation'
 
 function cleanApiKey(value: string | undefined): string {
   const trimmed = value?.trim() ?? ''
   return trimmed && !trimmed.startsWith('#') && !trimmed.toLowerCase().includes('todo') ? trimmed : ''
-}
-
-function normalizeWebsiteUrl(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
 }
 
 function titleCase(value: string): string {
@@ -42,49 +32,18 @@ function deriveBusinessName(url: string, fallback: string): string {
   }
 }
 
-function buildFallbackSuggestions(params: {
-  url: string
-  businessName: string
-  businessDescription: string
-  webpageTitle: string
-  webpageDescription: string
-}): SuggestionResult {
-  const name = deriveBusinessName(params.url, params.businessName)
-  const pageSummary = params.webpageDescription || params.webpageTitle
-  const description = params.businessDescription.trim()
-    || (pageSummary ? `${name} helps customers with ${pageSummary.toLowerCase()}. Use this summary as a starting point and refine it with your positioning.` : `${name} helps customers solve a specific business problem. Add a sharper positioning line to improve monitoring suggestions.`)
-
-  return {
-    businessName: name,
-    description,
-    subreddits: ['SaaS', 'startups', 'Entrepreneur', 'smallbusiness', 'marketing', 'webdev'],
-    buyerKeywords: [
-      `looking for ${name}`,
-      `best tool for ${name}`,
-      `recommend ${name}`,
-    ],
-    competitorKeywords: [
-      `alternative to ${name}`,
-      `switching from ${name}`,
-    ],
-    painPointKeywords: [
-      'need a better way to find leads',
-      'struggling to monitor reddit',
-      'how to find buying intent',
-    ],
-    source: 'fallback',
-  }
-}
-
-function parseAiJson(value: string): SuggestionResult | null {
+function parseAiJson(value: string): OnboardingSuggestions | null {
   const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim()
   if (!jsonString) return null
   try {
-    const parsed = JSON.parse(jsonString) as SuggestionResult
-    return {
-      ...parsed,
-      source: 'ai',
-    }
+    const result = sanitizeOnboardingSuggestions(JSON.parse(jsonString), 'ai')
+    const keywordCount =
+      result.buyerKeywords.length
+      + result.competitorKeywords.length
+      + result.painPointKeywords.length
+    return result.description && result.subreddits.length > 0 && keywordCount >= 3
+      ? result
+      : null
   } catch {
     return null
   }
@@ -197,10 +156,10 @@ Rules:
       }
     }
 
+    const detectedBusinessName = deriveBusinessName(url, businessName)
     const result = parseAiJson(aiResponse) ?? buildFallbackSuggestions({
-      url,
-      businessName,
-      businessDescription,
+      businessName: detectedBusinessName,
+      description: businessDescription,
       webpageTitle,
       webpageDescription,
     })
