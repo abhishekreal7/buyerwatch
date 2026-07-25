@@ -461,9 +461,94 @@ export default function SettingsPage() {
                       </Field>
                     </SectionCard>
 
-                    <SectionCard title="Writing Style & Tone Matching" description="Describe your natural voice and provide examples. The AI will match this exact style when drafting replies.">
-                      <div className="space-y-5">
-                        <Field label="Writing Style" hint="e.g. casual, direct, no buzzwords">
+                    <SectionCard title="Writing Style & Tone Matching" description="Select a tone archetype or describe your natural voice. Scouto's AI will match this exact style when drafting replies.">
+                      <div className="space-y-6">
+                        {/* 1-Click Tone Archetypes */}
+                        <div>
+                          <label className="block text-[13px] font-semibold text-gray-900 mb-2">Tone Archetype</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {[
+                              {
+                                id: 'consultative',
+                                label: '🤝 Consultative Expert',
+                                desc: 'Informative, helpful, subtle product recommendation.',
+                                text: 'Informative, consultative expert. Shares practical advice first and mentions product naturally as a solution.',
+                              },
+                              {
+                                id: 'casual',
+                                label: '💬 Casual Peer',
+                                desc: 'Friendly, informal, conversational tone.',
+                                text: 'Casual, friendly peer tone. Informal, conversational, uses relaxed phrasing without buzzwords.',
+                              },
+                              {
+                                id: 'direct',
+                                label: '🎯 Direct & Concise',
+                                desc: 'Short, punchy, gets straight to the point.',
+                                text: 'Direct and concise. Keeps replies under 3 sentences, zero fluff, straight to the point.',
+                              },
+                              {
+                                id: 'problem_solver',
+                                label: '🛠️ Problem Solver',
+                                desc: 'Diagnoses technical pain points with clear steps.',
+                                text: 'Technical problem solver. Focuses on root-cause diagnosis and step-by-step resolution.',
+                              },
+                            ].map((archetype) => (
+                              <button
+                                key={archetype.id}
+                                type="button"
+                                onClick={() => setProfile(p => ({ ...p, writingStyle: archetype.text }))}
+                                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                  profile.writingStyle.includes(archetype.text.slice(0, 15))
+                                    ? 'bg-blue-50/60 border-[#0A84FF] ring-2 ring-[#0A84FF]/10'
+                                    : 'bg-white border-gray-200/80 hover:border-gray-300 hover:bg-gray-50/50'
+                                }`}
+                              >
+                                <span className="text-xs font-bold text-gray-900 block">{archetype.label}</span>
+                                <span className="text-[11px] text-gray-500 mt-0.5 block leading-tight font-normal">{archetype.desc}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Quick Style Guardrail Pills */}
+                        <div>
+                          <label className="block text-[12px] font-medium text-gray-500 mb-2">Quick Style Guardrails</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              'No Emojis',
+                              'Casual Lowercase',
+                              'Include Affiliation Disclosure',
+                              'Lead with Value First',
+                              'Never Pitch Directly',
+                            ].map((pill) => {
+                              const active = profile.writingStyle.includes(pill)
+                              return (
+                                <button
+                                  key={pill}
+                                  type="button"
+                                  onClick={() => {
+                                    setProfile(p => {
+                                      const current = p.writingStyle
+                                      const next = active
+                                        ? current.replace(new RegExp(`,?\\s*${pill}`, 'g'), '').trim()
+                                        : current ? `${current}, ${pill}` : pill
+                                      return { ...p, writingStyle: next }
+                                    })
+                                  }}
+                                  className={`text-[11px] font-semibold px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                                    active
+                                      ? 'bg-gray-900 text-white border-gray-900'
+                                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  {active ? `✓ ${pill}` : `+ ${pill}`}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        <Field label="Custom Writing Style Instructions" hint="e.g. casual, direct, no buzzwords">
                           <textarea
                             value={profile.writingStyle}
                             onChange={e => setProfile(p => ({ ...p, writingStyle: e.target.value }))}

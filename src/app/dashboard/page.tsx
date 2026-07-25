@@ -5,6 +5,7 @@ import { Search, Target, CheckCircle, ChevronDown, MessageCircle, ExternalLink, 
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { GettingStartedChecklist } from '@/components/GettingStartedChecklist'
 import { getPlanLimits } from '@/lib/plan-limits'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 
@@ -69,6 +70,9 @@ export default function DashboardPage() {
   const [keywordsCount, setKeywordsCount] = useState(0)
   const [keywordsMax, setKeywordsMax] = useState(1)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [hasInspectedLead, setHasInspectedLead] = useState(false)
+  const [hasCopiedOrApproved, setHasCopiedOrApproved] = useState(false)
+  const [autoSendEnabled, setAutoSendEnabled] = useState(false)
   const [userId, setUserId] = useState('')
   const supabase = createClient()
 
@@ -297,7 +301,7 @@ export default function DashboardPage() {
   }, [filterTab, threads])
 
   return (
-    <div className="max-w-[1400px] mx-auto py-8">
+    <div className="max-w-[1400px] mx-auto space-y-6">
 
       {/* Post-upgrade modal — shown once per plan tier per browser, via localStorage */}
       {!loading && userId && (
@@ -309,87 +313,118 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Stats Container */}
-      <div className="bg-surface rounded-2xl border border-black/5 shadow-sm py-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-black/5">
-          {/* Threads Found */}
-          <div className="flex flex-col items-center justify-center py-2 md:py-0 relative group">
-            <div className="text-[13px] font-medium text-text-secondary mb-1.5 flex items-center gap-1.5 cursor-help">
-              Conversations Found
-              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block w-56 p-2.5 bg-gray-900 text-white text-[11px] rounded-lg shadow-xl z-50 text-center leading-relaxed">
-                We found {stats.threadsFound} conversations where someone was actively looking for what you sell.
-              </div>
+      {/* ElevenLabs-style Page Title Header & Top Action Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+            Overview
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5 font-medium">
+            Real-time intent monitoring and AI response drafting across monitored communities.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <a
+            href="/keywords"
+            className="inline-flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
+            + Add Keyword
+          </a>
+        </div>
+      </div>
+
+      {/* ElevenLabs Style 4 Metric Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1: Conversations Found */}
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group relative">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-gray-500">Conversations Found</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
+              <MessageCircle className="w-4 h-4" strokeWidth={2} />
             </div>
-            <div className="text-[28px] font-bold text-text-primary leading-none tracking-tight mb-1.5">
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.threadsFound}
-            </div>
-            <div className="text-[12px] font-medium text-text-tertiary">
-              Pending review
+            </span>
+            <span className="text-[11.5px] font-medium text-gray-400">Pending review</span>
+          </div>
+        </div>
+
+        {/* Metric 2: High Intent */}
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-gray-500">High Intent</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
-          {/* High Intent */}
-          <div className="flex flex-col items-center justify-center py-2 md:py-0">
-            <div className="text-[13px] font-medium text-text-secondary mb-1.5">
-              High Intent
-            </div>
-            <div className="text-[28px] font-bold text-text-primary leading-none tracking-tight mb-1.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.highIntent}
-            </div>
-            <div className="inline-flex items-center gap-1 bg-[#E8F8F0] text-[#0F9D58] px-2 py-0.5 rounded text-[12px] font-medium">
+            </span>
+            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded-full">
               ↑ {stats.trend}
+            </span>
+          </div>
+        </div>
+
+        {/* Metric 3: Drafts Ready */}
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-gray-500">Drafts Ready</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
-          {/* Drafts Ready */}
-          <div className="flex flex-col items-center justify-center py-2 md:py-0">
-            <div className="text-[13px] font-medium text-text-secondary mb-1.5">
-              Drafts Ready
-            </div>
-            <div className="text-[28px] font-bold text-text-primary leading-none tracking-tight mb-1.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.draftsReady}
-            </div>
-            <div className="text-[12px] font-medium text-text-tertiary">
+            </span>
+            <span className="text-[11.5px] font-medium text-gray-400">
               {stats.draftsReady > 0 ? 'Review Now →' : 'Up to date'}
+            </span>
+          </div>
+        </div>
+
+        {/* Metric 4: Posted Today */}
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-gray-500">Posted Today</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
-          {/* Posted Today */}
-          <div className="flex flex-col items-center justify-center py-2 md:py-0">
-            <div className="text-[13px] font-medium text-text-secondary mb-1.5">
-              Posted Today
-            </div>
-            <div className="text-[28px] font-bold text-text-primary leading-none tracking-tight mb-1.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.postedToday}
-            </div>
+            </span>
+            <span className="text-[11.5px] font-medium text-gray-400">Automated & manual</span>
           </div>
         </div>
       </div>
 
-      {/* ── Upgrade banner (Placement B) ──────────────────────────────
-          Show once per session when:
-          - plan === 'free'
-          - user is at 1-keyword limit (keywordsCount >= 1)
-          - at least 1 high-intent thread found (real data)
-          - banner not yet dismissed this session
-      ──────────────────────────────────────────────────────────── */}
+      {/* ── Upgrade banner (Placement B) ────────────────────────────── */}
       {!loading && plan === 'free' && keywordsCount >= 1 && stats.highIntent > 0 && !bannerDismissed && (
-        <div className="mb-6 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 flex items-center gap-4">
+        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/80 px-5 py-3.5 flex items-center gap-4 shadow-2xs">
           <Sparkles className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={1.75} />
-          <p className="flex-1 text-[13.5px] text-amber-900 leading-relaxed">
+          <p className="flex-1 text-xs text-amber-900 leading-relaxed">
             <span className="font-semibold">{stats.highIntent} high-intent conversation{stats.highIntent !== 1 ? 's' : ''} found</span>{' '}
-            this month with your current keyword. You&apos;re only monitoring 1 topic. Upgrading to Professional
-            adds 9 more keywords — each one is a different buying conversation you&apos;re currently invisible in.
+            this month with your current keyword. Upgrade to Professional to add 9 more topics.
           </p>
           <div className="flex items-center gap-2 shrink-0">
             <a
               href="/pricing"
-              className="text-[13px] font-semibold text-white bg-gray-900 hover:bg-gray-800 px-3.5 py-2 rounded-xl transition-colors"
+              className="text-xs font-semibold text-white bg-gray-900 hover:bg-gray-800 px-3 py-1.5 rounded-xl transition-colors"
             >
               Upgrade
             </a>
             <button
               onClick={() => setBannerDismissed(true)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" strokeWidth={2} />
+              <X className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -406,120 +441,106 @@ export default function DashboardPage() {
 
         return (
           <>
-            {/* Filters & Tabs */}
-            <div className="flex items-center gap-4 mb-6 flex-wrap">
-              <div className="flex items-center bg-[#F8F9FA] p-1 rounded-full border border-black/5">
+            {/* ElevenLabs Style Filters & Pill Navigation Bar */}
+            <div className="bg-white rounded-2xl border border-black/[0.06] p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-1.5 bg-gray-100/70 p-1 rounded-xl">
                 <button
                   onClick={() => setFilterTab('all')}
-                  className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${filterTab === 'all' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === 'all' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
-                  All
+                  All Conversations
                 </button>
                 <button
                   onClick={() => setFilterTab('high-intent')}
-                  className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${filterTab === 'high-intent' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
-                  High Intent
+                  High Intent (≥80%)
                 </button>
                 <button
                   onClick={() => setFilterTab('dismissed')}
-                  className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${filterTab === 'dismissed' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${filterTab === 'dismissed' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   <span>Dismissed</span>
                   {dismissedCount > 0 && (
-                    <span className="text-[11px] font-bold px-1.5 py-0.2 rounded-full bg-gray-200 text-gray-700">
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-gray-200 text-gray-700">
                       {dismissedCount}
                     </span>
                   )}
                 </button>
               </div>
+
+              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 pr-1">
+                <span>{filtered.length === 1 ? '1 opportunity' : `${filtered.length} opportunities`}</span>
+              </div>
             </div>
 
-            {/* Two Column Layout */}
+            {/* Main Feed & Detail Two Column Section */}
             <div className="flex items-start gap-6">
               {/* Left Column (Feed) */}
               <div className="flex-1 space-y-4">
-                {loading && (
-                  <div className="rounded-2xl p-8 bg-surface border border-black/5 flex items-center justify-center text-text-secondary text-sm">
-                    Loading threads...
-                  </div>
-                )}
+              {loading && (
+                <div className="rounded-2xl p-12 bg-white border border-black/[0.06] shadow-xs flex items-center justify-center text-gray-400 text-xs font-medium">
+                  Loading opportunities...
+                </div>
+              )}
 
-                {!loading && filtered.length === 0 && keywordsCount === 0 && (
-                  /* ── No keywords yet — onboarding CTA ── */
-                  <div className="rounded-2xl bg-surface border border-black/5 overflow-hidden">
-                    <div className="p-10 flex flex-col items-center text-center gap-5">
-                      <div className="w-16 h-16 rounded-2xl bg-[#F0F7FF] flex items-center justify-center">
-                        <Search className="w-7 h-7 text-[#0A84FF]" strokeWidth={1.6} />
-                      </div>
-                      <div>
-                        <p className="text-[18px] font-bold text-text-primary mb-2 tracking-tight">
-                          Your signal radar is idle
-                        </p>
-                        <p className="text-text-secondary text-[14px] max-w-[320px] leading-relaxed">
-                          Add your first keyword and Scouto will start scanning Reddit and Bluesky for people who need what you sell.
-                        </p>
-                      </div>
-                      <a
-                        href="/keywords"
-                        className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white px-5 py-2.5 rounded-xl font-medium text-[14px] hover:bg-[#222] transition-colors"
-                      >
-                        <Target className="w-4 h-4" strokeWidth={2} />
-                        Add first keyword
-                      </a>
-                      <div className="flex items-center gap-8 pt-2 border-t border-black/5 w-full justify-center">
-                        <div className="text-center">
-                          <p className="text-[13px] font-semibold text-text-primary">Free plan</p>
-                          <p className="text-[12px] text-text-tertiary">1 keyword · 50 signals/mo</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[13px] font-semibold text-text-primary">Takes 2 min</p>
-                          <p className="text-[12px] text-text-tertiary">First results in hours</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[13px] font-semibold text-text-primary">You approve</p>
-                          <p className="text-[12px] text-text-tertiary">Every reply before it sends</p>
-                        </div>
-                      </div>
-                    </div>
+              {!loading && filtered.length === 0 && keywordsCount === 0 && (
+                /* ── No keywords yet — onboarding CTA ── */
+                <div className="rounded-2xl bg-white border border-black/[0.06] p-10 shadow-xs text-center flex flex-col items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0A84FF] flex items-center justify-center border border-blue-100">
+                    <Search className="w-6 h-6" strokeWidth={2} />
                   </div>
-                )}
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 tracking-tight">Your signal radar is idle</h3>
+                    <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                      Add your first keyword to start scanning Reddit &amp; social communities for prospective buyers.
+                    </p>
+                  </div>
+                  <a
+                    href="/keywords"
+                    className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors shadow-xs"
+                  >
+                    <Target className="w-3.5 h-3.5" strokeWidth={2} />
+                    Add first keyword
+                  </a>
+                </div>
+              )}
 
-                {!loading && filtered.length === 0 && keywordsCount > 0 && (
-                  /* ── Ultra-minimal clean empty state ── */
-                  <div className="rounded-2xl bg-surface border border-black/5 p-8 flex flex-col items-center text-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
-                      <Search className="w-4 h-4" strokeWidth={2} />
-                    </div>
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-gray-900">No conversations yet</h3>
-                      <p className="text-[13px] text-gray-400 mt-0.5">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        toast.info('Checking for new posts...')
-                        try {
-                          const { data: kws } = await supabase.from('keywords').select('id').eq('user_id', userId).limit(1)
-                          if (kws && kws.length > 0) {
-                            await fetch('/api/keywords/fetch-now', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ keywordId: kws[0].id }),
-                            })
-                            toast.success('Check requested. Refreshing...')
-                            setTimeout(() => loadData(), 3000)
-                          }
-                        } catch {
-                          toast.error('Scan check failed')
+              {!loading && filtered.length === 0 && keywordsCount > 0 && (
+                /* ── ElevenLabs Style Clean Empty State ── */
+                <div className="rounded-2xl bg-white border border-black/[0.06] p-10 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col items-center text-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200/70 flex items-center justify-center text-gray-400">
+                    <Search className="w-5 h-5" strokeWidth={1.8} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">No conversations yet</h3>
+                    <p className="text-xs text-gray-400 mt-1">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      toast.info('Checking for new posts...')
+                      try {
+                        const { data: kws } = await supabase.from('keywords').select('id').eq('user_id', userId).limit(1)
+                        if (kws && kws.length > 0) {
+                          await fetch('/api/keywords/fetch-now', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ keywordId: kws[0].id }),
+                          })
+                          toast.success('Check requested. Refreshing...')
+                          setTimeout(() => loadData(), 3000)
                         }
-                      }}
-                      className="px-3.5 py-1.5 rounded-lg border border-gray-200 bg-white text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer mt-1"
-                    >
-                      <RefreshCcw className="w-3.5 h-3.5 text-gray-400" />
-                      Check now
-                    </button>
-                  </div>
-                )}
+                      } catch {
+                        toast.error('Scan check failed')
+                      }
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer mt-1"
+                  >
+                    <RefreshCcw className="w-3.5 h-3.5 text-gray-400" />
+                    Check now
+                  </button>
+                </div>
+              )}
 
 
                 {filtered.map((thread) => {
@@ -529,7 +550,10 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={thread.id}
-                      onClick={() => setSelectedThread(thread)}
+                      onClick={() => {
+                        setSelectedThread(thread)
+                        setHasInspectedLead(true)
+                      }}
                       className={`rounded-2xl p-5 bg-white cursor-pointer transition-all ${isSelected
                         ? 'border-2 border-[#0A84FF] shadow-sm'
                         : 'border border-black/5 hover:border-black/15'
@@ -673,66 +697,94 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Right Column (Review & Post) */}
+              {/* Right Column (Review & Post Detail Panel) */}
               {selectedThread && (
-                <div className="w-[540px] shrink-0 border border-black/10 rounded-xl bg-white flex flex-col overflow-hidden shadow-sm sticky top-[100px]" style={{ height: 'calc(100vh - 120px)' }}>
-                  {/* Header */}
-                  <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between bg-surface shrink-0">
-                    <h2 className="font-semibold text-gray-900 text-[15px]">Review & Post</h2>
+                <div className="w-[520px] shrink-0 bg-white border border-black/[0.08] rounded-3xl shadow-lg flex flex-col max-h-[calc(100vh-96px)] sticky top-[80px] overflow-hidden transition-all">
+                  {/* Panel Header */}
+                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4" strokeWidth={2} />
+                      </div>
+                      <div>
+                        <h2 className="font-bold text-gray-900 text-sm tracking-tight">Review &amp; Post</h2>
+                        <span className="text-[11px] font-medium text-gray-400">
+                          {selectedThread.platform === 'reddit' ? `r/${selectedThread.target}` : selectedThread.target}
+                        </span>
+                      </div>
+                    </div>
+
                     {selectedThread.url ? (
-                      <a href={selectedThread.url} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-blue-600 flex items-center gap-1.5 hover:text-blue-700 transition-colors">
-                        Open Thread <ExternalLink className="w-3.5 h-3.5" />
+                      <a
+                        href={selectedThread.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-semibold text-[#0A84FF] hover:text-blue-700 flex items-center gap-1 bg-blue-50 hover:bg-blue-100/80 px-3 py-1.5 rounded-xl transition-all"
+                      >
+                        Open Thread <ExternalLink className="w-3 h-3" />
                       </a>
                     ) : (
-                      <span className="text-[13px] font-medium text-gray-300 flex items-center gap-1.5">
-                        Open Thread <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
+                        Open Thread <ExternalLink className="w-3 h-3" />
                       </span>
                     )}
                   </div>
 
-                  <div className="p-6 flex-1 bg-white overflow-y-auto">
+                  {/* Panel Body Scrollable Content */}
+                  <div className="p-6 flex-1 overflow-y-auto space-y-6 no-scrollbar">
                     {/* Original Post Preview */}
-                    <div className="flex flex-col gap-2 mb-8">
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        Original Post Preview
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                        <span className="flex items-center gap-1.5">
+                          <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
+                          Original Post Preview
+                        </span>
                       </div>
-                      <div className="border-l-[3px] border-gray-200 pl-4 py-1">
-                        {selectedThread.title && <h3 className="text-[14px] font-semibold text-gray-900 mb-1.5 leading-snug">{selectedThread.title}</h3>}
-                        <p className="text-[13px] text-gray-600 leading-relaxed">{selectedThread.content}</p>
+
+                      <div className="bg-gray-50/80 border border-gray-200/70 rounded-2xl p-4 space-y-2">
+                        {selectedThread.title && (
+                          <h3 className="text-xs font-bold text-gray-900 leading-snug">
+                            {selectedThread.title}
+                          </h3>
+                        )}
+                        <p className="text-xs text-gray-600 leading-relaxed font-normal">
+                          {selectedThread.content}
+                        </p>
                       </div>
                     </div>
 
-                    {/* AI Draft Reply */}
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-600" />
-                          <span className="text-[12px] font-bold text-blue-600 tracking-wide uppercase">AI Draft Reply</span>
+                    {/* AI Draft Reply Section */}
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[#0A84FF]" strokeWidth={2} />
+                          <span className="text-[11px] font-bold text-gray-900 uppercase tracking-wider">
+                            AI Draft Reply
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {/* Feature 4: inline edit toggle */}
                           {selectedThread.draft && (
                             <button
                               onClick={() => setEditingDraft(editingDraft === selectedThread.id ? null : selectedThread.id)}
-                              className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-colors ${editingDraft === selectedThread.id
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                              className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-lg border transition-all cursor-pointer ${editingDraft === selectedThread.id
+                                  ? 'bg-gray-900 text-white border-gray-900 shadow-2xs'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                 }`}
                             >
-                              {editingDraft === selectedThread.id ? 'Done editing' : 'Edit'}
+                              {editingDraft === selectedThread.id ? 'Done editing' : 'Edit Draft'}
                             </button>
                           )}
-                          <span className="text-[12px] text-gray-400 font-medium">{selectedThread.draft.length} chars</span>
+                          <span className="text-[11px] text-gray-400 font-medium">
+                            {(selectedThread.draft || '').length} chars
+                          </span>
                         </div>
                       </div>
 
-                      <div className="bg-surface border border-gray-200/80 rounded-xl shadow-sm group relative overflow-hidden">
+                      <div className="bg-white border border-[#0A84FF]/30 focus-within:border-[#0A84FF] focus-within:ring-4 focus-within:ring-[#0A84FF]/10 rounded-2xl shadow-2xs transition-all overflow-hidden">
                         {editingDraft === selectedThread.id ? (
-                          /* Feature 4: Inline editable textarea */
                           <textarea
-                            className="w-full p-5 text-[14px] text-gray-800 leading-[1.6] resize-none outline-none bg-transparent min-h-[180px]"
-                            value={selectedThread.draft}
+                            className="w-full p-4 text-xs text-gray-900 leading-relaxed resize-none outline-none bg-transparent min-h-[160px] font-normal"
+                            value={selectedThread.draft || ''}
                             onChange={(e) => {
                               const updated = e.target.value
                               setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, draft: updated } : t))
@@ -742,15 +794,17 @@ export default function DashboardPage() {
                             spellCheck
                           />
                         ) : (
-                          <div className="p-5">
+                          <div className="p-4">
                             {selectedThread.draft ? (
                               selectedThread.draft.split('\n\n').map((paragraph, i) => (
-                                <p key={i} className="text-[14px] text-gray-800 leading-[1.6] mb-4 last:mb-0">
+                                <p key={i} className="text-xs text-gray-800 leading-relaxed mb-3 last:mb-0 font-normal">
                                   {paragraph}
                                 </p>
                               ))
                             ) : (
-                              <p className="text-[14px] text-gray-400 italic">No draft generated yet. The AI will draft a reply once the thread is scored.</p>
+                              <p className="text-xs text-gray-400 italic">
+                                No draft generated yet. The AI will draft a reply once the thread is processed.
+                              </p>
                             )}
                           </div>
                         )}
@@ -758,24 +812,22 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Review panel footer — Linear/Vercel Action Bar */}
-                  <div className="p-4 bg-surface border-t border-black/5 flex flex-col gap-3 shrink-0">
-                    {/* Primary CTA */}
+                  {/* Panel Footer & Action Bar */}
+                  <div className="p-5 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
                     <button
                       onClick={handleApproveAndSend}
                       disabled={!selectedThread.draft}
-                      className="w-full py-2.5 rounded-xl bg-gray-900 text-white font-semibold text-[13.5px] hover:bg-black disabled:bg-gray-100 disabled:text-gray-400 disabled:border disabled:border-gray-200/60 shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      className="w-full py-3 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold text-xs disabled:bg-gray-100 disabled:text-gray-400 disabled:border disabled:border-gray-200/60 shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
-                      <CheckCircle className="w-4 h-4" />
-                      Approve &amp; Send
+                      <CheckCircle className="w-4 h-4 text-white" />
+                      Approve &amp; Send Reply
                     </button>
 
-                    {/* Secondary actions toolbar */}
                     <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={handleDismiss}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all cursor-pointer"
                           title="Dismiss thread"
                         >
                           <X className="w-4 h-4" />
@@ -783,14 +835,14 @@ export default function DashboardPage() {
                         <button
                           onClick={handleRegenerate}
                           disabled={regenerating}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40 cursor-pointer"
+                          className="p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all disabled:opacity-40 cursor-pointer"
                           title="Regenerate AI draft"
                         >
                           <RefreshCcw className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
                         </button>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
                             if (selectedThread.draft) {
@@ -798,14 +850,14 @@ export default function DashboardPage() {
                               toast.success('Copied to clipboard')
                             }
                           }}
-                          className="px-2.5 py-1.5 rounded-lg border border-black/10 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                         >
-                          <Copy className="w-3.5 h-3.5 text-gray-500" />
+                          <Copy className="w-3.5 h-3.5 text-gray-400" />
                           Copy
                         </button>
                         <button
                           onClick={handleMarkAsPosted}
-                          className="px-2.5 py-1.5 rounded-lg border border-black/10 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+                          className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all cursor-pointer shadow-2xs"
                         >
                           Mark as Posted
                         </button>
@@ -818,6 +870,14 @@ export default function DashboardPage() {
           </>
         )
       })()}
+
+      {/* Floating Bottom-Left Onboarding Checklist Widget */}
+      <GettingStartedChecklist
+        keywordsCount={keywordsCount}
+        hasInspectedLead={hasInspectedLead}
+        hasCopiedOrApproved={hasCopiedOrApproved}
+        autoSendEnabled={autoSendEnabled}
+      />
     </div>
   )
 }

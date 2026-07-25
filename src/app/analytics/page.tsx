@@ -139,8 +139,6 @@ export default function AnalyticsPage() {
       ).length
 
       // --- TREND DATA (Last 30 Days) ---
-      // Discovered = all threads found that day
-      // Qualified = threads where intent_score >= HIGH_INTENT_THRESHOLD (same as dashboard "High Intent" stat)
       const discoveredMap: Record<string, number> = {}
       const qualifiedMap: Record<string, number> = {}
       for (let i = 29; i >= 0; i--) {
@@ -171,7 +169,6 @@ export default function AnalyticsPage() {
       // --- ACTIVITY FEED ---
       const activityEvents: any[] = []
 
-      // Approvals & Auto-sends
       feedback.forEach(f => {
         if (f.action_type === 'APPROVED' || f.action_type === 'EDITED_APPROVED') {
           activityEvents.push({
@@ -186,7 +183,6 @@ export default function AnalyticsPage() {
         }
       })
 
-      // Drafts ready
       draftedThreads.forEach(t => {
         activityEvents.push({
           id: `th-${t.id}`, type: 'draft', timestamp: new Date(t.created_at),
@@ -194,7 +190,6 @@ export default function AnalyticsPage() {
         })
       })
 
-      // Sort and take top 6
       activityEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       const recentActivity = activityEvents.slice(0, 6)
 
@@ -334,7 +329,6 @@ export default function AnalyticsPage() {
                       minTickGap={30}
                     />
                     <Tooltip content={<LeadDiscoveryTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
-                    {/* Discovered — dark primary line (always >= Qualified by construction) */}
                     <Area
                       type="monotone"
                       dataKey="discovered"
@@ -344,7 +338,6 @@ export default function AnalyticsPage() {
                       fill="url(#colorDiscovered)"
                       activeDot={{ r: 4, fill: '#0A0A0A', stroke: '#fff', strokeWidth: 2 }}
                     />
-                    {/* Qualified — accent blue line (intent_score >= 80, same as dashboard High Intent) */}
                     <Area
                       type="monotone"
                       dataKey="qualified"
@@ -418,7 +411,6 @@ export default function AnalyticsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-
               <div className="flex justify-center items-center gap-8 mt-6 pt-6 border-t border-black/[0.04]">
                 {(data.platformData || []).map((p, i) => (
                   <span key={i} className="flex items-center gap-2 text-[15px] text-text-primary font-medium">
@@ -474,34 +466,34 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Feature 2: Attribution Pipeline Card (Positioned at bottom) */}
-          <div className="surface-ceramic border border-black/[0.04] p-6">
+          <div className="bg-white border border-black/[0.06] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Attribution Pipeline</h3>
-                <p className="text-[13px] text-text-secondary mt-0.5">Track replies that generated a verified click, conversion, or payment.</p>
+                <h3 className="text-[16px] font-bold text-gray-900 tracking-tight">Attribution Pipeline</h3>
+                <p className="text-xs text-gray-500 mt-0.5 font-medium">Track replies that generated a verified click, conversion, or payment.</p>
               </div>
-              <Link href="/settings#notifications" className="text-[13px] font-medium text-blue-600 hover:underline">
+              <Link href="/settings#notifications" className="text-xs font-semibold text-[#0A84FF] hover:underline">
                 Setup Conversion Webhook →
               </Link>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-surface-secondary/40 border border-black/[0.04] p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Replies Clicked</p>
-                <p className="text-[26px] font-bold text-text-primary tracking-tight">{data.attributionStats?.clicks || 0}</p>
-                <p className="text-[12px] text-text-secondary mt-1">Tracked replies with at least one verified click</p>
+              <div className="bg-white border border-gray-200/80 p-5 rounded-2xl shadow-2xs">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Replies Clicked</p>
+                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{data.attributionStats?.clicks || 0}</p>
+                <p className="text-xs text-gray-500 mt-1.5 font-medium">Tracked replies with at least one verified click</p>
               </div>
-              <div className="bg-[#0A84FF]/[0.04] border border-[#0A84FF]/10 p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Conversions</p>
-                <p className="text-[26px] font-bold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
-                <p className="text-[12px] text-text-secondary mt-1">Attributed signups/payments</p>
+              <div className="bg-blue-50/40 border border-blue-200/60 p-5 rounded-2xl shadow-2xs">
+                <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-wider mb-1">Conversions</p>
+                <p className="text-3xl font-extrabold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
+                <p className="text-xs text-gray-600 mt-1.5 font-medium">Attributed signups / payments</p>
               </div>
-              <div className="bg-[#10B981]/[0.04] border border-[#10B981]/10 p-4 rounded-xl">
-                <p className="text-[12px] font-medium text-text-tertiary uppercase tracking-wider mb-1">Attributed Revenue</p>
-                <p className="text-[26px] font-bold text-[#10B981] tracking-tight">
-                  ${(data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="bg-emerald-50/40 border border-emerald-200/60 p-5 rounded-2xl shadow-2xs">
+                <p className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-wider mb-1">Attributed Revenue</p>
+                <p className="text-3xl font-extrabold text-emerald-600 tracking-tight">
+                  {'$' + (data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-[12px] text-text-secondary mt-1">Total revenue generated</p>
+                <p className="text-xs text-gray-600 mt-1.5 font-medium">Total revenue generated</p>
               </div>
             </div>
           </div>
