@@ -391,7 +391,7 @@ export default function DashboardLayout({
 
         {/* Main Workspace Window Panel — Floating rounded white card (Image 1 design) */}
         <main className="flex-1 h-full bg-white rounded-none sm:rounded-[20px] lg:rounded-[24px] border border-[#E5E5E2] shadow-[0_4px_24px_rgba(0,0,0,0.035),0_1px_4px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
-          <header className="sticky top-0 z-20 flex h-[56px] shrink-0 items-center justify-between border-b border-[#E5E5E2] bg-white px-4 sm:px-6">
+          <header className="sticky top-0 z-20 flex h-[56px] shrink-0 items-center justify-between bg-white px-4 sm:px-6">
               <div className="flex min-w-0 items-center text-[12.5px] font-medium tracking-normal text-[#50504C]">
                 <button
                   type="button"
