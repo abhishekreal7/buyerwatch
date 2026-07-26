@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Target, CheckCircle, ChevronDown, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, ChevronUp, Globe, LayoutGrid, List } from 'lucide-react'
+import { Search, Target, CheckCircle, ChevronDown, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, ChevronUp, Globe } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { GettingStartedChecklist } from '@/components/GettingStartedChecklist'
 import { BlueskyIcon, RedditIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
-import { LeadPipelineBoard, type PipelineOpportunity } from '@/components/LeadPipelineBoard'
 import { getPlanLimits } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
@@ -63,7 +62,6 @@ export default function DashboardPage() {
   const [plan, setPlan] = useState('free')
   const [regenerating, setRegenerating] = useState(false)
   const [filterTab, setFilterTab] = useState<'all' | 'high-intent' | 'dismissed'>('all')
-  const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
   const [expandedTrace, setExpandedTrace] = useState<string | null>(null) // Feature 1
   const [communityHealth, setCommunityHealth] = useState<Record<string, { rejection_rate: number; total_engagements: number }>>({}) // Feature 3
   const [editingDraft, setEditingDraft] = useState<string | null>(null) // Feature 4: inline draft edit
@@ -567,76 +565,14 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3">
-                {/* View Mode Switcher Toggle */}
-                <div className="inline-flex items-center gap-1 rounded-xl border border-black/[0.08] bg-[#F1F2F3] p-1 shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('board')}
-                    className={`flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-all duration-150 ${
-                      viewMode === 'board'
-                        ? 'bg-white text-gray-950 shadow-xs'
-                        : 'text-[#4F5865] hover:text-gray-950'
-                    }`}
-                    title="Board View (Pipeline)"
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                    Board
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('list')}
-                    className={`flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-all duration-150 ${
-                      viewMode === 'list'
-                        ? 'bg-white text-gray-950 shadow-xs'
-                        : 'text-[#4F5865] hover:text-gray-950'
-                    }`}
-                    title="List View (Feed)"
-                  >
-                    <List className="h-3.5 w-3.5" />
-                    List
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#4F5865] pr-1">
-                  <span>{filtered.length === 1 ? '1 opportunity' : `${filtered.length} opportunities`}</span>
-                </div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#4F5865] pr-1">
+                <span>{filtered.length === 1 ? '1 opportunity' : `${filtered.length} opportunities`}</span>
               </div>
             </div>
 
-            {viewMode === 'board' ? (
-              <div className="mt-4">
-                <LeadPipelineBoard
-                  opportunities={filtered.map(t => ({
-                    id: t.id,
-                    platform: t.platform,
-                    author: t.target || 'Community Member',
-                    target: t.target,
-                    createdAt: t.createdAt,
-                    title: t.title || t.matchedKeyword || 'Conversation Lead',
-                    content: t.content,
-                    score: t.score,
-                    label: t.label,
-                    keyword: t.matchedKeyword,
-                    reasoning: t.reasoning || '',
-                    matchedSignals: [],
-                    qualityIssues: [],
-                    automationReason: '',
-                    url: t.url,
-                    status: (t.status === 'replied' || t.status === 'posted') ? 'posted' : t.status === 'drafted' ? 'drafted' : t.flag ? 'needs_manual_reply' : 'pending',
-                    flag: t.flag,
-                  }))}
-                  onDraftReply={(id) => {
-                    const thread = threads.find(t => t.id === id)
-                    if (thread) handleInspectThread(thread)
-                  }}
-                  draftingId={regenerating ? selectedThread?.id ?? null : null}
-                />
-              </div>
-            ) : (
-              /* Main Feed & Detail Two Column Section */
-              <div className="flex flex-col items-start gap-6 xl:flex-row mt-4">
-                {/* Left Column (Feed) */}
+            {/* Main Feed & Detail Two Column Section */}
+            <div className="flex flex-col items-start gap-6 xl:flex-row">
+              {/* Left Column (Feed) */}
               <div className="flex-1 space-y-4">
               {loading && (
                 <div className="rounded-2xl p-12 bg-white border border-[#E3E3E0] shadow-xs flex items-center justify-center text-[#667085] text-xs font-medium">
@@ -1046,10 +982,9 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-          )}
-        </>
-      )
-    })()}
+          </>
+        )
+      })()}
 
       {/* Floating Bottom-Left Onboarding Checklist Widget */}
       <GettingStartedChecklist
