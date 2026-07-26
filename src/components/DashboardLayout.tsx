@@ -230,160 +230,171 @@ export default function DashboardLayout({
 
   return (
     <DashboardSessionProvider userId={userId}>
-      <div className="relative min-h-screen overflow-x-hidden bg-[#FAFAFA] selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
-      {/* Compact desktop sidebar matching exact Dribbble #F4F4F2 theme */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[210px] shrink-0 flex-col border-r border-[#E5E5E2] bg-[#F4F4F2] px-3 py-3.5 lg:flex">
-        <div className="mb-3 flex h-10 shrink-0 items-center px-1.5">
-          <Link
-            href="/dashboard"
-            className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
-          >
-            <BrandLogo size="sm" />
-          </Link>
-        </div>
-
-        <nav className="no-scrollbar flex-1 space-y-1 overflow-y-auto" aria-label="Primary navigation">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            const badge = badges[item.href]
-            const SidebarIcon = item.sidebarIcon
-            return (
-              <div key={item.name}>
+      {/* Outer App Canvas */}
+      <div className="min-h-screen bg-[#F0F0EC] p-0 sm:p-2 lg:p-3 flex justify-center text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
+        
+        {/* Outer App Window Frame */}
+        <div className="w-full max-w-[1680px] min-h-[calc(100vh-24px)] rounded-none sm:rounded-[24px] border border-[#E5E5E2] bg-[#F4F4F2] shadow-[0_8px_36px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.03)] flex overflow-hidden p-0 sm:p-2.5 gap-2.5">
+          
+          {/* Desktop Sidebar */}
+          <aside className="hidden w-[210px] shrink-0 flex-col justify-between py-1 px-1 lg:flex">
+            <div>
+              {/* Logo Header */}
+              <div className="mb-3 flex h-10 shrink-0 items-center px-2">
                 <Link
-                  href={item.href}
-                  onMouseEnter={() => router.prefetch(item.href)}
-                  onFocus={() => router.prefetch(item.href)}
-                  className={`group flex h-9.5 items-center justify-between rounded-xl px-3 text-[14px] transition-all duration-150 ${
-                    isActive
-                      ? 'border border-[#E2E2DE] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]'
-                      : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EAEAE7] hover:text-[#1C1C1A]'
-                  }`}
+                  href="/dashboard"
+                  className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
                 >
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    <SidebarIcon
-                      aria-hidden
-                      className={`h-[18px] w-[18px] shrink-0 ${
-                        isActive ? 'text-[#1C1C1A]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
-                      }`}
-                    />
-                    <span className="truncate">{item.name}</span>
-                  </span>
-                  {badge != null && badge > 0 && (
-                    <span
-                      className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
-                        item.name === 'Opportunities'
-                          ? 'bg-[#EF4444] text-white font-bold px-1.5 py-0.5 min-w-[20px] text-center'
-                          : isActive
-                          ? 'bg-[#F2F2F0] text-[#555550]'
-                          : 'bg-white border border-[#E2E2DF] text-[#666660]'
-                      }`}
-                    >
-                      {badge}
-                    </span>
-                  )}
+                  <BrandLogo size="sm" />
                 </Link>
               </div>
-            )
-          })}
-        </nav>
 
-        <div className="shrink-0 pt-2 flex flex-col gap-2">
-          <div className="border-t border-[#E5E5E2] pt-2">
-            <Link
-              href="/contact"
-              className="group flex h-9 items-center gap-2.5 rounded-xl px-3 text-[14px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
-            >
-              <PiQuestionFill className="h-[18px] w-[18px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
-              Help center
-            </Link>
-          </div>
+              {/* Navigation Items */}
+              <nav className="no-scrollbar space-y-1 overflow-y-auto" aria-label="Primary navigation">
+                {NAV_ITEMS.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  const badge = badges[item.href]
+                  const SidebarIcon = item.sidebarIcon
+                  return (
+                    <div key={item.name}>
+                      <Link
+                        href={item.href}
+                        onMouseEnter={() => router.prefetch(item.href)}
+                        onFocus={() => router.prefetch(item.href)}
+                        className={`group flex h-9.5 items-center justify-between rounded-xl px-3 text-[14px] transition-all duration-150 ${
+                          isActive
+                            ? 'border border-[#E2E2DE] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]'
+                            : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EAEAE7] hover:text-[#1C1C1A]'
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <SidebarIcon
+                            aria-hidden
+                            className={`h-[18px] w-[18px] shrink-0 ${
+                              isActive ? 'text-[#1C1C1A]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
+                            }`}
+                          />
+                          <span className="truncate">{item.name}</span>
+                        </span>
+                        {badge != null && badge > 0 && (
+                          <span
+                            className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
+                              item.name === 'Opportunities'
+                                ? 'bg-[#EF4444] text-white font-bold px-1.5 py-0.5 min-w-[20px] text-center'
+                                : isActive
+                                ? 'bg-[#F2F2F0] text-[#555550]'
+                                : 'bg-white border border-[#E2E2DF] text-[#666660]'
+                            }`}
+                          >
+                            {badge}
+                          </span>
+                        )}
+                      </Link>
+                    </div>
+                  )
+                })}
+              </nav>
+            </div>
 
-          {/* User profile card styled matching reference screenshot */}
-          <div className="rounded-xl border border-[#E2E2DE] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all">
-            <div className="flex items-center justify-between gap-2.5">
-              <Link
-                href="/settings"
-                className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80"
-                title="Settings"
-              >
-                <img
-                  src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                  alt={initialData.user?.name || 'Iona Rollins'}
-                  className="h-8.5 w-8.5 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
-                />
-                <span className="truncate text-[13.5px] font-semibold text-[#1C1C1A]">
-                  {initialData.user?.name || 'Iona Rollins'}
-                </span>
-              </Link>
-
-              <form action="/api/auth/signout" method="POST" className="shrink-0">
-                <button
-                  type="submit"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5D5D57] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
-                  title="Sign out"
-                  aria-label="Sign out"
+            {/* Bottom Cards & Profile Section */}
+            <div className="shrink-0 flex flex-col gap-2 pt-2">
+              <div className="border-t border-[#E5E5E2] pt-2">
+                <Link
+                  href="/contact"
+                  className="group flex h-9 items-center gap-2.5 rounded-xl px-3 text-[14px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
                 >
-                  <LogOut className="h-4 w-4" strokeWidth={1.75} />
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* Monthly usage card */}
-          <div className="rounded-xl border border-[#E2E2DE] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase leading-4 tracking-wider text-[#83837E]">
-                  Monthly usage
-                </p>
-                <p className="mt-0.5 truncate text-[13px] font-semibold leading-4 text-[#2F2F2C]">
-                  {credits ? `${creditsRemaining} drafts left` : 'Checking allowance'}
-                </p>
+                  <PiQuestionFill className="h-[18px] w-[18px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
+                  Help center
+                </Link>
               </div>
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-[#EDF6FF] text-[#087DE1]">
-                <Zap className="h-3.5 w-3.5" strokeWidth={2.1} aria-hidden />
-              </span>
+
+              {/* User profile card */}
+              <div className="rounded-xl border border-[#E2E2DE] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all">
+                <div className="flex items-center justify-between gap-2.5">
+                  <Link
+                    href="/settings"
+                    className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80"
+                    title="Settings"
+                  >
+                    <img
+                      src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                      alt={initialData.user?.name || 'Iona Rollins'}
+                      className="h-8.5 w-8.5 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
+                    />
+                    <span className="truncate text-[13.5px] font-semibold text-[#1C1C1A]">
+                      {initialData.user?.name || 'Iona Rollins'}
+                    </span>
+                  </Link>
+
+                  <form action="/api/auth/signout" method="POST" className="shrink-0">
+                    <button
+                      type="submit"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5D5D57] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
+                      title="Sign out"
+                      aria-label="Sign out"
+                    >
+                      <LogOut className="h-4 w-4" strokeWidth={1.75} />
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Monthly usage card */}
+              <div className="rounded-xl border border-[#E2E2DE] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase leading-4 tracking-wider text-[#83837E]">
+                      Monthly usage
+                    </p>
+                    <p className="mt-0.5 truncate text-[13px] font-semibold leading-4 text-[#2F2F2C]">
+                      {credits ? `${creditsRemaining} drafts left` : 'Checking allowance'}
+                    </p>
+                  </div>
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-[#EDF6FF] text-[#087DE1]">
+                    <Zap className="h-3.5 w-3.5" strokeWidth={2.1} aria-hidden />
+                  </span>
+                </div>
+
+                <div
+                  className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#E9E9E6]"
+                  role="progressbar"
+                  aria-label="Monthly drafts remaining"
+                  aria-valuemin={0}
+                  aria-valuemax={credits?.limit ?? 0}
+                  aria-valuenow={creditsRemaining ?? 0}
+                >
+                  <div
+                    className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
+                    style={{ width: `${creditsPercent}%` }}
+                  />
+                </div>
+
+                <div className="mt-1.5 flex items-center justify-between text-[9.5px] leading-4 text-[#858580]">
+                  <span>{credits ? `${credits.used} used` : 'Loading'}</span>
+                  <span>{credits ? `${credits.limit} included` : ''}</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddCredits}
+                  disabled={openingCheckout}
+                  className="mt-2.5 flex h-8 w-full items-center justify-center rounded-[8px] bg-[#20201E] px-2 text-[11px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.16)] transition-[background-color,box-shadow,transform] hover:bg-black hover:shadow-[0_2px_5px_rgba(0,0,0,0.18)] active:translate-y-px disabled:cursor-wait disabled:bg-[#A7A7A2]"
+                >
+                  {openingCheckout
+                    ? 'Opening checkout…'
+                    : plan === 'growth'
+                      ? 'View usage options'
+                      : plan === 'free'
+                        ? 'Upgrade plan'
+                        : 'Add credits'}
+                </button>
+              </div>
             </div>
+          </aside>
 
-            <div
-              className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#E9E9E6]"
-              role="progressbar"
-              aria-label="Monthly drafts remaining"
-              aria-valuemin={0}
-              aria-valuemax={credits?.limit ?? 0}
-              aria-valuenow={creditsRemaining ?? 0}
-            >
-              <div
-                className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
-                style={{ width: `${creditsPercent}%` }}
-              />
-            </div>
-
-            <div className="mt-1.5 flex items-center justify-between text-[9.5px] leading-4 text-[#858580]">
-              <span>{credits ? `${credits.used} used` : 'Loading'}</span>
-              <span>{credits ? `${credits.limit} included` : ''}</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleAddCredits}
-              disabled={openingCheckout}
-              className="mt-2.5 flex h-8 w-full items-center justify-center rounded-[8px] bg-[#20201E] px-2 text-[11px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.16)] transition-[background-color,box-shadow,transform] hover:bg-black hover:shadow-[0_2px_5px_rgba(0,0,0,0.18)] active:translate-y-px disabled:cursor-wait disabled:bg-[#A7A7A2]"
-            >
-              {openingCheckout
-                ? 'Opening checkout…'
-                : plan === 'growth'
-                  ? 'View usage options'
-                  : plan === 'free'
-                    ? 'Upgrade plan'
-                    : 'Add credits'}
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      <div className="flex min-h-screen flex-1 flex-col bg-white lg:ml-[200px]">
-        <header className="sticky top-0 z-20 flex h-[58px] shrink-0 items-center justify-between border-b border-[#E4E4E1] bg-white px-4 sm:px-5">
+          {/* Main Content Window — Floating rounded white card inside outer window frame */}
+          <main className="flex-1 bg-white rounded-none sm:rounded-[20px] border border-[#E5E5E2] overflow-hidden flex flex-col shadow-xs">
+            <header className="sticky top-0 z-20 flex h-[56px] shrink-0 items-center justify-between border-b border-[#E5E5E2] bg-white px-4 sm:px-6">
           <div className="flex min-w-0 items-center text-[12.5px] font-medium tracking-normal text-[#50504C]">
             <button
               type="button"
@@ -562,6 +573,7 @@ export default function DashboardLayout({
             </div>
           </>
         )}
+        </main>
         </div>
       </div>
     </DashboardSessionProvider>
