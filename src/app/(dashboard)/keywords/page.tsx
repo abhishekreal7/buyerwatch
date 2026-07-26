@@ -407,158 +407,117 @@ export default function KeywordsPage() {
           )}
         </div>
 
-        {/* ── Table Container matching Reference Screenshot ───────────────── */}
-        <div className="rounded-[20px] border border-[#E4E4E1] bg-white p-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+        {/* ── Main Table Container matching provided HTML template ───────────────── */}
+        <div className="w-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" data-purpose="deals-table-container">
+          <table className="w-full text-left border-collapse" data-purpose="deals-table">
+            {/* Table Header */}
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100 text-sm text-gray-500 font-medium">
+                <th className="py-4 pl-6 pr-4 w-12 rounded-tl-xl">
+                  <input
+                    className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 bg-white cursor-pointer"
+                    type="checkbox"
+                    aria-label="Select all rules"
+                  />
+                </th>
+                <th className="py-4 px-4 w-16">ID</th>
+                <th className="py-4 px-4 w-1/4">Deals</th>
+                <th className="py-4 px-4 w-1/4">Contact</th>
+                <th className="py-4 px-4 w-1/4">Email</th>
+                <th className="py-4 px-4 w-32">Value</th>
+                <th className="py-4 px-6 rounded-tr-xl">Source</th>
+                <th className="py-4 px-4 w-12" />
+              </tr>
+            </thead>
 
-          {/* Table Header Row */}
-          <div className="hidden sm:grid grid-cols-[36px_48px_1fr_200px_130px_110px_110px_44px] items-center gap-3 rounded-[14px] bg-[#F5F5F3] px-4 py-3 text-[12px] font-semibold text-[#8C8C85]">
-            <div className="flex items-center justify-center">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded-[5px] border-[#D5D5D0] text-gray-900 focus:ring-0 cursor-pointer"
-                aria-label="Select all rules"
-              />
-            </div>
-            <span>ID</span>
-            <span>Deals</span>
-            <span>Contact</span>
-            <span>Email</span>
-            <span>Value</span>
-            <span>Source</span>
-            <span />
-          </div>
+            {/* Table Body */}
+            <tbody className="divide-y divide-gray-100 text-sm">
+              {loading && (
+                <tr>
+                  <td colSpan={8} className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 rounded-full border-2 border-gray-200 border-t-gray-900 animate-spin" />
+                      <span className="text-xs font-medium text-gray-500">Loading rules…</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
 
-          {/* Loading */}
-          {loading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 rounded-full border-2 border-black/[0.08] border-t-text-primary animate-spin" />
-                <span className="text-[13px] text-text-tertiary font-medium">Loading rules…</span>
-              </div>
-            </div>
-          )}
+              {!loading && filtered.length === 0 && keywords.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-14 px-8 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-5">
+                        <Target className="w-7 h-7 text-[#0A84FF]" strokeWidth={1.6} />
+                      </div>
+                      <p className="text-base font-bold text-gray-900 mb-2">Set your first signal rule</p>
+                      <p className="text-xs text-gray-500 max-w-xs mb-6 leading-relaxed">
+                        Tell Scouto what buying intent looks like for your product — a keyword and a community.
+                      </p>
+                      <button
+                        onClick={() => setShowAdd(true)}
+                        className="btn-primary text-xs py-2.5 px-5 flex items-center gap-2 mb-4"
+                      >
+                        <Plus className="w-4 h-4" strokeWidth={2.5} />
+                        Create first rule
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
 
-          {/* Empty state */}
-          {!loading && filtered.length === 0 && keywords.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-14 px-8 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-[#F0F7FF] flex items-center justify-center mb-5">
-                <Target className="w-7 h-7 text-[#0A84FF]" strokeWidth={1.6} />
-              </div>
-              <p className="text-[17px] font-bold text-text-primary mb-2 tracking-tight">
-                Set your first signal rule
-              </p>
-              <p className="text-[13.5px] text-text-secondary max-w-[320px] mb-6 leading-relaxed">
-                Tell Scouto what buying intent looks like for your product — a keyword and a community. We scan every few hours and surface matching conversations.
-              </p>
-              <button
-                onClick={() => setShowAdd(true)}
-                className="btn-primary text-[13.5px] py-2.5 px-5 flex items-center gap-2 mb-8"
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
-                Create first rule
-              </button>
-              <div className="grid w-full max-w-sm grid-cols-1 gap-3 border-t border-black/5 pt-6 sm:grid-cols-3">
-                <div className="rounded-xl bg-black/[0.025] p-3 text-center">
-                  <p className="text-[13px] font-semibold text-text-primary">Always scanning</p>
-                  <p className="mt-1 text-[12px] text-text-tertiary">Continuous monitoring</p>
-                </div>
-                <div className="rounded-xl bg-black/[0.025] p-3 text-center">
-                  <p className="text-[13px] font-semibold text-text-primary">Intent ranked</p>
-                  <p className="mt-1 text-[12px] text-text-tertiary">Review strongest leads first</p>
-                </div>
-                <div className="rounded-xl bg-black/[0.025] p-3 text-center">
-                  <p className="text-[13px] font-semibold text-text-primary">Start free</p>
-                  <p className="mt-1 text-[12px] text-text-tertiary">No card needed</p>
-                </div>
-              </div>
-            </div>
-          )}
+              {!loading && filtered.length === 0 && keywords.length > 0 && (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center text-gray-500">
+                    No rules match your filters.
+                  </td>
+                </tr>
+              )}
 
-          {!loading && filtered.length === 0 && keywords.length > 0 && (
-            <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-surface border border-black/[0.06] flex items-center justify-center mb-4">
-                <Search className="w-5 h-5 text-text-tertiary" strokeWidth={1.75} />
-              </div>
-              <p className="text-[14px] font-semibold text-text-primary mb-1">No rules match your filters</p>
-              <p className="text-[13px] text-text-tertiary max-w-[240px] leading-relaxed">
-                Try adjusting your search or filter selection.
-              </p>
-            </div>
-          )}
-
-          {/* Rows */}
-          <div className="divide-y divide-[#F0F0ED]">
-            <AnimatePresence initial={false}>
               {filtered.map((kw, index) => {
                 const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
                 const successRate = getSuccessRate(kw.id, threadStats.total, threadStats.replied)
 
                 return (
-                  <motion.div
-                    key={kw.id}
-                    layout
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: kw.is_active ? 1 : 0.65, y: 0 }}
-                    exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                    transition={{ duration: 0.18 }}
-                    className="group relative grid grid-cols-[1fr_auto] sm:grid-cols-[36px_48px_1fr_200px_130px_110px_110px_44px] items-center gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-[#F9F9F8] rounded-xl"
-                  >
-                    {/* Checkbox column */}
-                    <div className="hidden sm:flex items-center justify-center">
+                  <tr key={kw.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4 pl-6 pr-4">
                       <input
+                        className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 bg-white cursor-pointer"
                         type="checkbox"
-                        className="h-4 w-4 rounded-[5px] border-[#D5D5D0] text-gray-900 focus:ring-0 cursor-pointer"
-                        aria-label={`Select rule ${kw.term}`}
                       />
-                    </div>
-
-                    {/* ID column */}
-                    <span className="hidden sm:block text-[13px] font-semibold text-[#7A7A74] tabular-nums">
+                    </td>
+                    <td className="py-4 px-4 text-gray-500 font-medium">
                       {String(index + 1).padStart(2, '0')}
-                    </span>
-
-                    {/* Deals / Term column */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-[14px] font-bold text-[#181816] tracking-tight truncate">
-                        {kw.term}
-                      </span>
-                    </div>
-
-                    {/* Contact / Community Pill column (matching reference avatar pill) */}
-                    <div className="hidden sm:flex items-center">
-                      <div className="inline-flex items-center gap-2 bg-white border border-[#E2E2DF] rounded-full px-3 py-1 text-[12.5px] font-semibold text-[#2C2C28] shadow-2xs truncate max-w-full">
+                    </td>
+                    <td className="py-4 px-4 font-medium text-gray-900">
+                      {kw.term}
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white shadow-sm">
                         {kw.platform === 'reddit' ? (
-                          <RedditIcon className="h-4 w-4 shrink-0 text-[#FF4500]" />
+                          <RedditIcon className="w-4 h-4 text-[#FF4500]" />
                         ) : (
-                          <BlueskyIcon className="h-4 w-4 shrink-0 text-[#1185FE]" />
+                          <BlueskyIcon className="w-4 h-4 text-[#1185FE]" />
                         )}
-                        <span className="truncate">
+                        <span className="font-medium text-gray-700">
                           {kw.platform === 'reddit' ? `r/${kw.target}` : kw.target}
                         </span>
                       </div>
-                    </div>
-
-                    {/* Email / Leads Found column */}
-                    <div className="hidden sm:block text-[13px] font-semibold text-[#181816] tabular-nums">
+                    </td>
+                    <td className="py-4 px-4 text-gray-500">
                       {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
-                    </div>
-
-                    {/* Value / Reply Rate column */}
-                    <div className="hidden sm:block text-[13px] font-semibold text-[#181816] tabular-nums">
-                      {successRate > 0 ? `${successRate}%` : '0%'}
-                    </div>
-
-                    {/* Source / Status column */}
-                    <div>
+                    </td>
+                    <td className="py-4 px-4 font-medium text-gray-900">
+                      {successRate}%
+                    </td>
+                    <td className="py-4 px-6">
                       <StatusPill active={kw.is_active} onClick={() => handleToggle(kw)} />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-end" data-menu>
+                    </td>
+                    <td className="py-4 px-4 text-right relative" data-menu>
                       <button
                         onClick={() => setMenuId(menuId === kw.id ? null : kw.id)}
-                        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-[#8A8A84] transition-colors hover:bg-black/5 hover:text-black"
-                        aria-label={`Open actions for ${kw.term}`}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                        aria-label={`Actions for ${kw.term}`}
                       >
                         <MoreHorizontal className="w-4 h-4" />
                       </button>
@@ -570,11 +529,11 @@ export default function KeywordsPage() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.94, y: -4 }}
                             transition={{ duration: 0.1 }}
-                            className="absolute right-4 top-12 z-30 bg-white border border-[#E2E2DF] rounded-xl shadow-lg p-1 w-40"
+                            className="absolute right-4 top-12 z-30 bg-white border border-gray-200 rounded-xl shadow-lg p-1 w-40 text-left"
                           >
                             <button
                               onClick={() => handleToggle(kw)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-gray-800 hover:bg-gray-50 transition-colors cursor-pointer"
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-800 hover:bg-gray-50 transition-colors cursor-pointer"
                             >
                               {kw.is_active
                                 ? <><Pause className="w-3.5 h-3.5 text-gray-500" /> Pause rule</>
@@ -583,20 +542,19 @@ export default function KeywordsPage() {
                             <div className="h-px bg-gray-100 my-1" />
                             <button
                               onClick={() => handleDelete(kw.id)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Delete rule
                             </button>
                           </motion.div>
                         )}
                       </AnimatePresence>
-                    </div>
-                  </motion.div>
+                    </td>
+                  </tr>
                 )
               })}
-            </AnimatePresence>
-          </div>
-
+            </tbody>
+          </table>
         </div>
 
         {/* ── Upgrade prompt (Placement A) ─────────────────────────
