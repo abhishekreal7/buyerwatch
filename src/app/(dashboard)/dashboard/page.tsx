@@ -1046,9 +1046,10 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-          </>
-        )
-      })()}
+          )}
+        </>
+      )
+    })()}
 
       {/* Floating Bottom-Left Onboarding Checklist Widget */}
       <GettingStartedChecklist
