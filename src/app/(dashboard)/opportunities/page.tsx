@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  LayoutGrid,
+  List,
   MessageCircle,
   Search,
   Target,
@@ -16,6 +18,7 @@ import { toast } from 'sonner'
 import { AppPage } from '@/components/AppPage'
 import { BlueskyIcon, RedditIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
+import { LeadPipelineBoard } from '@/components/LeadPipelineBoard'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { springs, staggers } from '@/lib/motion'
 import { createClient } from '@/utils/supabase/client'
