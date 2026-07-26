@@ -210,7 +210,6 @@ export default function OpportunitiesPage() {
       <div className="flex w-full flex-col">
         <PageHeader
           title="Opportunities"
-          subtitle="Qualified conversations with the source evidence and intent reasoning attached."
           action={(
             <div className="flex items-center gap-2 rounded-full bg-gray-900 px-3 py-1 text-[12px] font-medium text-white shadow-sm ring-1 ring-black/5">
               <span className="relative flex h-2 w-2 items-center justify-center">

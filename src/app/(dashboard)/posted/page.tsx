@@ -60,7 +60,7 @@ export default function PostedPage() {
   return (
     <AppPage>
       <div className="w-full flex flex-col">
-        <PageHeader title="Posted Replies" subtitle="History of approved replies sent to Reddit and Bluesky." />
+        <PageHeader title="Posted Replies" />
 
       {posted.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center surface-ceramic border border-transparent">

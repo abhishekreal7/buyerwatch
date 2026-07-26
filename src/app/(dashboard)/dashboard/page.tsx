@@ -417,7 +417,6 @@ export default function DashboardPage() {
       {/* ElevenLabs-style Page Title Header & Top Action Row */}
       <PageHeader
         title="Overview"
-        subtitle="Real-time intent monitoring and AI response drafting across monitored communities."
         action={(
           <a
             href="/keywords"

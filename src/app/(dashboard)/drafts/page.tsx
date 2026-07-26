@@ -285,7 +285,7 @@ export default function DraftsPage() {
   return (
     <AppPage>
       <div className="flex w-full flex-col xl:h-[calc(100vh-144px)] xl:overflow-hidden">
-        <PageHeader title="Drafts Ready" subtitle="AI-drafted replies ready for your review and approval before posting." />
+        <PageHeader title="Drafts Ready" />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible xl:flex-row xl:gap-8 xl:overflow-hidden">
         {/* Draft list */}
