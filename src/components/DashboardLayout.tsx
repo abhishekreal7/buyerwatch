@@ -233,11 +233,11 @@ export default function DashboardLayout({
       {/* Outer App Canvas — Fits 100% viewport screen */}
       <div className="h-screen w-screen overflow-hidden bg-[#F4F4F2] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
-        {/* Desktop Sidebar sitting directly on warm stone background fitting full height (Static) */}
-        <aside className="hidden w-[210px] shrink-0 flex-col justify-between bg-[#F4F4F2] px-1.5 py-1.5 h-full lg:flex select-none">
-          <div>
+        {/* Desktop Sidebar sitting directly on warm stone background */}
+        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F4F4F2] px-2 py-2.5 h-full lg:flex select-none">
+          <div className="flex flex-col h-full">
             {/* Logo Header */}
-            <div className="mb-3 flex h-10 shrink-0 items-center px-2">
+            <div className="mb-2 flex h-9 shrink-0 items-center px-1.5">
               <Link
                 href="/dashboard"
                 className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
@@ -247,7 +247,7 @@ export default function DashboardLayout({
             </div>
 
             {/* Navigation Items */}
-            <nav className="no-scrollbar space-y-1 overflow-y-auto" aria-label="Primary navigation">
+            <nav className="space-y-0.5" aria-label="Primary navigation">
               {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 const badge = badges[item.href]
@@ -258,27 +258,30 @@ export default function DashboardLayout({
                       href={item.href}
                       onMouseEnter={() => router.prefetch(item.href)}
                       onFocus={() => router.prefetch(item.href)}
-                      className={`group flex h-9.5 items-center justify-between rounded-xl px-3 text-[14px] transition-all duration-150 ${isActive
-                          ? 'border border-[#E2E2DE] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]'
+                      className={`group flex h-8.5 items-center justify-between rounded-xl px-2.5 text-[13.5px] transition-all duration-150 ${
+                        isActive
+                          ? 'border border-[#E2E2DE] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.04)]'
                           : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EAEAE7] hover:text-[#1C1C1A]'
-                        }`}
+                      }`}
                     >
-                      <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex min-w-0 items-center gap-2">
                         <SidebarIcon
                           aria-hidden
-                          className={`h-[18px] w-[18px] shrink-0 ${isActive ? 'text-[#1C1C1A]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
-                            }`}
+                          className={`h-[17px] w-[17px] shrink-0 ${
+                            isActive ? 'text-[#1C1C1A]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
+                          }`}
                         />
                         <span className="truncate">{item.name}</span>
                       </span>
                       {badge != null && badge > 0 && (
                         <span
-                          className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${item.name === 'Opportunities'
-                              ? 'bg-[#EF4444] text-white font-bold px-1.5 py-0.5 min-w-[20px] text-center'
+                          className={`ml-1.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums ${
+                            item.name === 'Opportunities'
+                              ? 'bg-[#EF4444] text-white font-bold px-1.5 py-0.2 min-w-[18px] text-center'
                               : isActive
-                                ? 'bg-[#F2F2F0] text-[#555550]'
-                                : 'bg-white border border-[#E2E2DF] text-[#666660]'
-                            }`}
+                              ? 'bg-[#F2F2F0] text-[#555550]'
+                              : 'bg-white border border-[#E2E2DF] text-[#666660]'
+                          }`}
                         >
                           {badge}
                         </span>
@@ -288,93 +291,94 @@ export default function DashboardLayout({
                 )
               })}
             </nav>
-          </div>
-          {/* Bottom Navigation & Unified User Widget */}
-          <div className="shrink-0 flex flex-col gap-2 pt-1">
-            <Link
-              href="/contact"
-              className="group flex h-8.5 items-center gap-2.5 rounded-xl px-2.5 text-[13.5px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
-            >
-              <PiQuestionFill className="h-[17px] w-[17px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
-              Help center
-            </Link>
 
-            {/* Unified Professional Profile & Usage Card */}
-            <div className="rounded-[16px] border border-[#E2E2DE] bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col gap-2.5">
-              {/* User Info Row */}
-              <div className="flex items-center justify-between gap-2">
-                <Link
-                  href="/settings"
-                  className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80"
-                  title="Account Settings"
-                >
-                  <img
-                    src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                    alt={initialData.user?.name || 'User'}
-                    className="h-8 w-8 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-[#1C1C1A] leading-tight">
-                      {initialData.user?.name || 'User'}
-                    </p>
-                    <p className="truncate text-[10.5px] font-medium text-[#82827D] capitalize">
-                      {plan} Plan
-                    </p>
-                  </div>
-                </Link>
+            {/* Bottom Navigation & Unified User Widget grouped with mt-auto */}
+            <div className="mt-auto shrink-0 flex flex-col gap-2 pt-3">
+              <Link
+                href="/contact"
+                className="group flex h-8 items-center gap-2 rounded-xl px-2.5 text-[13px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
+              >
+                <PiQuestionFill className="h-[16px] w-[16px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
+                Help center
+              </Link>
 
-                <form action="/api/auth/signout" method="POST" className="shrink-0">
-                  <button
-                    type="submit"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-[#7C7C76] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
-                    title="Sign out"
-                    aria-label="Sign out"
+              {/* Unified Professional Profile & Usage Card */}
+              <div className="rounded-[16px] border border-[#E2E2DE] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col gap-2">
+                {/* User Info Row */}
+                <div className="flex items-center justify-between gap-2">
+                  <Link
+                    href="/settings"
+                    className="group flex min-w-0 flex-1 items-center gap-2 rounded-lg transition-opacity hover:opacity-80"
+                    title="Account Settings"
                   >
-                    <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  </button>
-                </form>
-              </div>
+                    <img
+                      src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                      alt={initialData.user?.name || 'User'}
+                      className="h-7.5 w-7.5 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12.5px] font-semibold text-[#1C1C1A] leading-tight">
+                        {initialData.user?.name || 'User'}
+                      </p>
+                      <p className="truncate text-[10px] font-medium text-[#82827D] capitalize">
+                        {plan} Plan
+                      </p>
+                    </div>
+                  </Link>
 
-              {/* Muted Divider */}
-              <div className="h-px w-full bg-[#EAEAE7]" />
-
-              {/* Usage & Upgrade Section */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-[11px] font-medium text-[#686863]">
-                  <span>Usage</span>
-                  <span className="font-semibold text-[#1C1C1A]">
-                    {credits ? `${creditsRemaining} drafts left` : 'Checking'}
-                  </span>
+                  <form action="/api/auth/signout" method="POST" className="shrink-0">
+                    <button
+                      type="submit"
+                      className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-[#7C7C76] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
+                      title="Sign out"
+                      aria-label="Sign out"
+                    >
+                      <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </button>
+                  </form>
                 </div>
 
-                <div
-                  className="h-1.5 overflow-hidden rounded-full bg-[#EFEFEA]"
-                  role="progressbar"
-                  aria-label="Monthly drafts remaining"
-                  aria-valuemin={0}
-                  aria-valuemax={credits?.limit ?? 0}
-                  aria-valuenow={creditsRemaining ?? 0}
-                >
+                {/* Muted Divider */}
+                <div className="h-px w-full bg-[#EAEAE7]" />
+
+                {/* Usage & Upgrade Section */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-[10.5px] font-medium text-[#686863]">
+                    <span>Usage</span>
+                    <span className="font-semibold text-[#1C1C1A]">
+                      {credits ? `${creditsRemaining} drafts left` : 'Checking'}
+                    </span>
+                  </div>
+
                   <div
-                    className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
-                    style={{ width: `${creditsPercent}%` }}
-                  />
-                </div>
+                    className="h-1.5 overflow-hidden rounded-full bg-[#EFEFEA]"
+                    role="progressbar"
+                    aria-label="Monthly drafts remaining"
+                    aria-valuemin={0}
+                    aria-valuemax={credits?.limit ?? 0}
+                    aria-valuenow={creditsRemaining ?? 0}
+                  >
+                    <div
+                      className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
+                      style={{ width: `${creditsPercent}%` }}
+                    />
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={handleAddCredits}
-                  disabled={openingCheckout}
-                  className="mt-1 flex h-7.5 w-full items-center justify-center rounded-lg bg-[#1C1C1A] px-2 text-[11.5px] font-semibold text-white shadow-xs transition-colors hover:bg-black disabled:cursor-wait disabled:bg-[#A7A7A2]"
-                >
-                  {openingCheckout
-                    ? 'Opening checkout…'
-                    : plan === 'growth'
-                      ? 'Manage Subscription'
-                      : plan === 'free'
-                        ? 'Upgrade Plan'
-                        : 'Add Credits'}
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCredits}
+                    disabled={openingCheckout}
+                    className="mt-0.5 flex h-7 w-full items-center justify-center rounded-lg bg-[#1C1C1A] px-2 text-[11px] font-semibold text-white shadow-xs transition-colors hover:bg-black disabled:cursor-wait disabled:bg-[#A7A7A2]"
+                  >
+                    {openingCheckout
+                      ? 'Opening checkout…'
+                      : plan === 'growth'
+                        ? 'Manage Subscription'
+                        : plan === 'free'
+                          ? 'Upgrade Plan'
+                          : 'Add Credits'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
