@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, X, Sparkles, ArrowRight, Trophy } from 'lucide-react'
+import Link from 'next/link'
 
 interface GettingStartedChecklistProps {
   keywordsCount: number
@@ -86,10 +87,12 @@ export function GettingStartedChecklist({
   return (
     <>
       {/* Sleek Floating Header Action Trigger (Clean white glassmorphism pill) */}
-      <div className="fixed bottom-6 right-6 z-40">
+      <div className="fixed bottom-[76px] right-3 z-40 sm:right-6 lg:bottom-6">
         <button
           onClick={() => setVisible(prev => !prev)}
-          className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/95 backdrop-blur-md text-gray-900 text-xs font-bold shadow-lg hover:shadow-xl hover:bg-white transition-all cursor-pointer border border-gray-200/90 ring-1 ring-black/[0.04]"
+          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 text-xs font-bold text-gray-900 shadow-lg ring-1 ring-black/[0.04] backdrop-blur-md transition-all hover:bg-white hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]"
+          aria-expanded={visible}
+          aria-controls="setup-progress-panel"
         >
           <div className="w-5 h-5 rounded-full bg-blue-50 text-[#0A84FF] flex items-center justify-center font-extrabold text-[11px] border border-blue-100">
             {completedCount}
@@ -106,7 +109,8 @@ export function GettingStartedChecklist({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 24, stiffness: 300 }}
-            className="fixed bottom-20 right-6 z-50 w-84 bg-white border border-black/10 rounded-3xl shadow-2xl overflow-hidden p-5 space-y-4"
+            id="setup-progress-panel"
+            className="fixed inset-x-3 bottom-[132px] z-[60] space-y-4 overflow-hidden rounded-3xl border border-black/10 bg-white p-5 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[336px] lg:bottom-20"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -130,8 +134,10 @@ export function GettingStartedChecklist({
               </div>
 
               <button
+                type="button"
                 onClick={() => setVisible(false)}
-                className="w-7 h-7 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]"
+                aria-label="Close setup progress"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -160,12 +166,12 @@ export function GettingStartedChecklist({
                   </div>
 
                   {!s.done && s.link && (
-                    <a
+                    <Link
                       href={s.link}
-                      className="text-[11px] font-bold text-[#0A84FF] hover:underline shrink-0 ml-1"
+                      className="ml-1 inline-flex min-h-11 shrink-0 items-center gap-1 px-2 text-[11px] font-bold text-[#0A84FF] hover:underline"
                     >
-                      Go <ArrowRight className="w-3 h-3 inline" />
-                    </a>
+                      Open <ArrowRight className="h-3 w-3" />
+                    </Link>
                   )}
                 </div>
               ))}
@@ -173,7 +179,7 @@ export function GettingStartedChecklist({
 
             {isAllComplete && (
               <div className="p-3 bg-emerald-500 text-white rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm">
-                <Sparkles className="w-4 h-4" /> Radar 100% Fully Configured!
+                <Sparkles className="w-4 h-4" /> Your signal radar is ready
               </div>
             )}
           </motion.div>

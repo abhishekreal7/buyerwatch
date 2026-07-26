@@ -2,11 +2,36 @@
 
 import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Target, FileText, CheckCircle, ChartNoAxesCombined, Key, Bell, Search, LogOut, ChevronRight, Zap } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import {
+  Bell,
+  ChartNoAxesCombined,
+  CheckCircle,
+  ChevronRight,
+  FileText,
+  Key,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Search,
+  Settings,
+  Target,
+  X,
+  Zap,
+} from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
+import { BrandLogo } from '@/components/BrandLogo'
+import { DashboardSessionProvider } from '@/components/DashboardContext'
+
+export type DashboardBootstrap = {
+  autoSend: boolean
+  plan: PlanTier
+  credits: { used: number; limit: number }
+  opportunityCount: number
+  draftCount: number
+}
 
 const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -17,29 +42,53 @@ const NAV_ITEMS = [
   { name: 'Keywords', href: '/keywords', icon: Key },
 ]
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
-  const supabase = createClient()
+const MOBILE_NAV_ITEMS = NAV_ITEMS.filter((item) =>
+  ['Dashboard', 'Opportunities', 'Drafts Ready', 'Analytics'].includes(item.name)
+)
 
-  const [autoSend, setAutoSend] = useState<boolean | null>(null)
+export default function DashboardLayout({
+  children,
+  userId,
+  initialData,
+}: {
+  children: ReactNode
+  userId: string
+  initialData: DashboardBootstrap
+}) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [supabase] = useState(createClient)
+
+  const [autoSend, setAutoSend] = useState<boolean | null>(initialData.autoSend)
   const [togglingAutoSend, setTogglingAutoSend] = useState(false)
-  const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
-  const [draftCount, setDraftCount] = useState<number | null>(null)
-  const [plan, setPlan] = useState<PlanTier>('free')
-  const [credits, setCredits] = useState<{ used: number; limit: number } | null>(null)
+  const [opportunityCount, setOpportunityCount] = useState<number | null>(initialData.opportunityCount)
+  const [draftCount, setDraftCount] = useState<number | null>(initialData.draftCount)
+  const [plan, setPlan] = useState<PlanTier>(initialData.plan)
+  const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
   const [openingCheckout, setOpeningCheckout] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     async function loadSidebarData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       // Profile — auto-send state
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('auto_send_enabled, plan, draft_count, draft_month')
-        .eq('id', user.id)
-        .single()
+      const [profileResult, opportunitiesResult, draftsResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('auto_send_enabled, plan, draft_count, draft_month')
+          .eq('id', userId)
+          .single(),
+        supabase
+          .from('monitored_threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .in('status', ['pending', 'needs_manual_reply']),
+        supabase
+          .from('monitored_threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('status', 'drafted'),
+      ])
+      const profile = profileResult.data
       if (profile) {
         const normalizedPlan = normalizePlan(profile.plan)
         const limit = getPlanLimits(normalizedPlan).aiDraftsPerMonth
@@ -52,31 +101,38 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setCredits({ used, limit })
       }
 
-      // Real badge counts
-      const [opportunitiesRes, draftsRes] = await Promise.all([
-        supabase
-          .from('monitored_threads')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .in('status', ['pending', 'needs_manual_reply']),
-        supabase
-          .from('monitored_threads')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'drafted'),
-      ])
-      setOpportunityCount(opportunitiesRes.count ?? 0)
-      setDraftCount(draftsRes.count ?? 0)
+      setOpportunityCount(opportunitiesResult.count ?? 0)
+      setDraftCount(draftsResult.count ?? 0)
     }
-    loadSidebarData()
-    const refreshCredits = () => loadSidebarData()
+    const refreshCredits = () => void loadSidebarData()
     const refreshInterval = window.setInterval(loadSidebarData, 60_000)
     window.addEventListener('scouto:credits-changed', refreshCredits)
     return () => {
       window.clearInterval(refreshInterval)
       window.removeEventListener('scouto:credits-changed', refreshCredits)
     }
-  }, [])
+  }, [supabase, userId])
+
+  useEffect(() => {
+    const prefetchRoutes = () => {
+      for (const item of NAV_ITEMS) {
+        if (item.href !== pathname) router.prefetch(item.href)
+      }
+      router.prefetch('/settings')
+    }
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(prefetchRoutes, { timeout: 1_500 })
+      return () => window.cancelIdleCallback(idleId)
+    }
+
+    const timeoutId = globalThis.setTimeout(prefetchRoutes, 250)
+    return () => globalThis.clearTimeout(timeoutId)
+  }, [pathname, router])
+
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [pathname])
 
   async function handleToggleAutoSend() {
     if (autoSend === null || togglingAutoSend) return
@@ -133,16 +189,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const creditsPercent = credits && credits.limit > 0
     ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
     : 0
+  const currentPage = NAV_ITEMS.find((item) =>
+    pathname === item.href || pathname.startsWith(`${item.href}/`)
+  )?.name ?? (pathname.startsWith('/settings') ? 'Settings' : 'Overview')
+
+  function openCommandPalette() {
+    window.dispatchEvent(new Event('scouto:open-command-palette'))
+  }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] relative selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
+    <DashboardSessionProvider userId={userId}>
+      <div className="min-h-screen bg-[#FAFAFA] relative selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
       {/* Sidebar - ElevenLabs Style */}
-      <aside className="w-[260px] h-screen fixed top-0 left-0 bottom-0 hidden md:flex flex-col bg-[#F9FAFB] border-r border-gray-200/70 shrink-0 z-30 py-4 px-3">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[260px] shrink-0 flex-col border-r border-gray-200/70 bg-[#F9FAFB] px-3 py-4 lg:flex">
         {/* Logo & Brand Header */}
         <div className="h-12 flex items-center px-2 shrink-0 mb-2">
           <Link href="/dashboard" className="text-xl font-display font-bold tracking-tight text-gray-900 flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <img src="/scouto_official_logo.png" alt="Scouto" className="w-7.5 h-7.5 rounded-full object-contain" />
-            <span>Scouto</span>
+            <BrandLogo />
           </Link>
         </div>
 
@@ -155,6 +218,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.name}
                 href={item.href}
+                onMouseEnter={() => router.prefetch(item.href)}
+                onFocus={() => router.prefetch(item.href)}
                 className={`flex items-center justify-between px-3 py-2 rounded-xl transition-colors text-[13.5px] ${isActive
                   ? 'bg-[#EAEAEA] text-gray-900 font-semibold'
                   : 'text-[#555555] hover:bg-[#F2F2F2] hover:text-gray-900 font-medium'
@@ -200,7 +265,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               type="button"
               onClick={handleAddCredits}
               disabled={openingCheckout}
-              className="w-full py-1 rounded-xl bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white text-[11px] font-semibold flex items-center justify-center gap-1 transition-all shadow-2xs"
+              className="flex min-h-9 w-full items-center justify-center gap-1 rounded-xl bg-gray-900 py-1 text-[11px] font-semibold text-white shadow-2xs transition-all hover:bg-black disabled:bg-gray-400"
             >
               {openingCheckout ? 'Opening checkout…' : plan === 'growth' ? 'View usage options' : '+ Add Credits'}
             </button>
@@ -222,8 +287,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <form action="/api/auth/signout" method="POST">
                 <button
                   type="submit"
-                  className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]"
                   title="Sign out"
+                  aria-label="Sign out"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
@@ -234,43 +300,52 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main Container - Offset by fixed sidebar width */}
-      <div className="flex-1 md:pl-[260px] flex flex-col min-h-screen">
+      <div className="flex min-h-screen flex-1 flex-col lg:pl-[260px]">
         {/* ElevenLabs Style Top Bar Header with Breadcrumbs */}
-        <header className="h-[60px] flex items-center justify-between px-8 bg-white/80 backdrop-blur-md sticky top-0 z-20 shrink-0 border-b border-black/[0.06]">
+        <header className="sticky top-0 z-20 flex h-[60px] shrink-0 items-center justify-between border-b border-black/[0.06] bg-white/90 px-4 backdrop-blur-md sm:px-6 lg:px-8">
           {/* Breadcrumb Context */}
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-            <span className="text-gray-400">Dashboard</span>
-            <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+            <span className="hidden text-gray-400 sm:inline">Scouto</span>
+            <ChevronRight className="hidden h-3.5 w-3.5 text-gray-300 sm:block" />
             <span className="text-gray-800 font-semibold">
-              {pathname === '/dashboard' ? 'Overview' : pathname.replace('/', '').charAt(0).toUpperCase() + pathname.replace('/', '').slice(1)}
+              {currentPage}
             </span>
           </div>
 
           {/* Search Bar & Auto-send / Notification Controls */}
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex relative w-72 group">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={openCommandPalette}
+              className="group relative hidden w-60 cursor-pointer items-center rounded-xl border border-gray-200/80 bg-gray-50/80 py-2 pl-8 pr-4 text-left text-xs font-medium text-gray-400 transition-all hover:bg-gray-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 xl:flex"
+              aria-label="Open search and command menu"
+            >
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-focus-within:text-[#0A84FF] transition-colors" strokeWidth={2.2} />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full bg-gray-50/80 hover:bg-gray-100/60 focus:bg-white border border-gray-200/80 focus:border-[#0A84FF]/40 rounded-xl pl-8 pr-12 py-1.5 text-xs text-gray-900 placeholder-gray-400 font-medium focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/10 transition-all duration-200"
-              />
-              <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 bg-white border border-gray-200 rounded shadow-2xs pointer-events-none">
-                ⌘K
-              </kbd>
-            </div>
+              Search or jump to...
+            </button>
 
-            <div className="h-4 w-[1px] bg-gray-200 hidden md:block" />
+            <button
+              type="button"
+              onClick={openCommandPalette}
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200/70 bg-gray-50 text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 xl:hidden"
+              aria-label="Open search and command menu"
+            >
+              <Search className="h-4 w-4" strokeWidth={1.9} />
+            </button>
+
+            <div className="hidden h-4 w-px bg-gray-200 sm:block" />
 
             {/* Clean Auto-send toggle */}
             {autoSend !== null && (
               <button
+                type="button"
                 onClick={handleToggleAutoSend}
                 disabled={togglingAutoSend}
                 title={autoSend ? 'Auto-send is active — click to pause' : 'Auto-send is paused — click to resume'}
-                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-gray-50 hover:bg-gray-100/80 border border-gray-200/70 transition-all cursor-pointer"
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-gray-200/70 bg-gray-50 px-2.5 py-1 transition-all hover:bg-gray-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
+                aria-pressed={autoSend}
               >
-                <span className="text-xs font-medium text-gray-700 select-none">
+                <span className="hidden select-none text-xs font-medium text-gray-700 sm:inline">
                   Auto-send
                 </span>
                 <div className={`relative w-8 h-[18px] rounded-full transition-colors duration-200 ${autoSend ? 'bg-emerald-500' : 'bg-gray-300'}`}>
@@ -280,28 +355,35 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             )}
 
             {/* Bell Icon */}
-            <button className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200/70 flex items-center justify-center text-gray-600 transition-colors cursor-pointer" title="Notifications">
+            <button
+              type="button"
+              onClick={() => toast.success("You're all caught up", { description: 'No new notifications right now.' })}
+              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-gray-200/70 bg-gray-50 text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
+              title="Notifications"
+              aria-label="View notifications"
+            >
               <Bell className="w-4 h-4" strokeWidth={1.8} />
             </button>
           </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 pb-[90px] md:pb-8 relative z-10 px-8 py-6 max-w-[1400px] w-full mx-auto">
+        <main className="relative z-10 mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
           {children}
         </main>
 
         {/* Mobile Nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-black/[0.06] pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">
+        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-black/[0.06] bg-white/95 pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-xl lg:hidden" aria-label="Mobile navigation">
           <div className="flex items-center justify-around px-2 h-[64px] pt-1">
-            {NAV_ITEMS.filter(i => ['Dashboard', 'Opportunities', 'Drafts Ready', 'Keywords', 'Settings'].includes(i.name)).map((item) => {
+            {MOBILE_NAV_ITEMS.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               const badge = badges[item.href]
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex flex-col items-center justify-center w-16 gap-1 transition-colors ${isActive ? 'text-[#0A84FF]' : 'text-gray-400 hover:text-gray-700'
+                  onTouchStart={() => router.prefetch(item.href)}
+                  className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 ${isActive ? 'text-[#0A84FF]' : 'text-gray-400 hover:text-gray-700'
                     }`}
                 >
                   <div className="relative">
@@ -316,9 +398,69 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </Link>
               )
             })}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-more-menu"
+              className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 ${
+                mobileMenuOpen || ['/posted', '/keywords', '/settings'].some((href) => pathname.startsWith(href))
+                  ? 'text-[#0A84FF]'
+                  : 'text-gray-400 hover:text-gray-700'
+              }`}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              <span className="text-[10px] font-medium">More</span>
+            </button>
           </div>
         </nav>
+
+        {mobileMenuOpen && (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-40 bg-black/15 lg:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close navigation menu"
+            />
+            <div
+              id="mobile-more-menu"
+              className="fixed inset-x-3 bottom-[76px] z-50 overflow-hidden rounded-2xl border border-black/10 bg-white p-2 shadow-[0_20px_60px_rgba(0,0,0,0.16)] lg:hidden"
+            >
+              {[
+                { name: 'Posted replies', href: '/posted', icon: CheckCircle },
+                { name: 'Keywords', href: '/keywords', icon: Key },
+                { name: 'Settings', href: '/settings', icon: Settings },
+              ].map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onTouchStart={() => router.prefetch(item.href)}
+                    className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${
+                      isActive ? 'bg-blue-50 text-[#0A84FF]' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <item.icon className="h-4.5 w-4.5" />
+                    {item.name}
+                  </Link>
+                )
+              })}
+              <form action="/api/auth/signout" method="POST" className="border-t border-gray-100 pt-2">
+                <button
+                  type="submit"
+                  className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-gray-600 hover:bg-red-50 hover:text-red-600"
+                >
+                  <LogOut className="h-4.5 w-4.5" />
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </>
+        )}
+        </div>
       </div>
-    </div>
+    </DashboardSessionProvider>
   )
 }

@@ -224,7 +224,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[600px] flex-col">
+    <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-col">
       {/* Progress Steps */}
       <div className="flex items-center justify-center gap-2 mb-6">
         {[1, 2, 3, 4].map(i => (
@@ -242,7 +242,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={springs.smooth}
-          className="glass flex-1 min-h-0 overflow-y-auto rounded-2xl p-7 md:p-8 border border-border"
+          className="glass min-h-0 flex-1 overflow-y-visible rounded-2xl border border-border p-5 sm:p-7 md:p-8"
         >
           {/* STEP 1: PRODUCT INFO + INSTANT AI EXTRACT */}
           {step === 1 && (
@@ -337,7 +337,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                               type="button"
                               key={phrase}
                               onClick={() => toggleKeywordTerm(phrase)}
-                              className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer font-medium flex items-center gap-1.5 ${active ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
+                              className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${active ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
                             >
                               {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
                               "{phrase}"
@@ -348,7 +348,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                     </div>
                   )}
 
-                  {/* Category 2: Competitor Hijack */}
+                  {/* Category 2: Competitor mentions */}
                   {aiSuggestions.competitor.length > 0 && (
                     <div>
                       <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-amber-700">
@@ -362,7 +362,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                               type="button"
                               key={phrase}
                               onClick={() => toggleKeywordTerm(phrase)}
-                              className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer font-medium flex items-center gap-1.5 ${active ? 'bg-amber-500 text-white border-amber-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
+                              className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${active ? 'bg-amber-500 text-white border-amber-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
                             >
                               {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
                               "{phrase}"
@@ -387,7 +387,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                               type="button"
                               key={phrase}
                               onClick={() => toggleKeywordTerm(phrase)}
-                              className={`text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer font-medium flex items-center gap-1.5 ${active ? 'bg-blue-500 text-white border-blue-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
+                              className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${active ? 'bg-blue-500 text-white border-blue-600 shadow-xs' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}
                             >
                               {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
                               "{phrase}"
@@ -411,14 +411,19 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                       className="flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF]"
                     />
                     {keywords.length > 1 && (
-                      <button type="button" onClick={() => removeKeyword(i)} className="p-2.5 text-gray-400 hover:text-red-500 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => removeKeyword(i)}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                        aria-label={`Remove keyword ${kw.term || i + 1}`}
+                      >
                         <X className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 ))}
 
-                <button type="button" onClick={addKeyword} className="flex items-center gap-1.5 text-xs text-[#0A84FF] font-semibold hover:opacity-80 transition-opacity">
+                <button type="button" onClick={addKeyword} className="flex min-h-11 items-center gap-1.5 text-xs text-[#0A84FF] font-semibold hover:opacity-80 transition-opacity">
                   <Plus className="w-3.5 h-3.5" /> Add custom phrase
                 </button>
               </div>
@@ -445,7 +450,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                           type="button"
                           key={sub}
                           onClick={() => toggleSubreddit(sub)}
-                          className={`text-xs px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-semibold flex items-center gap-1.5 ${active ? 'bg-[#0A84FF] text-white border-[#0A84FF] shadow-xs' : 'bg-surface-elevated text-gray-700 border-border hover:border-gray-300'}`}
+                          className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${active ? 'bg-[#0A84FF] text-white border-[#0A84FF] shadow-xs' : 'bg-surface-elevated text-gray-700 border-border hover:border-gray-300'}`}
                         >
                           r/{sub}
                           {active ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3 text-gray-400" />}
@@ -459,7 +464,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
               {/* Add Custom Subreddit */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Add Custom Subreddit</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="relative flex-1">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">r/</span>
                     <input
@@ -471,7 +476,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                       className="w-full bg-surface-elevated border border-border rounded-xl pl-8 pr-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-[#0A84FF]"
                     />
                   </div>
-                  <button type="button" onClick={addTarget} className="bg-gray-900 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors">
+                  <button type="button" onClick={addTarget} className="min-h-11 bg-gray-900 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors">
                     Add
                   </button>
                 </div>
@@ -482,9 +487,9 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Active Targets ({redditTargets.length})</label>
                 <div className="flex flex-wrap gap-2">
                   {redditTargets.map(sub => (
-                    <span key={sub} className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-800 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200">
+                    <span key={sub} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-800">
                       r/{sub}
-                      <button type="button" onClick={() => toggleSubreddit(sub)} className="hover:text-red-500 cursor-pointer">
+                      <button type="button" onClick={() => toggleSubreddit(sub)} className="-mr-2 flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg hover:bg-red-50 hover:text-red-500" aria-label={`Remove r/${sub}`}>
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -546,12 +551,12 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
       )}
 
       {/* Navigation Buttons */}
-      <div className="mt-6 flex shrink-0 items-center justify-between gap-4">
+      <div className="mt-5 flex shrink-0 items-center justify-between gap-3">
         {step > 1 ? (
           <button
             type="button"
             onClick={handlePrev}
-            className="text-text-secondary hover:text-text-primary px-6 py-3 font-semibold text-sm transition-colors cursor-pointer"
+            className="min-h-11 cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-gray-100 hover:text-text-primary sm:px-6"
           >
             Back
           </button>
@@ -562,7 +567,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
             type="button"
             onClick={handleNext}
             disabled={step === 1 && (!businessName.trim() || businessDescription.trim().length < 12)}
-            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50"
+            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-gray-800 disabled:opacity-50 sm:px-8"
           >
             Continue <ArrowRight className="w-4 h-4" />
           </button>

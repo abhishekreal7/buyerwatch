@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface CustomIconProps {
   size?: number;
@@ -143,8 +143,10 @@ export function ApprovalQueueIcon({ size = 24, color = '#0A0A0A', strokeWidth = 
 // A two-stage hinged flap opens behind the report, then closes over the pocket.
 export function DailyDigestIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.9, style }: CustomIconProps) {
   const [angles, setAngles] = React.useState({ minute: 0, hour: 0 });
+  const shouldReduceMotion = useReducedMotion();
 
   React.useEffect(() => {
+    if (shouldReduceMotion) return;
     let rafId: number;
     const start = performance.now();
     function tick(now: number) {
@@ -156,7 +158,7 @@ export function DailyDigestIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0.
     }
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [shouldReduceMotion]);
 
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>

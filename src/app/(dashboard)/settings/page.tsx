@@ -12,6 +12,7 @@ import { createClient } from '@/utils/supabase/client'
 import { AppPage } from '@/components/AppPage'
 import { toast } from 'sonner'
 import { PLAN_LIMITS, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { useDashboardSession } from '@/components/DashboardContext'
 import {
   STYLE_GUARDRAILS,
   TONE_ARCHETYPES,
@@ -35,13 +36,13 @@ function SectionCard({ title, description, children }: {
   title: string; description?: string; children: React.ReactNode
 }) {
   return (
-    <div className="bg-surface border border-gray-100 rounded-2xl overflow-hidden">
-      <div className="px-6 pt-6 pb-5 border-b border-gray-50">
-        <h3 className="text-[22px] font-[500] tracking-[-0.02em] leading-[1.2] text-[rgba(43,38,33,0.95)]">{title}</h3>
+    <section className="overflow-hidden rounded-2xl border border-gray-100 bg-surface">
+      <div className="border-b border-gray-100 px-4 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+        <h3 className="text-[18px] font-semibold leading-[1.3] tracking-[-0.015em] text-gray-900">{title}</h3>
         {description && <p className="text-[14px] font-[400] text-[rgba(43,38,33,0.52)] mt-1.5 leading-snug tracking-[0]">{description}</p>}
       </div>
-      <div className="p-6">{children}</div>
-    </div>
+      <div className="p-4 sm:p-6">{children}</div>
+    </section>
   )
 }
 
@@ -59,15 +60,19 @@ function Field({ label, hint, children }: { label: string; hint?: React.ReactNod
 
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-[13.5px] text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300 transition-all duration-150"
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative w-10 h-[22px] rounded-full transition-colors duration-200 cursor-pointer shrink-0 focus:outline-none focus:ring-2 focus:ring-gray-900/15 focus:ring-offset-1 ${checked ? 'bg-gray-900' : 'bg-gray-200'}`}
+      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900/15 focus:ring-offset-1"
     >
-      <span className={`absolute top-[3px] left-[3px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${checked ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+      <span className={`relative h-[22px] w-10 rounded-full transition-colors duration-200 ${checked ? 'bg-gray-900' : 'bg-gray-200'}`}>
+        <span className={`absolute left-[3px] top-[3px] h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+      </span>
     </button>
   )
 }
@@ -80,7 +85,7 @@ function PlatformRow({
 }) {
   return (
     <div className="rounded-xl border border-gray-100 overflow-hidden">
-      <div className="flex items-center gap-4 px-4 py-4">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:gap-4">
         <div className="w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
           {icon}
         </div>
@@ -96,13 +101,13 @@ function PlatformRow({
           </div>
           <p className="text-[12px] text-gray-500 mt-0.5">{description}</p>
         </div>
-        <div className="shrink-0">
+        <div className="ml-[48px] shrink-0 sm:ml-0">
           {connected ? (
-            <button onClick={onDisconnect} className="text-[13px] font-medium text-red-500 hover:text-red-600 transition-colors cursor-pointer px-3 py-1.5 rounded-lg hover:bg-red-50">
+            <button type="button" onClick={onDisconnect} className="min-h-11 cursor-pointer rounded-lg px-3 py-1.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-50 hover:text-red-600">
               Disconnect
             </button>
           ) : onConnect ? (
-            <button onClick={onConnect} className="text-[13px] font-semibold text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+            <button type="button" onClick={onConnect} className="min-h-11 cursor-pointer rounded-lg bg-gray-100 px-3 py-1.5 text-[13px] font-semibold text-gray-900 transition-colors hover:bg-gray-200">
               Connect
             </button>
           ) : null}
@@ -162,24 +167,46 @@ export default function SettingsPage() {
   // total_drafts_reviewed from user_trust_metrics — used to show trust-meter in locked auto-send toggle
   const [draftsReviewed, setDraftsReviewed] = useState<number>(0)
 
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
+  const { userId } = useDashboardSession()
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const now = new Date()
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const [
+        extendedProfileResult,
+        connectionsResult,
+        threadsCountResult,
+        draftsCountResult,
+        sentCountResult,
+        keywordsCountResult,
+        trustResult,
+      ] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
+          .eq('id', userId)
+          .single(),
+        supabase.from('platform_connections').select('platform, external_username').eq('user_id', userId),
+        supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay),
+        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).not('draft_text', 'is', null),
+        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).eq('was_sent', true),
+        supabase.from('keywords').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+        supabase
+          .from('user_trust_metrics')
+          .select('total_drafts_reviewed')
+          .eq('user_id', userId)
+          .maybeSingle(),
+      ])
 
-      const { data: extendedProfile } = await supabase
-        .from('profiles')
-        .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
-        .eq('id', user.id)
-        .single()
+      const extendedProfile = extendedProfileResult.data
       let p = extendedProfile
       if (!p) {
         const { data: legacyProfile } = await supabase
           .from('profiles')
           .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single()
         p = legacyProfile
           ? { ...legacyProfile, tone_archetype: null, style_guardrails: [] }
@@ -206,7 +233,7 @@ export default function SettingsPage() {
         setWebhookSecret(p.webhook_secret || '')
       }
 
-      const { data: conns } = await supabase.from('platform_connections').select('platform, external_username').eq('user_id', user.id)
+      const conns = connectionsResult.data
       if (conns) {
         const redditConn = conns.find(c => c.platform === 'reddit')
         setConnections({
@@ -216,27 +243,11 @@ export default function SettingsPage() {
         })
       }
 
-      // Load Usage Data
-      const now = new Date()
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-      const [
-        { count: threadsCount },
-        { count: draftsCount },
-        { count: sentCount },
-        { count: keywordsCount }
-      ] = await Promise.all([
-        supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay),
-        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay).not('draft_text', 'is', null),
-        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', firstDay).eq('was_sent', true),
-        supabase.from('keywords').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-      ])
-
       setUsageStats({
-        threads: threadsCount || 0,
-        drafts: draftsCount || 0,
-        replies: sentCount || 0,
-        keywords: keywordsCount || 0,
+        threads: threadsCountResult.count || 0,
+        drafts: draftsCountResult.count || 0,
+        replies: sentCountResult.count || 0,
+        keywords: keywordsCountResult.count || 0,
       })
 
       if (p) {
@@ -250,12 +261,7 @@ export default function SettingsPage() {
         })
       }
 
-      // Load trust metrics for auto-send trust meter (shown to all users)
-      const { data: trustData } = await supabase
-        .from('user_trust_metrics')
-        .select('total_drafts_reviewed')
-        .eq('user_id', user.id)
-        .maybeSingle()
+      const trustData = trustResult.data
       setDraftsReviewed(Math.min(trustData?.total_drafts_reviewed ?? 0, 10))
     }
     load()
@@ -284,11 +290,9 @@ export default function SettingsPage() {
       const newUrl = window.location.pathname + window.location.hash
       window.history.replaceState({}, '', newUrl)
     }
-  }, [])
+  }, [supabase, userId])
 
   const handleSave = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     setSaving(true)
 
     const baseProfileUpdates = {
@@ -310,9 +314,9 @@ export default function SettingsPage() {
         ...baseProfileUpdates,
         tone_archetype: profile.toneArchetype,
         style_guardrails: profile.styleGuardrails,
-      }).eq('id', user.id)
+      }).eq('id', userId)
       if (!extendedResult.error) return extendedResult
-      return supabase.from('profiles').update(baseProfileUpdates).eq('id', user.id)
+      return supabase.from('profiles').update(baseProfileUpdates).eq('id', userId)
     }
 
     const [{ error }, autoSendResponse] = await Promise.all([
@@ -377,9 +381,7 @@ export default function SettingsPage() {
   }
 
   const handleDisconnect = async (platform: 'reddit' | 'bluesky') => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('platform_connections').delete().eq('user_id', user.id).eq('platform', platform)
+    await supabase.from('platform_connections').delete().eq('user_id', userId).eq('platform', platform)
     setConnections(p => ({ ...p, [platform]: false }))
     toast.success(`${platform} disconnected`)
   }
@@ -396,20 +398,20 @@ export default function SettingsPage() {
     <AppPage>
       <div className="w-full max-w-[960px]">
         {/* Page title */}
-        <div className="mb-10">
+        <div className="mb-6">
           <h1 className="page-title">Settings</h1>
           <p className="page-subtitle">Manage your workspace, connections, and preferences.</p>
         </div>
 
-        <div className="flex gap-8 items-start">
+        <div className="flex flex-col items-start gap-5 md:flex-row md:gap-8">
           {/* ── Sidebar ───────────────────────────────────────────── */}
-          <nav className="w-52 shrink-0 sticky top-24">
-            <ul className="space-y-0.5">
+          <nav className="sticky top-[60px] z-10 -mx-1 w-[calc(100%+8px)] shrink-0 overflow-x-auto bg-[#FAFAFA]/95 px-1 py-1 backdrop-blur-sm no-scrollbar md:top-24 md:mx-0 md:w-52 md:overflow-visible md:bg-transparent md:p-0" aria-label="Settings sections">
+            <ul className="flex min-w-max gap-1 md:min-w-0 md:flex-col md:space-y-0.5">
               {SECTIONS.map(s => (
                 <li key={s.id}>
                   <button
                     onClick={() => setActiveSection(s.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer group ${activeSection === s.id
+                    className={`group flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all duration-150 md:gap-3 ${activeSection === s.id
                       ? 'bg-gray-900 text-white'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                       }`}
@@ -439,7 +441,7 @@ export default function SettingsPage() {
                   <>
                     <SectionCard title="Business Details" description="Used to personalise your AI-generated replies.">
                       <div className="space-y-5">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <Field label="Business Name">
                             <input
                               value={profile.businessName}
@@ -575,7 +577,7 @@ export default function SettingsPage() {
                       </div>
                     </SectionCard>
 
-                    <SectionCard title="Competitor Hijack Alerts" description="List competitors to track. We'll aggressively flag posts where users complain about them.">
+                    <SectionCard title="Competitor Mention Alerts" description="List competitors to track. Scouto will highlight relevant posts where customers describe friction or ask for alternatives.">
                       <Field label="Competitors" hint="Comma separated (e.g. AcmeCorp, Globex, Initech)">
                         <input
                           value={profile.competitors}
@@ -635,7 +637,7 @@ export default function SettingsPage() {
                         >
                           {!connections.bluesky && (
                             <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <input
                                   value={bskyHandle}
                                   onChange={e => setBskyHandle(e.target.value)}
@@ -688,7 +690,7 @@ export default function SettingsPage() {
                               </span>
                             </div>
                           ) : (
-                            <Toggle checked={profile.autoSendEnabled} onChange={v => setProfile(p => ({ ...p, autoSendEnabled: v }))} />
+                            <Toggle label="Toggle auto-send" checked={profile.autoSendEnabled} onChange={v => setProfile(p => ({ ...p, autoSendEnabled: v }))} />
                           )}
                         </div>
 
@@ -750,6 +752,7 @@ export default function SettingsPage() {
                           </p>
                         </div>
                         <Toggle
+                          label="Toggle referral tracking"
                           checked={profile.referralTrackingEnabled}
                           onChange={v => setProfile(p => ({ ...p, referralTrackingEnabled: v }))}
                         />
@@ -794,6 +797,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
                             <Toggle
+                              label={`Toggle ${item.label}`}
                               checked={notifications[item.key as keyof typeof notifications]}
                               onChange={v => setNotifications(p => ({ ...p, [item.key]: v }))}
                             />
@@ -891,15 +895,15 @@ export default function SettingsPage() {
                           label="Webhook Receiver Endpoint"
                           hint="POST JSON payloads to this endpoint when a user who clicked a Scouto link converts."
                         >
-                          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-[12px] text-gray-800 flex items-center justify-between">
-                            <span>{process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion</span>
+                          <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800 sm:flex-row sm:items-center">
+                            <span className="min-w-0 break-all">{process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion</span>
                             <button
                               type="button"
                               onClick={() => {
                                 navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion`)
                                 toast.success('Webhook URL copied')
                               }}
-                              className="text-[12px] text-blue-600 font-sans font-semibold hover:underline"
+                              className="min-h-11 shrink-0 px-2 font-sans text-[12px] font-semibold text-blue-600 hover:underline"
                             >
                               Copy
                             </button>
@@ -910,8 +914,8 @@ export default function SettingsPage() {
                           label="Authorization Secret"
                           hint="Send this value as a Bearer token. Keep it server-side and rotate it if it is ever exposed."
                         >
-                          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800">
-                            <span>{webhookSecret ? `${'•'.repeat(16)}${webhookSecret.slice(-8)}` : 'Secret unavailable until migrations are applied'}</span>
+                          <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800 sm:flex-row sm:items-center">
+                            <span className="min-w-0 break-all">{webhookSecret ? `${'•'.repeat(16)}${webhookSecret.slice(-8)}` : 'Secret unavailable until migrations are applied'}</span>
                             {webhookSecret && (
                               <button
                                 type="button"
@@ -919,7 +923,7 @@ export default function SettingsPage() {
                                   navigator.clipboard.writeText(webhookSecret)
                                   toast.success('Webhook secret copied')
                                 }}
-                                className="font-sans text-[12px] font-semibold text-blue-600 hover:underline"
+                                className="min-h-11 shrink-0 px-2 font-sans text-[12px] font-semibold text-blue-600 hover:underline"
                               >
                                 Copy
                               </button>
@@ -932,7 +936,7 @@ export default function SettingsPage() {
                             <Info className="w-3.5 h-3.5 text-blue-600" />
                             Sample POST Payload
                           </p>
-                          <pre className="font-mono text-[11px] bg-white/70 p-2.5 rounded-lg text-gray-800 border border-blue-200/50">
+                          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-blue-200/50 bg-white/70 p-2.5 font-mono text-[11px] text-gray-800">
 {`{
   "shortcode": "aB1cD2eF",
   "revenue_usd": 99.00

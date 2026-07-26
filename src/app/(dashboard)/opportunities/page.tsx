@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { springs, staggers } from '@/lib/motion'
 import { createClient } from '@/utils/supabase/client'
+import { useDashboardSession } from '@/components/DashboardContext'
 
 const FILTERS = ['All', 'Buying intent', 'Researching', 'Pain signals', 'Reddit', 'Bluesky']
 
@@ -102,6 +103,8 @@ function getKeywordRelation(value: unknown): { term?: string; target?: string } 
 }
 
 export default function OpportunitiesPage() {
+  const [supabase] = useState(createClient)
+  const { userId } = useDashboardSession()
   const [activeFilter, setActiveFilter] = useState('All')
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
@@ -110,14 +113,10 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     async function fetchOpportunities() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       const { data, error } = await supabase
         .from('monitored_threads')
         .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, created_at, keywords(term, target)')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .in('status', ['pending', 'drafted', 'needs_manual_reply'])
         .order('created_at', { ascending: false })
 
@@ -153,7 +152,7 @@ export default function OpportunitiesPage() {
       }))
     }
     fetchOpportunities()
-  }, [])
+  }, [supabase, userId])
 
   const handleDraftReply = async (id: string) => {
     if (draftingId) return
@@ -215,7 +214,7 @@ export default function OpportunitiesPage() {
                 key={filter}
                 type="button"
                 onClick={() => setActiveFilter(filter)}
-                className={`whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] transition-all duration-150 ${
+                className={`min-h-11 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] transition-all duration-150 sm:min-h-0 ${
                   activeFilter === filter
                     ? 'bg-text-primary font-semibold text-white shadow-sm'
                     : 'font-medium text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
@@ -233,7 +232,7 @@ export default function OpportunitiesPage() {
           <button
             type="button"
             onClick={() => setSortOrder(current => current === 'desc' ? 'asc' : 'desc')}
-            className="ml-auto flex items-center gap-2 whitespace-nowrap rounded-[14px] border border-black/[0.06] bg-surface px-3.5 py-2 text-[13px] font-semibold text-text-primary shadow-sm transition-all hover:bg-white"
+            className="ml-auto flex min-h-11 items-center gap-2 whitespace-nowrap rounded-[14px] border border-black/[0.06] bg-surface px-3.5 py-2 text-[13px] font-semibold text-text-primary shadow-sm transition-all hover:bg-white sm:min-h-0"
           >
             {sortOrder === 'desc'
               ? <ChevronDown className="h-4 w-4 text-text-secondary" />
@@ -243,7 +242,7 @@ export default function OpportunitiesPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="surface-ceramic flex flex-col items-center justify-center border border-transparent py-32 text-center">
+          <div className="surface-ceramic flex flex-col items-center justify-center border border-transparent px-5 py-20 text-center sm:py-32">
             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">
               <Target className="h-8 w-8" strokeWidth={2.25} />
             </div>
@@ -256,9 +255,8 @@ export default function OpportunitiesPage() {
               <motion.article
                 key={opportunity.id}
                 variants={staggers.item}
-                whileHover={{ y: -2, boxShadow: 'var(--shadow-elevation-2)' }}
                 transition={springs.smooth}
-                className="surface-ceramic border border-transparent p-6 transition-all duration-300"
+                className="surface-ceramic border border-transparent p-5 sm:p-6"
               >
                 <div className="mb-4 flex flex-wrap items-center gap-2.5 text-[13px] text-text-secondary">
                   <PlatformBadge platform={opportunity.platform} />

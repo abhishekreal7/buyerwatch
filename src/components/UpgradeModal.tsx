@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowRight, Sparkles, Shield } from 'lucide-react'
+import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { normalizePlan } from '@/lib/plan-limits'
 
@@ -25,6 +26,8 @@ interface UpgradeModalProps {
 export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: UpgradeModalProps) {
   const [visible, setVisible] = useState(false)
   const [draftsReviewed, setDraftsReviewed] = useState(0)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
   const storageKey = `scouto_seen_upgrade_modal_${userId}_${plan}`
@@ -55,6 +58,42 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
     setVisible(false)
   }
 
+  useEffect(() => {
+    if (!visible) return
+
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        dismiss()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable?.length) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    closeButtonRef.current?.focus()
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previouslyFocused?.focus()
+    }
+  }, [visible])
+
   const tierLabel = normalizePlan(plan) === 'growth' ? 'Growth' : 'Professional'
 
   return (
@@ -68,21 +107,30 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/25 backdrop-blur-[2px] z-50"
             onClick={dismiss}
+            aria-hidden="true"
           />
 
           {/* Modal */}
           <motion.div
+            ref={dialogRef}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-x-0 top-1/2 -translate-y-1/2 z-50 mx-auto w-full max-w-[420px] px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upgrade-modal-title"
+            aria-describedby="upgrade-modal-description"
           >
             <div className="bg-white rounded-[24px] shadow-[0_24px_80px_rgba(0,0,0,0.18)] p-8 relative">
               {/* Close */}
               <button
+                ref={closeButtonRef}
+                type="button"
                 onClick={dismiss}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                className="absolute right-4 top-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]"
+                aria-label="Close upgrade details"
               >
                 <X className="w-4 h-4" strokeWidth={2} />
               </button>
@@ -93,12 +141,12 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
               </div>
 
               {/* Headline */}
-              <h2 className="text-[22px] font-bold text-gray-900 tracking-tight mb-1">
+              <h2 id="upgrade-modal-title" className="text-[22px] font-bold text-gray-900 tracking-tight mb-1">
                 You&apos;re on {tierLabel}.
               </h2>
 
               {/* Keyword slots */}
-              <p className="text-[14px] text-gray-600 leading-relaxed mb-5">
+              <p id="upgrade-modal-description" className="text-[14px] text-gray-600 leading-relaxed mb-5">
                 You now have{' '}
                 <span className="font-semibold text-gray-900">{keywordsMax} keyword slots</span>{' '}
                 {keywordsUsed > 0 && (
@@ -111,14 +159,14 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
               </p>
 
               {/* Primary CTA */}
-              <a
+              <Link
                 href="/keywords"
                 onClick={dismiss}
                 className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white text-[14px] font-semibold py-3 rounded-[14px] transition-colors mb-4"
               >
                 Add your{keywordsUsed >= 1 ? ' next' : ' first'} keyword
                 <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
-              </a>
+              </Link>
 
               {/* Auto-send trust note */}
               <div className="flex items-start gap-2.5 p-3.5 bg-gray-50 rounded-[12px] border border-gray-100">

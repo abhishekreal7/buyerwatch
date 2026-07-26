@@ -1,6 +1,8 @@
 import Link from 'next/link'
-import { Target, Check, ArrowRight } from 'lucide-react'
+import { Check, ArrowRight } from 'lucide-react'
 import { getProviderCapabilities } from '@/lib/env'
+import { BrandLogo } from '@/components/BrandLogo'
+import { PRICING_PLANS } from '@/lib/pricing-plans'
 
 export const metadata = {
   title: 'Pricing — Scouto',
@@ -9,84 +11,29 @@ export const metadata = {
 
 export const dynamic = 'force-dynamic'
 
-const PLANS = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: 'forever',
-    description: 'Try Scouto and get your first real buying signal.',
-    features: [
-      '1 keyword monitoring rule',
-      'Up to 50 signals discovered/month',
-      '40 AI-drafted replies/month',
-      'Manual send workflow',
-      'Reddit & Bluesky',
-    ],
-    cta: 'Get started free',
-    href: '/signup',
-    highlight: false,
-  },
-  {
-    name: 'Professional',
-    price: '$49',
-    period: '/month',
-    description: 'For founders actively working a social selling motion.',
-    features: [
-      '10 keyword monitoring rules',
-      'Up to 1,000 signals/month',
-      '400 AI-drafted replies/month',
-      'Auto-send (confidence-gated)',
-      'Subreddit targeting',
-      'Slack notifications',
-      'Reply attribution tracking',
-    ],
-    cta: 'Upgrade to Professional',
-    href: '/dashboard',
-    highlight: true,
-  },
-  {
-    name: 'Growth',
-    price: '$149',
-    period: '/month',
-    description: 'For teams running multi-channel signal monitoring at scale.',
-    features: [
-      '50 keyword monitoring rules',
-      'Up to 5,000 signals/month',
-      '2,000 AI-drafted replies/month',
-      'Auto-send (confidence-gated)',
-      'All platforms',
-      'Priority support',
-    ],
-    cta: 'Upgrade to Growth',
-    href: '/dashboard',
-    highlight: false,
-  },
-]
-
 export default function PricingPage() {
   const billingEnabled = getProviderCapabilities().billing
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-black selection:text-white">
       {/* Nav */}
-      <nav className="w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Target className="w-6 h-6 text-[#0A84FF]" strokeWidth={2.5} />
-          <span className="text-lg font-bold tracking-tight text-[#0A0A0A]">Scouto</span>
+      <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6 sm:py-6">
+        <Link href="/" className="flex min-h-11 items-center gap-2 hover:opacity-80 transition-opacity">
+          <BrandLogo />
         </Link>
         <div className="flex items-center gap-4">
-          <Link href="/login" className="text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors">
+          <Link href="/login" className="inline-flex min-h-11 items-center px-1 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors">
             Log in
           </Link>
-          <Link href="/signup" className="text-[13px] font-semibold text-white bg-[#0A0A0A] hover:bg-[#1C1C1E] px-4 py-2 rounded-xl transition-colors">
+          <Link href="/signup" className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white bg-[#0A0A0A] hover:bg-[#1C1C1E] px-4 py-2 rounded-xl transition-colors">
             Get started free
           </Link>
         </div>
       </nav>
 
       {/* Header */}
-      <div className="text-center pt-16 pb-12 px-6">
-        <h1 className="text-[42px] font-bold tracking-tight text-[#0A0A0A] mb-4 leading-tight">
+      <div className="px-4 pb-10 pt-12 text-center sm:px-6 sm:pb-12 sm:pt-16">
+        <h1 className="mb-4 text-[36px] font-bold leading-tight tracking-tight text-[#0A0A0A] sm:text-[42px]">
           Simple, transparent pricing
         </h1>
         <p className="text-[17px] text-[#666666] max-w-[480px] mx-auto leading-relaxed">
@@ -95,8 +42,8 @@ export default function PricingPage() {
       </div>
 
       {/* Plans */}
-      <div className="max-w-5xl mx-auto px-6 pb-24 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {PLANS.map((plan) => {
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 pb-20 sm:px-6 md:grid-cols-2 md:pb-24 lg:grid-cols-3">
+        {PRICING_PLANS.map((plan) => {
           const paidPlan = plan.name !== 'Free'
           const checkoutAvailable = !paidPlan || billingEnabled
           return (
@@ -106,7 +53,7 @@ export default function PricingPage() {
               plan.highlight
                 ? 'bg-[#0A0A0A] border-[#0A0A0A] text-white shadow-[0_8px_40px_rgba(0,0,0,0.18)]'
                 : 'bg-white border-black/[0.08] shadow-[0_1px_3px_rgba(0,0,0,0.04)]'
-            }`}
+            } ${plan.id === 'growth' ? 'md:col-span-2 md:w-[calc(50%-0.75rem)] md:justify-self-center lg:col-span-1 lg:w-auto' : ''}`}
           >
             <div className="mb-6">
               <p className={`text-[12px] font-bold uppercase tracking-widest mb-3 ${plan.highlight ? 'text-white/50' : 'text-[#888888]'}`}>
@@ -143,7 +90,7 @@ export default function PricingPage() {
                   : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
               }`}
             >
-              {checkoutAvailable ? plan.cta : 'Join the paid-plan waitlist'}
+              {checkoutAvailable ? plan.cta : `Contact us about ${plan.name}`}
               <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
             </Link>
           </div>
@@ -153,7 +100,7 @@ export default function PricingPage() {
 
       {/* Footer */}
       <div className="text-center pb-12 text-[13px] text-[#888888]">
-        <p>Questions? <Link href="/contact" className="underline underline-offset-4 hover:text-[#0A0A0A] transition-colors">Talk to us</Link></p>
+        <p>Questions? <Link href="/contact" className="inline-flex min-h-11 items-center align-middle underline underline-offset-4 hover:text-[#0A0A0A] transition-colors">Talk to us</Link></p>
       </div>
     </div>
   )

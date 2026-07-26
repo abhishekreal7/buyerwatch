@@ -77,6 +77,19 @@ body {
   font-feature-settings: "cv02", "cv11";
 }
 
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* EyebrowBadge compat tokens */
 .border-border {
   border-color: rgba(0, 0, 0, 0.08);
@@ -164,14 +177,10 @@ p {
 .body-md {
   font-family: var(--font-inter), sans-serif;
   font-weight: 400;
-  align-items: center;
-  gap: 7px;
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: var(--radius-full);
-  padding: 6px 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  margin-bottom: 20px;
+  font-size: 15px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  color: var(--text-secondary);
 }
 
 .myniq-badge span {
@@ -234,7 +243,7 @@ p {
     inset 0 -1px 2px rgba(0, 0, 0, 0.015),
     var(--shadow-elevation-1);
   border-radius: var(--radius-xl);
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
 }
 
 .surface-ceramic:hover {
@@ -280,6 +289,12 @@ p {
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none;
   cursor: pointer;
+}
+
+@media (max-width: 639px) {
+  .btn-primary {
+    min-height: 44px;
+  }
 }
 
 .btn-primary:hover {
@@ -600,4 +615,15 @@ p {
 .animate-gauge-needle {
   transform-origin: 12px 12px;
   animation: sweep-needle 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

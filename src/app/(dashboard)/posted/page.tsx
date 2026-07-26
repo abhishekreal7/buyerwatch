@@ -8,6 +8,7 @@ import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { PageHeader } from '@/components/PageHeader'
 import { createClient } from '@/utils/supabase/client'
+import { useDashboardSession } from '@/components/DashboardContext'
 
 function PlatformBadge({ platform }: { platform: string }) {
   return (
@@ -25,17 +26,15 @@ function formatPostedDate(dateString: string) {
 
 export default function PostedPage() {
   const [posted, setPosted] = useState<any[]>([])
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
+  const { userId } = useDashboardSession()
 
   useEffect(() => {
     async function fetchPosted() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      
       const { data } = await supabase
         .from('monitored_threads')
         .select('*, reply_analytics(draft_text, sent_at)')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('status', 'replied')
         .order('created_at', { ascending: false })
 
@@ -56,7 +55,7 @@ export default function PostedPage() {
       }
     }
     fetchPosted()
-  }, [])
+  }, [supabase, userId])
 
   return (
     <AppPage>
@@ -77,12 +76,11 @@ export default function PostedPage() {
             <motion.div 
               key={p.id} 
               variants={staggers.item} 
-              whileHover={{ y: -2, boxShadow: 'var(--shadow-elevation-2)' }} 
               transition={springs.smooth} 
-              className="surface-ceramic p-6 border border-transparent transition-all duration-300 hover:shadow-elevation-2"
+              className="surface-ceramic border border-transparent p-5 sm:p-6"
             >
               {/* Header row */}
-              <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <PlatformBadge platform={p.platform} />
                   <span className="text-[14px] font-semibold text-text-primary">{p.platform === 'reddit' ? `r/${p.target}` : p.target}</span>
@@ -96,7 +94,7 @@ export default function PostedPage() {
               <div className="flex items-center justify-between gap-4 mb-3">
                 <h3 className="text-[16px] font-semibold text-text-primary line-clamp-1 flex-1 tracking-tight">{p.threadTitle}</h3>
                 {p.threadUrl ? (
-                  <a href={p.threadUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:opacity-80 transition-opacity shrink-0 bg-accent/5 p-2 rounded-full">
+                  <a href={p.threadUrl} target="_blank" rel="noopener noreferrer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent/5 text-accent transition-opacity hover:opacity-80" aria-label="Open original thread">
                     <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
                   </a>
                 ) : (

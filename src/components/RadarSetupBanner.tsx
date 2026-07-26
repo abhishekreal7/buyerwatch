@@ -73,7 +73,7 @@ export function RadarSetupBanner({
   return (
     <div className="bg-white border border-black/[0.08] rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all relative overflow-hidden">
       {/* Top Header Row */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
             <Target className="w-4 h-4" strokeWidth={2.2} />
@@ -86,15 +86,16 @@ export function RadarSetupBanner({
               </span>
             </div>
             <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-              Complete these steps to optimize your real-time lead radar.
+              Complete these steps to improve your buyer-intent monitoring.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 self-end sm:self-auto">
           <button
             onClick={handleToggleMinimize}
-            className="px-2.5 py-1 rounded-lg hover:bg-gray-100 text-gray-500 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
+            className="flex min-h-11 cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100"
+            aria-expanded={!minimized}
           >
             {minimized ? (
               <>
@@ -108,8 +109,8 @@ export function RadarSetupBanner({
           </button>
           <button
             onClick={handleDismiss}
-            className="w-7 h-7 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
-            title="Dismiss guide"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Dismiss setup guide"
           >
             <X className="w-3.5 h-3.5" />
           </button>

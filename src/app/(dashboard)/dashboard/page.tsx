@@ -6,7 +6,10 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { GettingStartedChecklist } from '@/components/GettingStartedChecklist'
+import { BlueskyIcon, RedditIcon } from '@/components/Icons'
+import { PageHeader } from '@/components/PageHeader'
 import { getPlanLimits } from '@/lib/plan-limits'
+import { useDashboardSession } from '@/components/DashboardContext'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 
 interface Thread {
@@ -75,19 +78,45 @@ export default function DashboardPage() {
   const [hasInspectedLead, setHasInspectedLead] = useState(false)
   const [hasCopiedOrApproved, setHasCopiedOrApproved] = useState(false)
   const [autoSendEnabled, setAutoSendEnabled] = useState(false)
-  const [userId, setUserId] = useState('')
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
+  const { userId } = useDashboardSession()
 
   async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    setUserId(user.id)
+    const [
+      profileResult,
+      keywordsCountResult,
+      feedbackCountResult,
+      threadsResult,
+      allThreadsResult,
+    ] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('plan, auto_send_enabled')
+        .eq('id', userId)
+        .single(),
+      supabase
+        .from('keywords')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId),
+      supabase
+        .from('draft_feedback')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .in('action_type', ['COPIED', 'APPROVED', 'EDITED_APPROVED', 'AUTO_SENT']),
+      supabase
+        .from('monitored_threads')
+        .select('*, reply_analytics(draft_text), keywords(term, target)')
+        .eq('user_id', userId)
+        .in('status', ['pending', 'drafted', 'needs_manual_reply', 'dismissed'])
+        .order('created_at', { ascending: false })
+        .limit(60),
+      supabase
+        .from('monitored_threads')
+        .select('status, intent_score, created_at')
+        .eq('user_id', userId),
+    ])
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('plan, auto_send_enabled')
-      .eq('id', user.id)
-      .single()
+    const profile = profileResult.data
     if (profile?.plan) {
       setPlan(profile.plan)
       setKeywordsMax(getPlanLimits(profile.plan).keywords)
@@ -95,28 +124,11 @@ export default function DashboardPage() {
     setAutoSendEnabled(profile?.auto_send_enabled ?? false)
 
     // Load persisted setup progress rather than resetting the checklist per session.
-    const [{ count: kwCount }, { count: feedbackCount }] = await Promise.all([
-      supabase
-        .from('keywords')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id),
-      supabase
-        .from('draft_feedback')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('action_type', ['COPIED', 'APPROVED', 'EDITED_APPROVED', 'AUTO_SENT']),
-    ])
-    setKeywordsCount(kwCount ?? 0)
-    setHasCopiedOrApproved((feedbackCount ?? 0) > 0)
+    setKeywordsCount(keywordsCountResult.count ?? 0)
+    setHasCopiedOrApproved((feedbackCountResult.count ?? 0) > 0)
 
     // Load threads including dismissed for audit tab
-    const { data: threadData, error } = await supabase
-      .from('monitored_threads')
-      .select('*, reply_analytics(draft_text), keywords(term, target)')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'drafted', 'needs_manual_reply', 'dismissed'])
-      .order('created_at', { ascending: false })
-      .limit(60)
+    const { data: threadData, error } = threadsResult
 
     if (error) {
       toast.error('Failed to load threads')
@@ -175,10 +187,7 @@ export default function DashboardPage() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    const { data: allThreads } = await supabase
-      .from('monitored_threads')
-      .select('status, intent_score, created_at')
-      .eq('user_id', user.id)
+    const allThreads = allThreadsResult.data
 
     if (allThreads) {
       const todayThreads = allThreads.filter(t => new Date(t.created_at) >= today)
@@ -388,9 +397,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
-      setSelectedThread(filtered[0] || null)
-    } else if (!selectedThread && filtered.length > 0) {
-      setSelectedThread(filtered[0])
+      setSelectedThread(null)
     }
   }, [filterTab, threads])
 
@@ -408,30 +415,24 @@ export default function DashboardPage() {
       )}
 
       {/* ElevenLabs-style Page Title Header & Top Action Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Overview
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5 font-medium">
-            Real-time intent monitoring and AI response drafting across monitored communities.
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5">
+      <PageHeader
+        title="Overview"
+        subtitle="Real-time intent monitoring and AI response drafting across monitored communities."
+        action={(
           <a
             href="/keywords"
-            className="inline-flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl bg-gray-900 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-gray-800 sm:min-h-0"
           >
             <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
             + Add Keyword
           </a>
-        </div>
-      </div>
+        )}
+      />
 
       {/* ElevenLabs Style 4 Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Conversations Found */}
-        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group relative">
+        <div className="relative rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-gray-500">Conversations Found</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
@@ -447,7 +448,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 2: High Intent */}
-        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group">
+        <div className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-gray-500">High Intent</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -465,10 +466,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 3: Drafts Ready */}
-        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group">
+        <div className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-gray-500">Drafts Ready</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
@@ -483,7 +484,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 4: Posted Today */}
-        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-black/10 transition-all group">
+        <div className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-gray-500">Posted Today</span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
@@ -501,22 +502,23 @@ export default function DashboardPage() {
 
       {/* ── Upgrade banner (Placement B) ────────────────────────────── */}
       {!loading && plan === 'free' && keywordsCount >= 1 && stats.highIntent > 0 && !bannerDismissed && (
-        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/80 px-5 py-3.5 flex items-center gap-4 shadow-2xs">
+        <div className="flex flex-col items-start gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/80 px-4 py-3.5 shadow-2xs sm:flex-row sm:items-center sm:px-5">
           <Sparkles className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={1.75} />
           <p className="flex-1 text-xs text-amber-900 leading-relaxed">
             <span className="font-semibold">{stats.highIntent} high-intent conversation{stats.highIntent !== 1 ? 's' : ''} found</span>{' '}
             this month with your current keyword. Upgrade to Professional to add 9 more topics.
           </p>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <a
               href="/pricing"
-              className="text-xs font-semibold text-white bg-gray-900 hover:bg-gray-800 px-3 py-1.5 rounded-xl transition-colors"
+              className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-gray-800 sm:min-h-0"
             >
               Upgrade
             </a>
             <button
               onClick={() => setBannerDismissed(true)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-amber-600 transition-colors hover:bg-amber-100"
+              aria-label="Dismiss upgrade suggestion"
             >
               <X className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
@@ -537,22 +539,22 @@ export default function DashboardPage() {
           <>
             {/* ElevenLabs Style Filters & Pill Navigation Bar */}
             <div className="bg-white rounded-2xl border border-black/[0.06] p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-1.5 bg-gray-100/70 p-1 rounded-xl">
+              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-gray-100/70 p-1 no-scrollbar">
                 <button
                   onClick={() => setFilterTab('all')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === 'all' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   All Conversations
                 </button>
                 <button
                   onClick={() => setFilterTab('high-intent')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   High Intent (≥80%)
                 </button>
                 <button
                   onClick={() => setFilterTab('dismissed')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${filterTab === 'dismissed' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   <span>Dismissed</span>
                   {dismissedCount > 0 && (
@@ -569,7 +571,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Main Feed & Detail Two Column Section */}
-            <div className="flex items-start gap-6">
+            <div className="flex flex-col items-start gap-6 xl:flex-row">
               {/* Left Column (Feed) */}
               <div className="flex-1 space-y-4">
               {loading && (
@@ -642,25 +644,34 @@ export default function DashboardPage() {
                   const isReddit = thread.platform === 'reddit'
 
                   return (
-                    <div
+                    <article
                       key={thread.id}
                       onClick={() => handleInspectThread(thread)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          handleInspectThread(thread)
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={isSelected}
                       className={`rounded-2xl p-5 bg-white cursor-pointer transition-all ${isSelected
                         ? 'border-2 border-[#0A84FF] shadow-sm'
-                        : 'border border-black/5 hover:border-black/15'
+                        : 'border border-black/5 hover:border-black/15 focus-visible:border-[#0A84FF]'
                         }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-sm text-text-secondary">
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text-secondary">
                           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F4F5F7]">
                             {isReddit ? (
                               <>
-                                <img src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" alt="Reddit" className="w-[18px] h-[18px] rounded-full shadow-sm" />
+                                <RedditIcon className="h-[18px] w-[18px] text-[#FF4500]" />
                                 <span className="font-medium text-text-secondary text-[13px] tracking-tight">Reddit</span>
                               </>
                             ) : (
                               <>
-                                <img src="https://bsky.app/static/apple-touch-icon.png" alt="Bluesky" className="w-[18px] h-[18px] rounded-full shadow-sm" />
+                                <BlueskyIcon className="h-[18px] w-[18px] text-[#1185FE]" />
                                 <span className="font-medium text-text-secondary text-[13px] tracking-tight">Bluesky</span>
                               </>
                             )}
@@ -693,7 +704,7 @@ export default function DashboardPage() {
                         </div>
                         {/* Feature 5: Google Ranked badge */}
                         {thread.googleRanked && (
-                          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-50 text-violet-600 border border-violet-100">
+                          <span className="flex items-center gap-1 rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
                             <Globe className="w-3 h-3" />
                             Google Ranked
                           </span>
@@ -703,8 +714,8 @@ export default function DashboardPage() {
                       {thread.title && <h3 className="text-[15px] font-bold text-text-primary mb-2 leading-snug">{thread.title}</h3>}
                       <p className="text-text-secondary text-[14px] line-clamp-2 mb-4 leading-relaxed">{thread.content}</p>
 
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-3">
                           {thread.flag === 'COMPETITOR_RISK' ? (
                             <span className="px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1.5 bg-red-100 text-red-700 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]">
                               <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -757,7 +768,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                       )}
-                    </div>
+                    </article>
                   )
                 })}
 
@@ -790,9 +801,16 @@ export default function DashboardPage() {
 
               {/* Right Column (Review & Post Detail Panel) */}
               {selectedThread && (
-                <div className="w-[520px] shrink-0 bg-white border border-black/[0.08] rounded-3xl shadow-lg flex flex-col max-h-[calc(100vh-96px)] sticky top-[80px] overflow-hidden transition-all">
+                <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-30 bg-black/20 backdrop-blur-[1px] xl:hidden"
+                  onClick={() => setSelectedThread(null)}
+                  aria-label="Close review panel"
+                />
+                <div className="fixed inset-x-3 bottom-[76px] top-[72px] z-40 flex w-auto shrink-0 flex-col overflow-hidden rounded-3xl border border-black/[0.08] bg-white shadow-xl transition-all xl:sticky xl:inset-auto xl:top-[80px] xl:z-auto xl:max-h-[calc(100vh-96px)] xl:w-[46%] xl:max-w-[520px] xl:shadow-lg">
                   {/* Panel Header */}
-                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
                         <FileText className="w-4 h-4" strokeWidth={2} />
@@ -805,6 +823,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
+                    <div className="flex items-center gap-2">
                     {selectedThread.url ? (
                       <a
                         href={selectedThread.url}
@@ -819,10 +838,19 @@ export default function DashboardPage() {
                         Open Thread <ExternalLink className="w-3 h-3" />
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedThread(null)}
+                      className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 xl:hidden"
+                      aria-label="Close review panel"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    </div>
                   </div>
 
                   {/* Panel Body Scrollable Content */}
-                  <div className="p-6 flex-1 overflow-y-auto space-y-6 no-scrollbar">
+                  <div className="flex-1 space-y-6 overflow-y-visible p-4 sm:p-6 xl:overflow-y-auto">
                     {/* Original Post Preview */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider">
@@ -951,6 +979,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+                </>
               )}
             </div>
           </>

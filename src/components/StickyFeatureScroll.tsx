@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence, useInView } from 'framer-motion'
+import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-motion'
 import { BadgeCheck, Gauge, History, ShieldCheck } from 'lucide-react'
 
 // Sleek vector line-art icons for the Orange Metric Showcase Card
@@ -81,19 +81,32 @@ const features = [
 
 export const StickyFeatureScroll = () => {
   const [activeIndex, setActiveIndex] = useState(0)
+  const [paused, setPaused] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
   const inView = useInView(sectionRef, { margin: '160px' })
+  const shouldReduceMotion = useReducedMotion()
 
   useEffect(() => {
-    if (!inView) return
+    if (!inView || paused || shouldReduceMotion) return
     const timer = setTimeout(() => {
       setActiveIndex((prev) => (prev + 1) % features.length)
     }, 6000)
     return () => clearTimeout(timer)
-  }, [activeIndex, inView])
+  }, [activeIndex, inView, paused, shouldReduceMotion])
 
   return (
-    <section ref={sectionRef} id="features" className="relative w-full py-28" style={{ backgroundColor: '#FFFFFF' }}>
+    <section
+      ref={sectionRef}
+      id="features"
+      className="relative w-full py-28"
+      style={{ backgroundColor: '#FFFFFF' }}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false)
+      }}
+    >
       <div className="max-w-[1200px] mx-auto px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-[62px] items-start">
           
@@ -237,7 +250,7 @@ export const StickyFeatureScroll = () => {
                                 initial={{ width: '0%' }}
                                 animate={{ width: '100%' }}
                                 key={activeIndex}
-                                transition={{ duration: 6, ease: 'linear' }}
+                                transition={{ duration: shouldReduceMotion ? 0 : 6, ease: 'linear' }}
                                 className="absolute left-0 top-0 h-full bg-[#FF5101]"
                               />
                             </div>

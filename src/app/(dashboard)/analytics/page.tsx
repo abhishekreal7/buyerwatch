@@ -13,6 +13,7 @@ import { RadialGauge } from '@/components/RadialGauge'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { formatDistanceToNow, subDays, startOfDay, isAfter, isBefore, format } from 'date-fns'
+import { useDashboardSession } from '@/components/DashboardContext'
 
 // Custom Label for Horizontal Bar Chart
 const CustomBarLabel = (props: any) => {
@@ -98,21 +99,19 @@ export default function AnalyticsPage() {
     attributionStats: { clicks: number; conversions: number; totalRevenue: number }
   } | null>(null)
 
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
+  const { userId } = useDashboardSession()
 
   useEffect(() => {
     async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       // Parallel fetching for performance
       const [profileRes, connsRes, threadsRes, analyticsRes, feedbackRes, attributionRes] = await Promise.all([
-        supabase.from('profiles').select('auto_send_enabled').eq('id', user.id).single(),
-        supabase.from('platform_connections').select('platform').eq('user_id', user.id),
-        supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', user.id),
-        supabase.from('reply_analytics').select('was_sent, sent_at').eq('user_id', user.id),
-        supabase.from('draft_feedback').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('reply_attribution').select('clicked_at, converted_at, revenue_usd').eq('user_id', user.id),
+        supabase.from('profiles').select('auto_send_enabled').eq('id', userId).single(),
+        supabase.from('platform_connections').select('platform').eq('user_id', userId),
+        supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId),
+        supabase.from('reply_analytics').select('was_sent, sent_at').eq('user_id', userId),
+        supabase.from('draft_feedback').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('reply_attribution').select('clicked_at, converted_at, revenue_usd').eq('user_id', userId),
       ])
 
       const threads = threadsRes.data || []
@@ -258,12 +257,12 @@ export default function AnalyticsPage() {
     }
 
     loadData()
-  }, [])
+  }, [supabase, userId])
 
   if (loading || !data) {
     return (
       <AppPage>
-        <div className="w-full h-screen flex flex-col pt-12 items-center">
+        <div className="flex min-h-[50vh] w-full flex-col items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-black/[0.08] border-t-text-primary animate-spin" />
           <p className="mt-4 text-text-tertiary text-sm font-medium">Loading analytics…</p>
         </div>
@@ -274,7 +273,7 @@ export default function AnalyticsPage() {
   return (
     <AppPage>
       <div className="w-full max-w-[1200px] pb-12">
-        <div className="mb-10">
+        <div className="mb-6">
           <h1 className="page-title">Analytics</h1>
           <p className="page-subtitle">Reply performance and engagement metrics.</p>
         </div>
@@ -285,7 +284,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* Left Card: Lead Discovery */}
-            <div className="lg:col-span-2 surface-ceramic border border-black/[0.04] p-8 flex flex-col relative overflow-hidden">
+            <div className="relative flex flex-col overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:col-span-2 lg:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-text-secondary">
@@ -389,7 +388,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* Left Card: Traffic by Platform */}
-            <div className="surface-ceramic border border-black/[0.04] p-8 flex flex-col relative overflow-hidden">
+            <div className="relative flex flex-col overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:p-8">
               <h2 className="text-[16px] font-semibold text-text-primary tracking-tight mb-8">Traffic by Platform</h2>
               <div className="flex-1 min-h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -411,7 +410,7 @@ export default function AnalyticsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-center items-center gap-8 mt-6 pt-6 border-t border-black/[0.04]">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-5 border-t border-black/[0.04] pt-6 sm:gap-8">
                 {(data.platformData || []).map((p, i) => (
                   <span key={i} className="flex items-center gap-2 text-[15px] text-text-primary font-medium">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.isPrimary ? '#FF3B30' : '#E5E5EA' }} />
@@ -422,11 +421,11 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Middle Card: Reply Rate Gauge */}
-            <div className="surface-ceramic border border-black/[0.04] p-8 flex flex-col items-center justify-center relative overflow-hidden">
-              <div className="w-full flex justify-between items-start mb-6 absolute top-6 left-6 right-6">
+            <div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:p-8">
+              <div className="absolute inset-x-5 top-5 flex items-start justify-between sm:inset-x-6 sm:top-6">
                 <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Reply Rate</h3>
               </div>
-              <div className="mt-8 scale-[1.15]">
+              <div className="mt-8 flex w-full justify-center">
                 <RadialGauge percentage={data.replyRate} label="Drafted → Posted" />
               </div>
             </div>
@@ -466,8 +465,8 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Feature 2: Attribution Pipeline Card (Positioned at bottom) */}
-          <div className="bg-white border border-black/[0.06] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="flex items-center justify-between mb-6">
+          <div className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-6">
+            <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <div>
                 <h3 className="text-[16px] font-bold text-gray-900 tracking-tight">Attribution Pipeline</h3>
                 <p className="text-xs text-gray-500 mt-0.5 font-medium">Track replies that generated a verified click, conversion, or payment.</p>

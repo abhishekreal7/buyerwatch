@@ -3,13 +3,23 @@
 import React, { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
 import { useRouter } from 'next/navigation'
-import { Search, Settings, Target, Edit3, FileText, LayoutDashboard } from 'lucide-react'
+import {
+  BarChart3,
+  CheckCircle2,
+  FileText,
+  KeyRound,
+  LayoutDashboard,
+  Search,
+  Settings,
+  Target,
+} from 'lucide-react'
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
+    const openPalette = () => setOpen(true)
     const down = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
       if (
@@ -28,7 +38,11 @@ export function CommandPalette() {
     }
 
     document.addEventListener('keydown', down)
-    return () => document.removeEventListener('keydown', down)
+    window.addEventListener('scouto:open-command-palette', openPalette)
+    return () => {
+      document.removeEventListener('keydown', down)
+      window.removeEventListener('scouto:open-command-palette', openPalette)
+    }
   }, [])
 
   const runCommand = (command: () => void) => {
@@ -41,9 +55,9 @@ export function CommandPalette() {
       open={open} 
       onOpenChange={setOpen} 
       label="Global Command Menu"
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] sm:pt-[20vh] bg-black/40 backdrop-blur-sm transition-all p-4"
+      className="fixed inset-0 z-[70] flex items-start justify-center bg-black/35 p-4 pt-[12vh] backdrop-blur-sm sm:pt-[18vh]"
     >
-      <div className="w-full max-w-[640px] bg-surface rounded-2xl shadow-2xl border border-black/5 overflow-hidden flex flex-col scale-100 animate-in fade-in zoom-in-95 duration-200">
+      <div className="flex w-full max-w-[640px] flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
         <div className="flex items-center px-4 border-b border-black/5" cmdk-input-wrapper="">
           <Search className="w-5 h-5 text-text-tertiary shrink-0" />
           <Command.Input 
@@ -80,6 +94,27 @@ export function CommandPalette() {
               <FileText className="w-4 h-4 text-text-secondary" />
               <span>Drafts</span>
             </Command.Item>
+            <Command.Item
+              onSelect={() => runCommand(() => router.push('/posted'))}
+              className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
+            >
+              <CheckCircle2 className="h-4 w-4 text-text-secondary" />
+              <span>Posted replies</span>
+            </Command.Item>
+            <Command.Item
+              onSelect={() => runCommand(() => router.push('/analytics'))}
+              className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
+            >
+              <BarChart3 className="h-4 w-4 text-text-secondary" />
+              <span>Analytics</span>
+            </Command.Item>
+            <Command.Item
+              onSelect={() => runCommand(() => router.push('/keywords'))}
+              className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
+            >
+              <KeyRound className="h-4 w-4 text-text-secondary" />
+              <span>Keywords</span>
+            </Command.Item>
           </Command.Group>
 
           <Command.Group heading="Quick Actions" className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider px-2 py-2 mt-2">
@@ -87,8 +122,8 @@ export function CommandPalette() {
               onSelect={() => runCommand(() => router.push('/opportunities'))}
               className="flex items-center gap-3 px-3 py-2.5 mt-1 text-[14px] font-medium text-text-primary rounded-xl aria-selected:bg-black/5 aria-selected:text-accent cursor-pointer transition-colors"
             >
-              <Edit3 className="w-4 h-4 text-text-secondary" />
-              <span>Compose New Reply...</span>
+              <Target className="w-4 h-4 text-text-secondary" />
+              <span>Review opportunities</span>
             </Command.Item>
             <Command.Item 
               onSelect={() => runCommand(() => router.push('/settings'))}

@@ -63,7 +63,7 @@ export function GaugeMeter({
           textAnchor="middle"
           fontSize="32"
           fontWeight="700"
-          fontFamily="Inter, sans-serif"
+          fontFamily="var(--font-jakarta), var(--font-inter), sans-serif"
           fill={textColor}
           letterSpacing="-0.03em"
         >
@@ -75,7 +75,7 @@ export function GaugeMeter({
           textAnchor="middle"
           fontSize="12"
           fontWeight="500"
-          fontFamily="Inter, sans-serif"
+          fontFamily="var(--font-inter), sans-serif"
           fill="#9B9B9B"
           letterSpacing="0.04em"
         >

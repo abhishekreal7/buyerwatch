@@ -24,8 +24,8 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
   const activeTicks = Math.round((safePercentage / 100) * tickCount)
 
   return (
-    <div className="relative flex flex-col items-center justify-center" style={{ width: 276, height: 198 }}>
-      <svg width="276" height="198" viewBox="0 0 276 198" style={{ overflow: 'visible' }}>
+    <div className="relative flex aspect-[276/198] w-full max-w-[276px] flex-col items-center justify-center">
+      <svg className="h-full w-full overflow-visible" viewBox="0 0 276 198" role="img" aria-label={`${label}: ${safePercentage}%`}>
         {Array.from({ length: tickCount }).map((_, i) => {
           const angle = startAngle + i * angleStep
           const angleRad = (angle * Math.PI) / 180
@@ -73,7 +73,7 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
         <span
           style={{
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-            fontSize: '42px',
+            fontSize: 'clamp(32px, 12vw, 42px)',
             fontWeight: 700,
             letterSpacing: '-0.03em',
             color: '#0A0A0A',
@@ -82,7 +82,7 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
         >
           {safePercentage}%
         </span>
-        <span className="mt-2 text-xs font-medium text-gray-500">{label}</span>
+        <span className="mt-2 text-center text-xs font-medium text-gray-500">{label}</span>
       </div>
     </div>
   )

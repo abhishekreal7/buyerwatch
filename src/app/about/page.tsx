@@ -2,24 +2,24 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Target, ArrowLeft, Heart, Sparkles, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Heart, Sparkles, ShieldCheck } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 pb-20">
       {/* Header */}
-      <header className="border-b border-neutral-100 py-6 px-8 flex items-center justify-between max-w-5xl mx-auto">
-        <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight text-neutral-900">
-          <Target className="w-5 h-5 text-[#0A84FF]" strokeWidth={2.2} />
-          Scouto
+      <header className="mx-auto flex max-w-5xl items-center justify-between border-b border-neutral-100 px-4 py-5 sm:px-8 sm:py-6">
+        <Link href="/" className="flex min-h-11 items-center gap-2 font-bold text-lg tracking-tight text-neutral-900">
+          <BrandLogo size="sm" />
         </Link>
-        <Link href="/" className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 transition-colors">
+        <Link href="/" className="flex min-h-11 items-center gap-1 px-1 text-sm text-neutral-500 hover:text-neutral-900 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Home
         </Link>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-3xl mx-auto px-6 pt-16">
+      <main className="mx-auto max-w-3xl px-4 pt-12 sm:px-6 sm:pt-16">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -52,7 +52,7 @@ export default function AboutPage() {
                 <div>
                   <h3 className="font-semibold text-neutral-900 mb-1">Authentic Human Connection</h3>
                   <p className="text-[14px] text-neutral-500">
-                    We firmly believe that fully automated bot posting ruins communities. That's why Scouto will never post on your behalf without your manual review and approval.
+                    Manual review is the default. Guarded auto-send is optional on eligible paid plans and unlocks only after trust-building reviews, with confidence and content safeguards applied to every reply.
                   </p>
                 </div>
               </div>

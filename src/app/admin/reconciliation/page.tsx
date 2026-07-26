@@ -43,7 +43,7 @@ export default async function ReconciliationPage() {
   const rows = (data ?? []) as unknown as ReconciliationRow[]
 
   return (
-    <main className="min-h-screen bg-background p-6 text-text-primary md:p-12">
+    <main className="min-h-screen bg-background p-4 text-text-primary sm:p-6 md:p-12">
       <div className="mx-auto max-w-6xl space-y-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -56,7 +56,7 @@ export default async function ReconciliationPage() {
               Verify the public platform before choosing an outcome.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link href="/admin/usage" className="btn-secondary">Usage</Link>
             <Link href="/dashboard" className="btn-secondary">Dashboard</Link>
           </div>
@@ -80,14 +80,14 @@ export default async function ReconciliationPage() {
                       {row.trigger_type} send · {new Date(row.created_at).toLocaleString()}
                     </p>
                   </div>
-                  <div className="flex gap-4 text-sm">
+                  <div className="flex flex-wrap gap-2 text-sm">
                     {row.monitored_threads?.url && (
-                      <a href={row.monitored_threads.url} target="_blank" rel="noreferrer" className="text-[#0A84FF] hover:underline">
+                      <a href={row.monitored_threads.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded-lg px-2 text-[#0A84FF] hover:bg-blue-50 hover:underline">
                         Original thread
                       </a>
                     )}
                     {row.permalink && (
-                      <a href={row.permalink} target="_blank" rel="noreferrer" className="text-[#0A84FF] hover:underline">
+                      <a href={row.permalink} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded-lg px-2 text-[#0A84FF] hover:bg-blue-50 hover:underline">
                         Provider result
                       </a>
                     )}

@@ -535,18 +535,18 @@ function ComparisonPanel({ mode, setMode }: { mode: ComparisonMode; setMode: (mo
       </div>
 
       <motion.div
-        className="relative overflow-hidden rounded-b-[29px] border border-t-0 border-[#dce4e9] bg-[#f7f8f9] shadow-[0_22px_55px_rgba(24,39,50,0.08)]"
+        className="relative grid overflow-hidden rounded-b-[29px] border border-t-0 border-[#dce4e9] bg-[#f7f8f9] shadow-[0_22px_55px_rgba(24,39,50,0.08)]"
         animate={{ backgroundColor: after ? '#f7fafc' : '#f4f6f7' }}
         transition={{ duration: 0.5 }}
       >
-        <AnimatePresence mode="wait">
+        <AnimatePresence initial={false}>
           <motion.div
             key={mode}
-            className="grid min-h-[420px] gap-10 px-7 py-10 md:grid-cols-[1.08fr_0.92fr] md:px-12 md:py-12"
+            className="col-start-1 row-start-1 grid min-h-[420px] gap-10 px-7 py-10 md:grid-cols-[1.08fr_0.92fr] md:px-12 md:py-12"
             initial={{ opacity: 0, y: 10, filter: 'blur(5px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: -8, filter: 'blur(4px)' }}
-            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
           >
             <div className="flex flex-col justify-center">
               <div className={`mb-3 text-[10px] font-bold uppercase tracking-[0.14em] ${after ? 'text-[#0a72d8]' : 'text-[#7b8993]'}`}>

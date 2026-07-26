@@ -11,6 +11,7 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { evaluateReplyQuality } from '@/lib/reply-quality'
+import { useDashboardSession } from '@/components/DashboardContext'
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
   const isHigh = score >= 80
@@ -62,28 +63,26 @@ export default function DraftsPage() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [connections, setConnections] = useState<string[]>([])
   const [businessName, setBusinessName] = useState('')
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
+  const { userId } = useDashboardSession()
 
   useEffect(() => {
     async function fetchDrafts() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      
-      const { data: conns } = await supabase.from('platform_connections').select('platform').eq('user_id', user.id)
+      const [connectionsResult, profileResult, draftsResult] = await Promise.all([
+        supabase.from('platform_connections').select('platform').eq('user_id', userId),
+        supabase.from('profiles').select('business_name').eq('id', userId).single(),
+        supabase
+          .from('monitored_threads')
+          .select('*, reply_analytics(draft_text), keywords(term, target)')
+          .eq('user_id', userId)
+          .in('status', ['drafted', 'needs_manual_reply'])
+          .order('created_at', { ascending: false }),
+      ])
+      const conns = connectionsResult.data
       if (conns) setConnections(conns.map(c => c.platform))
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('business_name')
-        .eq('id', user.id)
-        .single()
+      const profile = profileResult.data
       setBusinessName(profile?.business_name || '')
-
-      const { data } = await supabase
-        .from('monitored_threads')
-        .select('*, reply_analytics(draft_text), keywords(term, target)')
-        .eq('user_id', user.id)
-        .in('status', ['drafted', 'needs_manual_reply'])
-        .order('created_at', { ascending: false })
+      const data = draftsResult.data
 
       if (data && data.length > 0) {
         const parsed = data.map(t => {
@@ -113,7 +112,7 @@ export default function DraftsPage() {
       }
     }
     fetchDrafts()
-  }, [])
+  }, [supabase, userId])
 
   const handleSelect = (d: any) => {
     setSelected(d)
@@ -273,21 +272,30 @@ export default function DraftsPage() {
 
   return (
     <AppPage>
-      <div className="flex flex-col h-[calc(100vh-144px)] overflow-hidden w-full">
+      <div className="flex w-full flex-col xl:h-[calc(100vh-144px)] xl:overflow-hidden">
         <PageHeader title="Drafts Ready" subtitle="AI-drafted replies ready for your review and approval before posting." />
 
-      <div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible xl:flex-row xl:gap-8 xl:overflow-hidden">
         {/* Draft list */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className="pb-4 shrink-0 px-1">
             <p className="text-[14px] font-medium text-text-secondary"><span className="tabular-nums font-bold text-text-primary">{drafts.length}</span> drafts awaiting review</p>
           </div>
-          <motion.div variants={staggers.container} initial="initial" animate="animate" className="flex-1 overflow-y-auto space-y-4 px-1 pb-4">
+          <motion.div variants={staggers.container} initial="initial" animate="animate" className="flex-1 space-y-4 px-1 pb-4 xl:overflow-y-auto">
             {drafts.map(d => (
               <motion.div
                 key={d.id}
                 variants={staggers.item}
                 onClick={() => handleSelect(d)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    handleSelect(d)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected?.id === d.id}
                 whileHover={selected?.id === d.id ? {} : { y: -2, boxShadow: 'var(--shadow-elevation-2)' }}
                 transition={springs.smooth}
                 className={`surface-ceramic p-6 cursor-pointer transition-all duration-300 ${
@@ -317,7 +325,7 @@ export default function DraftsPage() {
 
         {/* Reply Panel - Elevated Layer */}
         {selected && (
-          <div className="w-full lg:w-[500px] xl:w-[600px] flex flex-col shrink-0 min-h-0 bg-surface shadow-elevation-3 border border-transparent rounded-[24px] overflow-hidden">
+          <div className="order-first flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-[24px] border border-transparent bg-surface shadow-elevation-3 xl:order-last xl:w-[48%] xl:max-w-[600px]">
             <div className="px-6 py-5 border-b border-black/[0.06] flex justify-between items-center bg-surface shrink-0">
               <h3 className="font-semibold text-text-primary text-[16px]">Review & Post</h3>
               {selected.url ? (
@@ -336,7 +344,7 @@ export default function DraftsPage() {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-surface">
+            <div className="flex-1 space-y-8 bg-surface p-4 sm:p-6 xl:overflow-y-auto">
               {/* Original Post context */}
               <div className="p-5 rounded-[16px] bg-background border border-black/[0.04]">
                 <div className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider mb-2.5">Original Post Preview</div>
@@ -381,23 +389,24 @@ export default function DraftsPage() {
             </div>
 
             {/* Action Footer */}
-            <div className="p-5 border-t border-black/[0.06] bg-surface shrink-0 flex gap-3">
+            <div className="flex shrink-0 flex-wrap gap-3 border-t border-black/[0.06] bg-surface p-4 sm:p-5">
               {/* Dismiss */}
-              <button onClick={handleDismiss} className="btn-icon bg-background border border-black/[0.04]" title="Dismiss">
+              <button onClick={handleDismiss} className="btn-icon min-h-11 min-w-11 bg-background border border-black/[0.04]" title="Dismiss" aria-label="Dismiss draft">
                 <X className="w-5 h-5" strokeWidth={2} />
               </button>
               {/* Regenerate */}
               <button
                 onClick={handleRegenerate}
                 disabled={isRegenerating || isSending}
-                className="btn-icon bg-background border border-black/[0.04] disabled:opacity-40"
+                className="btn-icon min-h-11 min-w-11 bg-background border border-black/[0.04] disabled:opacity-40"
                 title="Regenerate Draft"
+                aria-label="Regenerate draft"
               >
                 <RefreshCcw className={`w-5 h-5 ${isRegenerating ? 'animate-spin' : ''}`} strokeWidth={2} />
               </button>
               <div className="flex-1" />
               {/* Copy */}
-              <button onClick={handleCopy} className="btn-secondary !rounded-[12px] px-4 hidden sm:flex items-center gap-2">
+              <button onClick={handleCopy} className="btn-secondary flex min-h-11 items-center gap-2 !rounded-[12px] px-4">
                 {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                 {copied ? 'Copied' : 'Copy'}
               </button>
@@ -405,7 +414,7 @@ export default function DraftsPage() {
               <button 
                 onClick={handleApproveAndSend}
                 disabled={isSending || currentQuality?.blocksAutomation}
-                className="btn-primary !rounded-[12px] px-6 flex items-center gap-2 flex-1 sm:flex-none justify-center"
+                className="btn-primary min-h-11 min-w-[160px] !rounded-[12px] px-5 flex items-center gap-2 flex-1 sm:flex-none justify-center"
               >
                 {isSending ? (
                   <span className="flex items-center gap-2">

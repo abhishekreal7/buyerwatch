@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { resetPasswordAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Target, Lock, Eye, EyeOff, AlertTriangle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
+import { Lock, Eye, EyeOff, AlertTriangle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 import { createClient } from '@/utils/supabase/client'
 
 export default function ResetPasswordPage() {
@@ -62,7 +63,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-5xl flex items-center justify-between z-10">
         <Link 
           href="/login" 
-          className="group inline-flex items-center gap-2 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors duration-200"
+          className="group inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors duration-200"
         >
           <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-0.5 text-[#888888] group-hover:text-[#0A0A0A]" />
           <span>Back to login</span>
@@ -78,11 +79,8 @@ export default function ResetPasswordPage() {
       >
         {/* Brand Lockup */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity focus:outline-none">
-            <Target className="w-8 h-8 text-[#0A84FF]" strokeWidth={2.5} />
-            <span className="text-3xl font-bold tracking-tight text-[#0A0A0A]">
-              Scouto
-            </span>
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2 mb-2 hover:opacity-80 transition-opacity focus:outline-none">
+            <span className="text-3xl"><BrandLogo size="lg" /></span>
           </Link>
           <h2 className="text-[15px] font-medium text-[#666666] tracking-tight">
             Set a new password
@@ -151,7 +149,8 @@ export default function ResetPasswordPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#0A0A0A] transition-colors p-1"
+                      className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#888888] transition-colors hover:bg-black/[0.04] hover:text-[#0A0A0A]"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -175,7 +174,8 @@ export default function ResetPasswordPage() {
                     <button
                       type="button"
                       onClick={() => setShowConfirm(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#0A0A0A] transition-colors p-1"
+                      className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#888888] transition-colors hover:bg-black/[0.04] hover:text-[#0A0A0A]"
+                      aria-label={showConfirm ? 'Hide confirmation password' : 'Show confirmation password'}
                     >
                       {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -211,7 +211,7 @@ export default function ResetPasswordPage() {
         {/* Footer Link */}
         <p className="text-center mt-6 text-[13px] text-[#666666]">
           Remember your password?{' '}
-          <Link href="/login" className="font-medium text-[#0A0A0A] hover:underline underline-offset-4">
+          <Link href="/login" className="inline-flex min-h-11 items-center px-1 font-medium text-[#0A0A0A] hover:underline underline-offset-4">
             Log in
           </Link>
         </p>

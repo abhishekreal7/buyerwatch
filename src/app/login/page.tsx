@@ -4,7 +4,8 @@ import { useState, Suspense } from 'react'
 import { signInAction, signInWithGoogleAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Target, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useSearchParams } from 'next/navigation'
 
 function LoginContent() {
@@ -40,7 +41,7 @@ function LoginContent() {
       <div className="w-full max-w-5xl flex items-center justify-between z-10">
         <Link 
           href="/" 
-          className="group inline-flex items-center gap-2 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors duration-200"
+          className="group inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors duration-200"
         >
           <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-0.5 text-[#888888] group-hover:text-[#0A0A0A]" />
           <span>Back to home</span>
@@ -56,11 +57,8 @@ function LoginContent() {
       >
         {/* Brand Lockup */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity focus:outline-none">
-            <Target className="w-8 h-8 text-[#0A84FF]" strokeWidth={2.5} />
-            <span className="text-3xl font-bold tracking-tight text-[#0A0A0A]">
-              Scouto
-            </span>
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2 mb-2 hover:opacity-80 transition-opacity focus:outline-none">
+            <span className="text-3xl"><BrandLogo size="lg" /></span>
           </Link>
           <h2 className="text-[15px] font-medium text-[#666666] tracking-tight">
             Log in to your account
@@ -130,7 +128,7 @@ function LoginContent() {
                 </label>
                 <Link
                   href="/forgot-password"
-                  className="text-[12px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors"
+                  className="inline-flex min-h-11 items-center text-[12px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors"
                 >
                   Forgot password?
                 </Link>
@@ -166,7 +164,7 @@ function LoginContent() {
         {/* Footer Link */}
         <p className="text-center mt-6 text-[13px] text-[#666666]">
           Don&apos;t have an account?{' '}
-          <Link href="/signup" className="font-medium text-[#0A0A0A] hover:underline underline-offset-4">
+          <Link href="/signup" className="inline-flex min-h-11 items-center px-1 font-medium text-[#0A0A0A] hover:underline underline-offset-4">
             Sign up
           </Link>
         </p>

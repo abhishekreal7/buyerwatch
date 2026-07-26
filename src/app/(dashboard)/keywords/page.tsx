@@ -11,6 +11,7 @@ import { AppPage } from '@/components/AppPage'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { normalizePlan } from '@/lib/plan-limits'
+import { useDashboardSession } from '@/components/DashboardContext'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
 
@@ -37,11 +38,12 @@ const PLATFORMS_AVAILABLE: Platform[] = ['reddit', 'bluesky']
 function StatusPill({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={(e) => {
         e.stopPropagation()
         onClick()
       }}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-medium transition-all duration-150 cursor-pointer border ${
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[12px] font-medium transition-all duration-150 cursor-pointer sm:min-h-0 ${
         active
           ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100/60 hover:border-emerald-300/80 shadow-2xs'
           : 'bg-gray-100/80 text-gray-600 border-gray-200/80 hover:bg-gray-200/60 hover:text-gray-800'
@@ -67,8 +69,9 @@ const getSuccessRate = (kwId: string, threadCount: number, repliedCount: number)
 function FilterPill({ label, active, onClick, icon }: { label: string; active: boolean; onClick: () => void; icon?: React.ReactNode }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] whitespace-nowrap transition-all duration-150 cursor-pointer ${
+      className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] transition-all duration-150 cursor-pointer sm:min-h-0 ${
         active
           ? 'bg-text-primary text-white font-semibold shadow-sm'
           : 'text-text-secondary hover:text-text-primary hover:bg-black/[0.04] font-medium'
@@ -101,7 +104,8 @@ export default function KeywordsPage() {
   const [metrics, setMetrics] = useState<Record<string, { total: number; replied: number }>>({})
   const [userPlan, setUserPlan] = useState<string>('free')
   const termRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
+  const { userId } = useDashboardSession()
 
 
   useEffect(() => {
@@ -117,53 +121,34 @@ export default function KeywordsPage() {
     if (showAdd) setTimeout(() => termRef.current?.focus(), 80)
   }, [showAdd])
 
-  async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data, error } = await supabase.from('keywords').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-    if (error) {
-      toast.error('Failed to load keywords')
-    } else {
-      setKeywords(data || [])
-
-      // Fetch thread counts for popularity and success metrics
-      const { data: threadsData } = await supabase
-        .from('monitored_threads')
-        .select('keyword_id, status')
-        .eq('user_id', user.id)
-
-      const counts: Record<string, { total: number; replied: number }> = {}
-      if (threadsData) {
-        threadsData.forEach(t => {
-          if (!t.keyword_id) return
-          if (!counts[t.keyword_id]) {
-            counts[t.keyword_id] = { total: 0, replied: 0 }
-          }
-          counts[t.keyword_id].total++
-          if (t.status === 'replied') {
-            counts[t.keyword_id].replied++
-          }
-        })
-      }
-      setMetrics(counts)
-    }
-    setLoading(false)
-  }
-
-
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
-        setUserPlan(normalizePlan(profile?.plan))
-      }
-      await load()
-    }
-    init()
+      const [profileResult, keywordsResult, threadsResult] = await Promise.all([
+        supabase.from('profiles').select('plan').eq('id', userId).single(),
+        supabase.from('keywords').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('monitored_threads').select('keyword_id, status').eq('user_id', userId),
+      ])
 
-  }, [])
+      setUserPlan(normalizePlan(profileResult.data?.plan))
+      if (keywordsResult.error) {
+        toast.error('Failed to load keywords')
+      } else {
+        setKeywords(keywordsResult.data || [])
+      }
+
+      const counts: Record<string, { total: number; replied: number }> = {}
+      for (const thread of threadsResult.data || []) {
+        if (!thread.keyword_id) continue
+        counts[thread.keyword_id] ??= { total: 0, replied: 0 }
+        counts[thread.keyword_id].total++
+        if (thread.status === 'replied') counts[thread.keyword_id].replied++
+      }
+      setMetrics(counts)
+      setLoading(false)
+    }
+
+    void init()
+  }, [supabase, userId])
 
   const handleAdd = async () => {
     if (!newTerm.trim() || !newTarget.trim()) { toast.error('Fill in keyword and target'); return }
@@ -254,7 +239,7 @@ export default function KeywordsPage() {
       <div className="w-full">
 
         {/* ── Page header ─────────────────────────────────────── */}
-        <div className="flex items-start justify-between mb-10">
+        <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row">
           <div>
             <h1 className="page-title">Monitoring Rules</h1>
             {!loading && (
@@ -283,7 +268,7 @@ export default function KeywordsPage() {
             Persistent — resolves only when user upgrades.
         ─────────────────────────────────────────────────────────── */}
         {!loading && userPlan === 'free' && pausedCount > 0 && (
-          <div className="mb-6 rounded-2xl border border-orange-100 bg-orange-50 px-5 py-4 flex items-center gap-4">
+          <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
             <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
               <Rss className="w-4 h-4 text-orange-500" strokeWidth={1.75} />
             </div>
@@ -294,7 +279,7 @@ export default function KeywordsPage() {
             </p>
             <a
               href="/pricing"
-              className="shrink-0 text-[13px] font-semibold text-white bg-gray-900 hover:bg-gray-800 px-3.5 py-2 rounded-xl transition-colors"
+              className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-gray-900 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-gray-800 sm:min-h-0"
             >
               Upgrade →
             </a>
@@ -311,15 +296,16 @@ export default function KeywordsPage() {
               transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="overflow-hidden mb-8"
             >
-              <div className="bg-surface border border-black/[0.06] rounded-[20px] p-6">
+              <div className="rounded-[20px] border border-black/[0.06] bg-surface p-4 sm:p-6">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
+                <div className="mb-6 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="text-[15px] font-semibold text-text-primary tracking-tight">New monitoring rule</p>
                     <p className="text-[12.5px] text-text-tertiary mt-0.5">The system polls for new posts matching this keyword in the chosen location.</p>
                   </div>
-                  <button onClick={() => setShowAdd(false)}
-                    className="w-7 h-7 rounded-full bg-black/[0.04] hover:bg-black/[0.08] flex items-center justify-center text-text-tertiary hover:text-text-primary transition-all cursor-pointer">
+                  <button type="button" onClick={() => setShowAdd(false)}
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-black/[0.04] text-text-tertiary transition-all hover:bg-black/[0.08] hover:text-text-primary"
+                    aria-label="Close new rule form">
                     <X className="w-3.5 h-3.5" strokeWidth={2.5} />
                   </button>
                 </div>
@@ -359,19 +345,19 @@ export default function KeywordsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                   <p className="text-[12px] text-text-tertiary">
                     {newPlatform === 'reddit'
                       ? 'Monitors r/{subreddit} for posts containing your keyword.'
                       : 'Searches Bluesky posts and replies for your keyword.'}
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <button onClick={() => setShowAdd(false)}
-                      className="btn-secondary text-[13px] py-2 px-4">
+                      className="btn-secondary min-h-11 flex-1 px-4 py-2 text-[13px] sm:min-h-0 sm:flex-none">
                       Cancel
                     </button>
                     <button onClick={handleAdd} disabled={saving}
-                      className="btn-primary text-[13px] py-2 px-4 flex items-center gap-1.5 disabled:opacity-50">
+                      className="btn-primary min-h-11 flex flex-1 items-center gap-1.5 px-4 py-2 text-[13px] disabled:opacity-50 sm:min-h-0 sm:flex-none">
                       {saving ? 'Saving…' : <><Check className="w-3.5 h-3.5" strokeWidth={2.5} /> Create rule</>}
                     </button>
                   </div>
@@ -384,18 +370,18 @@ export default function KeywordsPage() {
         {/* ── Filter bar ──────────────────────────────────────── */}
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           {/* Search */}
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search…"
-              className="h-8 pl-9 pr-4 w-52 rounded-full bg-surface border border-black/[0.07] text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-black/[0.07] hover:border-black/[0.12] transition-all duration-150"
+              className="h-11 w-full rounded-full border border-black/[0.07] bg-surface pl-9 pr-4 text-[13px] text-text-primary placeholder-text-tertiary transition-all duration-150 hover:border-black/[0.12] focus:outline-none focus:ring-2 focus:ring-black/[0.07] sm:h-8 sm:w-52"
             />
           </div>
 
-          <div className="w-px h-5 bg-black/[0.07]" />
+          <div className="hidden h-5 w-px bg-black/[0.07] sm:block" />
 
           {/* Platform pills */}
           <div className="inline-flex items-center gap-1 p-1 bg-surface rounded-[14px] border border-black/[0.06] shadow-sm">
@@ -404,7 +390,7 @@ export default function KeywordsPage() {
             <FilterPill label="Bluesky" icon={<BlueskyIcon className="w-3.5 h-3.5 shrink-0" />} active={filterPlatform === 'bluesky'} onClick={() => setFilterPlatform('bluesky')} />
           </div>
 
-          <div className="w-px h-5 bg-black/[0.07]" />
+          <div className="hidden h-5 w-px bg-black/[0.07] sm:block" />
 
           {/* Status pills */}
           <div className="inline-flex items-center gap-1 p-1 bg-surface rounded-[14px] border border-black/[0.06] shadow-sm">
@@ -425,8 +411,8 @@ export default function KeywordsPage() {
         <div className="rounded-[18px] border border-black/[0.06] bg-white">
 
           {/* Table head */}
-          <div className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_140px_100px_100px_44px] items-center px-5 py-3 bg-surface border-b border-black/[0.05] rounded-t-[17px]">
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">#</span>
+          <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-t-[17px] border-b border-black/[0.05] bg-surface px-4 py-3 sm:grid-cols-[40px_1fr_100px_44px] sm:gap-0 sm:px-5 md:grid-cols-[40px_1fr_140px_100px_100px_44px]">
+            <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary sm:block">#</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Rule</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Leads Found</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Reply Rate</span>
@@ -463,18 +449,18 @@ export default function KeywordsPage() {
                 <Plus className="w-4 h-4" strokeWidth={2.5} />
                 Create first rule
               </button>
-              <div className="flex items-center gap-8 pt-6 border-t border-black/5 w-full max-w-sm justify-center">
-                <div className="text-center">
-                  <p className="text-[20px] font-bold text-text-primary tracking-tight">94%</p>
-                  <p className="text-[12px] text-text-tertiary">Intent accuracy</p>
+              <div className="grid w-full max-w-sm grid-cols-1 gap-3 border-t border-black/5 pt-6 sm:grid-cols-3">
+                <div className="rounded-xl bg-black/[0.025] p-3 text-center">
+                  <p className="text-[13px] font-semibold text-text-primary">Always scanning</p>
+                  <p className="mt-1 text-[12px] text-text-tertiary">Continuous monitoring</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-[20px] font-bold text-text-primary tracking-tight">&lt;2hrs</p>
-                  <p className="text-[12px] text-text-tertiary">Time to first signal</p>
+                <div className="rounded-xl bg-black/[0.025] p-3 text-center">
+                  <p className="text-[13px] font-semibold text-text-primary">Intent ranked</p>
+                  <p className="mt-1 text-[12px] text-text-tertiary">Review strongest leads first</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-[20px] font-bold text-text-primary tracking-tight">Free</p>
-                  <p className="text-[12px] text-text-tertiary">No card needed</p>
+                <div className="rounded-xl bg-black/[0.025] p-3 text-center">
+                  <p className="text-[13px] font-semibold text-text-primary">Start free</p>
+                  <p className="mt-1 text-[12px] text-text-tertiary">No card needed</p>
                 </div>
               </div>
             </div>
@@ -508,10 +494,10 @@ export default function KeywordsPage() {
                     animate={{ opacity: kw.is_active ? 1 : 0.55, y: 0 }}
                     exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                     transition={{ duration: 0.18 }}
-                    className="grid grid-cols-[40px_1fr_100px_44px] md:grid-cols-[40px_1fr_140px_100px_100px_44px] items-center px-5 py-4 hover:bg-surface/60 group transition-colors duration-150 relative last:rounded-b-[17px]"
+                    className="group relative grid grid-cols-[1fr_auto_auto] items-center gap-2 px-4 py-4 transition-colors duration-150 last:rounded-b-[17px] hover:bg-surface/60 sm:grid-cols-[40px_1fr_100px_44px] sm:gap-0 sm:px-5 md:grid-cols-[40px_1fr_140px_100px_100px_44px]"
                   >
                     {/* Index column */}
-                    <span className="text-[13px] font-mono text-text-tertiary font-semibold">
+                    <span className="hidden text-[13px] font-mono font-semibold text-text-tertiary sm:block">
                       {String(index + 1).padStart(2, '0')}
                     </span>
 
@@ -520,11 +506,11 @@ export default function KeywordsPage() {
                       <div className="flex-shrink-0">
                         {kw.platform === 'reddit' ? (
                           <div className="w-8 h-8 rounded-xl bg-[#FF4500]/8 flex items-center justify-center border border-[#FF4500]/15">
-                            <img src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" alt="Reddit" className="w-[18px] h-[18px] rounded-full object-cover" />
+                            <RedditIcon className="h-[18px] w-[18px] text-[#FF4500]" />
                           </div>
                         ) : (
                           <div className="w-8 h-8 rounded-xl bg-[#1185FE]/8 flex items-center justify-center border border-[#1185FE]/15">
-                            <img src="https://bsky.app/static/apple-touch-icon.png" alt="Bluesky" className="w-[18px] h-[18px] rounded-full object-cover" />
+                            <BlueskyIcon className="h-[18px] w-[18px] text-[#1185FE]" />
                           </div>
                         )}
                       </div>
@@ -565,7 +551,8 @@ export default function KeywordsPage() {
                     <div className="flex items-center justify-end" data-menu>
                       <button
                         onClick={() => setMenuId(menuId === kw.id ? null : kw.id)}
-                        className="w-8 h-8 rounded-[9px] flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-black/[0.05] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-150 cursor-pointer"
+                        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[9px] text-text-tertiary opacity-100 transition-all duration-150 hover:bg-black/[0.05] hover:text-text-primary focus:opacity-100 sm:h-10 sm:w-10 md:opacity-0 md:group-hover:opacity-100"
+                        aria-label={`Open actions for ${kw.term}`}
                       >
                         <MoreHorizontal className="w-4 h-4" />
                       </button>
@@ -622,7 +609,7 @@ export default function KeywordsPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.2 }}
-              className="mt-4 rounded-[18px] border border-black/[0.06] bg-gradient-to-br from-white to-[#F9F9FB] p-5 flex items-start gap-4"
+              className="mt-4 flex flex-col items-start gap-4 rounded-[18px] border border-black/[0.06] bg-gradient-to-br from-white to-[#F9F9FB] p-5 sm:flex-row"
             >
               <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 mt-0.5">
                 <Sparkles className="w-4 h-4 text-amber-500" strokeWidth={1.75} />
@@ -640,7 +627,7 @@ export default function KeywordsPage() {
               </div>
               <a
                 href="/pricing"
-                className="shrink-0 flex items-center gap-1.5 text-[13px] font-semibold text-white bg-gray-900 hover:bg-gray-800 px-4 py-2 rounded-xl transition-colors"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-gray-800 sm:min-h-0"
               >
                 Upgrade to Professional
                 <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />

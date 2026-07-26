@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { forgotPasswordAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Target, Mail, ArrowLeft, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
+import { Mail, ArrowLeft, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 
 export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +42,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-5xl flex items-center justify-between z-10">
         <Link 
           href="/login" 
-          className="group inline-flex items-center gap-2 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors duration-200"
+          className="group inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors duration-200"
         >
           <ArrowLeft className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-0.5 text-[#888888] group-hover:text-[#0A0A0A]" />
           <span>Back to login</span>
@@ -57,11 +58,8 @@ export default function ForgotPasswordPage() {
       >
         {/* Brand Lockup */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity focus:outline-none">
-            <Target className="w-8 h-8 text-[#0A84FF]" strokeWidth={2.5} />
-            <span className="text-3xl font-bold tracking-tight text-[#0A0A0A]">
-              Scouto
-            </span>
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2 mb-2 hover:opacity-80 transition-opacity focus:outline-none">
+            <span className="text-3xl"><BrandLogo size="lg" /></span>
           </Link>
           <h2 className="text-[15px] font-medium text-[#666666] tracking-tight">
             Reset your password
@@ -158,7 +156,7 @@ export default function ForgotPasswordPage() {
         {/* Footer Link */}
         <p className="text-center mt-6 text-[13px] text-[#666666]">
           Remember your password?{' '}
-          <Link href="/login" className="font-medium text-[#0A0A0A] hover:underline underline-offset-4">
+          <Link href="/login" className="inline-flex min-h-11 items-center px-1 font-medium text-[#0A0A0A] hover:underline underline-offset-4">
             Log in
           </Link>
         </p>
@@ -171,4 +169,3 @@ export default function ForgotPasswordPage() {
     </div>
   )
 }
-
