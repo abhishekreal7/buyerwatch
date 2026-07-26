@@ -231,8 +231,8 @@ export default function DashboardLayout({
   return (
     <DashboardSessionProvider userId={userId}>
       <div className="relative min-h-screen overflow-x-hidden bg-[#FAFAFA] selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
-        {/* Compact desktop sidebar matching reference design */}
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-[210px] shrink-0 flex-col border-r border-[#EBEBE8] bg-[#F8F8F7] px-3 py-3.5 lg:flex">
+      {/* Compact desktop sidebar matching exact Dribbble #F4F4F2 theme */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[210px] shrink-0 flex-col border-r border-[#E5E5E2] bg-[#F4F4F2] px-3 py-3.5 lg:flex">
         <div className="mb-3 flex h-10 shrink-0 items-center px-1.5">
           <Link
             href="/dashboard"
@@ -255,15 +255,15 @@ export default function DashboardLayout({
                   onFocus={() => router.prefetch(item.href)}
                   className={`group flex h-9.5 items-center justify-between rounded-xl px-3 text-[14px] transition-all duration-150 ${
                     isActive
-                      ? 'border border-[#EBEBE8] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]'
-                      : 'border border-transparent font-medium text-[#555550] hover:bg-[#EFEFED] hover:text-[#1C1C1A]'
+                      ? 'border border-[#E2E2DE] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]'
+                      : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EAEAE7] hover:text-[#1C1C1A]'
                   }`}
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <SidebarIcon
                       aria-hidden
                       className={`h-[18px] w-[18px] shrink-0 ${
-                        isActive ? 'text-[#1C1C1A]' : 'text-[#787872] group-hover:text-[#2C2C28]'
+                        isActive ? 'text-[#1C1C1A]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
                       }`}
                     />
                     <span className="truncate">{item.name}</span>
@@ -272,7 +272,7 @@ export default function DashboardLayout({
                     <span
                       className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
                         item.name === 'Opportunities'
-                          ? 'bg-[#FF3B30] text-white font-bold px-1.5 py-0.5 min-w-[20px] text-center'
+                          ? 'bg-[#EF4444] text-white font-bold px-1.5 py-0.5 min-w-[20px] text-center'
                           : isActive
                           ? 'bg-[#F2F2F0] text-[#555550]'
                           : 'bg-white border border-[#E2E2DF] text-[#666660]'
@@ -288,18 +288,18 @@ export default function DashboardLayout({
         </nav>
 
         <div className="shrink-0 pt-2 flex flex-col gap-2">
-          <div className="border-t border-[#ECECE9] pt-2">
+          <div className="border-t border-[#E5E5E2] pt-2">
             <Link
               href="/contact"
-              className="group flex h-9 items-center gap-2.5 rounded-xl px-3 text-[14px] font-medium text-[#555550] transition-colors hover:bg-[#EFEFED] hover:text-[#1C1C1A]"
+              className="group flex h-9 items-center gap-2.5 rounded-xl px-3 text-[14px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
             >
-              <PiQuestionFill className="h-[18px] w-[18px] text-[#787872] group-hover:text-[#2C2C28]" aria-hidden />
+              <PiQuestionFill className="h-[18px] w-[18px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
               Help center
             </Link>
           </div>
 
           {/* User profile card styled matching reference screenshot */}
-          <div className="rounded-xl border border-[#EBEBE8] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all">
+          <div className="rounded-xl border border-[#E2E2DE] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all">
             <div className="flex items-center justify-between gap-2.5">
               <Link
                 href="/settings"
@@ -319,7 +319,7 @@ export default function DashboardLayout({
               <form action="/api/auth/signout" method="POST" className="shrink-0">
                 <button
                   type="submit"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#555550] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5D5D57] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
                   title="Sign out"
                   aria-label="Sign out"
                 >
@@ -330,7 +330,7 @@ export default function DashboardLayout({
           </div>
 
           {/* Monthly usage card */}
-          <div className="rounded-xl border border-[#EBEBE8] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="rounded-xl border border-[#E2E2DE] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase leading-4 tracking-wider text-[#83837E]">
