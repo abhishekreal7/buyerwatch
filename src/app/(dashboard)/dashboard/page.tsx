@@ -402,7 +402,7 @@ export default function DashboardPage() {
   }, [filterTab, threads])
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="w-full space-y-6">
 
       {/* Post-upgrade modal — shown once per plan tier per browser, via localStorage */}
       {!loading && userId && (
@@ -432,9 +432,9 @@ export default function DashboardPage() {
       {/* ElevenLabs Style 4 Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Conversations Found */}
-        <div className="relative rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-gray-500">Conversations Found</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">Conversations Found</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
               <MessageCircle className="w-4 h-4" strokeWidth={2} />
             </div>
@@ -443,14 +443,14 @@ export default function DashboardPage() {
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.threadsFound}
             </span>
-            <span className="text-[11.5px] font-medium text-gray-400">Pending review</span>
+            <span className="text-[11.5px] font-medium text-[#667085]">Pending review</span>
           </div>
         </div>
 
         {/* Metric 2: High Intent */}
-        <div className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-gray-500">High Intent</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <Sparkles className="w-4 h-4" strokeWidth={2} />
             </div>
@@ -466,9 +466,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 3: Drafts Ready */}
-        <div className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-gray-500">Drafts Ready</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">Drafts Ready</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0A84FF] flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" strokeWidth={2} />
             </div>
@@ -477,16 +477,16 @@ export default function DashboardPage() {
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.draftsReady}
             </span>
-            <span className="text-[11.5px] font-medium text-gray-400">
+            <span className="text-[11.5px] font-medium text-[#667085]">
               {stats.draftsReady > 0 ? 'Review Now →' : 'Up to date'}
             </span>
           </div>
         </div>
 
         {/* Metric 4: Posted Today */}
-        <div className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-gray-500">Posted Today</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">Posted Today</span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <CheckCircle className="w-4 h-4" strokeWidth={2} />
             </div>
@@ -495,7 +495,7 @@ export default function DashboardPage() {
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.postedToday}
             </span>
-            <span className="text-[11.5px] font-medium text-gray-400">Automated & manual</span>
+            <span className="text-[11.5px] font-medium text-[#667085]">Automated & manual</span>
           </div>
         </div>
       </div>
@@ -538,23 +538,23 @@ export default function DashboardPage() {
         return (
           <>
             {/* ElevenLabs Style Filters & Pill Navigation Bar */}
-            <div className="bg-white rounded-2xl border border-black/[0.06] p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center justify-between flex-wrap gap-3">
-              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-gray-100/70 p-1 no-scrollbar">
+            <div className="bg-white rounded-2xl border border-[#E3E3E0] p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)] flex items-center justify-between flex-wrap gap-3">
+              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-[#F1F2F3] p-1 no-scrollbar">
                 <button
                   onClick={() => setFilterTab('all')}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   All Conversations
                 </button>
                 <button
                   onClick={() => setFilterTab('high-intent')}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   High Intent (≥80%)
                 </button>
                 <button
                   onClick={() => setFilterTab('dismissed')}
-                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   <span>Dismissed</span>
                   {dismissedCount > 0 && (
@@ -565,7 +565,7 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 pr-1">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#4F5865] pr-1">
                 <span>{filtered.length === 1 ? '1 opportunity' : `${filtered.length} opportunities`}</span>
               </div>
             </div>
@@ -575,7 +575,7 @@ export default function DashboardPage() {
               {/* Left Column (Feed) */}
               <div className="flex-1 space-y-4">
               {loading && (
-                <div className="rounded-2xl p-12 bg-white border border-black/[0.06] shadow-xs flex items-center justify-center text-gray-400 text-xs font-medium">
+                <div className="rounded-2xl p-12 bg-white border border-[#E3E3E0] shadow-xs flex items-center justify-center text-[#667085] text-xs font-medium">
                   Loading opportunities...
                 </div>
               )}
@@ -604,13 +604,13 @@ export default function DashboardPage() {
 
               {!loading && filtered.length === 0 && keywordsCount > 0 && (
                 /* ── ElevenLabs Style Clean Empty State ── */
-                <div className="rounded-2xl bg-white border border-black/[0.06] p-10 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col items-center text-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200/70 flex items-center justify-center text-gray-400">
+                <div className="rounded-2xl bg-white border border-[#E3E3E0] p-10 shadow-[0_1px_2px_rgba(0,0,0,0.055)] flex flex-col items-center text-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[#F8F9FA] border border-[#DEE2E6] flex items-center justify-center text-[#667085]">
                     <Search className="w-5 h-5" strokeWidth={1.8} />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900">No conversations yet</h3>
-                    <p className="text-xs text-gray-400 mt-1">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
+                    <p className="text-xs text-[#667085] mt-1">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
                   </div>
                   <button
                     onClick={async () => {

@@ -9,6 +9,7 @@ import {
   ChevronUp,
   ExternalLink,
   MessageCircle,
+  Search,
   Target,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -107,6 +108,7 @@ export default function OpportunitiesPage() {
   const { userId } = useDashboardSession()
   const [activeFilter, setActiveFilter] = useState('All')
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  const [searchQuery, setSearchQuery] = useState('')
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
   const [draftingId, setDraftingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -180,6 +182,15 @@ export default function OpportunitiesPage() {
 
   const filtered = opportunities
     .filter(opportunity => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim()
+        const matchesTitle = opportunity.title.toLowerCase().includes(q)
+        const matchesContent = opportunity.content.toLowerCase().includes(q)
+        const matchesAuthor = opportunity.author.toLowerCase().includes(q)
+        const matchesTarget = opportunity.target.toLowerCase().includes(q)
+        const matchesKeyword = opportunity.keyword.toLowerCase().includes(q)
+        if (!matchesTitle && !matchesContent && !matchesAuthor && !matchesTarget && !matchesKeyword) return false
+      }
       if (activeFilter === 'All') return true
       if (activeFilter === 'Buying intent') return opportunity.intentLabel === 'buying'
       if (activeFilter === 'Researching') return opportunity.intentLabel === 'researching'
@@ -207,8 +218,8 @@ export default function OpportunitiesPage() {
           )}
         />
 
-        <div className="mb-6 flex items-center justify-between gap-3 overflow-x-auto px-1 pb-1 no-scrollbar">
-          <div className="inline-flex items-center gap-1 rounded-[14px] border border-black/[0.06] bg-surface p-1 shadow-sm">
+        <div className="mb-6 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 px-1 pb-1">
+          <div className="inline-flex items-center gap-1 rounded-[14px] border border-black/[0.06] bg-surface p-1 shadow-sm overflow-x-auto no-scrollbar">
             {FILTERS.map(filter => (
               <button
                 key={filter}
@@ -229,16 +240,30 @@ export default function OpportunitiesPage() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSortOrder(current => current === 'desc' ? 'asc' : 'desc')}
-            className="ml-auto flex min-h-11 items-center gap-2 whitespace-nowrap rounded-[14px] border border-black/[0.06] bg-surface px-3.5 py-2 text-[13px] font-semibold text-text-primary shadow-sm transition-all hover:bg-white sm:min-h-0"
-          >
-            {sortOrder === 'desc'
-              ? <ChevronDown className="h-4 w-4 text-text-secondary" />
-              : <ChevronUp className="h-4 w-4 text-text-secondary" />}
-            <span className="font-medium text-text-secondary">Sort:</span> Intent
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Search thread pill input */}
+            <div className="relative flex-1 sm:w-56">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none" strokeWidth={2} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search thread"
+                className="w-full rounded-2xl border border-gray-200/90 bg-white py-2 pl-9 pr-4 text-xs font-normal text-gray-800 shadow-2xs placeholder-gray-500 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20 focus:border-[#0A84FF] transition-all"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSortOrder(current => current === 'desc' ? 'asc' : 'desc')}
+              className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-[14px] border border-black/[0.06] bg-surface px-3.5 py-2 text-[13px] font-semibold text-text-primary shadow-sm transition-all hover:bg-white sm:min-h-0 shrink-0"
+            >
+              {sortOrder === 'desc'
+                ? <ChevronDown className="h-4 w-4 text-text-secondary" />
+                : <ChevronUp className="h-4 w-4 text-text-secondary" />}
+              <span className="font-medium text-text-secondary hidden sm:inline">Sort:</span> Intent
+            </button>
+          </div>
         </div>
 
         {filtered.length === 0 ? (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink } from 'lucide-react'
+import { AlertTriangle, Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -49,6 +49,7 @@ function formatTimeAgo(dateString: string) {
 }
 
 export default function DraftsPage() {
+  const [searchQuery, setSearchQuery] = useState('')
   const [drafts, setDrafts] = useState<any[]>([])
   const [selected, setSelected] = useState<any | null>(null)
   const [draftContent, setDraftContent] = useState('')
@@ -270,6 +271,17 @@ export default function DraftsPage() {
       })
     : null
 
+  const filteredDrafts = drafts.filter(d => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase().trim()
+    return (
+      d.title?.toLowerCase().includes(q) ||
+      d.content?.toLowerCase().includes(q) ||
+      d.target?.toLowerCase().includes(q) ||
+      d.draft?.toLowerCase().includes(q)
+    )
+  })
+
   return (
     <AppPage>
       <div className="flex w-full flex-col xl:h-[calc(100vh-144px)] xl:overflow-hidden">
@@ -278,11 +290,22 @@ export default function DraftsPage() {
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible xl:flex-row xl:gap-8 xl:overflow-hidden">
         {/* Draft list */}
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="pb-4 shrink-0 px-1">
-            <p className="text-[14px] font-medium text-text-secondary"><span className="tabular-nums font-bold text-text-primary">{drafts.length}</span> drafts awaiting review</p>
+          <div className="pb-4 shrink-0 px-1 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+            <p className="text-[14px] font-medium text-text-secondary"><span className="tabular-nums font-bold text-text-primary">{filteredDrafts.length}</span> drafts awaiting review</p>
+            
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none" strokeWidth={2} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search thread"
+                className="w-full rounded-2xl border border-gray-200/90 bg-white py-2 pl-9 pr-4 text-xs font-normal text-gray-800 shadow-2xs placeholder-gray-500 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20 focus:border-[#0A84FF] transition-all"
+              />
+            </div>
           </div>
           <motion.div variants={staggers.container} initial="initial" animate="animate" className="flex-1 space-y-4 px-1 pb-4 xl:overflow-y-auto">
-            {drafts.map(d => (
+            {filteredDrafts.map(d => (
               <motion.div
                 key={d.id}
                 variants={staggers.item}

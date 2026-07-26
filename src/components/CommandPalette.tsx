@@ -4,15 +4,17 @@ import React, { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
 import { useRouter } from 'next/navigation'
 import {
-  BarChart3,
-  CheckCircle2,
-  FileText,
-  KeyRound,
+  FolderClosed,
   LayoutDashboard,
+  Package,
   Search,
   Settings,
-  Target,
 } from 'lucide-react'
+import {
+  ReferenceAnalyticsIcon,
+  ReferencePostedIcon,
+  ReferencePuzzleIcon,
+} from '@/components/SidebarReferenceIcons'
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
@@ -81,39 +83,39 @@ export function CommandPalette() {
               <span>Dashboard</span>
             </Command.Item>
             <Command.Item 
-              onSelect={() => runCommand(() => router.push('/opportunities'))}
-              className="flex items-center gap-3 px-3 py-2.5 text-[14px] font-medium text-text-primary rounded-xl aria-selected:bg-black/5 aria-selected:text-accent cursor-pointer transition-colors"
-            >
-              <Target className="w-4 h-4 text-text-secondary" />
-              <span>Opportunities</span>
-            </Command.Item>
-            <Command.Item 
               onSelect={() => runCommand(() => router.push('/drafts'))}
               className="flex items-center gap-3 px-3 py-2.5 text-[14px] font-medium text-text-primary rounded-xl aria-selected:bg-black/5 aria-selected:text-accent cursor-pointer transition-colors"
             >
-              <FileText className="w-4 h-4 text-text-secondary" />
+              <FolderClosed className="w-4 h-4 text-text-secondary" />
               <span>Drafts</span>
             </Command.Item>
-            <Command.Item
-              onSelect={() => runCommand(() => router.push('/posted'))}
-              className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
-            >
-              <CheckCircle2 className="h-4 w-4 text-text-secondary" />
-              <span>Posted replies</span>
-            </Command.Item>
-            <Command.Item
+            <Command.Item 
               onSelect={() => runCommand(() => router.push('/analytics'))}
-              className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
+              className="flex items-center gap-3 px-3 py-2.5 text-[14px] font-medium text-text-primary rounded-xl aria-selected:bg-black/5 aria-selected:text-accent cursor-pointer transition-colors"
             >
-              <BarChart3 className="h-4 w-4 text-text-secondary" />
+              <ReferenceAnalyticsIcon className="h-4 w-4 text-text-secondary" />
               <span>Analytics</span>
             </Command.Item>
             <Command.Item
               onSelect={() => runCommand(() => router.push('/keywords'))}
               className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
             >
-              <KeyRound className="h-4 w-4 text-text-secondary" />
+              <ReferencePuzzleIcon className="h-4 w-4 text-text-secondary" />
               <span>Keywords</span>
+            </Command.Item>
+            <Command.Item
+              onSelect={() => runCommand(() => router.push('/opportunities'))}
+              className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
+            >
+              <Package className="h-4 w-4 text-text-secondary" />
+              <span>Opportunities</span>
+            </Command.Item>
+            <Command.Item
+              onSelect={() => runCommand(() => router.push('/posted'))}
+              className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-text-primary transition-colors aria-selected:bg-black/5 aria-selected:text-accent"
+            >
+              <ReferencePostedIcon className="h-4 w-4 text-text-secondary" />
+              <span>Posted replies</span>
             </Command.Item>
           </Command.Group>
 
@@ -122,7 +124,7 @@ export function CommandPalette() {
               onSelect={() => runCommand(() => router.push('/opportunities'))}
               className="flex items-center gap-3 px-3 py-2.5 mt-1 text-[14px] font-medium text-text-primary rounded-xl aria-selected:bg-black/5 aria-selected:text-accent cursor-pointer transition-colors"
             >
-              <Target className="w-4 h-4 text-text-secondary" />
+              <Package className="w-4 h-4 text-text-secondary" />
               <span>Review opportunities</span>
             </Command.Item>
             <Command.Item 

@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [profileResult, opportunitiesResult, draftsResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('auto_send_enabled, plan, draft_count, draft_month')
+      .select('auto_send_enabled, plan, draft_count, draft_month, business_name')
       .eq('id', user.id)
       .single(),
     supabase
@@ -36,12 +36,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const used = profile?.draft_month === currentMonth
     ? Math.min(Math.max(profile.draft_count ?? 0, 0), limit)
     : 0
+  const userMetadata = user.user_metadata
+  const userName = userMetadata?.full_name || userMetadata?.name || profile?.business_name || (user.email ? user.email.split('@')[0] : 'Iona Rollins')
   const bootstrap: DashboardBootstrap = {
     autoSend: profile?.auto_send_enabled ?? false,
     plan,
     credits: { used, limit },
     opportunityCount: opportunitiesResult.count ?? 0,
     draftCount: draftsResult.count ?? 0,
+    user: {
+      name: userName,
+      email: user.email,
+      avatarUrl: userMetadata?.avatar_url || userMetadata?.picture,
+    },
   }
 
   return (

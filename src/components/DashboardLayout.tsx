@@ -5,25 +5,36 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Bell,
-  ChartNoAxesCombined,
-  CheckCircle,
   ChevronRight,
-  FileText,
-  Key,
+  FolderClosed,
   LayoutDashboard,
   LogOut,
   Menu,
+  Package,
   Search,
   Settings,
-  Target,
   X,
   Zap,
 } from 'lucide-react'
+import {
+  PiArrowLeftBold,
+  PiQuestionFill,
+} from 'react-icons/pi'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
 import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
+import {
+  ReferenceAnalyticsIcon,
+  ReferenceBreadcrumbCurrentIcon,
+  ReferenceBreadcrumbFolderIcon,
+  ReferenceCubeIcon,
+  ReferenceDashboardIcon,
+  ReferenceFolderIcon,
+  ReferencePostedIcon,
+  ReferencePuzzleIcon,
+} from '@/components/SidebarReferenceIcons'
 
 export type DashboardBootstrap = {
   autoSend: boolean
@@ -31,19 +42,34 @@ export type DashboardBootstrap = {
   credits: { used: number; limit: number }
   opportunityCount: number
   draftCount: number
+  user?: {
+    name?: string
+    email?: string
+    avatarUrl?: string
+  }
 }
 
 const NAV_ITEMS = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Opportunities', href: '/opportunities', icon: Target },
-  { name: 'Drafts Ready', href: '/drafts', icon: FileText },
-  { name: 'Posted', href: '/posted', icon: CheckCircle },
-  { name: 'Analytics', href: '/analytics', icon: ChartNoAxesCombined },
-  { name: 'Keywords', href: '/keywords', icon: Key },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, sidebarIcon: ReferenceDashboardIcon },
+  { name: 'Drafts Ready', href: '/drafts', icon: FolderClosed, sidebarIcon: ReferenceFolderIcon },
+  { name: 'Analytics', href: '/analytics', icon: ReferenceAnalyticsIcon, sidebarIcon: ReferenceAnalyticsIcon },
+  { name: 'Keywords', href: '/keywords', icon: ReferencePuzzleIcon, sidebarIcon: ReferencePuzzleIcon },
+  { name: 'Opportunities', href: '/opportunities', icon: Package, sidebarIcon: ReferenceCubeIcon },
+  { name: 'Posted', href: '/posted', icon: ReferencePostedIcon, sidebarIcon: ReferencePostedIcon },
 ]
 
+const PAGE_SECTIONS: Record<string, string> = {
+  '/dashboard': 'Workspace',
+  '/opportunities': 'Lead discovery',
+  '/drafts': 'Outreach',
+  '/posted': 'Outreach',
+  '/analytics': 'Insights',
+  '/keywords': 'Monitoring',
+  '/settings': 'Account',
+}
+
 const MOBILE_NAV_ITEMS = NAV_ITEMS.filter((item) =>
-  ['Dashboard', 'Opportunities', 'Drafts Ready', 'Analytics'].includes(item.name)
+  ['Drafts Ready', 'Analytics', 'Keywords', 'Opportunities'].includes(item.name)
 )
 
 export default function DashboardLayout({
@@ -189,9 +215,14 @@ export default function DashboardLayout({
   const creditsPercent = credits && credits.limit > 0
     ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
     : 0
-  const currentPage = NAV_ITEMS.find((item) =>
+  const currentNavItem = NAV_ITEMS.find((item) =>
     pathname === item.href || pathname.startsWith(`${item.href}/`)
-  )?.name ?? (pathname.startsWith('/settings') ? 'Settings' : 'Overview')
+  )
+  const currentPage = currentNavItem?.name ?? (pathname.startsWith('/settings') ? 'Settings' : 'Overview')
+  const currentSection = Object.entries(PAGE_SECTIONS).find(([href]) =>
+    pathname === href || pathname.startsWith(`${href}/`)
+  )?.[1] ?? 'Workspace'
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
 
   function openCommandPalette() {
     window.dispatchEvent(new Event('scouto:open-command-palette'))
@@ -199,141 +230,205 @@ export default function DashboardLayout({
 
   return (
     <DashboardSessionProvider userId={userId}>
-      <div className="min-h-screen bg-[#FAFAFA] relative selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
-      {/* Sidebar - ElevenLabs Style */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[260px] shrink-0 flex-col border-r border-gray-200/70 bg-[#F9FAFB] px-3 py-4 lg:flex">
-        {/* Logo & Brand Header */}
-        <div className="h-12 flex items-center px-2 shrink-0 mb-2">
-          <Link href="/dashboard" className="text-xl font-display font-bold tracking-tight text-gray-900 flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <BrandLogo />
+      <div className="relative min-h-screen overflow-x-hidden bg-[#FAFAFA] selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
+      {/* Compact desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[200px] shrink-0 flex-col border-r border-[#E8E8E8] bg-[#F7F7F7] px-3 py-3 lg:flex">
+        <div className="mb-2.5 flex h-10 shrink-0 items-center px-1">
+          <Link
+            href="/dashboard"
+            className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#20201E] transition-opacity hover:opacity-75"
+          >
+            <BrandLogo size="sm" />
           </Link>
         </div>
 
-        {/* Main Nav Section */}
-        <nav className="flex-1 space-y-0.5 overflow-y-auto no-scrollbar">
+        <nav className="no-scrollbar flex-1 overflow-y-auto" aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             const badge = badges[item.href]
+            const SidebarIcon = item.sidebarIcon
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onMouseEnter={() => router.prefetch(item.href)}
-                onFocus={() => router.prefetch(item.href)}
-                className={`flex items-center justify-between px-3 py-2 rounded-xl transition-colors text-[13.5px] ${isActive
-                  ? 'bg-[#EAEAEA] text-gray-900 font-semibold'
-                  : 'text-[#555555] hover:bg-[#F2F2F2] hover:text-gray-900 font-medium'
+              <div key={item.name}>
+                <Link
+                  href={item.href}
+                  onMouseEnter={() => router.prefetch(item.href)}
+                  onFocus={() => router.prefetch(item.href)}
+                  className={`group flex h-9 items-center justify-between rounded-[10px] border px-2.5 text-[13.5px] tracking-normal transition-[background-color,border-color,box-shadow,color] ${
+                    isActive
+                      ? 'border-[#DADAD6] bg-white font-semibold text-[#181816] shadow-[0_1px_2px_rgba(0,0,0,0.08),0_2px_7px_rgba(0,0,0,0.045)]'
+                      : 'border-transparent font-medium text-[#3F3F3B] hover:bg-black/[0.045] hover:text-[#181816]'
                   }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-gray-900' : 'text-gray-500'}`} strokeWidth={1.8} />
-                  <span className="truncate">{item.name}</span>
-                </div>
-                {badge != null && badge > 0 && (
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-1 tabular-nums ${isActive ? 'bg-gray-300/70 text-gray-900' : 'bg-gray-200/70 text-gray-600'
-                    }`}>
-                    {badge}
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <SidebarIcon
+                      aria-hidden
+                      className={`h-[18px] w-[18px] shrink-0 ${
+                        isActive ? 'text-[#242421]' : 'text-[#787874] group-hover:text-[#5E5E5A]'
+                      }`}
+                    />
+                    <span className="truncate">{item.name}</span>
                   </span>
-                )}
-              </Link>
+                  {badge != null && badge > 0 && (
+                    <span className="ml-2 shrink-0 text-[11px] font-semibold tabular-nums text-[#6D6D68]">
+                      {badge}
+                    </span>
+                  )}
+                </Link>
+              </div>
             )
           })}
         </nav>
 
-        {/* ElevenLabs Style Bottom Profile / Card Box */}
-        <div className="pt-2 shrink-0 space-y-2">
-          {/* Credits Allowance Widget */}
-          <div className="bg-gradient-to-b from-gray-50 to-white rounded-2xl border border-gray-200/80 p-3 space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-[#0A84FF]" strokeWidth={2.2} />
-                <span className="text-[11.5px] font-bold text-gray-900 tracking-tight">Credits</span>
+        <div className="shrink-0 pt-2 flex flex-col gap-2">
+          <div className="border-t border-[#E4E4E1] pt-2">
+            <Link
+              href="/contact"
+              className="group flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-medium tracking-normal text-[#454541] transition-colors hover:bg-black/[0.045] hover:text-[#181816]"
+            >
+              <PiQuestionFill className="h-[17px] w-[17px] text-[#858581] group-hover:text-[#5E5E5A]" aria-hidden />
+              Help center
+            </Link>
+          </div>
+
+          {/* User profile card styled to match screenshot */}
+          <div className="rounded-[16px] border border-[#E4E4E1] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all">
+            <div className="flex items-center justify-between gap-2.5">
+              <Link
+                href="/settings"
+                className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80"
+                title="Settings"
+              >
+                <img
+                  src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                  alt={initialData.user?.name || 'Iona Rollins'}
+                  className="h-9 w-9 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
+                />
+                <span className="truncate text-[13.5px] font-medium tracking-tight text-[#181816]">
+                  {initialData.user?.name || 'Iona Rollins'}
+                </span>
+              </Link>
+
+              <form action="/api/auth/signout" method="POST" className="shrink-0">
+                <button
+                  type="submit"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#181816] transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10"
+                  title="Sign out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="h-[18px] w-[18px]" strokeWidth={1.6} />
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Monthly usage card */}
+          <div className="rounded-[16px] border border-[#E4E4E1] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase leading-4 tracking-wider text-[#83837E]">
+                  Monthly usage
+                </p>
+                <p className="mt-0.5 truncate text-[13px] font-semibold leading-4 text-[#2F2F2C]">
+                  {credits ? `${creditsRemaining} drafts left` : 'Checking allowance'}
+                </p>
               </div>
-              <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                {credits ? `${creditsRemaining} / ${credits.limit} left` : 'Loading'}
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-[#EDF6FF] text-[#087DE1]">
+                <Zap className="h-3.5 w-3.5" strokeWidth={2.1} aria-hidden />
               </span>
             </div>
 
-            <div className="w-full bg-gray-200/70 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#E9E9E6]"
+              role="progressbar"
+              aria-label="Monthly drafts remaining"
+              aria-valuemin={0}
+              aria-valuemax={credits?.limit ?? 0}
+              aria-valuenow={creditsRemaining ?? 0}
+            >
               <div
-                className="bg-[#0A84FF] h-full rounded-full transition-all duration-300"
+                className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
                 style={{ width: `${creditsPercent}%` }}
               />
+            </div>
+
+            <div className="mt-1.5 flex items-center justify-between text-[9.5px] leading-4 text-[#858580]">
+              <span>{credits ? `${credits.used} used` : 'Loading'}</span>
+              <span>{credits ? `${credits.limit} included` : ''}</span>
             </div>
 
             <button
               type="button"
               onClick={handleAddCredits}
               disabled={openingCheckout}
-              className="flex min-h-9 w-full items-center justify-center gap-1 rounded-xl bg-gray-900 py-1 text-[11px] font-semibold text-white shadow-2xs transition-all hover:bg-black disabled:bg-gray-400"
+              className="mt-2.5 flex h-8 w-full items-center justify-center rounded-[8px] bg-[#20201E] px-2 text-[11px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.16)] transition-[background-color,box-shadow,transform] hover:bg-black hover:shadow-[0_2px_5px_rgba(0,0,0,0.18)] active:translate-y-px disabled:cursor-wait disabled:bg-[#A7A7A2]"
             >
-              {openingCheckout ? 'Opening checkout…' : plan === 'growth' ? 'View usage options' : '+ Add Credits'}
+              {openingCheckout
+                ? 'Opening checkout…'
+                : plan === 'growth'
+                  ? 'View usage options'
+                  : plan === 'free'
+                    ? 'Upgrade plan'
+                    : 'Add credits'}
             </button>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-2xs">
-            <div className="flex items-center justify-between gap-2 group">
-              <Link href="/settings" className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-7 h-7 rounded-full bg-gray-900 text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-xs">
-                  S
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[12.5px] font-semibold text-gray-900 truncate leading-tight group-hover:text-[#0A84FF] transition-colors">Settings &amp; Profile</span>
-                  <span className="text-[10.5px] text-gray-400 truncate">
-                    {plan.charAt(0).toUpperCase() + plan.slice(1)} Plan
-                  </span>
-                </div>
-              </Link>
-              <form action="/api/auth/signout" method="POST">
-                <button
-                  type="submit"
-                  className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]"
-                  title="Sign out"
-                  aria-label="Sign out"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </form>
-            </div>
           </div>
         </div>
       </aside>
 
-      {/* Main Container - Offset by fixed sidebar width */}
-      <div className="flex min-h-screen flex-1 flex-col lg:pl-[260px]">
-        {/* ElevenLabs Style Top Bar Header with Breadcrumbs */}
-        <header className="sticky top-0 z-20 flex h-[60px] shrink-0 items-center justify-between border-b border-black/[0.06] bg-white/90 px-4 backdrop-blur-md sm:px-6 lg:px-8">
-          {/* Breadcrumb Context */}
-          <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-            <span className="hidden text-gray-400 sm:inline">Scouto</span>
-            <ChevronRight className="hidden h-3.5 w-3.5 text-gray-300 sm:block" />
-            <span className="text-gray-800 font-semibold">
-              {currentPage}
+      <div className="flex min-h-screen flex-1 flex-col bg-white lg:ml-[200px]">
+        <header className="sticky top-0 z-20 flex h-[58px] shrink-0 items-center justify-between border-b border-[#E4E4E1] bg-white px-4 sm:px-5">
+          <div className="flex min-w-0 items-center text-[12.5px] font-medium tracking-normal text-[#50504C]">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="mr-2.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[#343431] transition-colors hover:bg-black/[0.045]"
+              aria-label="Go back"
+              title="Go back"
+            >
+              <PiArrowLeftBold className="h-3.5 w-3.5" aria-hidden />
+            </button>
+            <span className="mr-3 h-4 w-px shrink-0 bg-[#E3E3E0]" aria-hidden />
+            <div className="hidden min-w-0 items-center sm:flex">
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <ReferenceBreadcrumbFolderIcon className="h-[15px] w-[15px] text-[#8B8E8A]" aria-hidden />
+                Scouto
+              </span>
+              <ChevronRight className="mx-1.5 h-3 w-3 shrink-0 text-[#B8B8B4]" strokeWidth={1.8} aria-hidden />
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <ReferenceBreadcrumbFolderIcon className="h-[15px] w-[15px] text-[#8B8E8A]" aria-hidden />
+                {currentSection}
+              </span>
+              <ChevronRight className="mx-1.5 h-3 w-3 shrink-0 text-[#B8B8B4]" strokeWidth={1.8} aria-hidden />
+            </div>
+            <span className="flex min-w-0 items-center gap-1.5 font-semibold text-[#343431]">
+              <ReferenceBreadcrumbCurrentIcon className="h-[18px] w-[18px] shrink-0 text-[#343431]" aria-hidden />
+              <span className="truncate">{currentPage}</span>
             </span>
           </div>
 
-          {/* Search Bar & Auto-send / Notification Controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={openCommandPalette}
-              className="group relative hidden w-60 cursor-pointer items-center rounded-xl border border-gray-200/80 bg-gray-50/80 py-2 pl-8 pr-4 text-left text-xs font-medium text-gray-400 transition-all hover:bg-gray-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 xl:flex"
+              className="group relative hidden h-9 w-[238px] items-center rounded-[10px] border border-[#DCDCD8] bg-white pl-9 pr-3 text-left text-[12.5px] font-medium text-[#62625E] shadow-[0_1px_2px_rgba(0,0,0,0.045)] transition-colors hover:bg-[#F8F8F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 xl:flex"
               aria-label="Open search and command menu"
             >
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-focus-within:text-[#0A84FF] transition-colors" strokeWidth={2.2} />
-              Search or jump to...
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#7D7D78] transition-colors group-hover:text-[#555551]" strokeWidth={1.9} />
+              <span className="truncate">Search or jump to...</span>
+              <span className="ml-auto rounded-[6px] border border-[#D8D8D4] bg-white px-1.5 text-[9.5px] font-semibold leading-[18px] text-[#73736E] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
+                Ctrl K
+              </span>
             </button>
 
             <button
               type="button"
               onClick={openCommandPalette}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200/70 bg-gray-50 text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 xl:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] text-[#666662] transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8 sm:w-8 lg:hidden"
               aria-label="Open search and command menu"
             >
-              <Search className="h-4 w-4" strokeWidth={1.9} />
+              <Search className="h-3.5 w-3.5" strokeWidth={1.9} />
             </button>
 
-            <div className="hidden h-4 w-px bg-gray-200 sm:block" />
+            <div className="hidden h-4 w-px bg-[#E3E3E0] sm:block lg:hidden" />
 
             {/* Clean Auto-send toggle */}
             {autoSend !== null && (
@@ -342,14 +437,14 @@ export default function DashboardLayout({
                 onClick={handleToggleAutoSend}
                 disabled={togglingAutoSend}
                 title={autoSend ? 'Auto-send is active — click to pause' : 'Auto-send is paused — click to resume'}
-                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-gray-200/70 bg-gray-50 px-2.5 py-1 transition-all hover:bg-gray-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
+                className="flex h-11 cursor-pointer items-center gap-2 rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] px-2.5 transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8"
                 aria-pressed={autoSend}
               >
-                <span className="hidden select-none text-xs font-medium text-gray-700 sm:inline">
+                <span className="hidden select-none text-[11px] font-medium text-[#555552] sm:inline">
                   Auto-send
                 </span>
-                <div className={`relative w-8 h-[18px] rounded-full transition-colors duration-200 ${autoSend ? 'bg-emerald-500' : 'bg-gray-300'}`}>
-                  <div className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] bg-white rounded-full shadow-sm transition-transform duration-200 ${autoSend ? 'translate-x-[14px]' : 'translate-x-0'}`} />
+                <div className={`relative h-4 w-7 rounded-full transition-colors duration-200 ${autoSend ? 'bg-emerald-500' : 'bg-[#D1D1CD]'}`}>
+                  <div className={`absolute left-[2px] top-[2px] h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${autoSend ? 'translate-x-3' : 'translate-x-0'}`} />
                 </div>
               </button>
             )}
@@ -358,17 +453,17 @@ export default function DashboardLayout({
             <button
               type="button"
               onClick={() => toast.success("You're all caught up", { description: 'No new notifications right now.' })}
-              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-gray-200/70 bg-gray-50 text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
+              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] text-[#666662] transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8 sm:w-8"
               title="Notifications"
               aria-label="View notifications"
             >
-              <Bell className="w-4 h-4" strokeWidth={1.8} />
+              <Bell className="h-3.5 w-3.5" strokeWidth={1.8} />
             </button>
           </div>
         </header>
 
         {/* Content */}
-        <main className="relative z-10 mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
+        <main className="relative z-10 w-full flex-1 px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
           {children}
         </main>
 
@@ -404,7 +499,7 @@ export default function DashboardLayout({
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-more-menu"
               className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 ${
-                mobileMenuOpen || ['/posted', '/keywords', '/settings'].some((href) => pathname.startsWith(href))
+                mobileMenuOpen || ['/dashboard', '/posted', '/settings'].some((href) => pathname.startsWith(href))
                   ? 'text-[#0A84FF]'
                   : 'text-gray-400 hover:text-gray-700'
               }`}
@@ -428,8 +523,8 @@ export default function DashboardLayout({
               className="fixed inset-x-3 bottom-[76px] z-50 overflow-hidden rounded-2xl border border-black/10 bg-white p-2 shadow-[0_20px_60px_rgba(0,0,0,0.16)] lg:hidden"
             >
               {[
-                { name: 'Posted replies', href: '/posted', icon: CheckCircle },
-                { name: 'Keywords', href: '/keywords', icon: Key },
+                { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+                { name: 'Posted replies', href: '/posted', icon: ReferencePostedIcon },
                 { name: 'Settings', href: '/settings', icon: Settings },
               ].map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
