@@ -258,29 +258,27 @@ export default function DashboardLayout({
                       href={item.href}
                       onMouseEnter={() => router.prefetch(item.href)}
                       onFocus={() => router.prefetch(item.href)}
-                      className={`group flex h-8.5 items-center justify-between rounded-xl px-2.5 text-[13.5px] transition-all duration-150 ${
+                      className={`group flex h-9 items-center justify-between rounded-[10px] px-3 text-[13.5px] transition-all duration-150 ${
                         isActive
-                          ? 'border border-[#E2E2DE] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.04)]'
-                          : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EAEAE7] hover:text-[#1C1C1A]'
+                          ? 'border border-[#E2E2DE] bg-white font-semibold text-[#111110] shadow-[0_1px_2.5px_rgba(0,0,0,0.035)]'
+                          : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EBEBE8] hover:text-[#1C1C1A]'
                       }`}
                     >
-                      <span className="flex min-w-0 items-center gap-2">
+                      <span className="flex min-w-0 items-center gap-2.5">
                         <SidebarIcon
                           aria-hidden
                           className={`h-[17px] w-[17px] shrink-0 ${
-                            isActive ? 'text-[#1C1C1A]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
+                            isActive ? 'text-[#111110]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
                           }`}
                         />
                         <span className="truncate">{item.name}</span>
                       </span>
                       {badge != null && badge > 0 && (
                         <span
-                          className={`ml-1.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums ${
+                          className={`ml-2 shrink-0 text-[12px] tabular-nums ${
                             item.name === 'Opportunities'
-                              ? 'bg-[#EF4444] text-white font-bold px-1.5 py-0.2 min-w-[18px] text-center'
-                              : isActive
-                              ? 'bg-[#F2F2F0] text-[#555550]'
-                              : 'bg-white border border-[#E2E2DF] text-[#666660]'
+                              ? 'rounded-full bg-[#EF4444] text-white font-bold px-1.5 py-0.2 min-w-[18px] text-center text-[10.5px]'
+                              : 'font-normal text-[#888883]'
                           }`}
                         >
                           {badge}
