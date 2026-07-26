@@ -112,6 +112,7 @@ export default function OpportunitiesPage() {
   const [activeFilter, setActiveFilter] = useState('All')
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
   const [draftingId, setDraftingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -244,6 +245,36 @@ export default function OpportunitiesPage() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* View Mode Switcher Toggle */}
+            <div className="inline-flex items-center gap-1 rounded-[14px] border border-black/[0.06] bg-surface p-1 shadow-2xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewMode('board')}
+                className={`flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12.5px] font-semibold transition-all duration-150 ${
+                  viewMode === 'board'
+                    ? 'bg-text-primary text-white shadow-xs'
+                    : 'text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
+                }`}
+                title="Board View (Pipeline)"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Board
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12.5px] font-semibold transition-all duration-150 ${
+                  viewMode === 'list'
+                    ? 'bg-text-primary text-white shadow-xs'
+                    : 'text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
+                }`}
+                title="List View (Feed)"
+              >
+                <List className="h-3.5 w-3.5" />
+                List
+              </button>
+            </div>
+
             {/* Search thread pill input */}
             <div className="relative flex-1 sm:w-56">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none" strokeWidth={2} />
@@ -277,6 +308,12 @@ export default function OpportunitiesPage() {
             <h3 className="mb-2 text-[20px] font-display font-semibold text-text-primary">No active opportunities</h3>
             <p className="max-w-sm text-[15px] leading-relaxed text-text-secondary">New qualified conversations will appear here with their source evidence and draft status.</p>
           </div>
+        ) : viewMode === 'board' ? (
+          <LeadPipelineBoard
+            opportunities={filtered}
+            onDraftReply={handleDraftReply}
+            draftingId={draftingId}
+          />
         ) : (
           <motion.div variants={staggers.container} initial="initial" animate="animate" className="space-y-4 px-1 pb-4">
             {filtered.map(opportunity => (
