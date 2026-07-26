@@ -43,13 +43,13 @@ function StatusPill({ active, onClick }: { active: boolean; onClick: () => void 
         e.stopPropagation()
         onClick()
       }}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold transition-all duration-150 cursor-pointer shadow-2xs ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[12px] font-medium transition-all duration-150 cursor-pointer ${
         active
-          ? 'bg-[#E8F8F0] text-[#15803D] border border-[#C6F0D8] hover:bg-[#DCFCE7]'
-          : 'bg-[#F2F2F0] text-[#555550] border border-[#E2E2DE] hover:bg-[#E8E8E5]'
+          ? 'bg-[#EAF7F2] text-[#0F8A50] border border-[#C5EFE0] hover:bg-[#DDF3EA]'
+          : 'bg-[#F2F2F0] text-[#5C5C56] border border-[#E2E2DE] hover:bg-[#E7E7E3]'
       }`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-[#16A34A]' : 'bg-[#71716A]'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-[#0F8A50]' : 'bg-[#7E7E78]'}`} />
       {active ? 'Active' : 'Paused'}
     </button>
   )
@@ -407,154 +407,164 @@ export default function KeywordsPage() {
           )}
         </div>
 
-        {/* ── Main Table Container matching provided HTML template ───────────────── */}
-        <div className="w-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" data-purpose="deals-table-container">
-          <table className="w-full text-left border-collapse" data-purpose="deals-table">
-            {/* Table Header */}
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100 text-sm text-gray-500 font-medium">
-                <th className="py-4 pl-6 pr-4 w-12 rounded-tl-xl">
-                  <input
-                    className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 bg-white cursor-pointer"
-                    type="checkbox"
-                    aria-label="Select all rules"
-                  />
-                </th>
-                <th className="py-4 px-4 w-16">ID</th>
-                <th className="py-4 px-4 w-1/4">Deals</th>
-                <th className="py-4 px-4 w-1/4">Contact</th>
-                <th className="py-4 px-4 w-1/4">Email</th>
-                <th className="py-4 px-4 w-32">Value</th>
-                <th className="py-4 px-6 rounded-tr-xl">Source</th>
-                <th className="py-4 px-4 w-12" />
-              </tr>
-            </thead>
+        {/* ── Table Container matching Reference Image Exact Detailing ───────────── */}
+        <div className="w-full bg-white rounded-[20px] border border-[#E6E6E3] p-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+          
+          {/* Header Row Bar */}
+          <div className="hidden sm:grid grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 rounded-[16px] bg-[#F5F5F3] border border-[#ECECE9] px-6 py-3.5 mb-1.5 text-[13px] font-medium text-[#8C8C86]">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                className="w-5 h-5 rounded-[7px] border border-[#DDDCD8] bg-white text-gray-900 focus:ring-0 cursor-pointer shadow-2xs"
+                aria-label="Select all rules"
+              />
+            </div>
+            <span>ID</span>
+            <span>Deals</span>
+            <span>Contact</span>
+            <span>Email</span>
+            <span>Value</span>
+            <span>Source</span>
+            <span />
+          </div>
 
-            {/* Table Body */}
-            <tbody className="divide-y divide-gray-100 text-sm">
-              {loading && (
-                <tr>
-                  <td colSpan={8} className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-8 h-8 rounded-full border-2 border-gray-200 border-t-gray-900 animate-spin" />
-                      <span className="text-xs font-medium text-gray-500">Loading rules…</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
+          {/* Table Rows Container */}
+          <div className="divide-y divide-[#F0F0ED]">
+            {loading && (
+              <div className="py-20 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-[#E2E2DF] border-t-[#1C1C1A] animate-spin" />
+                  <span className="text-xs font-medium text-[#787872]">Loading rules…</span>
+                </div>
+              </div>
+            )}
 
-              {!loading && filtered.length === 0 && keywords.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-14 px-8 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-5">
-                        <Target className="w-7 h-7 text-[#0A84FF]" strokeWidth={1.6} />
-                      </div>
-                      <p className="text-base font-bold text-gray-900 mb-2">Set your first signal rule</p>
-                      <p className="text-xs text-gray-500 max-w-xs mb-6 leading-relaxed">
-                        Tell Scouto what buying intent looks like for your product — a keyword and a community.
-                      </p>
-                      <button
-                        onClick={() => setShowAdd(true)}
-                        className="btn-primary text-xs py-2.5 px-5 flex items-center gap-2 mb-4"
-                      >
-                        <Plus className="w-4 h-4" strokeWidth={2.5} />
-                        Create first rule
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
+            {!loading && filtered.length === 0 && keywords.length === 0 && (
+              <div className="py-14 px-8 text-center flex flex-col items-center justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-[#F0F7FF] flex items-center justify-center mb-5">
+                  <Target className="w-7 h-7 text-[#0A84FF]" strokeWidth={1.6} />
+                </div>
+                <p className="text-[16px] font-semibold text-[#1C1C1A] mb-2">Set your first signal rule</p>
+                <p className="text-[13px] text-[#787872] max-w-xs mb-6 leading-relaxed">
+                  Tell Scouto what buying intent looks like for your product — a keyword and a community.
+                </p>
+                <button
+                  onClick={() => setShowAdd(true)}
+                  className="btn-primary text-[13px] py-2.5 px-5 flex items-center gap-2 mb-4"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.5} />
+                  Create first rule
+                </button>
+              </div>
+            )}
 
-              {!loading && filtered.length === 0 && keywords.length > 0 && (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-gray-500">
-                    No rules match your filters.
-                  </td>
-                </tr>
-              )}
+            {!loading && filtered.length === 0 && keywords.length > 0 && (
+              <div className="py-16 text-center text-[#787872] text-[13.5px]">
+                No rules match your filters.
+              </div>
+            )}
 
-              {filtered.map((kw, index) => {
-                const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
-                const successRate = getSuccessRate(kw.id, threadStats.total, threadStats.replied)
+            {filtered.map((kw, index) => {
+              const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
+              const successRate = getSuccessRate(kw.id, threadStats.total, threadStats.replied)
 
-                return (
-                  <tr key={kw.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-4 pl-6 pr-4">
-                      <input
-                        className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 bg-white cursor-pointer"
-                        type="checkbox"
-                      />
-                    </td>
-                    <td className="py-4 px-4 text-gray-500 font-medium">
-                      {String(index + 1).padStart(2, '0')}
-                    </td>
-                    <td className="py-4 px-4 font-medium text-gray-900">
+              return (
+                <div
+                  key={kw.id}
+                  className="group grid grid-cols-[1fr_auto] sm:grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 px-6 py-4 transition-colors duration-150 hover:bg-[#F9F9F8] rounded-xl"
+                >
+                  {/* Checkbox column */}
+                  <div className="hidden sm:flex items-center">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 rounded-[7px] border border-[#DDDCD8] bg-white text-gray-900 focus:ring-0 cursor-pointer shadow-2xs hover:border-[#B5B5B0]"
+                      aria-label={`Select rule ${kw.term}`}
+                    />
+                  </div>
+
+                  {/* ID column */}
+                  <span className="hidden sm:block text-[13.5px] font-medium text-[#6E6E68] tabular-nums">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+
+                  {/* Deals / Term column */}
+                  <div className="flex items-center min-w-0 pr-2">
+                    <span className="text-[14px] font-semibold text-[#1C1C1A] tracking-[-0.01em] truncate">
                       {kw.term}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white shadow-sm">
-                        {kw.platform === 'reddit' ? (
-                          <RedditIcon className="w-4 h-4 text-[#FF4500]" />
-                        ) : (
-                          <BlueskyIcon className="w-4 h-4 text-[#1185FE]" />
-                        )}
-                        <span className="font-medium text-gray-700">
-                          {kw.platform === 'reddit' ? `r/${kw.target}` : kw.target}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-gray-500">
-                      {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
-                    </td>
-                    <td className="py-4 px-4 font-medium text-gray-900">
-                      {successRate}%
-                    </td>
-                    <td className="py-4 px-6">
-                      <StatusPill active={kw.is_active} onClick={() => handleToggle(kw)} />
-                    </td>
-                    <td className="py-4 px-4 text-right relative" data-menu>
-                      <button
-                        onClick={() => setMenuId(menuId === kw.id ? null : kw.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                        aria-label={`Actions for ${kw.term}`}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                    </span>
+                  </div>
 
-                      <AnimatePresence>
-                        {menuId === kw.id && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.94, y: -4 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.94, y: -4 }}
-                            transition={{ duration: 0.1 }}
-                            className="absolute right-4 top-12 z-30 bg-white border border-gray-200 rounded-xl shadow-lg p-1 w-40 text-left"
+                  {/* Contact / Community Pill column (Exact pill styling from screenshot) */}
+                  <div className="hidden sm:flex items-center">
+                    <div className="inline-flex items-center gap-2.5 rounded-full border border-[#E2E2DF] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] truncate max-w-full">
+                      {kw.platform === 'reddit' ? (
+                        <RedditIcon className="h-4.5 w-4.5 shrink-0 text-[#FF4500]" />
+                      ) : (
+                        <BlueskyIcon className="h-4.5 w-4.5 shrink-0 text-[#1185FE]" />
+                      )}
+                      <span className="text-[13.5px] font-medium text-[#33332E] truncate">
+                        {kw.platform === 'reddit' ? `r/${kw.target}` : kw.target}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Email / Leads Found column */}
+                  <div className="hidden sm:block text-[13.5px] font-normal text-[#787872] truncate">
+                    {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
+                  </div>
+
+                  {/* Value / Reply Rate column */}
+                  <div className="hidden sm:block text-[14px] font-semibold text-[#1C1C1A] tabular-nums">
+                    {successRate}%
+                  </div>
+
+                  {/* Source / Status column */}
+                  <div>
+                    <StatusPill active={kw.is_active} onClick={() => handleToggle(kw)} />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end relative" data-menu>
+                    <button
+                      onClick={() => setMenuId(menuId === kw.id ? null : kw.id)}
+                      className="p-1.5 rounded-lg text-[#8A8A84] hover:text-black hover:bg-black/5 transition-colors"
+                      aria-label={`Actions for ${kw.term}`}
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+
+                    <AnimatePresence>
+                      {menuId === kw.id && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.94, y: -4 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.94, y: -4 }}
+                          transition={{ duration: 0.1 }}
+                          className="absolute right-4 top-10 z-30 bg-white border border-[#E2E2DF] rounded-xl shadow-lg p-1 w-40 text-left"
+                        >
+                          <button
+                            onClick={() => handleToggle(kw)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-gray-800 hover:bg-gray-50 transition-colors cursor-pointer"
                           >
-                            <button
-                              onClick={() => handleToggle(kw)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-800 hover:bg-gray-50 transition-colors cursor-pointer"
-                            >
-                              {kw.is_active
-                                ? <><Pause className="w-3.5 h-3.5 text-gray-500" /> Pause rule</>
-                                : <><Play className="w-3.5 h-3.5 text-gray-500" /> Activate rule</>}
-                            </button>
-                            <div className="h-px bg-gray-100 my-1" />
-                            <button
-                              onClick={() => handleDelete(kw.id)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" /> Delete rule
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                            {kw.is_active
+                              ? <><Pause className="w-3.5 h-3.5 text-gray-500" /> Pause rule</>
+                              : <><Play className="w-3.5 h-3.5 text-gray-500" /> Activate rule</>}
+                          </button>
+                          <div className="h-px bg-gray-100 my-1" />
+                          <button
+                            onClick={() => handleDelete(kw.id)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete rule
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* ── Upgrade prompt (Placement A) ─────────────────────────
