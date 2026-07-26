@@ -275,7 +275,6 @@ export default function AnalyticsPage() {
       <div className="w-full max-w-[1200px] pb-12">
         <div className="mb-6">
           <h1 className="page-title">Analytics</h1>
-          <p className="page-subtitle">Reply performance and engagement metrics.</p>
         </div>
 
         <div className="flex flex-col gap-6">

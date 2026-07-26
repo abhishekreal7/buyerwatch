@@ -400,7 +400,6 @@ export default function SettingsPage() {
         {/* Page title */}
         <div className="mb-6">
           <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Manage your workspace, connections, and preferences.</p>
         </div>
 
         <div className="flex flex-col items-start gap-5 md:flex-row md:gap-8">
