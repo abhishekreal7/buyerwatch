@@ -43,13 +43,13 @@ function StatusPill({ active, onClick }: { active: boolean; onClick: () => void 
         e.stopPropagation()
         onClick()
       }}
-      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[12px] font-medium transition-all duration-150 cursor-pointer sm:min-h-0 ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold transition-all duration-150 cursor-pointer shadow-2xs ${
         active
-          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100/60 hover:border-emerald-300/80 shadow-2xs'
-          : 'bg-gray-100/80 text-gray-600 border-gray-200/80 hover:bg-gray-200/60 hover:text-gray-800'
+          ? 'bg-[#E8F8F0] text-[#15803D] border border-[#C6F0D8] hover:bg-[#DCFCE7]'
+          : 'bg-[#F2F2F0] text-[#555550] border border-[#E2E2DE] hover:bg-[#E8E8E5]'
       }`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-[#16A34A]' : 'bg-[#71716A]'}`} />
       {active ? 'Active' : 'Paused'}
     </button>
   )
@@ -407,16 +407,24 @@ export default function KeywordsPage() {
           )}
         </div>
 
-        {/* ── Table ───────────────────────────────────────────── */}
-        <div className="rounded-[18px] border border-black/[0.06] bg-white">
+        {/* ── Table Container matching Reference Screenshot ───────────────── */}
+        <div className="rounded-[20px] border border-[#E4E4E1] bg-white p-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
 
-          {/* Table head */}
-          <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-t-[17px] border-b border-black/[0.05] bg-surface px-4 py-3 sm:grid-cols-[40px_1fr_100px_44px] sm:gap-0 sm:px-5 md:grid-cols-[40px_1fr_140px_100px_100px_44px]">
-            <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary sm:block">#</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Rule</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Leads Found</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary hidden md:block">Reply Rate</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Status</span>
+          {/* Table Header Row */}
+          <div className="hidden sm:grid grid-cols-[36px_48px_1fr_200px_130px_110px_110px_44px] items-center gap-3 rounded-[14px] bg-[#F5F5F3] px-4 py-3 text-[12px] font-semibold text-[#8C8C85]">
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded-[5px] border-[#D5D5D0] text-gray-900 focus:ring-0 cursor-pointer"
+                aria-label="Select all rules"
+              />
+            </div>
+            <span>ID</span>
+            <span>Deals</span>
+            <span>Contact</span>
+            <span>Email</span>
+            <span>Value</span>
+            <span>Source</span>
             <span />
           </div>
 
@@ -478,9 +486,8 @@ export default function KeywordsPage() {
             </div>
           )}
 
-
           {/* Rows */}
-          <div className="divide-y divide-black/[0.04]">
+          <div className="divide-y divide-[#F0F0ED]">
             <AnimatePresence initial={false}>
               {filtered.map((kw, index) => {
                 const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
@@ -491,58 +498,57 @@ export default function KeywordsPage() {
                     key={kw.id}
                     layout
                     initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: kw.is_active ? 1 : 0.55, y: 0 }}
+                    animate={{ opacity: kw.is_active ? 1 : 0.65, y: 0 }}
                     exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                     transition={{ duration: 0.18 }}
-                    className="group relative grid grid-cols-[1fr_auto_auto] items-center gap-2 px-4 py-4 transition-colors duration-150 last:rounded-b-[17px] hover:bg-surface/60 sm:grid-cols-[40px_1fr_100px_44px] sm:gap-0 sm:px-5 md:grid-cols-[40px_1fr_140px_100px_100px_44px]"
+                    className="group relative grid grid-cols-[1fr_auto] sm:grid-cols-[36px_48px_1fr_200px_130px_110px_110px_44px] items-center gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-[#F9F9F8] rounded-xl"
                   >
-                    {/* Index column */}
-                    <span className="hidden text-[13px] font-mono font-semibold text-text-tertiary sm:block">
+                    {/* Checkbox column */}
+                    <div className="hidden sm:flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded-[5px] border-[#D5D5D0] text-gray-900 focus:ring-0 cursor-pointer"
+                        aria-label={`Select rule ${kw.term}`}
+                      />
+                    </div>
+
+                    {/* ID column */}
+                    <span className="hidden sm:block text-[13px] font-semibold text-[#7A7A74] tabular-nums">
                       {String(index + 1).padStart(2, '0')}
                     </span>
 
-                    {/* Name column */}
-                    <div className="flex items-center gap-3.5 min-w-0 pr-4">
-                      <div className="flex-shrink-0">
+                    {/* Deals / Term column */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-[14px] font-bold text-[#181816] tracking-tight truncate">
+                        {kw.term}
+                      </span>
+                    </div>
+
+                    {/* Contact / Community Pill column (matching reference avatar pill) */}
+                    <div className="hidden sm:flex items-center">
+                      <div className="inline-flex items-center gap-2 bg-white border border-[#E2E2DF] rounded-full px-3 py-1 text-[12.5px] font-semibold text-[#2C2C28] shadow-2xs truncate max-w-full">
                         {kw.platform === 'reddit' ? (
-                          <div className="w-8 h-8 rounded-xl bg-[#FF4500]/8 flex items-center justify-center border border-[#FF4500]/15">
-                            <RedditIcon className="h-[18px] w-[18px] text-[#FF4500]" />
-                          </div>
+                          <RedditIcon className="h-4 w-4 shrink-0 text-[#FF4500]" />
                         ) : (
-                          <div className="w-8 h-8 rounded-xl bg-[#1185FE]/8 flex items-center justify-center border border-[#1185FE]/15">
-                            <BlueskyIcon className="h-[18px] w-[18px] text-[#1185FE]" />
-                          </div>
+                          <BlueskyIcon className="h-4 w-4 shrink-0 text-[#1185FE]" />
                         )}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[14px] font-semibold text-text-primary truncate leading-snug">{kw.term}</span>
-                        <span className="text-[12px] text-text-secondary truncate font-medium mt-0.5">
+                        <span className="truncate">
                           {kw.platform === 'reddit' ? `r/${kw.target}` : kw.target}
                         </span>
                       </div>
                     </div>
 
-                    {/* Leads Found column with Popularity Bar */}
-                    <div className="hidden md:flex flex-col justify-center">
-                      <span className={`text-[13px] font-medium tabular-nums ${threadStats.total > 0 ? 'text-text-primary font-semibold' : 'text-text-tertiary'}`}>
-                        {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
-                      </span>
-                      <div className="w-20 h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1" title={`${threadStats.total} leads found`}>
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${threadStats.total > 0 ? 'bg-[#0A84FF]' : 'bg-gray-300 opacity-40'}`}
-                          style={{ width: `${Math.min(Math.max(threadStats.total * 20, 8), 100)}%` }}
-                        />
-                      </div>
+                    {/* Email / Leads Found column */}
+                    <div className="hidden sm:block text-[13px] font-semibold text-[#181816] tabular-nums">
+                      {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
                     </div>
 
-                    {/* Reply Rate column */}
-                    <div className="hidden md:block">
-                      <span className={`text-[13px] tabular-nums tracking-tight ${successRate > 0 ? 'font-bold text-text-primary' : 'font-medium text-text-tertiary'}`}>
-                        {successRate}%
-                      </span>
+                    {/* Value / Reply Rate column */}
+                    <div className="hidden sm:block text-[13px] font-semibold text-[#181816] tabular-nums">
+                      {successRate > 0 ? `${successRate}%` : '0%'}
                     </div>
 
-                    {/* Status column */}
+                    {/* Source / Status column */}
                     <div>
                       <StatusPill active={kw.is_active} onClick={() => handleToggle(kw)} />
                     </div>
@@ -551,7 +557,7 @@ export default function KeywordsPage() {
                     <div className="flex items-center justify-end" data-menu>
                       <button
                         onClick={() => setMenuId(menuId === kw.id ? null : kw.id)}
-                        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[9px] text-text-tertiary opacity-100 transition-all duration-150 hover:bg-black/[0.05] hover:text-text-primary focus:opacity-100 sm:h-10 sm:w-10 md:opacity-0 md:group-hover:opacity-100"
+                        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-[#8A8A84] transition-colors hover:bg-black/5 hover:text-black"
                         aria-label={`Open actions for ${kw.term}`}
                       >
                         <MoreHorizontal className="w-4 h-4" />
@@ -564,20 +570,20 @@ export default function KeywordsPage() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.94, y: -4 }}
                             transition={{ duration: 0.1 }}
-                            className="absolute right-4 top-12 z-30 bg-surface border border-black/[0.09] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.09),0_2px_8px_rgba(0,0,0,0.05)] p-1 w-40"
+                            className="absolute right-4 top-12 z-30 bg-white border border-[#E2E2DF] rounded-xl shadow-lg p-1 w-40"
                           >
                             <button
                               onClick={() => handleToggle(kw)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[13px] font-medium text-text-primary hover:bg-surface transition-colors cursor-pointer"
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-gray-800 hover:bg-gray-50 transition-colors cursor-pointer"
                             >
                               {kw.is_active
-                                ? <><Pause className="w-3.5 h-3.5 text-text-secondary" /> Pause rule</>
-                                : <><Play className="w-3.5 h-3.5 text-text-secondary" /> Activate rule</>}
+                                ? <><Pause className="w-3.5 h-3.5 text-gray-500" /> Pause rule</>
+                                : <><Play className="w-3.5 h-3.5 text-gray-500" /> Activate rule</>}
                             </button>
-                            <div className="h-px bg-black/[0.05] my-1" />
+                            <div className="h-px bg-gray-100 my-1" />
                             <button
                               onClick={() => handleDelete(kw.id)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-[13px] font-medium text-destructive hover:bg-destructive/5 transition-colors cursor-pointer"
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Delete rule
                             </button>
