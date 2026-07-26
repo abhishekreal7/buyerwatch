@@ -233,8 +233,8 @@ export default function DashboardLayout({
       {/* Outer App Canvas — Fits 100% viewport screen */}
       <div className="h-screen w-screen overflow-hidden bg-[#F4F4F2] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
         
-        {/* Desktop Sidebar sitting directly on warm stone background fitting full height */}
-        <aside className="hidden w-[210px] shrink-0 flex-col justify-between bg-[#F4F4F2] px-1.5 py-1.5 h-full lg:flex overflow-y-auto no-scrollbar">
+        {/* Desktop Sidebar sitting directly on warm stone background fitting full height (Static) */}
+        <aside className="hidden w-[210px] shrink-0 flex-col justify-between bg-[#F4F4F2] px-1.5 py-1.5 h-full lg:flex select-none">
           <div>
             {/* Logo Header */}
             <div className="mb-3 flex h-10 shrink-0 items-center px-2">
@@ -478,10 +478,10 @@ export default function DashboardLayout({
               </div>
             </header>
 
-            {/* Content */}
-            <main className="relative z-10 w-full flex-1 px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
+            {/* Content Container — Smooth independent vertical scroll */}
+            <div className="relative z-10 w-full flex-1 min-h-0 overflow-y-auto px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
               {children}
-            </main>
+            </div>
 
             {/* Mobile Nav */}
             <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-black/[0.06] bg-white/95 pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-xl lg:hidden" aria-label="Mobile navigation">
