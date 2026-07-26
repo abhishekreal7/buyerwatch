@@ -231,18 +231,18 @@ export default function DashboardLayout({
   return (
     <DashboardSessionProvider userId={userId}>
       <div className="relative min-h-screen overflow-x-hidden bg-[#FAFAFA] selection:bg-accent/20 selection:text-accent font-sans text-gray-900">
-      {/* Compact desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[200px] shrink-0 flex-col border-r border-[#E8E8E8] bg-[#F7F7F7] px-3 py-3 lg:flex">
-        <div className="mb-2.5 flex h-10 shrink-0 items-center px-1">
+        {/* Compact desktop sidebar matching reference design */}
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-[210px] shrink-0 flex-col border-r border-[#EBEBE8] bg-[#F8F8F7] px-3 py-3.5 lg:flex">
+        <div className="mb-3 flex h-10 shrink-0 items-center px-1.5">
           <Link
             href="/dashboard"
-            className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#20201E] transition-opacity hover:opacity-75"
+            className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
           >
             <BrandLogo size="sm" />
           </Link>
         </div>
 
-        <nav className="no-scrollbar flex-1 overflow-y-auto" aria-label="Primary navigation">
+        <nav className="no-scrollbar flex-1 space-y-1 overflow-y-auto" aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             const badge = badges[item.href]
@@ -253,23 +253,31 @@ export default function DashboardLayout({
                   href={item.href}
                   onMouseEnter={() => router.prefetch(item.href)}
                   onFocus={() => router.prefetch(item.href)}
-                  className={`group flex h-9 items-center justify-between rounded-[10px] border px-2.5 text-[13.5px] tracking-normal transition-[background-color,border-color,box-shadow,color] ${
+                  className={`group flex h-9.5 items-center justify-between rounded-xl px-3 text-[14px] transition-all duration-150 ${
                     isActive
-                      ? 'border-[#DADAD6] bg-white font-semibold text-[#181816] shadow-[0_1px_2px_rgba(0,0,0,0.08),0_2px_7px_rgba(0,0,0,0.045)]'
-                      : 'border-transparent font-medium text-[#3F3F3B] hover:bg-black/[0.045] hover:text-[#181816]'
+                      ? 'border border-[#EBEBE8] bg-white font-bold text-[#1C1C1A] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]'
+                      : 'border border-transparent font-medium text-[#555550] hover:bg-[#EFEFED] hover:text-[#1C1C1A]'
                   }`}
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <SidebarIcon
                       aria-hidden
                       className={`h-[18px] w-[18px] shrink-0 ${
-                        isActive ? 'text-[#242421]' : 'text-[#787874] group-hover:text-[#5E5E5A]'
+                        isActive ? 'text-[#1C1C1A]' : 'text-[#787872] group-hover:text-[#2C2C28]'
                       }`}
                     />
                     <span className="truncate">{item.name}</span>
                   </span>
                   {badge != null && badge > 0 && (
-                    <span className="ml-2 shrink-0 text-[11px] font-semibold tabular-nums text-[#6D6D68]">
+                    <span
+                      className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
+                        item.name === 'Opportunities'
+                          ? 'bg-[#FF3B30] text-white font-bold px-1.5 py-0.5 min-w-[20px] text-center'
+                          : isActive
+                          ? 'bg-[#F2F2F0] text-[#555550]'
+                          : 'bg-white border border-[#E2E2DF] text-[#666660]'
+                      }`}
+                    >
                       {badge}
                     </span>
                   )}
@@ -280,18 +288,18 @@ export default function DashboardLayout({
         </nav>
 
         <div className="shrink-0 pt-2 flex flex-col gap-2">
-          <div className="border-t border-[#E4E4E1] pt-2">
+          <div className="border-t border-[#ECECE9] pt-2">
             <Link
               href="/contact"
-              className="group flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-medium tracking-normal text-[#454541] transition-colors hover:bg-black/[0.045] hover:text-[#181816]"
+              className="group flex h-9 items-center gap-2.5 rounded-xl px-3 text-[14px] font-medium text-[#555550] transition-colors hover:bg-[#EFEFED] hover:text-[#1C1C1A]"
             >
-              <PiQuestionFill className="h-[17px] w-[17px] text-[#858581] group-hover:text-[#5E5E5A]" aria-hidden />
+              <PiQuestionFill className="h-[18px] w-[18px] text-[#787872] group-hover:text-[#2C2C28]" aria-hidden />
               Help center
             </Link>
           </div>
 
-          {/* User profile card styled to match screenshot */}
-          <div className="rounded-[16px] border border-[#E4E4E1] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all">
+          {/* User profile card styled matching reference screenshot */}
+          <div className="rounded-xl border border-[#EBEBE8] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all">
             <div className="flex items-center justify-between gap-2.5">
               <Link
                 href="/settings"
@@ -301,9 +309,9 @@ export default function DashboardLayout({
                 <img
                   src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
                   alt={initialData.user?.name || 'Iona Rollins'}
-                  className="h-9 w-9 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
+                  className="h-8.5 w-8.5 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
                 />
-                <span className="truncate text-[13.5px] font-medium tracking-tight text-[#181816]">
+                <span className="truncate text-[13.5px] font-semibold text-[#1C1C1A]">
                   {initialData.user?.name || 'Iona Rollins'}
                 </span>
               </Link>
@@ -311,18 +319,18 @@ export default function DashboardLayout({
               <form action="/api/auth/signout" method="POST" className="shrink-0">
                 <button
                   type="submit"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#181816] transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#555550] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
                   title="Sign out"
                   aria-label="Sign out"
                 >
-                  <LogOut className="h-[18px] w-[18px]" strokeWidth={1.6} />
+                  <LogOut className="h-4 w-4" strokeWidth={1.75} />
                 </button>
               </form>
             </div>
           </div>
 
           {/* Monthly usage card */}
-          <div className="rounded-[16px] border border-[#E4E4E1] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <div className="rounded-xl border border-[#EBEBE8] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase leading-4 tracking-wider text-[#83837E]">
