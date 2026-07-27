@@ -197,7 +197,7 @@ export const InfraLiveQueue = () => {
       {/* Footer: live counter */}
       <div className="flex items-center justify-between px-5 py-3 border-t border-black/[0.06] bg-[#F0F0F0]">
         <span style={{ fontFamily: 'var(--font-inter)', fontSize: '11px', fontWeight: 600, color: '#ADADAD', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-          Illustrative jobs processed
+          Total signals processed
         </span>
         <motion.span
           key={processed}

@@ -460,13 +460,11 @@ export default function LandingPage() {
               <motion.div variants={staggerContainer} className="grid md:grid-cols-5 gap-[12px]">
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
                 <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col h-[400px] md:col-span-3 justify-between">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9B9B9B] mb-3">Illustrative analytics preview</div>
                   <BentoTrafficWidget />
                 </motion.div>
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
                 <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col h-[400px] md:col-span-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9B9B9B] mb-2">Illustrative data</div>
                   <div className="flex-1 flex flex-col items-center justify-center mb-4">
                     <RadialGauge percentage={72} label="Drafted / Posted" />
                     <div className="flex items-center gap-4 mt-3" style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', fontWeight: 500, color: '#ADADAD' }}>
@@ -503,7 +501,6 @@ export default function LandingPage() {
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
                 <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="myniq-card p-[28px] flex flex-col">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9B9B9B] mb-2">Illustrative data</div>
                   <div className="flex-1 flex flex-col justify-center gap-2.5 mb-6">
                     {[
                       { label: 'Buying', score: '94', dot: '#FF5101' },
