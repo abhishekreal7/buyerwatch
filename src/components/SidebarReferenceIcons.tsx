@@ -20,26 +20,27 @@ function IconFrame({ title, children, ...props }: SidebarReferenceIconProps) {
   )
 }
 
-/** 1. Dashboard: 4 rounded squares (2 solid, 2 muted for high-end depth) */
+/** 1. Dashboard: Bento grid layout (Top-Left wide, Top-Right square, Bottom-Left square, Bottom-Right wide) */
 export function ReferenceDashboardIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="2" y="2" width="7" height="7" rx="2" fill="currentColor" />
-      <rect x="11" y="2" width="7" height="7" rx="2" fill="currentColor" opacity="0.45" />
-      <rect x="2" y="11" width="7" height="7" rx="2" fill="currentColor" opacity="0.45" />
-      <rect x="11" y="11" width="7" height="7" rx="2" fill="currentColor" />
+      <rect x="2.5" y="2.5" width="8" height="6.5" rx="1.8" fill="currentColor" />
+      <rect x="12" y="2.5" width="5.5" height="6.5" rx="1.8" fill="currentColor" opacity="0.8" />
+      <rect x="2.5" y="11" width="5.5" height="6.5" rx="1.8" fill="currentColor" opacity="0.8" />
+      <rect x="9.5" y="11" width="8" height="6.5" rx="1.8" fill="currentColor" />
     </IconFrame>
   )
 }
 
-/** 2. Folder (Drafts Ready / Projects): Solid folder with tab and cutout */
+/** 2. Folder (Drafts Ready / Projects): Solid folder with tab notch */
 export function ReferenceFolderIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
       <path
-        d="M2 5C2 3.89543 2.89543 3 4 3H8C8.6 3 9.1 3.2 9.5 3.6L10.8 5H16C17.1046 5 18 5.89543 18 7V15C18 16.1046 17.1046 17 16 17H4C2.89543 17 2 16.1046 2 15V5Z"
+        d="M2.5 5C2.5 3.89543 3.39543 3 4.5 3H8.25C8.85 3 9.4 3.25 9.8 3.7L11.1 5.3H15.5C16.6046 5.3 17.5 6.19543 17.5 7.3V14.7C17.5 15.8046 16.6046 16.7 15.5 16.7H4.5C3.39543 16.7 2.5 15.8046 2.5 14.7V5Z"
         fill="currentColor"
       />
+      <rect x="4" y="8" width="12" height="1.5" rx="0.75" fill="#FFF" opacity="0.25" />
     </IconFrame>
   )
 }
@@ -48,7 +49,7 @@ export function ReferenceBreadcrumbFolderIcon(props: SidebarReferenceIconProps) 
   return (
     <IconFrame {...props}>
       <path
-        d="M2 5C2 3.89543 2.89543 3 4 3H8C8.6 3 9.1 3.2 9.5 3.6L10.8 5H16C17.1046 5 18 5.89543 18 7V15C18 16.1046 17.1046 17 16 17H4C2.89543 17 2 16.1046 2 15V5Z"
+        d="M2.5 5C2.5 3.89543 3.39543 3 4.5 3H8.25C8.85 3 9.4 3.25 9.8 3.7L11.1 5.3H15.5C16.6046 5.3 17.5 6.19543 17.5 7.3V14.7C17.5 15.8046 16.6046 16.7 15.5 16.7H4.5C3.39543 16.7 2.5 15.8046 2.5 14.7V5Z"
         fill="currentColor"
       />
     </IconFrame>
@@ -58,19 +59,22 @@ export function ReferenceBreadcrumbFolderIcon(props: SidebarReferenceIconProps) 
 export function ReferenceBreadcrumbCurrentIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="2" y="2" width="16" height="16" rx="5" fill="currentColor" />
-      <circle cx="10" cy="10" r="3" fill="#FFF" />
+      <rect x="2.5" y="2.5" width="15" height="15" rx="4.5" fill="currentColor" />
+      <circle cx="10" cy="10" r="2.75" fill="#FFF" />
     </IconFrame>
   )
 }
 
-/** 3. Analytics (Easel Chart / Histogram Board) */
+/** 3. Analytics: Easel Stand presentation board with trendline */
 export function ReferenceAnalyticsIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="2" y="3" width="16" height="11" rx="2" fill="currentColor" />
-      <path d="M5 11L8.5 7.5L11.5 9.5L15 6" stroke="#FFF" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M7 17L9 14M13 17L11 14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      {/* Board Body */}
+      <rect x="2.5" y="2.5" width="15" height="10.5" rx="2" fill="currentColor" />
+      {/* Chart Line inside board */}
+      <path d="M5 9.5L8 6.5L11 8.5L15 4.5" stroke="#FFF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Easel Legs */}
+      <path d="M6.5 13L5 17.5M13.5 13L15 17.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </IconFrame>
   )
 }
@@ -78,9 +82,10 @@ export function ReferenceAnalyticsIcon(props: SidebarReferenceIconProps) {
 export function ReferenceReportIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <path d="M4 3C4 2.44772 4.44772 2 5 2H12L16 6V17C16 17.5523 15.5523 18 15 18H5C4.44772 18 4 17.5523 4 17V3Z" fill="currentColor" />
-      <rect x="7" y="9" width="6" height="1.5" rx="0.75" fill="#FFF" />
-      <rect x="7" y="12.5" width="4" height="1.5" rx="0.75" fill="#FFF" />
+      <path d="M4 3C4 2.44772 4.44772 2 5 2H11.5L16 6.5V17C16 17.5523 15.5523 18 15 18H5C4.44772 18 4 17.5523 4 17V3Z" fill="currentColor" />
+      <path d="M11 2V6.5H16" fill="#FFF" opacity="0.35" />
+      <rect x="6.5" y="9.5" width="7" height="1.5" rx="0.75" fill="#FFF" />
+      <rect x="6.5" y="13" width="4.5" height="1.5" rx="0.75" fill="#FFF" />
     </IconFrame>
   )
 }
@@ -90,40 +95,47 @@ export function ReferencePuzzleIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
       <path
-        d="M8.5 3H5C3.89543 3 3 3.89543 3 5V8.5C4.1 8.5 5 9.4 5 10.5C5 11.6 4.1 12.5 3 12.5V16C3 17.1046 3.89543 18 5 18H8.5C8.5 16.9 9.4 16 10.5 16C11.6 16 12.5 16.9 12.5 18H16C17.1046 18 18 17.1046 18 16V12.5C16.9 12.5 16 11.6 16 10.5C16 9.4 16.9 8.5 18 8.5V5C18 3.89543 17.1046 3 16 3H12.5C12.5 4.1 11.6 5 10.5 5C9.4 5 8.5 4.1 8.5 3Z"
+        d="M8.5 2.75H5C3.75736 2.75 2.75 3.75736 2.75 5V8.5C3.85457 8.5 4.75 9.39543 4.75 10.5C4.75 11.6046 3.85457 12.5 2.75 12.5V16C2.75 17.2426 3.75736 18.25 5 18.25H8.5C8.5 17.1454 9.39543 16.25 10.5 16.25C11.6046 16.25 12.5 17.1454 12.5 18.25H16C17.2426 18.25 18.25 17.2426 18.25 16V12.5C17.1454 12.5 16.25 11.6046 16.25 10.5C16.25 9.39543 17.1454 8.5 18.25 8.5V5C18.25 3.75736 17.2426 2.75 16 2.75H12.5C12.5 3.85457 11.6046 4.75 10.5 4.75C9.39543 4.75 8.5 3.85457 8.5 2.75Z"
         fill="currentColor"
       />
     </IconFrame>
   )
 }
 
-/** 5. Opportunities (Companies / 3D Isometric Cube with 3 shaded faces) */
+/** 5. Opportunities (Companies / 3D Isometric Cube with CAD Precision Seams) */
 export function ReferenceCubeIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      {/* Top Face - Light shading */}
-      <path d="M10 2.5L16.5 6L10 9.5L3.5 6L10 2.5Z" fill="currentColor" opacity="0.45" />
-      {/* Left Face - Mid shading */}
-      <path d="M3.5 6L10 9.5V17L3.5 13.5V6Z" fill="currentColor" opacity="0.75" />
-      {/* Right Face - Solid shading */}
-      <path d="M10 9.5L16.5 6V13.5L10 17V9.5Z" fill="currentColor" />
+      {/* Top Face - Light opacity */}
+      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8L10 2.2Z" fill="currentColor" opacity="0.4" />
+      {/* Left Face - Mid opacity */}
+      <path d="M3.2 5.8L10 9.4V17.2L3.2 13.6V5.8Z" fill="currentColor" opacity="0.75" />
+      {/* Right Face - Solid */}
+      <path d="M10 9.4L16.8 5.8V13.6L10 17.2V9.4Z" fill="currentColor" />
+      {/* 1px White Seam Lines for Crisp 3D CAD Definition */}
+      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8Z" stroke="#FFF" strokeWidth="0.6" opacity="0.6" />
+      <path d="M10 9.4V17.2" stroke="#FFF" strokeWidth="0.6" opacity="0.6" />
     </IconFrame>
   )
 }
 
+/** 6. People: Contact ID badge card with avatar circle & text bars */
 export function ReferencePeopleIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <path d="M3 4.5C3 3.67157 3.67157 3 4.5 3H15.5C16.3284 3 17 3.67157 17 4.5V15.5C17 16.3284 16.3284 17 15.5 17H4.5C3.67157 17 3 16.3284 3 15.5V4.5Z" fill="currentColor" />
-      <circle cx="7.5" cy="8" r="2" fill="#FFF" />
-      <path d="M4.5 14C5 12.3 6.1 11.5 7.5 11.5C8.9 11.5 10 12.3 10.5 14H4.5Z" fill="#FFF" />
-      <rect x="11.5" y="7" width="3.5" height="1.5" rx="0.75" fill="#FFF" opacity="0.8" />
-      <rect x="11.5" y="10" width="3.5" height="1.5" rx="0.75" fill="#FFF" opacity="0.6" />
+      <rect x="2.5" y="3" width="15" height="14" rx="2.5" fill="currentColor" />
+      {/* Profile Avatar */}
+      <circle cx="7" cy="8.25" r="2.2" fill="#FFF" />
+      <path d="M4.5 14.5C5.1 12.8 6.2 12 7.5 12C8.8 12 9.9 12.8 10.5 14.5H4.5Z" fill="#FFF" />
+      {/* Text Lines */}
+      <rect x="11.5" y="7" width="4" height="1.5" rx="0.75" fill="#FFF" opacity="0.85" />
+      <rect x="11.5" y="10" width="4" height="1.5" rx="0.75" fill="#FFF" opacity="0.6" />
+      <rect x="11.5" y="13" width="2.5" height="1.5" rx="0.75" fill="#FFF" opacity="0.4" />
     </IconFrame>
   )
 }
 
-/** 6. Posted (Send / Paper Airplane) */
+/** 7. Posted: Paper Plane Send Icon */
 export function ReferencePostedIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
