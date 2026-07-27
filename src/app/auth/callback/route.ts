@@ -1,34 +1,54 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  
+  const oauthError = requestUrl.searchParams.get('error_description') || requestUrl.searchParams.get('error')
+
+  if (oauthError) {
+    console.error('OAuth callback error parameter:', oauthError)
+    return NextResponse.redirect(
+      new URL(`/login?error=${encodeURIComponent(oauthError)}`, request.url)
+    )
+  }
+
   if (code) {
-    const supabase = await createClient()
-    const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (error) {
-      console.error('exchangeCodeForSession error:', error.message)
-    }
-    
-    if (!error && user) {
-      // Check if they have a profile, if not redirect to onboarding
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, business_name')
-        .eq('id', user.id)
-        .single()
-        
-      if (!profile || !profile.business_name) {
-        return NextResponse.redirect(new URL('/onboarding', request.url))
+    try {
+      const supabase = await createClient()
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (error) {
+        console.error('exchangeCodeForSession error:', error.message)
+        return NextResponse.redirect(
+          new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url)
+        )
       }
-      
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+
+      const user = data?.user
+      if (user) {
+        // Check if user has completed onboarding profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, business_name')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (!profile || !profile.business_name) {
+          return NextResponse.redirect(new URL('/onboarding', request.url))
+        }
+
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+    } catch (err: any) {
+      console.error('Callback handler exception:', err)
+      return NextResponse.redirect(
+        new URL(`/login?error=${encodeURIComponent(err.message || 'Authentication error')}`, request.url)
+      )
     }
   }
 
-  // URL to redirect to after sign in process completes
   return NextResponse.redirect(new URL('/login', request.url))
 }
