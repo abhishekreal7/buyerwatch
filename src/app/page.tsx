@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { springs } from '@/lib/motion'
 import EyebrowBadge from '@/components/EyebrowBadge'
+import { BrandLogo } from '@/components/BrandLogo'
 import { StickyFeatureScroll } from '@/components/StickyFeatureScroll'
 import {
   CustomKeywordRulesIcon,
@@ -90,9 +91,8 @@ export default function LandingPage() {
         style={{ backgroundColor: navBg, backdropFilter: navBlur, borderColor: navBorder, boxShadow: navShadow }}
         className="fixed top-0 left-0 right-0 z-50 border-b will-change-transform">
         <div className="max-w-7xl mx-auto px-6 h-[60px] flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.025em', color: '#0A0A0A' }}>
-            <Target className="w-5 h-5 text-[#0A84FF]" strokeWidth={2.2} />
-            BuyerWatch
+          <Link href="/" className="flex items-center hover:opacity-90 transition-opacity">
+            <BrandLogo size="md" />
           </Link>
           <div className="hidden md:flex items-center gap-7">
             {['Features', 'How it works', 'Pricing'].map((label) => (
