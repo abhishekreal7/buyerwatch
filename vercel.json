@@ -2,7 +2,22 @@
   "crons": [
     {
       "path": "/api/cron/enqueue",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "services": {
+    "web": {
+      "root": ".",
+      "framework": "nextjs"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "web"
+      }
     }
   ]
 }
