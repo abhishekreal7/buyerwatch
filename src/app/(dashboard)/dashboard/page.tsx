@@ -486,8 +486,11 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">Posted Today</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <CheckCircle className="w-4 h-4" strokeWidth={2} />
+            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF5101] flex items-center justify-center shrink-0 border border-orange-100/80">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M8.5 12L11 14.5L15.5 9.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
           </div>
           <div className="flex items-baseline justify-between">

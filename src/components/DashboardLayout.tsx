@@ -234,10 +234,10 @@ export default function DashboardLayout({
       <div className="h-screen w-screen overflow-hidden bg-[#F4F4F2] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
         {/* Desktop Sidebar sitting directly on warm stone background */}
-        <aside className="hidden w-[215px] shrink-0 flex-col bg-[#F4F4F2] px-2.5 py-3 h-full lg:flex select-none">
+        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F4F4F2] px-2 py-2.5 h-full lg:flex select-none">
           <div className="flex flex-col h-full">
             {/* Logo Header */}
-            <div className="mb-3 flex h-8 shrink-0 items-center justify-between px-1">
+            <div className="mb-2 flex h-9 shrink-0 items-center px-1.5">
               <Link
                 href="/dashboard"
                 className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
@@ -245,20 +245,6 @@ export default function DashboardLayout({
                 <BrandLogo size="sm" />
               </Link>
             </div>
-
-            {/* Sidebar Search Bar (Prody style) */}
-            <button
-              type="button"
-              onClick={openCommandPalette}
-              className="group mb-3 flex h-8.5 w-full items-center gap-2 rounded-[10px] border border-[#E2E2DE] bg-white/80 px-2.5 text-left text-[12px] font-medium text-[#7D7D77] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25"
-              aria-label="Search or jump to..."
-            >
-              <Search className="h-3.5 w-3.5 shrink-0 text-[#8B8E8A]" strokeWidth={2} />
-              <span className="truncate">Search...</span>
-              <span className="ml-auto rounded-[5px] border border-[#E2E2DE] bg-[#FAFAF9] px-1 text-[9.5px] font-semibold text-[#8B8E8A]">
-                ⌘F
-              </span>
-            </button>
 
             {/* Navigation Items */}
             <nav className="space-y-0.5" aria-label="Primary navigation">
@@ -272,28 +258,25 @@ export default function DashboardLayout({
                       href={item.href}
                       onMouseEnter={() => router.prefetch(item.href)}
                       onFocus={() => router.prefetch(item.href)}
-                      className={`group flex h-9 items-center justify-between rounded-[10px] px-3 text-[13.5px] transition-all duration-150 ${
-                        isActive
+                      className={`group flex h-9 items-center justify-between rounded-[10px] px-3 text-[13.5px] transition-all duration-150 ${isActive
                           ? 'border border-[#E2E2DE] bg-white font-semibold text-[#111110] shadow-[0_1px_2.5px_rgba(0,0,0,0.035)]'
                           : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EBEBE8] hover:text-[#1C1C1A]'
-                      }`}
+                        }`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <SidebarIcon
                           aria-hidden
-                          className={`h-[17px] w-[17px] shrink-0 ${
-                            isActive ? 'text-[#111110]' : 'text-[#7D7D77] group-hover:text-[#2C2C28]'
-                          }`}
+                          className={`h-[20px] w-[20px] shrink-0 transition-colors ${isActive ? 'text-[#111110]' : 'text-[#3B3B37] group-hover:text-[#111110]'
+                            }`}
                         />
                         <span className="truncate">{item.name}</span>
                       </span>
                       {badge != null && badge > 0 && (
                         <span
-                          className={`ml-2 shrink-0 text-[12px] tabular-nums ${
-                            item.name === 'Opportunities'
+                          className={`ml-2 shrink-0 text-[12px] tabular-nums ${item.name === 'Opportunities'
                               ? 'rounded-full bg-[#EF4444] text-white font-bold px-1.5 py-0.2 min-w-[18px] text-center text-[10.5px]'
                               : 'font-normal text-[#888883]'
-                          }`}
+                            }`}
                         >
                           {badge}
                         </span>
@@ -304,100 +287,99 @@ export default function DashboardLayout({
               })}
             </nav>
 
-            {/* Bottom Navigation & Prody-style Footer */}
-            <div className="mt-auto shrink-0 flex flex-col gap-1.5 pt-3">
+            {/* Bottom Navigation & Unified User Widget grouped with mt-auto */}
+            <div className="mt-auto shrink-0 flex flex-col gap-2 pt-3">
               <Link
                 href="/contact"
-                className="group flex h-8 items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EBEBE8] hover:text-[#1C1C1A]"
+                className="group flex h-8 items-center gap-2 rounded-xl px-2.5 text-[13px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
               >
                 <PiQuestionFill className="h-[16px] w-[16px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
                 Help center
               </Link>
 
-              <button
-                type="button"
-                onClick={() => toast.success("You're all caught up", { description: 'No new notifications right now.' })}
-                className="group flex h-8 items-center justify-between rounded-xl px-2.5 text-[13px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EBEBE8] hover:text-[#1C1C1A]"
-              >
-                <span className="flex items-center gap-2.5">
-                  <Bell className="h-[16px] w-[16px] text-[#7D7D77] group-hover:text-[#2C2C28]" strokeWidth={1.8} />
-                  Notifications
-                </span>
-                <span className="flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1 text-[10px] font-bold text-white">
-                  3
-                </span>
-              </button>
-
-              {/* User Profile Row */}
-              <div className="flex items-center justify-between px-1 py-1">
-                <Link
-                  href="/settings"
-                  className="group flex min-w-0 flex-1 items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80"
-                  title="Account Settings"
-                >
-                  <img
-                    src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                    alt={initialData.user?.name || 'User'}
-                    className="h-7 w-7 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
-                  />
-                  <span className="truncate text-[13px] font-semibold text-[#1C1C1A]">
-                    {initialData.user?.name || 'Abhishek'}
-                  </span>
-                </Link>
-
-                <form action="/api/auth/signout" method="POST" className="shrink-0">
-                  <button
-                    type="submit"
-                    className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-[#7C7C76] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
-                    title="Sign out"
-                    aria-label="Sign out"
+              {/* Unified Professional Profile & Usage Card */}
+              <div className="rounded-[16px] border border-[#E2E2DE] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col gap-2">
+                {/* User Info Row */}
+                <div className="flex items-center justify-between gap-2">
+                  <Link
+                    href="/settings"
+                    className="group flex min-w-0 flex-1 items-center gap-2 rounded-lg transition-opacity hover:opacity-80"
+                    title="Account Settings"
                   >
-                    <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  </button>
-                </form>
-              </div>
+                    <img
+                      src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                      alt={initialData.user?.name || 'User'}
+                      className="h-7.5 w-7.5 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12.5px] font-semibold text-[#1C1C1A] leading-tight">
+                        {initialData.user?.name || 'User'}
+                      </p>
+                      <p className="truncate text-[10px] font-medium text-[#82827D] capitalize">
+                        {plan} Plan
+                      </p>
+                    </div>
+                  </Link>
 
-              {/* Prody-style Overview Card */}
-              <div className="rounded-[16px] border border-[#E2E2DE] bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col gap-2">
-                <div>
-                  <p className="text-[12px] font-semibold text-[#1C1C1A]">
-                    Starter set overview
-                  </p>
-                  <p className="text-[10.5px] font-medium text-[#82827D]">
-                    {credits ? `${creditsRemaining} of ${credits.limit} drafts remaining` : 'Checking allowance'}
-                  </p>
+                  <form action="/api/auth/signout" method="POST" className="shrink-0">
+                    <button
+                      type="submit"
+                      className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-[#7C7C76] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
+                      title="Sign out"
+                      aria-label="Sign out"
+                    >
+                      <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    </button>
+                  </form>
                 </div>
 
-                <div
-                  className="h-1.5 overflow-hidden rounded-full bg-[#EFEFEA]"
-                  role="progressbar"
-                  aria-label="Monthly drafts remaining"
-                  aria-valuemin={0}
-                  aria-valuemax={credits?.limit ?? 0}
-                  aria-valuenow={creditsRemaining ?? 0}
-                >
+                {/* Muted Divider */}
+                <div className="h-px w-full bg-[#EAEAE7]" />
+
+                {/* Usage & Upgrade Section */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-[10.5px] font-medium text-[#686863]">
+                    <span>Usage</span>
+                    <span className="font-semibold text-[#1C1C1A]">
+                      {credits ? `${creditsRemaining} drafts left` : 'Checking'}
+                    </span>
+                  </div>
+
                   <div
-                    className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
-                    style={{ width: `${creditsPercent}%` }}
-                  />
-                </div>
+                    className="h-1.5 overflow-hidden rounded-full bg-[#EFEFEA]"
+                    role="progressbar"
+                    aria-label="Monthly drafts remaining"
+                    aria-valuemin={0}
+                    aria-valuemax={credits?.limit ?? 0}
+                    aria-valuenow={creditsRemaining ?? 0}
+                  >
+                    <div
+                      className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
+                      style={{ width: `${creditsPercent}%` }}
+                    />
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={handleAddCredits}
-                  disabled={openingCheckout}
-                  className="mt-0.5 flex h-7.5 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[#E2E2DE] bg-white px-2 text-[11.5px] font-semibold text-[#1C1C1A] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-[#F8F8F6] disabled:cursor-wait"
-                >
-                  {openingCheckout
-                    ? 'Opening checkout…'
-                    : 'Get full access 🚀'}
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCredits}
+                    disabled={openingCheckout}
+                    className="mt-0.5 flex h-7 w-full items-center justify-center rounded-lg bg-[#1C1C1A] px-2 text-[11px] font-semibold text-white shadow-xs transition-colors hover:bg-black disabled:cursor-wait disabled:bg-[#A7A7A2]"
+                  >
+                    {openingCheckout
+                      ? 'Opening checkout…'
+                      : plan === 'growth'
+                        ? 'Manage Subscription'
+                        : plan === 'free'
+                          ? 'Upgrade Plan'
+                          : 'Add Credits'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Main Workspace Window Panel — Floating rounded white card (Prody design) */}
+        {/* Main Workspace Window Panel — Floating rounded white card (Image 1 design) */}
         <main className="flex-1 h-full bg-white rounded-none sm:rounded-[20px] lg:rounded-[24px] border border-[#E5E5E2] shadow-[0_4px_24px_rgba(0,0,0,0.035),0_1px_4px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
           <header className="sticky top-0 z-20 flex h-[56px] shrink-0 items-center justify-between bg-white px-4 sm:px-6">
             <div className="flex min-w-0 items-center text-[12.5px] font-medium tracking-normal text-[#50504C]">
@@ -430,6 +412,30 @@ export default function DashboardLayout({
             </div>
 
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={openCommandPalette}
+                className="group relative hidden h-9 w-[238px] items-center rounded-[10px] border border-[#DCDCD8] bg-white pl-9 pr-3 text-left text-[12.5px] font-medium text-[#62625E] shadow-[0_1px_2px_rgba(0,0,0,0.045)] transition-colors hover:bg-[#F8F8F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 xl:flex"
+                aria-label="Open search and command menu"
+              >
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#7D7D78] transition-colors group-hover:text-[#555551]" strokeWidth={1.9} />
+                <span className="truncate">Search or jump to...</span>
+                <span className="ml-auto rounded-[6px] border border-[#D8D8D4] bg-white px-1.5 text-[9.5px] font-semibold leading-[18px] text-[#73736E] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
+                  Ctrl K
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={openCommandPalette}
+                className="flex h-11 w-11 items-center justify-center rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] text-[#666662] transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8 sm:w-8 lg:hidden"
+                aria-label="Open search and command menu"
+              >
+                <Search className="h-3.5 w-3.5" strokeWidth={1.9} />
+              </button>
+
+              <div className="hidden h-4 w-px bg-[#E3E3E0] sm:block lg:hidden" />
+
               {/* Clean Auto-send toggle */}
               {autoSend !== null && (
                 <button
@@ -437,7 +443,7 @@ export default function DashboardLayout({
                   onClick={handleToggleAutoSend}
                   disabled={togglingAutoSend}
                   title={autoSend ? 'Auto-send is active — click to pause' : 'Auto-send is paused — click to resume'}
-                  className="flex h-8 cursor-pointer items-center gap-2 rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] px-2.5 transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25"
+                  className="flex h-11 cursor-pointer items-center gap-2 rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] px-2.5 transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8"
                   aria-pressed={autoSend}
                 >
                   <span className="hidden select-none text-[11px] font-medium text-[#555552] sm:inline">
@@ -448,6 +454,17 @@ export default function DashboardLayout({
                   </div>
                 </button>
               )}
+
+              {/* Bell Icon */}
+              <button
+                type="button"
+                onClick={() => toast.success("You're all caught up", { description: 'No new notifications right now.' })}
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] text-[#666662] transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8 sm:w-8"
+                title="Notifications"
+                aria-label="View notifications"
+              >
+                <Bell className="h-3.5 w-3.5" strokeWidth={1.8} />
+              </button>
             </div>
           </header>
 

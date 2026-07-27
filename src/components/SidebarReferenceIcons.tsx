@@ -7,7 +7,7 @@ type SidebarReferenceIconProps = SVGProps<SVGSVGElement> & {
 function IconFrame({ title, children, ...props }: SidebarReferenceIconProps) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 20 20"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden={title ? undefined : true}
@@ -20,25 +20,24 @@ function IconFrame({ title, children, ...props }: SidebarReferenceIconProps) {
   )
 }
 
+/** 1. Dashboard: 4 rounded squares (2 solid, 2 muted for high-end depth) */
 export function ReferenceDashboardIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="4.25" y="5.25" width="8.45" height="5.85" rx="1.45" fill="currentColor" />
-      <rect x="4.25" y="12.9" width="8.45" height="5.85" rx="1.45" fill="currentColor" />
-      <rect x="14.35" y="6.65" width="5.4" height="10.7" rx="1.45" fill="currentColor" />
+      <rect x="2" y="2" width="7" height="7" rx="2" fill="currentColor" />
+      <rect x="11" y="2" width="7" height="7" rx="2" fill="currentColor" opacity="0.45" />
+      <rect x="2" y="11" width="7" height="7" rx="2" fill="currentColor" opacity="0.45" />
+      <rect x="11" y="11" width="7" height="7" rx="2" fill="currentColor" />
     </IconFrame>
   )
 }
 
+/** 2. Folder (Drafts Ready / Projects): Solid folder with tab and cutout */
 export function ReferenceFolderIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
       <path
-        d="M3.55 7.2c0-.88.72-1.6 1.6-1.6h5.2c.56 0 1.08.29 1.37.77l.67 1.1h6.46c.88 0 1.6.72 1.6 1.6v.82H3.55V7.2Z"
-        fill="currentColor"
-      />
-      <path
-        d="M3.55 10.55h16.9v6.7c0 .88-.72 1.6-1.6 1.6H5.15c-.88 0-1.6-.72-1.6-1.6v-6.7Z"
+        d="M2 5C2 3.89543 2.89543 3 4 3H8C8.6 3 9.1 3.2 9.5 3.6L10.8 5H16C17.1046 5 18 5.89543 18 7V15C18 16.1046 17.1046 17 16 17H4C2.89543 17 2 16.1046 2 15V5Z"
         fill="currentColor"
       />
     </IconFrame>
@@ -49,15 +48,9 @@ export function ReferenceBreadcrumbFolderIcon(props: SidebarReferenceIconProps) 
   return (
     <IconFrame {...props}>
       <path
-        d="M3.65 7.55c0-.72.58-1.3 1.3-1.3h5.1c.45 0 .86.23 1.1.6l.48.78h7.42c.72 0 1.3.58 1.3 1.3v1H3.65V7.55Z"
-        fill="currentColor"
-        opacity=".88"
-      />
-      <path
-        d="M3.65 10.5h16.7v5.95c0 .72-.58 1.3-1.3 1.3H4.95c-.72 0-1.3-.58-1.3-1.3V10.5Z"
+        d="M2 5C2 3.89543 2.89543 3 4 3H8C8.6 3 9.1 3.2 9.5 3.6L10.8 5H16C17.1046 5 18 5.89543 18 7V15C18 16.1046 17.1046 17 16 17H4C2.89543 17 2 16.1046 2 15V5Z"
         fill="currentColor"
       />
-      <path d="M4.35 9.95h15.3" stroke="#fff" strokeWidth="1" strokeLinecap="round" opacity=".45" />
     </IconFrame>
   )
 }
@@ -65,33 +58,19 @@ export function ReferenceBreadcrumbFolderIcon(props: SidebarReferenceIconProps) 
 export function ReferenceBreadcrumbCurrentIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="3.65" y="3.65" width="16.7" height="16.7" rx="5" fill="currentColor" />
-      <path
-        d="M12 6.65c.64 0 1.15.51 1.15 1.15v.34c0 .33.2.63.51.75.22.09.44.18.65.28.3.14.65.08.88-.15l.24-.24c.45-.45 1.18-.45 1.63 0l.16.16c.45.45.45 1.18 0 1.63l-.24.24c-.23.23-.29.58-.15.88.1.21.19.43.28.65.12.31.42.51.75.51h.34c.64 0 1.15.51 1.15 1.15v.22c0 .64-.51 1.15-1.15 1.15h-.34c-.33 0-.63.2-.75.51-.09.22-.18.44-.28.65-.14.3-.08.65.15.88l.24.24c.45.45.45 1.18 0 1.63l-.16.16c-.45.45-1.18.45-1.63 0l-.24-.24c-.23-.23-.58-.29-.88-.15-.21.1-.43.19-.65.28-.31.12-.51.42-.51.75v.34c0 .64-.51 1.15-1.15 1.15h-.22c-.64 0-1.15-.51-1.15-1.15v-.34c0-.33-.2-.63-.51-.75-.22-.09-.44-.18-.65-.28-.3-.14-.65-.08-.88.15l-.24.24c-.45.45-1.18.45-1.63 0l-.16-.16c-.45-.45-.45-1.18 0-1.63l.24-.24c.23-.23.29-.58.15-.88a6.04 6.04 0 0 1-.28-.65.8.8 0 0 0-.75-.51H5.8c-.64 0-1.15-.51-1.15-1.15V14c0-.64.51-1.15 1.15-1.15h.34c.33 0 .63-.2.75-.51.09-.22.18-.44.28-.65.14-.3.08-.65-.15-.88l-.24-.24c-.45-.45-.45-1.18 0-1.63l.16-.16c.45-.45 1.18-.45 1.63 0l.24.24c.23.23.58.29.88.15.21-.1.43-.19.65-.28.31-.12.51-.42.51-.75V7.8c0-.64.51-1.15 1.15-1.15H12Z"
-        fill="#fff"
-      />
-      <circle cx="12" cy="12" r="2.25" fill="currentColor" />
+      <rect x="2" y="2" width="16" height="16" rx="5" fill="currentColor" />
+      <circle cx="10" cy="10" r="3" fill="#FFF" />
     </IconFrame>
   )
 }
 
+/** 3. Analytics (Easel Chart / Histogram Board) */
 export function ReferenceAnalyticsIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <path
-        d="M5.25 4.85h13.5c.94 0 1.7.76 1.7 1.7v8.85c0 .94-.76 1.7-1.7 1.7H5.25c-.94 0-1.7-.76-1.7-1.7V6.55c0-.94.76-1.7 1.7-1.7Z"
-        fill="currentColor"
-      />
-      <path
-        d="m6.85 12.75 3.08-2.98 2.36 2.04 4.64-4.52"
-        stroke="#fff"
-        strokeWidth="1.45"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M8.4 14.35h7.2" stroke="#fff" strokeWidth="1.15" strokeLinecap="round" opacity=".52" />
-      <path d="M12 16.75v2.1" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-      <path d="M9.15 19.15h5.7" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <rect x="2" y="3" width="16" height="11" rx="2" fill="currentColor" />
+      <path d="M5 11L8.5 7.5L11.5 9.5L15 6" stroke="#FFF" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 17L9 14M13 17L11 14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
     </IconFrame>
   )
 }
@@ -99,37 +78,35 @@ export function ReferenceAnalyticsIcon(props: SidebarReferenceIconProps) {
 export function ReferenceReportIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <path
-        d="M6.25 4.35h8.7l3.1 3.1v11.2c0 .83-.67 1.5-1.5 1.5H6.25c-.83 0-1.5-.67-1.5-1.5V5.85c0-.83.67-1.5 1.5-1.5Z"
-        fill="currentColor"
-      />
-      <path d="M14.75 4.7v2.65c0 .72.58 1.3 1.3 1.3h2.6" fill="#fff" opacity=".78" />
-      <rect x="7.55" y="10.5" width="7.85" height="1.35" rx=".68" fill="#fff" />
-      <rect x="7.55" y="13.25" width="7.85" height="1.35" rx=".68" fill="#fff" opacity=".82" />
-      <rect x="7.55" y="16" width="5.25" height="1.35" rx=".68" fill="#fff" opacity=".82" />
+      <path d="M4 3C4 2.44772 4.44772 2 5 2H12L16 6V17C16 17.5523 15.5523 18 15 18H5C4.44772 18 4 17.5523 4 17V3Z" fill="currentColor" />
+      <rect x="7" y="9" width="6" height="1.5" rx="0.75" fill="#FFF" />
+      <rect x="7" y="12.5" width="4" height="1.5" rx="0.75" fill="#FFF" />
     </IconFrame>
   )
 }
 
+/** 4. Keywords (Extensions / Puzzle piece) */
 export function ReferencePuzzleIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
       <path
-        d="M7.64 7.29h4.51c.35 0 .6-.27.6-.6 0-.22-.09-.43-.24-.61-.6-.7-.83-1.54-.58-2.3.29-.89 1.14-1.4 2.03-1.28 1.12.15 1.95 1.1 1.98 2.22.02.6-.18 1.16-.56 1.62-.18.22-.28.46-.28.67 0 .17.15.28.34.28h5.13c.51 0 .93.42.93.93v4.29c0 .62-.68.99-1.2.64-.52-.36-1.11-.87-1.87-.87-.9 0-1.63.73-1.63 1.63s.73 1.63 1.63 1.63c.7 0 1.29-.43 1.84-.77.56-.35 1.23.03 1.23.65v5.03c0 .58-.47 1.05-1.05 1.05h-5.3c-.6 0-.96-.68-.61-1.16.41-.56.85-1.11.85-1.82 0-.91-.74-1.65-1.65-1.65s-1.65.74-1.65 1.65c0 .71.43 1.28.82 1.83.35.49-.02 1.15-.61 1.15H7.64c-.52 0-.94-.42-.94-.94v-4.87c0-.57-.63-.9-1.13-.59-.51.32-1.02.68-1.68.68-.9 0-1.64-.73-1.64-1.64s.74-1.64 1.64-1.64c.67 0 1.18.37 1.69.69.5.31 1.12-.03 1.12-.6V8.22c0-.51.42-.93.94-.93Z"
+        d="M8.5 3H5C3.89543 3 3 3.89543 3 5V8.5C4.1 8.5 5 9.4 5 10.5C5 11.6 4.1 12.5 3 12.5V16C3 17.1046 3.89543 18 5 18H8.5C8.5 16.9 9.4 16 10.5 16C11.6 16 12.5 16.9 12.5 18H16C17.1046 18 18 17.1046 18 16V12.5C16.9 12.5 16 11.6 16 10.5C16 9.4 16.9 8.5 18 8.5V5C18 3.89543 17.1046 3 16 3H12.5C12.5 4.1 11.6 5 10.5 5C9.4 5 8.5 4.1 8.5 3Z"
         fill="currentColor"
       />
     </IconFrame>
   )
 }
 
+/** 5. Opportunities (Companies / 3D Isometric Cube with 3 shaded faces) */
 export function ReferenceCubeIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <path d="M12 3.4 20.1 7.9 12 12.45 3.9 7.9 12 3.4Z" fill="currentColor" />
-      <path d="M4.45 9.1 11.2 12.9v7.7l-6.75-3.82V9.1Z" fill="currentColor" opacity=".9" />
-      <path d="M19.55 9.1 12.8 12.9v7.7l6.75-3.82V9.1Z" fill="currentColor" opacity=".72" />
-      <path d="M12 12.45v7.65" stroke="#fff" strokeWidth="1.35" strokeLinecap="round" opacity=".9" />
-      <path d="M5.1 8.28 12 12.18l6.9-3.9" stroke="#fff" strokeWidth="1.35" strokeLinejoin="round" opacity=".78" />
+      {/* Top Face - Light shading */}
+      <path d="M10 2.5L16.5 6L10 9.5L3.5 6L10 2.5Z" fill="currentColor" opacity="0.45" />
+      {/* Left Face - Mid shading */}
+      <path d="M3.5 6L10 9.5V17L3.5 13.5V6Z" fill="currentColor" opacity="0.75" />
+      {/* Right Face - Solid shading */}
+      <path d="M10 9.5L16.5 6V13.5L10 17V9.5Z" fill="currentColor" />
     </IconFrame>
   )
 }
@@ -137,45 +114,21 @@ export function ReferenceCubeIcon(props: SidebarReferenceIconProps) {
 export function ReferencePeopleIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="3.85" y="5.6" width="16.3" height="12.8" rx="2.1" fill="currentColor" />
-      <circle cx="8.85" cy="10" r="1.95" fill="#fff" />
-      <path
-        d="M5.95 15.18c.5-1.42 1.62-2.25 2.9-2.25 1.3 0 2.42.83 2.92 2.25.13.38-.16.77-.56.77H6.5c-.4 0-.68-.39-.55-.77Z"
-        fill="#fff"
-      />
-      <rect x="13.2" y="8.6" width="4.15" height="1.4" rx=".7" fill="#fff" opacity=".9" />
-      <rect x="13.2" y="12.1" width="4.95" height="1.4" rx=".7" fill="#fff" opacity=".72" />
-      <rect x="13.2" y="15.6" width="3.3" height="1.35" rx=".68" fill="#fff" opacity=".72" />
+      <path d="M3 4.5C3 3.67157 3.67157 3 4.5 3H15.5C16.3284 3 17 3.67157 17 4.5V15.5C17 16.3284 16.3284 17 15.5 17H4.5C3.67157 17 3 16.3284 3 15.5V4.5Z" fill="currentColor" />
+      <circle cx="7.5" cy="8" r="2" fill="#FFF" />
+      <path d="M4.5 14C5 12.3 6.1 11.5 7.5 11.5C8.9 11.5 10 12.3 10.5 14H4.5Z" fill="#FFF" />
+      <rect x="11.5" y="7" width="3.5" height="1.5" rx="0.75" fill="#FFF" opacity="0.8" />
+      <rect x="11.5" y="10" width="3.5" height="1.5" rx="0.75" fill="#FFF" opacity="0.6" />
     </IconFrame>
   )
 }
 
+/** 6. Posted (Send / Paper Airplane) */
 export function ReferencePostedIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <path
-        d="M3.75 11.45 18.95 4.6c.83-.38 1.68.47 1.3 1.3l-6.85 15.2c-.38.84-1.6.79-1.9-.08l-1.78-5.1a1.15 1.15 0 0 0-.72-.72l-5.1-1.78c-.87-.3-.93-1.59-.15-1.97Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.45"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m9.86 15.08 5.55-5.55"
-        stroke="currentColor"
-        strokeWidth="1.45"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m7.52 14.7.08 3.26c.03.96 1.18 1.43 1.87.77l1.86-1.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.45"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M2.5 9.5L17.5 3L11.5 17.5L9 11.5L2.5 9.5Z" fill="currentColor" />
+      <path d="M9 11.5L17.5 3" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </IconFrame>
   )
 }
@@ -183,14 +136,9 @@ export function ReferencePostedIcon(props: SidebarReferenceIconProps) {
 export function ReferenceCheckIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <circle cx="12" cy="12" r="8.05" fill="currentColor" />
-      <path
-        d="m8.35 12.05 2.25 2.25 5.05-5.1"
-        stroke="#fff"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <circle cx="10" cy="10" r="8" fill="currentColor" opacity="0.15" />
+      <circle cx="10" cy="10" r="6.5" fill="currentColor" />
+      <path d="M7 10L9 12L13 7.5" stroke="#FFF" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
     </IconFrame>
   )
 }
