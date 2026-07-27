@@ -271,61 +271,79 @@ export const BentoPlatformSourcesWidget = () => {
 
 export const BentoTrafficWidget = () => {
   return (
-    <div className="w-full h-full flex flex-col justify-between relative min-h-[280px]">
-      <div className="flex items-center justify-between mb-2 z-10">
-        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>Traffic</h4>
-      </div>
-
-      <div className="flex-1 relative flex flex-col justify-center gap-5 px-1 py-2 z-10">
-        {/* Grid lines background */}
-        <div className="absolute inset-0 flex justify-between pointer-events-none opacity-[0.06] px-1">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="w-[1px] border-r border-dashed border-[#0A0A0A] h-full" />
-          ))}
+    <div className="w-full h-full flex flex-col justify-between relative min-h-[290px] p-5 rounded-2xl backdrop-blur-xl bg-white/70 border border-white/80 shadow-[0_8px_32px_rgba(0,0,0,0.04)] overflow-hidden">
+      {/* Top Header Row with Glass Badges */}
+      <div className="flex items-center justify-between z-10 w-full mb-4">
+        {/* LIVE Badge */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0A84FF] text-white text-[11px] font-bold tracking-wide shadow-[0_2px_8px_rgba(10,132,255,0.35)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+          LIVE
         </div>
 
-        {/* Bar 1: Reddit */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[12px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[12px]" style={{ width: '40%' }} />
-            <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">40%</span>
-          </div>
-        </div>
-
-        {/* Bar 2: X */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[12px] bg-[#F0F7FF] border border-[#0A84FF]/20 flex items-center relative shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
-            <div className="h-full bg-[#0A84FF] rounded-[12px] flex items-center justify-end pr-1.5 transition-all duration-500 shadow-[0_1px_3px_rgba(0,0,0,0.05)]" style={{ width: '80%' }}>
-              <div className="bg-white border border-[#0A84FF]/30 rounded-full px-2 py-0.5 text-[11px] font-bold text-[#0A0A0A] shadow-[0_1px_3px_rgba(0,0,0,0.05)] mr-1">
-                80%
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bar 3: Bluesky */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[12px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[12px]" style={{ width: '20%' }} />
-            <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">20%</span>
-          </div>
+        {/* Matches Badge */}
+        <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#1F1F1F] text-white text-[12px] font-semibold tracking-tight shadow-sm">
+          <span>12 matches</span>
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center justify-start gap-8 mt-2 text-[13px] font-medium z-10" style={{ fontFamily: 'var(--font-inter)' }}>
-        <div className="flex items-center gap-2 text-[#ADADAD]">
-          <span className="w-2 h-2 rounded-full bg-black/[0.08]" />
-          Reddit
-        </div>
-        <div className="flex items-center gap-2 text-[#0A0A0A]">
-          <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-          X
-        </div>
-        <div className="flex items-center gap-2 text-[#ADADAD]">
-          <span className="w-2 h-2 rounded-full bg-black/[0.08]" />
-          Bluesky
-        </div>
+      {/* SVG Smooth Curve Graph Area */}
+      <div className="flex-1 relative w-full h-[150px] flex items-center justify-center">
+        {/* Background Subtle Gradient Grid */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A84FF]/[0.03] to-transparent rounded-xl pointer-events-none" />
+
+        <svg viewBox="0 0 400 120" className="w-full h-full overflow-visible">
+          <defs>
+            <linearGradient id="lineGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0A84FF" />
+              <stop offset="50%" stopColor="#38BDF8" />
+              <stop offset="100%" stopColor="#0A84FF" />
+            </linearGradient>
+            <linearGradient id="areaGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#0A84FF" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#0A84FF" stopOpacity="0" />
+            </linearGradient>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          {/* Area Fill Under Curve */}
+          <path
+            d="M 10 90 Q 60 50, 110 75 T 210 25 T 310 80 T 390 55 L 390 120 L 10 120 Z"
+            fill="url(#areaGlow)"
+          />
+
+          {/* Main Glowing Smooth Curve Line */}
+          <motion.path
+            d="M 10 90 Q 60 50, 110 75 T 210 25 T 310 80 T 390 55"
+            fill="none"
+            stroke="url(#lineGlow)"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            filter="url(#glow)"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 1.8, ease: 'easeInOut' }}
+          />
+
+          {/* Active Highlight Dot on Peak */}
+          <g transform="translate(210, 25)">
+            <circle r="7" fill="white" className="shadow-md" />
+            <circle r="4" fill="#FF5101" />
+            <circle r="9" fill="none" stroke="#FF5101" strokeWidth="1.5" opacity="0.6">
+              <animate attributeName="r" values="6;13;6" dur="2s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite" />
+            </circle>
+          </g>
+        </svg>
+      </div>
+
+      {/* Bottom Platform Axis Labels */}
+      <div className="flex items-center justify-between w-full pt-3 px-2 border-t border-black/[0.05] text-[10px] font-extrabold text-[#8E8E93] tracking-widest uppercase">
+        <span>REDDIT</span>
+        <span>BLUESKY</span>
+        <span>QUALIFIED</span>
       </div>
     </div>
   )
