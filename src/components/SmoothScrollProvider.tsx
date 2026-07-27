@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SmoothScrollProvider — Lenis smooth wheel scroll for public marketing pages only.
  *
  * Why marketing-only (not root-global):
@@ -44,7 +44,7 @@ function isMarketingPath(pathname: string | null): boolean {
  * easing — deceleration curve.
  * Try: linear (t)=>t | ease-out-quad (t)=>1-(1-t)**2 | expo (default).
  */
-const LENIS_DURATION = 0.8
+const LENIS_DURATION = 1.2
 const easeOutExpo = (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t))
 
 export default function SmoothScrollProvider({ children }: { children: ReactNode }) {
