@@ -4,10 +4,14 @@ import { sendDigestQueue } from '@/lib/queues'
 import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
 import { logger } from '@/lib/logger'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+export const dynamic = 'force-dynamic'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request.headers.get('authorization'), process.env.CRON_SECRET)) {
@@ -22,6 +26,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    const supabase = getSupabaseAdmin()
     const pageSize = 1_000
     const profiles: Array<{ id: string; notification_preferences: Record<string, boolean> | null }> = []
     for (let offset = 0; ; offset += pageSize) {

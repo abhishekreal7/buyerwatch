@@ -4,10 +4,14 @@ import { createClient } from '@supabase/supabase-js'
 import { redditFetchQueue, blueskyFetchQueue, xFetchQueue } from '../../../../lib/queues'
 import { logger } from '../../../../lib/logger'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(req: Request) {
   try {
@@ -40,6 +44,7 @@ export async function POST(req: Request) {
     const { platform, target } = triggeringKeyword
     const hourBucket = `fetch-now-${Date.now()}` // Ensure uniqueness for immediate jobs
 
+    const supabaseAdmin = getSupabaseAdmin()
     // Fan-out: find ALL users watching this same target so the shared-fetch
     // architecture works correctly. The triggering user's keyword is enqueued
     // first to guarantee their aha-moment result arrives promptly.

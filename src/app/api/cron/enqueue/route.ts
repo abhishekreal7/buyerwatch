@@ -7,10 +7,14 @@ import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
 import { fetchWithTimeout } from '@/lib/http'
 import { logger } from '@/lib/logger'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+export const dynamic = 'force-dynamic'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 type KeywordRow = {
   id: string
@@ -36,6 +40,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    const supabase = getSupabaseAdmin()
     const { data, error } = await supabase
       .from('keywords')
       .select('id, platform, target, term, user_id, profiles!inner(plan, last_polled_at)')
