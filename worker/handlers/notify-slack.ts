@@ -1,4 +1,4 @@
-import { Job } from 'bullmq'
+﻿import { Job } from 'bullmq'
 import { logger } from '../../src/lib/logger'
 import { supabaseWorker as supabase } from '../lib/supabase'
 import { fetchWithTimeout } from '../../src/lib/http'
@@ -44,7 +44,7 @@ export async function notifySlackHandler(job: Job) {
     : 'No draft available.'
 
   const payload = {
-    text: `${scoreEmoji} Scouto found a ${intentScore}% intent lead on r/${subreddit}`,
+    text: `${scoreEmoji} BuyerWatch found a ${intentScore}% intent lead on r/${subreddit}`,
     blocks: [
       {
         type: 'header',
@@ -88,7 +88,7 @@ export async function notifySlackHandler(job: Job) {
           },
           {
             type: 'button',
-            text: { type: 'plain_text', text: '📋 View in Scouto', emoji: true },
+            text: { type: 'plain_text', text: '📋 View in BuyerWatch', emoji: true },
             url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
           },
         ],
@@ -101,7 +101,7 @@ export async function notifySlackHandler(job: Job) {
         elements: [
           {
             type: 'mrkdwn',
-            text: `Sent by Scouto · <${process.env.NEXT_PUBLIC_APP_URL}/settings|Manage notifications>`,
+            text: `Sent by BuyerWatch · <${process.env.NEXT_PUBLIC_APP_URL}/settings|Manage notifications>`,
           },
         ],
       },

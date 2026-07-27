@@ -11,7 +11,7 @@ export default function GlobalError({
       <body className="min-h-screen bg-white text-neutral-900">
         <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-[#0A84FF]">
-            Scouto
+            BuyerWatch
           </p>
           <h1 className="mt-3 text-3xl font-bold">Something went wrong</h1>
           <p className="mt-3 text-neutral-600">

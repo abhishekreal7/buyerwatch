@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -461,7 +461,7 @@ const comparisonContent = {
     ],
   },
   after: {
-    eyebrow: 'With Scouto',
+    eyebrow: 'With BuyerWatch',
     title: 'Every opportunity carries its evidence',
     bullets: [
       'Reddit and Bluesky conversations arrive in one ranked queue',
@@ -486,7 +486,7 @@ function ComparisonKnob({
   return (
     <motion.button
       type="button"
-      aria-label={`Show ${mode === 'before' ? 'after' : 'before'} Scouto comparison`}
+      aria-label={`Show ${mode === 'before' ? 'after' : 'before'} BuyerWatch comparison`}
       onClick={onToggle}
       className="absolute left-1/2 top-0 z-20 h-[104px] w-[104px] -translate-x-1/2 -translate-y-[48px] rounded-full border border-black/25 bg-[linear-gradient(145deg,#f8f8f8_0%,#a9a9a9_42%,#e6e6e6_66%,#888_100%)] p-[8px] shadow-[0_12px_22px_rgba(0,0,0,0.24),inset_0_2px_2px_rgba(255,255,255,0.85),inset_0_-3px_5px_rgba(0,0,0,0.26)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#0a84ff]/25"
       whileTap={{ scale: 0.96 }}
@@ -522,14 +522,14 @@ function ComparisonPanel({ mode, setMode }: { mode: ComparisonMode; setMode: (mo
           onClick={() => setMode('before')}
           className={`pr-12 text-right text-[13px] font-semibold transition-colors md:pr-20 ${after ? 'text-[#b1b7bb]' : 'text-[#20272c]'}`}
         >
-          Before Scouto
+          Before BuyerWatch
         </button>
         <button
           type="button"
           onClick={() => setMode('after')}
           className={`border-l border-[#dce4e9] pl-12 text-left text-[13px] font-semibold transition-colors md:pl-20 ${after ? 'text-[#20272c]' : 'text-[#b1b7bb]'}`}
         >
-          After Scouto
+          After BuyerWatch
         </button>
         <ComparisonKnob mode={mode} onToggle={() => setMode(after ? 'before' : 'after')} />
       </div>

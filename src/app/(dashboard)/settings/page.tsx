@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -482,7 +482,7 @@ export default function SettingsPage() {
                       </div>
                     </SectionCard>
 
-                    <SectionCard title="Reply Identity" description="How your account appears when Scouto posts on your behalf.">
+                    <SectionCard title="Reply Identity" description="How your account appears when BuyerWatch posts on your behalf.">
                       <Field label="Reddit Username">
                         <div className="relative">
                           <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -496,7 +496,7 @@ export default function SettingsPage() {
                       </Field>
                     </SectionCard>
 
-                    <SectionCard title="Writing Style & Tone Matching" description="Select a tone archetype or describe your natural voice. Scouto's AI will match this exact style when drafting replies.">
+                    <SectionCard title="Writing Style & Tone Matching" description="Select a tone archetype or describe your natural voice. BuyerWatch's AI will match this exact style when drafting replies.">
                       <div className="space-y-6">
                         {/* 1-Click Tone Archetypes */}
                         <div>
@@ -576,7 +576,7 @@ export default function SettingsPage() {
                       </div>
                     </SectionCard>
 
-                    <SectionCard title="Competitor Mention Alerts" description="List competitors to track. Scouto will highlight relevant posts where customers describe friction or ask for alternatives.">
+                    <SectionCard title="Competitor Mention Alerts" description="List competitors to track. BuyerWatch will highlight relevant posts where customers describe friction or ask for alternatives.">
                       <Field label="Competitors" hint="Comma separated (e.g. AcmeCorp, Globex, Initech)">
                         <input
                           value={profile.competitors}
@@ -611,7 +611,7 @@ export default function SettingsPage() {
                 {/* ── CONNECTIONS ─────────────────────────────────── */}
                 {activeSection === 'connections' && (
                   <>
-                    <SectionCard title="Platform Accounts" description="Connect accounts to enable direct posting from Scouto.">
+                    <SectionCard title="Platform Accounts" description="Connect accounts to enable direct posting from BuyerWatch.">
                       <div className="space-y-3">
                         <PlatformRow
                           icon={<RedditIcon className="w-5 h-5 text-[#FF4500]" />}
@@ -664,7 +664,7 @@ export default function SettingsPage() {
                       </div>
                     </SectionCard>
 
-                    <SectionCard title="Automation" description="Control how Scouto handles high-confidence matches.">
+                    <SectionCard title="Automation" description="Control how BuyerWatch handles high-confidence matches.">
                       <div className="space-y-5">
                         <div className="flex items-start justify-between gap-6">
                           <div className="flex-1">
@@ -700,7 +700,7 @@ export default function SettingsPage() {
                             How Auto-Send Earns Your Trust
                           </p>
                           <p>
-                            Scouto combines your review history with community rejection data. Your selected threshold remains the minimum: learned risk can make sending stricter, but never more permissive than your setting.
+                            BuyerWatch combines your review history with community rejection data. Your selected threshold remains the minimum: learned risk can make sending stricter, but never more permissive than your setting.
                           </p>
                         </div>
 
@@ -742,12 +742,12 @@ export default function SettingsPage() {
                       </div>
                     </SectionCard>
 
-                    <SectionCard title="Reply Tracking" description="Control how Scouto attributes clicks and revenue from your replies.">
+                    <SectionCard title="Reply Tracking" description="Control how BuyerWatch attributes clicks and revenue from your replies.">
                       <div className="flex items-start justify-between gap-6">
                         <div className="flex-1">
                           <p className="text-[14px] font-semibold text-gray-900">Include referral tracking in replies</p>
                           <p className="text-[13px] text-gray-500 mt-1">
-                            Gives each relevant reply a unique tracked link. Scouto records the click, then immediately redirects the reader to your website with its attribution token preserved.
+                            Gives each relevant reply a unique tracked link. BuyerWatch records the click, then immediately redirects the reader to your website with its attribution token preserved.
                           </p>
                         </div>
                         <Toggle
@@ -758,7 +758,7 @@ export default function SettingsPage() {
                       </div>
                       <div className="mt-4 p-3 bg-gray-50 border border-gray-100 rounded-xl text-[12px] text-gray-500 leading-relaxed">
                         <span className="font-semibold text-gray-700">How it works: </span>
-                        A link such as <span className="font-mono text-gray-700">{process.env.NEXT_PUBLIC_APP_URL || 'https://app.scouto.co'}/r/abc123</span> redirects to <span className="font-mono text-gray-700">{profile.businessUrl || 'https://yoursite.com'}?ref=scouto&amp;sid=abc123</span>. It is included only when the product is directly relevant and the affiliation is disclosed.
+                        A link such as <span className="font-mono text-gray-700">{process.env.NEXT_PUBLIC_APP_URL || 'https://app.buyerwatch.co'}/r/abc123</span> redirects to <span className="font-mono text-gray-700">{profile.businessUrl || 'https://yoursite.com'}?ref=buyerwatch&amp;sid=abc123</span>. It is included only when the product is directly relevant and the affiliation is disclosed.
                       </div>
                     </SectionCard>
 
@@ -808,7 +808,7 @@ export default function SettingsPage() {
                     {/* Slack Notifications Card */}
                     <SectionCard
                       title="Slack Notifications"
-                      description="Get an instant Slack message with the AI draft reply whenever Scouto finds a high-intent lead."
+                      description="Get an instant Slack message with the AI draft reply whenever BuyerWatch finds a high-intent lead."
                     >
                       <div className="space-y-5">
                         {/* Webhook URL */}
@@ -887,12 +887,12 @@ export default function SettingsPage() {
                     {/* Feature 2: Conversion Webhook Integration Card */}
                     <SectionCard
                       title="Conversion Webhook Integration"
-                      description="Attribute paid conversions back to your Scouto replies by firing a webhook from Stripe, Paddle, or your payment system."
+                      description="Attribute paid conversions back to your BuyerWatch replies by firing a webhook from Stripe, Paddle, or your payment system."
                     >
                       <div className="space-y-4">
                         <Field
                           label="Webhook Receiver Endpoint"
-                          hint="POST JSON payloads to this endpoint when a user who clicked a Scouto link converts."
+                          hint="POST JSON payloads to this endpoint when a user who clicked a BuyerWatch link converts."
                         >
                           <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800 sm:flex-row sm:items-center">
                             <span className="min-w-0 break-all">{process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion</span>

@@ -1,4 +1,4 @@
-import { NormalizedPost } from './types'
+﻿import { NormalizedPost } from './types'
 import { fetchWithTimeout } from './http'
 
 let cachedToken: string | null = null
@@ -23,7 +23,7 @@ async function getRedditToken(): Promise<string> {
     headers: {
       'Authorization': `Basic ${authString}`,
       'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+      'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
     },
     body: 'grant_type=client_credentials'
   }, 10_000)
@@ -209,7 +209,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
       const response = await fetchWithTimeout(url, {
         headers: {
           'Authorization': `Bearer ${redditApisKey}`,
-          'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+          'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
         }
       }, 10_000)
       if (response.ok) {
@@ -243,7 +243,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
       const response = await fetchWithTimeout(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+          'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
         }
       }, 10_000)
       if (response.ok) {

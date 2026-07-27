@@ -1,4 +1,4 @@
-const baseUrl = process.env.PRODUCTION_BASE_URL?.replace(/\/$/, '')
+﻿const baseUrl = process.env.PRODUCTION_BASE_URL?.replace(/\/$/, '')
 
 if (!baseUrl || !baseUrl.startsWith('https://')) {
   console.error('PRODUCTION_BASE_URL must be an HTTPS origin')
@@ -12,7 +12,7 @@ async function check(path, validate) {
     const response = await fetch(`${baseUrl}${path}`, {
       redirect: 'manual',
       signal: controller.signal,
-      headers: { 'user-agent': 'Scouto-Synthetic/1.0' },
+      headers: { 'user-agent': 'BuyerWatch-Synthetic/1.0' },
     })
     await validate(response)
     console.log(`PASS ${path} (${response.status})`)

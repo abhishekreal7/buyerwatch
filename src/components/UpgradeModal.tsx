@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -30,7 +30,7 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
   const dialogRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
-  const storageKey = `scouto_seen_upgrade_modal_${userId}_${plan}`
+  const storageKey = `buyerwatch_seen_upgrade_modal_${userId}_${plan}`
 
   useEffect(() => {
     if (normalizePlan(plan) === 'free') return

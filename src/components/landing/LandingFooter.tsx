@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import type { ReactNode } from 'react'
 import { useRef, useState } from 'react'
@@ -10,14 +10,14 @@ import { NewsletterForm } from '@/components/NewsletterForm'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
 
 const faqs = [
-  { q: 'What is Scouto?', a: 'It monitors Reddit and Bluesky for people looking for solutions like yours, scores their intent, and drafts a reply for review.' },
-  { q: 'Does Scouto post automatically?', a: 'Manual review is the default. Paid accounts can explicitly enable guarded auto-send only after completing the required trust-building reviews.' },
+  { q: 'What is BuyerWatch?', a: 'It monitors Reddit and Bluesky for people looking for solutions like yours, scores their intent, and drafts a reply for review.' },
+  { q: 'Does BuyerWatch post automatically?', a: 'Manual review is the default. Paid accounts can explicitly enable guarded auto-send only after completing the required trust-building reviews.' },
   { q: 'Does it work for non-SaaS businesses?', a: 'Yes. You can monitor configured Reddit communities and Bluesky searches for conversations relevant to any product or service.' },
-  { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. Scouto finds active buying intent from people who don\'t know you yet.' },
+  { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. BuyerWatch finds active buying intent from people who don\'t know you yet.' },
   { q: 'How does intent scoring work?', a: 'We classify posts into Buying, Researching, Complaining, and Other, then attach a 0–100 confidence score for review.' },
   { q: 'Can I try it for free?', a: 'Yes. Start with 1 keyword and up to 50 conversations per month. No card required.' },
-  { q: 'Does this violate platform terms of service?', a: 'Scouto uses public-feed access and authenticated connections where configured. Manual review is the default, and you remain responsible for each platform\'s rules.' },
-  { q: 'How does Scouto reduce promotional replies?', a: 'Drafts include an affiliation disclosure, are checked for promotional phrasing, and stay in manual review until the confidence engine has enough trust evidence.' }
+  { q: 'Does this violate platform terms of service?', a: 'BuyerWatch uses public-feed access and authenticated connections where configured. Manual review is the default, and you remain responsible for each platform\'s rules.' },
+  { q: 'How does BuyerWatch reduce promotional replies?', a: 'Drafts include an affiliation disclosure, are checked for promotional phrasing, and stay in manual review until the confidence engine has enough trust evidence.' }
 ]
 
 const fadeUp = {
@@ -47,7 +47,7 @@ export function LandingFooter() {
                 Common questions
               </h2>
               <p style={{ fontFamily: 'var(--font-inter)', fontSize: '16px', color: '#6B6B6B', lineHeight: 1.6 }}>
-                Everything you need to know about Scouto
+                Everything you need to know about BuyerWatch
               </p>
             </motion.div>
 
@@ -118,7 +118,7 @@ export function LandingFooter() {
             <div className="md:col-span-1">
               <div className="flex items-center gap-2 mb-4" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.025em' }}>
                 <Target className="w-4.5 h-4.5 text-[#0A84FF]" strokeWidth={2.2} />
-                Scouto
+                BuyerWatch
               </div>
               <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.42)', lineHeight: 1.65 }}>
                 Find your customers where they're already talking.
@@ -165,7 +165,7 @@ export function LandingFooter() {
             </div>
           </div>
           <div className="max-w-[1200px] mx-auto border-t border-white/[0.07] pt-7 flex items-center justify-between">
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: 'rgba(255,255,255,0.25)' }}>© 2026 Scouto. All rights reserved.</div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: 'rgba(255,255,255,0.25)' }}>© 2026 BuyerWatch. All rights reserved.</div>
           </div>
         </footer>
     </>

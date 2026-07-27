@@ -1,4 +1,4 @@
-import { checkApplicationReadiness } from '@/lib/health'
+﻿import { checkApplicationReadiness } from '@/lib/health'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,7 +7,7 @@ export async function GET() {
   return Response.json(
     {
       status: result.ready ? 'ok' : 'degraded',
-      service: 'scouto-web',
+      service: 'buyerwatch-web',
       timestamp: new Date().toISOString(),
       checks: result.checks,
     },

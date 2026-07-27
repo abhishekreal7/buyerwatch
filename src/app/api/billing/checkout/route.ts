@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import DodoPayments from 'dodopayments'
 import { createHash } from 'node:crypto'
@@ -11,7 +11,7 @@ import { getAppUrl } from '@/lib/app-url'
  * Accepts optional `plan` body param ('pro' | 'growth') — defaults to 'pro'.
  *
  * The user is identified via Supabase session; their ID + email are passed as
- * checkout metadata so the webhook can map the payment to a Scouto account.
+ * checkout metadata so the webhook can map the payment to a BuyerWatch account.
  *
  * UX flow:
  *   user clicks Upgrade → POST here → redirect to Dodo hosted checkout →

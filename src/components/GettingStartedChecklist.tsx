@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -55,14 +55,14 @@ export function GettingStartedChecklist({
   const isAllComplete = completedCount === steps.length
 
   useEffect(() => {
-    const savedDismissed = localStorage.getItem('scouto_checklist_dismissed') === 'true'
+    const savedDismissed = localStorage.getItem('buyerwatch_checklist_dismissed') === 'true'
     if (savedDismissed) setDismissed(true)
   }, [])
 
   // Permanently hide & dismiss once 100% complete
   useEffect(() => {
     if (isAllComplete) {
-      localStorage.setItem('scouto_checklist_dismissed', 'true')
+      localStorage.setItem('buyerwatch_checklist_dismissed', 'true')
     }
   }, [isAllComplete])
 

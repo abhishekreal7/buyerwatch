@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
@@ -40,10 +40,10 @@ export function CommandPalette() {
     }
 
     document.addEventListener('keydown', down)
-    window.addEventListener('scouto:open-command-palette', openPalette)
+    window.addEventListener('buyerwatch:open-command-palette', openPalette)
     return () => {
       document.removeEventListener('keydown', down)
-      window.removeEventListener('scouto:open-command-palette', openPalette)
+      window.removeEventListener('buyerwatch:open-command-palette', openPalette)
     }
   }, [])
 

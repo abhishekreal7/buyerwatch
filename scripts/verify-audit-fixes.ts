@@ -1,4 +1,4 @@
-import { evaluateAutoSend } from '../src/lib/confidence-engine'
+﻿import { evaluateAutoSend } from '../src/lib/confidence-engine'
 import { checkSendRateLimit } from '../src/lib/send-limiter'
 
 async function runAuditVerification() {
@@ -14,7 +14,7 @@ async function runAuditVerification() {
   }
   const dummyDraft = {
     score: 85,
-    text: 'Check out our solution at scouto.com for automated keyword monitoring. Founder disclosure: I built Scouto.',
+    text: 'Check out our solution at buyerwatch.com for automated keyword monitoring. Founder disclosure: I built BuyerWatch.',
     flagged: false,
     hasDisclosure: true
   }

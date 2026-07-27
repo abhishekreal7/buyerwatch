@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Runtime Verification Script: Confidence Engine Safeguards
  *
  * Tests two things against real Supabase data:
@@ -272,7 +272,7 @@ async function test2_communityMetrics_coldStart() {
 // ─── Run All Tests ────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('Scouto Confidence Engine — Runtime Verification')
+  console.log('BuyerWatch Confidence Engine — Runtime Verification')
   console.log(`Supabase URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL}`)
   console.log(`MIN_FEEDBACK_FOR_TRUST = ${MIN_FEEDBACK_FOR_TRUST}`)
   console.log(`MIN_COMMUNITY_SAMPLE   = ${MIN_COMMUNITY_SAMPLE}`)

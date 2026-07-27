@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -e
 
 PROJECT_ID="scouto-501307"
 REGION="us-central1"
-SERVICE_NAME="scouto-worker"
+SERVICE_NAME="buyerwatch-worker"
 
-echo "🚀 Deploying Scouto Background Worker to GCP ($PROJECT_ID / $REGION)..."
+echo "🚀 Deploying BuyerWatch Background Worker to GCP ($PROJECT_ID / $REGION)..."
 
 # 1. Enable GCP Services
 gcloud services enable run.googleapis.com containerregistry.googleapis.com artifactregistry.googleapis.com --project "$PROJECT_ID"

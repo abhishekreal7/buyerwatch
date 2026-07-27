@@ -1,4 +1,4 @@
-import { createBullBoard } from '@bull-board/api'
+﻿import { createBullBoard } from '@bull-board/api'
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
 import { ExpressAdapter } from '@bull-board/express'
 import * as Sentry from '@sentry/node'
@@ -194,7 +194,7 @@ export async function startWorkerRuntime() {
       .set('Cache-Control', 'no-store')
       .json({
         status: shuttingDown ? 'stopping' : 'ok',
-        service: 'scouto-worker',
+        service: 'buyerwatch-worker',
         release: release ?? 'development',
       })
   })
@@ -228,22 +228,22 @@ export async function startWorkerRuntime() {
 
   app.get('/metrics', requireAdmin, async (_request, response) => {
     const lines = [
-      '# HELP scouto_worker_jobs_total Jobs observed by this worker process.',
-      '# TYPE scouto_worker_jobs_total counter',
+      '# HELP buyerwatch_worker_jobs_total Jobs observed by this worker process.',
+      '# TYPE buyerwatch_worker_jobs_total counter',
     ]
     for (const [queue, metric] of metrics) {
       const label = sanitizeMetricLabel(queue)
-      lines.push(`scouto_worker_jobs_total{queue="${label}",result="completed"} ${metric.completed}`)
-      lines.push(`scouto_worker_jobs_total{queue="${label}",result="failed"} ${metric.failed}`)
+      lines.push(`buyerwatch_worker_jobs_total{queue="${label}",result="completed"} ${metric.completed}`)
+      lines.push(`buyerwatch_worker_jobs_total{queue="${label}",result="failed"} ${metric.failed}`)
     }
 
-    lines.push('# HELP scouto_queue_jobs Current BullMQ job counts.')
-    lines.push('# TYPE scouto_queue_jobs gauge')
+    lines.push('# HELP buyerwatch_queue_jobs Current BullMQ job counts.')
+    lines.push('# TYPE buyerwatch_queue_jobs gauge')
     for (const [queueName, queue] of queueEntries) {
       const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'failed')
       const label = sanitizeMetricLabel(queueName)
       for (const [state, value] of Object.entries(counts)) {
-        lines.push(`scouto_queue_jobs{queue="${label}",state="${state}"} ${value}`)
+        lines.push(`buyerwatch_queue_jobs{queue="${label}",state="${state}"} ${value}`)
       }
     }
     response.type('text/plain; version=0.0.4').send(`${lines.join('\n')}\n`)
@@ -287,7 +287,7 @@ export async function startWorkerRuntime() {
 
   process.once('SIGTERM', () => void shutdown('SIGTERM'))
   process.once('SIGINT', () => void shutdown('SIGINT'))
-  logger.info({ workers: workers.length }, 'Scouto workers initialized')
+  logger.info({ workers: workers.length }, 'BuyerWatch workers initialized')
 
   return { app, workers, shutdown }
 }

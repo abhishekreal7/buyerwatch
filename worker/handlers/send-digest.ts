@@ -1,4 +1,4 @@
-import { Job } from 'bullmq'
+﻿import { Job } from 'bullmq'
 import { Resend } from 'resend'
 import { WeeklyDigest } from '../../src/emails/WeeklyDigest'
 import { logger } from '../../src/lib/logger'
@@ -47,7 +47,7 @@ export async function sendDigestHandler(job: Job) {
     const data = await withTimeout(resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL!,
       to: [email],
-      subject: `Scouto found ${threadsCount || items.length} opportunities for you this week`,
+      subject: `BuyerWatch found ${threadsCount || items.length} opportunities for you this week`,
       react: WeeklyDigest({
         opportunities: items,
         totalFound: threadsCount || items.length,

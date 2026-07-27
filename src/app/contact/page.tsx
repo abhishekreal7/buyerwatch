@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -47,7 +47,7 @@ export default function ContactPage() {
                 Send us a direct inquiry. We normally reply to all founder requests within a few hours.
               </p>
               <a
-                href={`mailto:${SUPPORT_EMAIL}?subject=Inquiry%20from%20Scouto`}
+                href={`mailto:${SUPPORT_EMAIL}?subject=Inquiry%20from%20BuyerWatch`}
                 className="inline-flex items-center gap-2 bg-[#0A0A0A] hover:bg-[#222] text-white text-[14px] font-bold px-6 py-3 rounded-full transition-colors duration-150 shadow-[0_2px_12px_rgba(0,0,0,0.1)]"
                 style={{ fontFamily: 'var(--font-inter), sans-serif' }}
               >

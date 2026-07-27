@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { signUpAction, signInWithGoogleAction } from '@/app/actions/auth'
@@ -177,7 +177,7 @@ export default function SignupPage() {
 
       {/* Bottom Footer */}
       <div className="w-full max-w-5xl flex items-center justify-center text-[12px] text-[#888888] z-10 pt-4">
-        <span>© Scouto, Inc. All rights reserved.</span>
+        <span>© BuyerWatch, Inc. All rights reserved.</span>
       </div>
     </div>
   )

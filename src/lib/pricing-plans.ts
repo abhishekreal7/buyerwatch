@@ -1,10 +1,10 @@
-export const PRICING_PLANS = [
+﻿export const PRICING_PLANS = [
   {
     id: 'free',
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'Try Scouto and get your first real buying signal.',
+    description: 'Try BuyerWatch and get your first real buying signal.',
     features: [
       '1 keyword monitoring rule',
       'Up to 50 buyer-intent signals/month',

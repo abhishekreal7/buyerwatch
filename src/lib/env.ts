@@ -1,4 +1,4 @@
-const CORE_PRODUCTION_ENV = [
+﻿const CORE_PRODUCTION_ENV = [
   'NEXT_PUBLIC_APP_URL',
   'NEXT_PUBLIC_SUPPORT_EMAIL',
   'NEXT_PUBLIC_SUPABASE_URL',
@@ -120,19 +120,19 @@ function validateOptionalProviders(): void {
 
 export function validateAppEnvironment(): void {
   if (process.env.NODE_ENV !== 'production') return
-  assertValues(CORE_PRODUCTION_ENV, 'Scouto app')
+  assertValues(CORE_PRODUCTION_ENV, 'BuyerWatch app')
   validateOptionalProviders()
   if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
-    throw new Error('Scouto app requires ANTHROPIC_API_KEY or GEMINI_API_KEY')
+    throw new Error('BuyerWatch app requires ANTHROPIC_API_KEY or GEMINI_API_KEY')
   }
 }
 
 export function validateWorkerEnvironment(): void {
   if (process.env.NODE_ENV !== 'production') return
-  assertValues(WORKER_PRODUCTION_ENV, 'Scouto worker')
+  assertValues(WORKER_PRODUCTION_ENV, 'BuyerWatch worker')
   validateOptionalProviders()
   if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
-    throw new Error('Scouto worker requires ANTHROPIC_API_KEY or GEMINI_API_KEY')
+    throw new Error('BuyerWatch worker requires ANTHROPIC_API_KEY or GEMINI_API_KEY')
   }
 }
 

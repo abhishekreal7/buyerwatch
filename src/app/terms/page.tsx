@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -33,14 +33,14 @@ export default function TermsPage() {
 
           <div className="prose prose-neutral max-w-none text-neutral-600 space-y-6 text-[15px] leading-relaxed" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
             <p>
-              Welcome to Scouto. By accessing or using our website and services, you agree to comply with and be bound by these Terms of Service.
+              Welcome to BuyerWatch. By accessing or using our website and services, you agree to comply with and be bound by these Terms of Service.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
               1. Acceptable Use and Platform Policies
             </h2>
             <p>
-              Scouto is designed to assist you in monitoring public social networks (such as Reddit or Bluesky) and drafting replies. When using Scouto, you agree:
+              BuyerWatch is designed to assist you in monitoring public social networks (such as Reddit or Bluesky) and drafting replies. When using BuyerWatch, you agree:
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li>To comply with the target platform's policies, terms, and API guidelines.</li>
@@ -52,28 +52,28 @@ export default function TermsPage() {
               2. Accounts and Security
             </h2>
             <p>
-              You must provide accurate and complete registration information. You are responsible for safeguarding your account access credentials and OAuth tokens. Scouto cannot and will not be liable for any loss or damage arising from your failure to maintain account security.
+              You must provide accurate and complete registration information. You are responsible for safeguarding your account access credentials and OAuth tokens. BuyerWatch cannot and will not be liable for any loss or damage arising from your failure to maintain account security.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
               3. Payments, Subscriptions, and Refunds
             </h2>
             <p>
-              When paid plans are available, purchases, subscriptions, invoices, cancellations, and refunds are processed by <strong>Dodo Payments</strong> under the terms shown during checkout. Scouto does not collect or store full card numbers.
+              When paid plans are available, purchases, subscriptions, invoices, cancellations, and refunds are processed by <strong>Dodo Payments</strong> under the terms shown during checkout. BuyerWatch does not collect or store full card numbers.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
               4. Disclaimer of Warranties
             </h2>
             <p>
-              Scouto is provided on an "AS IS" and "AS AVAILABLE" basis. We do not warrant that the service will be error-free, uninterrupted, or that AI-generated content will always be accurate. You use the service at your own risk.
+              BuyerWatch is provided on an "AS IS" and "AS AVAILABLE" basis. We do not warrant that the service will be error-free, uninterrupted, or that AI-generated content will always be accurate. You use the service at your own risk.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
               5. Limitation of Liability
             </h2>
             <p>
-              In no event shall Scouto, its developers, or its affiliates be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or platform account access resulting from your use of the service.
+              In no event shall BuyerWatch, its developers, or its affiliates be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or platform account access resulting from your use of the service.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Runtime Verification — Positive Approval Path + Error Handling Scope
  *
  * Prerequisites:
@@ -322,7 +322,7 @@ async function test2_errorHandlingScope() {
 async function main() {
   const testUserId = process.env.TEST_USER_ID
 
-  console.log('Scouto Confidence Engine — Positive Path Runtime Verification')
+  console.log('BuyerWatch Confidence Engine — Positive Path Runtime Verification')
   console.log(`Supabase URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL}`)
 
   if (!testUserId) {

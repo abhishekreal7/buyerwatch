@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -446,7 +446,7 @@ export default function KeywordsPage() {
                 </div>
                 <p className="text-[16px] font-semibold text-[#1C1C1A] mb-2">Set your first signal rule</p>
                 <p className="text-[13px] text-[#787872] max-w-xs mb-6 leading-relaxed">
-                  Tell Scouto what buying intent looks like for your product — a keyword and a community.
+                  Tell BuyerWatch what buying intent looks like for your product — a keyword and a community.
                 </p>
                 <button
                   onClick={() => setShowAdd(true)}

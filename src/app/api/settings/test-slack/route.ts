@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { fetchWithTimeout } from '@/lib/http'
 import { isAllowedSlackWebhookUrl } from '@/lib/security/outbound-url'
@@ -15,13 +15,13 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = {
-    text: '✅ Scouto is connected to your Slack!',
+    text: '✅ BuyerWatch is connected to your Slack!',
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '✅ *Scouto is connected to your Slack!*\n\nYou\'ll receive messages like this whenever a high-intent lead is found. Here\'s a preview of what a real notification looks like:',
+          text: '✅ *BuyerWatch is connected to your Slack!*\n\nYou\'ll receive messages like this whenever a high-intent lead is found. Here\'s a preview of what a real notification looks like:',
         },
       },
       { type: 'divider' },
@@ -44,13 +44,13 @@ export async function POST(req: NextRequest) {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*AI Draft Reply:*\n```Hey! I\'ve been building exactly this — Scouto monitors subreddits for high-intent posts and drafts replies automatically. Happy to share more if you\'re interested!```',
+          text: '*AI Draft Reply:*\n```Hey! I\'ve been building exactly this — BuyerWatch monitors subreddits for high-intent posts and drafts replies automatically. Happy to share more if you\'re interested!```',
         },
       },
       {
         type: 'context',
         elements: [
-          { type: 'mrkdwn', text: 'This is a test message from Scouto.' },
+          { type: 'mrkdwn', text: 'This is a test message from BuyerWatch.' },
         ],
       },
     ],

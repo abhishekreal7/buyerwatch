@@ -1,4 +1,4 @@
-const ATTRIBUTION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{6,64}$/
+﻿const ATTRIBUTION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{6,64}$/
 
 export function assertAttributionToken(token: string): string {
   if (!ATTRIBUTION_TOKEN_PATTERN.test(token)) {
@@ -22,7 +22,7 @@ export function buildAttributionDestinationUrl(businessUrl: string, token: strin
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
     throw new Error('Invalid attribution destination')
   }
-  url.searchParams.set('ref', 'scouto')
+  url.searchParams.set('ref', 'buyerwatch')
   url.searchParams.set('sid', safeToken)
   return url.toString()
 }

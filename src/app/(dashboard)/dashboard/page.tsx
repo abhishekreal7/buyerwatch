@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { Search, Target, CheckCircle, ChevronDown, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, ChevronUp, Globe } from 'lucide-react'
@@ -222,8 +222,8 @@ export default function DashboardPage() {
     const handleAutoSendChanged = (event: Event) => {
       setAutoSendEnabled(Boolean((event as CustomEvent<boolean>).detail))
     }
-    window.addEventListener('scouto:auto-send-changed', handleAutoSendChanged)
-    return () => window.removeEventListener('scouto:auto-send-changed', handleAutoSendChanged)
+    window.addEventListener('buyerwatch:auto-send-changed', handleAutoSendChanged)
+    return () => window.removeEventListener('buyerwatch:auto-send-changed', handleAutoSendChanged)
   }, [])
 
   const handleInspectThread = async (thread: Thread) => {
@@ -380,7 +380,7 @@ export default function DashboardPage() {
 
       setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, draft, originalDraft: draft } : t))
       setSelectedThread(prev => prev ? { ...prev, draft, originalDraft: draft } : null)
-      window.dispatchEvent(new Event('scouto:credits-changed'))
+      window.dispatchEvent(new Event('buyerwatch:credits-changed'))
       toast.success('Draft regenerated.')
     } catch {
       toast.error('Failed to request regeneration')

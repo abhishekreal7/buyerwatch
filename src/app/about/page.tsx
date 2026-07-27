@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -26,12 +26,12 @@ export default function AboutPage() {
           transition={{ duration: 0.4 }}
         >
           <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 mb-6" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
-            About Scouto
+            About BuyerWatch
           </h1>
 
           <div className="prose prose-neutral max-w-none text-neutral-600 space-y-6 text-[15.5px] leading-relaxed" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
             <p>
-              Scouto was built to solve a problem faced by almost every early-stage founder and marketer: finding the exact moments when people are looking for a product like yours, and engaging with them before the conversation moves on.
+              BuyerWatch was built to solve a problem faced by almost every early-stage founder and marketer: finding the exact moments when people are looking for a product like yours, and engaging with them before the conversation moves on.
             </p>
 
             <p>
@@ -39,7 +39,7 @@ export default function AboutPage() {
             </p>
 
             <p>
-              Scouto automates this monitoring process by searching communities 24/7. When a match is found, our dual-stage AI pipeline handles the heavy lifting: first, a buyer-intent analysis (powered by Gemini) determines how warm the lead is; second, a voice-matching agent (powered by Claude) drafts a natural response tailored to your company's profile and custom tone.
+              BuyerWatch automates this monitoring process by searching communities 24/7. When a match is found, our dual-stage AI pipeline handles the heavy lifting: first, a buyer-intent analysis (powered by Gemini) determines how warm the lead is; second, a voice-matching agent (powered by Claude) drafts a natural response tailored to your company's profile and custom tone.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-12 mb-6" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>

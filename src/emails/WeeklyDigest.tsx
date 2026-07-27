@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Container,
   Head,
@@ -37,10 +37,10 @@ export const WeeklyDigest = ({
 }: WeeklyDigestProps) => (
   <Html>
     <Head />
-    <Preview>{`Your weekly Scouto digest: We found ${totalFound} opportunities for you.`}</Preview>
+    <Preview>{`Your weekly BuyerWatch digest: We found ${totalFound} opportunities for you.`}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Your Week with Scouto</Heading>
+        <Heading style={h1}>Your Week with BuyerWatch</Heading>
         
         <Text style={text}>
           Here's a quick summary of what we've been up to in the background:
@@ -85,7 +85,7 @@ export const WeeklyDigest = ({
 
         <Hr style={hr} />
         <Text style={footer}>
-          You are receiving this because you enabled Weekly Reports in Scouto Settings.
+          You are receiving this because you enabled Weekly Reports in BuyerWatch Settings.
         </Text>
       </Container>
     </Body>

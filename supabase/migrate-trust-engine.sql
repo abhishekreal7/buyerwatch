@@ -1,5 +1,5 @@
--- =============================================================================
--- Scouto: Incremental Migration — Trust Engine Tables
+﻿-- =============================================================================
+-- BuyerWatch: Incremental Migration — Trust Engine Tables
 -- Run this in the Supabase SQL Editor (NOT the full schema.sql which has DROP statements)
 -- This only adds new tables that don't exist yet in the live project.
 -- =============================================================================

@@ -18,13 +18,13 @@ export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: Brand
   return (
     <span className={`inline-flex items-center gap-2.5 font-display font-bold tracking-tight ${tone === 'light' ? 'text-white' : 'text-gray-950'}`}>
       <Image
-        src="/scouto_official_logo.png"
+        src="/buyerwatch_logo.png"
         alt=""
         width={pixels}
         height={pixels}
         className="rounded-full object-contain"
       />
-      {!compact && <span>Scouto</span>}
+      {!compact && <span>BuyerWatch</span>}
     </span>
   )
 }

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -257,7 +257,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Business Name *</label>
                   <input
                     value={businessName} onChange={e => setBusinessName(e.target.value)}
-                    type="text" placeholder="e.g. Scouto"
+                    type="text" placeholder="e.g. BuyerWatch"
                     className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
                   />
                 </div>

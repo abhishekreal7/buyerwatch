@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -33,14 +33,14 @@ export default function PrivacyPage() {
 
           <div className="prose prose-neutral max-w-none text-neutral-600 space-y-6 text-[15px] leading-relaxed" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
             <p>
-              At Scouto, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services.
+              At BuyerWatch, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
               1. Information We Collect
             </h2>
             <p>
-              When you use Scouto, we collect standard information necessary to provide and optimize the services:
+              When you use BuyerWatch, we collect standard information necessary to provide and optimize the services:
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li><strong>Account Information:</strong> Your name, email address, password, and profile preferences when you register.</li>
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
               3. Payment Processing
             </h2>
             <p>
-              When paid plans are enabled, payments, billing details, and subscription management are processed by our merchant provider, <strong>Dodo Payments</strong>. Scouto does not collect or store full card numbers.
+              When paid plans are enabled, payments, billing details, and subscription management are processed by our merchant provider, <strong>Dodo Payments</strong>. BuyerWatch does not collect or store full card numbers.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>

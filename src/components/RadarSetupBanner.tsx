@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { Target, CheckCircle2, ChevronUp, ChevronDown, X, ArrowRight } from 'lucide-react'
@@ -20,8 +20,8 @@ export function RadarSetupBanner({
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
-    const savedMinimized = localStorage.getItem('scouto_setup_minimized') === 'true'
-    const savedDismissed = localStorage.getItem('scouto_setup_dismissed') === 'true'
+    const savedMinimized = localStorage.getItem('buyerwatch_setup_minimized') === 'true'
+    const savedDismissed = localStorage.getItem('buyerwatch_setup_dismissed') === 'true'
     if (savedMinimized) setMinimized(true)
     if (savedDismissed) setDismissed(true)
   }, [])
@@ -62,12 +62,12 @@ export function RadarSetupBanner({
   const handleToggleMinimize = () => {
     const next = !minimized
     setMinimized(next)
-    localStorage.setItem('scouto_setup_minimized', String(next))
+    localStorage.setItem('buyerwatch_setup_minimized', String(next))
   }
 
   const handleDismiss = () => {
     setDismissed(true)
-    localStorage.setItem('scouto_setup_dismissed', 'true')
+    localStorage.setItem('buyerwatch_setup_dismissed', 'true')
   }
 
   return (

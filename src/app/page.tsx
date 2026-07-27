@@ -36,6 +36,7 @@ import {
   CoreFeatureBento,
 } from '@/components/landing/PremiumFeatureSections'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
+import { Reveal } from '@/components/Reveal'
 
 
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
@@ -91,7 +92,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 h-[60px] flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.025em', color: '#0A0A0A' }}>
             <Target className="w-5 h-5 text-[#0A84FF]" strokeWidth={2.2} />
-            Scouto
+            BuyerWatch
           </Link>
           <div className="hidden md:flex items-center gap-7">
             {['Features', 'How it works', 'Pricing'].map((label) => (
@@ -186,11 +187,13 @@ export default function LandingPage() {
                 { title: 'Manual search is a time sink', desc: 'Scrolling subreddits and social feeds takes hours you don\'t have.' },
                 { title: 'Relevant conversations move quickly', desc: 'Useful threads can disappear beneath newer posts before you know they exist.' }
               ].map((p, i) => (
-                <div key={i} className="flex flex-col gap-2">
-                  <span className="text-[12px] font-bold text-[#EF4444] uppercase tracking-wider">0{i + 1}</span>
-                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A' }}>{p.title}</h4>
-                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>{p.desc}</p>
-                </div>
+                <Reveal key={i} delay={i * 0.08} duration={0.7}>
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[12px] font-bold text-[#EF4444] uppercase tracking-wider">0{i + 1}</span>
+                    <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A' }}>{p.title}</h4>
+                    <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>{p.desc}</p>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </div>
@@ -222,7 +225,7 @@ export default function LandingPage() {
                       Set your keywords
                     </h4>
                     <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Competitor names, pain points, and buying signals. Scouto monitors Reddit and Bluesky on your plan&apos;s polling cadence.
+                      Competitor names, pain points, and buying signals. BuyerWatch monitors Reddit and Bluesky on your plan&apos;s polling cadence.
                     </p>
                   </div>
 
@@ -250,7 +253,7 @@ export default function LandingPage() {
                       AI drafts a reply
                     </h4>
                     <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.65 }}>
-                      Scouto uses your product profile, writing style, tone examples, and the thread context to draft a reply.
+                      BuyerWatch uses your product profile, writing style, tone examples, and the thread context to draft a reply.
                     </p>
                   </div>
 
@@ -609,7 +612,7 @@ export default function LandingPage() {
                 Claims you can verify<br />inside your workspace
               </h2>
               <p style={{ fontFamily: 'var(--font-inter)', fontSize: '16px', color: '#6B6B6B', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto' }}>
-                Scouto records the evidence behind discovery, sending, attribution, and search visibility.
+                BuyerWatch records the evidence behind discovery, sending, attribution, and search visibility.
               </p>
             </motion.div>
 
@@ -713,7 +716,7 @@ export default function LandingPage() {
                     </span>
                   </div>
                   <p className="font-sans text-[14px] text-[#52525B] font-normal mb-6 leading-relaxed min-h-[40px]">
-                    Great for trying out Scouto buyer intent signals and rule monitoring.
+                    Great for trying out BuyerWatch buyer intent signals and rule monitoring.
                   </p>
 
                   <PremiumCtaButton href="/signup" fullWidth className="mb-6">

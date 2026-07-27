@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { timingSafeEqual } from 'crypto'
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
     headers: {
       'Authorization': `Basic ${basicAuth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+      'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
@@ -109,7 +109,7 @@ export async function GET(req: Request) {
   const meRes = await fetchWithTimeout('https://oauth.reddit.com/api/v1/me', {
     headers: { 
       'Authorization': `Bearer ${tokenData.access_token}`,
-      'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+      'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
     }
   }, 10_000)
   if (!meRes.ok) {

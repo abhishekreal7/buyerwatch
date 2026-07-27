@@ -83,7 +83,7 @@ describe('reply-quality policy', () => {
   it('allows a useful non-commercial reply without a disclosure', () => {
     const result = evaluateReplyQuality(
       'Start by checking whether the queue is backing up before replacing the database.',
-      { businessName: 'Scouto', platform: 'reddit' },
+      { businessName: 'BuyerWatch', platform: 'reddit' },
     )
     expect(result.blocksAutomation).toBe(false)
     expect(result.mentionedProduct).toBe(false)
@@ -91,16 +91,16 @@ describe('reply-quality policy', () => {
 
   it('requires disclosure when the product is mentioned', () => {
     const result = evaluateReplyQuality(
-      'Scouto can monitor those conversations and summarize the relevant ones.',
-      { businessName: 'Scouto', platform: 'reddit' },
+      'BuyerWatch can monitor those conversations and summarize the relevant ones.',
+      { businessName: 'BuyerWatch', platform: 'reddit' },
     )
     expect(result.issues.map(issue => issue.code)).toContain('missing_disclosure')
   })
 
   it('allows a relevant, disclosed product mention', () => {
     const result = evaluateReplyQuality(
-      "Scouto can monitor those conversations. Disclosure: I'm affiliated with Scouto.",
-      { businessName: 'Scouto', platform: 'reddit' },
+      "BuyerWatch can monitor those conversations. Disclosure: I'm affiliated with BuyerWatch.",
+      { businessName: 'BuyerWatch', platform: 'reddit' },
     )
     expect(result.blocksAutomation).toBe(false)
     expect(result.hasDisclosure).toBe(true)
@@ -108,8 +108,8 @@ describe('reply-quality policy', () => {
 
   it('blocks promotional language and direct calls to action', () => {
     const result = evaluateReplyQuality(
-      "You should try Scouto, it is a game-changer. Sign up today! Disclosure: I'm affiliated with Scouto.",
-      { businessName: 'Scouto', platform: 'reddit' },
+      "You should try BuyerWatch, it is a game-changer. Sign up today! Disclosure: I'm affiliated with BuyerWatch.",
+      { businessName: 'BuyerWatch', platform: 'reddit' },
     )
     expect(result.issues.map(issue => issue.code)).toEqual(
       expect.arrayContaining(['promotional_language', 'call_to_action']),
@@ -119,14 +119,14 @@ describe('reply-quality policy', () => {
   it('blocks invented numerical outcomes', () => {
     const result = evaluateReplyQuality(
       'We increased conversions by 70% in one week.',
-      { businessName: 'Scouto', platform: 'reddit' },
+      { businessName: 'BuyerWatch', platform: 'reddit' },
     )
     expect(result.issues.map(issue => issue.code)).toContain('unsupported_claim')
   })
 
   it('enforces platform-specific reply limits', () => {
     const result = evaluateReplyQuality('a'.repeat(301), {
-      businessName: 'Scouto',
+      businessName: 'BuyerWatch',
       platform: 'bluesky',
     })
     expect(result.issues.map(issue => issue.code)).toContain('too_long')
@@ -209,7 +209,7 @@ describe('attribution URLs', () => {
     expect(buildAttributionDestinationUrl(
       'https://customer.example/pricing?campaign=summer',
       'abc-123',
-    )).toBe('https://customer.example/pricing?campaign=summer&ref=scouto&sid=abc-123')
+    )).toBe('https://customer.example/pricing?campaign=summer&ref=buyerwatch&sid=abc-123')
   })
 
   it('rejects unsafe tokens and destinations', () => {
@@ -221,7 +221,7 @@ describe('attribution URLs', () => {
 describe('onboarding intelligence', () => {
   it('deduplicates and bounds untrusted provider suggestions', () => {
     const result = sanitizeOnboardingSuggestions({
-      businessName: '  Scouto  ',
+      businessName: '  BuyerWatch  ',
       description: '  Finds relevant conversations. ',
       subreddits: ['r/SaaS', 'saas', 'not valid!', 'startups'],
       buyerKeywords: ['looking for a tool', 'Looking for a tool', '', 'recommend a tool'],
@@ -229,19 +229,19 @@ describe('onboarding intelligence', () => {
       painPointKeywords: [],
     }, 'ai')
 
-    expect(result.businessName).toBe('Scouto')
+    expect(result.businessName).toBe('BuyerWatch')
     expect(result.subreddits).toEqual(['SaaS', 'startups'])
     expect(result.buyerKeywords).toEqual(['looking for a tool', 'recommend a tool'])
   })
 
   it('uses honest generic intent patterns instead of treating the product as its own competitor', () => {
     const result = buildFallbackSuggestions({
-      businessName: 'Scouto',
+      businessName: 'BuyerWatch',
       description: 'Software for monitoring online buying intent.',
       webpageTitle: '',
       webpageDescription: '',
     })
-    expect(result.competitorKeywords).not.toContain('alternative to Scouto')
+    expect(result.competitorKeywords).not.toContain('alternative to BuyerWatch')
     expect(result.buyerKeywords).toContain('looking for a tool')
   })
 })
@@ -249,7 +249,7 @@ describe('onboarding intelligence', () => {
 describe('onboarding validation', () => {
   it('requires enough product context for meaningful scoring', () => {
     expect(validateProductContext({
-      businessName: 'Scouto',
+      businessName: 'BuyerWatch',
       businessDescription: 'short',
     })).toMatch(/short description/i)
   })
@@ -263,9 +263,9 @@ describe('onboarding validation', () => {
 
   it('validates the complete server payload without provider credentials', () => {
     expect(validateOnboardingData({
-      business_name: 'Scouto',
+      business_name: 'BuyerWatch',
       business_description: 'Finds relevant buying conversations online.',
-      business_url: 'https://scouto.example',
+      business_url: 'https://buyerwatch.example',
       business_type: 'saas',
       writing_style: 'Direct and helpful.',
       reddit_username: '',

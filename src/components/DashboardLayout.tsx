@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -132,10 +132,10 @@ export default function DashboardLayout({
     }
     const refreshCredits = () => void loadSidebarData()
     const refreshInterval = window.setInterval(loadSidebarData, 60_000)
-    window.addEventListener('scouto:credits-changed', refreshCredits)
+    window.addEventListener('buyerwatch:credits-changed', refreshCredits)
     return () => {
       window.clearInterval(refreshInterval)
-      window.removeEventListener('scouto:credits-changed', refreshCredits)
+      window.removeEventListener('buyerwatch:credits-changed', refreshCredits)
     }
   }, [supabase, userId])
 
@@ -177,7 +177,7 @@ export default function DashboardLayout({
       toast.error('Failed to update auto-send setting')
     } else {
       toast.success(next ? 'Auto-send enabled' : 'Auto-send paused')
-      window.dispatchEvent(new CustomEvent('scouto:auto-send-changed', { detail: next }))
+      window.dispatchEvent(new CustomEvent('buyerwatch:auto-send-changed', { detail: next }))
     }
     setTogglingAutoSend(false)
   }
@@ -225,7 +225,7 @@ export default function DashboardLayout({
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
 
   function openCommandPalette() {
-    window.dispatchEvent(new Event('scouto:open-command-palette'))
+    window.dispatchEvent(new Event('buyerwatch:open-command-palette'))
   }
 
   return (
@@ -396,7 +396,7 @@ export default function DashboardLayout({
               <div className="hidden min-w-0 items-center sm:flex">
                 <span className="flex items-center gap-1.5 whitespace-nowrap">
                   <ReferenceBreadcrumbFolderIcon className="h-[15px] w-[15px] text-[#8B8E8A]" aria-hidden />
-                  Scouto
+                  BuyerWatch
                 </span>
                 <ChevronRight className="mx-1.5 h-3 w-3 shrink-0 text-[#B8B8B4]" strokeWidth={1.8} aria-hidden />
                 <span className="flex items-center gap-1.5 whitespace-nowrap">

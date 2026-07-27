@@ -1,11 +1,11 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { Check, ArrowRight } from 'lucide-react'
 import { getProviderCapabilities } from '@/lib/env'
 import { BrandLogo } from '@/components/BrandLogo'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
 
 export const metadata = {
-  title: 'Pricing — Scouto',
+  title: 'Pricing — BuyerWatch',
   description: 'Simple, transparent pricing. Start free, upgrade when you need more signal coverage.',
 }
 

@@ -24,7 +24,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Scouto | Premium Lead Generation",
+  title: "BuyerWatch | Premium Lead Generation",
   description: "Advanced signal intelligence and reply automation.",
 };
 

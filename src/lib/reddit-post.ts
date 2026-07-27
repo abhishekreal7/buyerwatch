@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+﻿import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt } from './encryption'
 import { fetchWithTimeout } from './http'
 
@@ -60,7 +60,7 @@ async function refreshRedditToken(userId: string, refreshToken: string) {
     headers: {
       'Authorization': `Basic ${basicAuth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0',
+      'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
@@ -131,7 +131,7 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${redditApisKey}`,
-        'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0',
+        'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
@@ -182,7 +182,7 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0',
+        'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
@@ -233,7 +233,7 @@ export async function submitRedditPost(userId: string, subreddit: string, title:
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${redditApisKey}`,
-        'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0',
+        'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
@@ -285,7 +285,7 @@ export async function submitRedditPost(userId: string, subreddit: string, title:
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'User-Agent': process.env.REDDIT_USER_AGENT || 'ScoutoBot/1.0',
+        'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
