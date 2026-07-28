@@ -32,6 +32,8 @@ import {
   LeadDiscoveryWidget,
 } from '@/components/landing/HomeWidgets'
 import { LandingFooter } from '@/components/landing/LandingFooter'
+import { AgentoryFeatureCard } from '@/components/landing/AgentoryFeatureCard'
+import { AgentoryFeatureSection } from '@/components/landing/AgentoryFeatureSection'
 import {
   BeforeAfterTransformation,
   CoreFeatureBento,
