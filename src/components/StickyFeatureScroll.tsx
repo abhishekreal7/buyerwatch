@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-motion'
 
-// 🎨 High-Fidelity Vector Illustration 1: Futuristic Radar Target Scope (Automated Intent Tracking)
+// 🎨 Vector Illustration 1: Futuristic Radar Target Scope (Automated Intent Tracking)
 const RadarTargetScopeIcon = () => (
   <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
     {/* Outer Radar Scope Ring */}
@@ -27,30 +27,37 @@ const RadarTargetScopeIcon = () => (
   </svg>
 )
 
-// 🎨 High-Fidelity Vector Illustration 2: Diamond in Hand (AI Lead Qualification / Response Speed)
-const DiamondHandIcon = () => (
+// 🎨 Vector Illustration 2: AI Lead Intent Rating Badge (AI Lead Qualification / 94%)
+const AIIntentRatingIcon = () => (
   <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-    {/* Sparkling Diamond */}
-    <g transform="translate(18, 4)">
-      <polygon points="14,2 24,10 14,22 4,10" fill="#FFA575" stroke="#1C1816" strokeWidth="2.5" strokeLinejoin="round" />
-      <polygon points="14,2 19,10 14,22 9,10" fill="white" opacity="0.7" />
-      <line x1="4" y1="10" x2="24" y2="10" stroke="#1C1816" strokeWidth="2.5" />
-      {/* Sparkles */}
-      <path d="M2 2L0 0M26 2L28 0M14 -2L14 -5" stroke="#1C1816" strokeWidth="2" strokeLinecap="round" />
-    </g>
-    {/* Open Hand */}
+    {/* Shield Base */}
     <path
-      d="M10 40 C14 35 24 35 34 38 L48 38 C52 38 56 42 54 47 C52 52 44 54 36 54 C26 54 18 52 10 45 Z"
+      d="M32 6 L52 14 V30 C52 44 32 58 32 58 C32 58 12 44 12 30 V14 Z"
       fill="white"
       stroke="#1C1816"
       strokeWidth="2.5"
       strokeLinejoin="round"
     />
-    <path d="M22 37 C26 33 36 33 44 36" stroke="#1C1816" strokeWidth="2" strokeLinecap="round" />
+    {/* Inner Glowing Core */}
+    <path
+      d="M32 12 L46 18 V30 C46 40 32 51 32 51 C32 51 18 40 18 30 V18 Z"
+      fill="#FFA575"
+      opacity="0.85"
+      stroke="#1C1816"
+      strokeWidth="1.8"
+    />
+    {/* Sparkle Star in Center */}
+    <path
+      d="M32 20 C32 25 36 29 41 29 C36 29 32 33 32 38 C32 33 28 29 23 29 C28 29 32 25 32 20 Z"
+      fill="white"
+      stroke="#1C1816"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
   </svg>
 )
 
-// 🎨 High-Fidelity Vector Illustration 3: Dual Interlocking Precision Gears (Task Automation)
+// 🎨 Vector Illustration 3: Dual Interlocking Precision Gears (Task Automation)
 const PrecisionGearsIcon = () => (
   <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
     {/* Main Gear */}
@@ -103,7 +110,7 @@ const features = [
     listIcon: SparkleIcon,
     title: 'Automated Intent Tracking',
     description: 'Let BuyerWatch scan social signals automatically. From high-intent mentions to competitor alternative requests, leads move forward without bottlenecks.',
-    leftTitle: 'Social Coverage',
+    leftTitle: 'Automated Tracking',
     leftMetric: '24/7',
     leftDescription: 'BuyerWatch scans 24/7 in the background across Reddit and Bluesky.',
     metricIcon: RadarTargetScopeIcon,
@@ -113,10 +120,10 @@ const features = [
     listIcon: ClockIcon,
     title: 'AI Lead Qualification',
     description: 'Skip manual filtering chaos. BuyerWatch AI rates lead intent score (0-100), extracts buyer budget signals, and drafts contextual replies in seconds.',
-    leftTitle: 'Response Speed',
-    leftMetric: '10x',
+    leftTitle: 'AI Intent Score',
+    leftMetric: '94%',
     leftDescription: 'AI scoring engine filters noise and flags high-intent buyers instantly.',
-    metricIcon: DiamondHandIcon,
+    metricIcon: AIIntentRatingIcon,
   },
   {
     id: 2,
@@ -204,7 +211,7 @@ export const StickyFeatureScroll = () => {
                     boxShadow: '0 16px 44px rgba(255, 81, 1, 0.4)',
                   }}
                 >
-                  {/* High Quality Vector Illustration */}
+                  {/* Vector Illustration */}
                   <div className="mb-4 flex items-center justify-center">
                     {React.createElement(activeFeature.metricIcon)}
                   </div>
@@ -214,7 +221,7 @@ export const StickyFeatureScroll = () => {
                     {activeFeature.leftTitle}
                   </span>
 
-                  {/* Massive Metric Value */}
+                  {/* Metric Value */}
                   <span style={{ color: '#FFFFFF', WebkitTextFillColor: '#FFFFFF', opacity: 1, fontSize: '48px', fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', display: 'block', whiteSpace: 'nowrap' }}>
                     {activeFeature.leftMetric}
                   </span>
