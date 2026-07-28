@@ -28,12 +28,11 @@ export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: Brand
     </span>
   ) : (
     <span
-      className={`${dim.text} inline-flex items-baseline gap-1.5 leading-none tracking-normal`}
+      className={`${dim.text} inline-flex items-baseline leading-none tracking-[-0.025em]`}
       style={{ fontFamily: 'var(--font-serif), "Playfair Display", Georgia, serif' }}
-      aria-label="the buyer Watch"
+      aria-label="BuyerWatch"
     >
-      <span className="font-normal italic" style={{ color: tone === 'light' ? '#D8D8D8' : '#9E9E9E' }}>the</span>
-      <span className="font-normal" style={{ color: tone === 'light' ? '#FFFFFF' : '#D34519' }}>buyer</span>
+      <span className="font-normal" style={{ color: tone === 'light' ? '#FFFFFF' : '#D34519' }}>Buyer</span>
       <span className="font-normal" style={{ color: tone === 'light' ? '#FFFFFF' : '#2C2C2E' }}>Watch</span>
     </span>
   )
