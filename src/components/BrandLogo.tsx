@@ -28,7 +28,7 @@ export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: Brand
     </span>
   ) : (
     <span
-      className={`${dim.text} inline-flex items-baseline whitespace-nowrap leading-none tracking-[-0.025em]`}
+      className={`${dim.text} inline-flex items-baseline gap-[0.18em] whitespace-nowrap leading-none tracking-[-0.025em]`}
       style={{ fontFamily: 'var(--font-serif), "Playfair Display", Georgia, serif' }}
       aria-label="BuyerWatch"
     >
