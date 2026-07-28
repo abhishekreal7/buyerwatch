@@ -9,6 +9,7 @@ import { AppPage } from '@/components/AppPage'
 import { PageHeader } from '@/components/PageHeader'
 import { createClient } from '@/utils/supabase/client'
 import { useDashboardSession } from '@/components/DashboardContext'
+import { fetchAllPages } from '@/lib/supabase-pagination'
 
 function PlatformBadge({ platform }: { platform: string }) {
   return (
@@ -31,12 +32,13 @@ export default function PostedPage() {
 
   useEffect(() => {
     async function fetchPosted() {
-      const { data } = await supabase
+      const { data } = await fetchAllPages((from, to) => supabase
         .from('monitored_threads')
         .select('*, reply_analytics(draft_text, sent_at)')
         .eq('user_id', userId)
         .eq('status', 'replied')
         .order('created_at', { ascending: false })
+        .range(from, to))
 
       if (data) {
         setPosted(data.map(t => {

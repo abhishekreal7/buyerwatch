@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { getPlanLimits } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
+import { fetchAllPages } from '@/lib/supabase-pagination'
 
 interface Thread {
   id: string
@@ -110,10 +111,11 @@ export default function DashboardPage() {
         .in('status', ['pending', 'drafted', 'needs_manual_reply', 'dismissed'])
         .order('created_at', { ascending: false })
         .limit(60),
-      supabase
+      fetchAllPages((from, to) => supabase
         .from('monitored_threads')
         .select('status, intent_score, created_at')
-        .eq('user_id', userId),
+        .eq('user_id', userId)
+        .range(from, to)),
     ])
 
     const profile = profileResult.data
@@ -335,7 +337,7 @@ export default function DashboardPage() {
     setThreads(prev => prev.filter(t => t.id !== dismissed.id))
     setSelectedThread(threads.find(t => t.id !== dismissed.id) || null)
     toast.success('Thread dismissed')
-    supabase.from('monitored_threads').update({ status: 'dismissed' }).eq('id', dismissed.id).then()
+    supabase.rpc('dismiss_thread', { p_thread_id: dismissed.id }).then()
   }
 
   const handleMarkAsPosted = async () => {
@@ -344,7 +346,7 @@ export default function DashboardPage() {
     setThreads(prev => prev.filter(t => t.id !== thread.id))
     setSelectedThread(threads.find(t => t.id !== thread.id) || null)
     toast.success('Marked as posted')
-    await supabase.from('monitored_threads').update({ status: 'replied' }).eq('id', thread.id)
+    await supabase.rpc('mark_thread_manually_replied', { p_thread_id: thread.id })
     setStats(prev => ({ ...prev, postedToday: prev.postedToday + 1 }))
     setTotalSent(prev => prev + 1)
   }

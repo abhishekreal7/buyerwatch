@@ -2,17 +2,18 @@
 /**
  * Buying-signal pre-filter
  *
- * A zero-cost, deterministic gate that runs before any Gemini call.
+ * A zero-cost, deterministic gate that runs before any intent-model call.
  * Purpose: eliminate posts with no commercial shape so every AI call counts.
  *
  * Philosophy:
  *   - False negatives (missing a real lead) are worse than false positives
- *     (passing a borderline post to Gemini). So signals are intentionally
+ *     (passing a borderline post to the intent model). So signals are intentionally
  *     broad — we're filtering OUT obvious noise, not filtering IN only leads.
  *   - This list is a product decision, not a technical one. Edit freely.
  *   - All matching is case-insensitive, whole-word where marked with \b.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.analyzeBuyingSignals = analyzeBuyingSignals;
 exports.hasBuyingSignal = hasBuyingSignal;
 exports.matchedSignals = matchedSignals;
 /** Phrases that indicate a person is actively seeking a solution or product */
@@ -108,24 +109,38 @@ const PURCHASE_SIGNALS = [
     'should i pay',
     'roi',
 ];
-const ALL_SIGNALS = [
-    ...SEEKING_SIGNALS,
-    ...RESEARCH_SIGNALS,
-    ...PAIN_SIGNALS,
-    ...PURCHASE_SIGNALS,
+const SIGNAL_GROUPS = [
+    { category: 'seeking', signals: SEEKING_SIGNALS },
+    { category: 'research', signals: RESEARCH_SIGNALS },
+    { category: 'pain', signals: PAIN_SIGNALS },
+    { category: 'purchase', signals: PURCHASE_SIGNALS },
 ];
+function analyzeBuyingSignals(text) {
+    const lower = text.toLocaleLowerCase();
+    const matches = [];
+    const categories = [];
+    for (const group of SIGNAL_GROUPS) {
+        const groupMatches = group.signals.filter(signal => lower.includes(signal));
+        if (groupMatches.length === 0)
+            continue;
+        categories.push(group.category);
+        matches.push(...groupMatches);
+    }
+    return {
+        matchedSignals: [...new Set(matches)],
+        categories,
+    };
+}
 /**
  * Returns true if the post text contains at least one buying signal.
  * Always pass `title + ' ' + body` as the input for maximum coverage.
  */
 function hasBuyingSignal(text) {
-    const lower = text.toLowerCase();
-    return ALL_SIGNALS.some(signal => lower.includes(signal));
+    return analyzeBuyingSignals(text).matchedSignals.length > 0;
 }
 /**
  * Returns which signals were matched (useful for logging / debugging).
  */
 function matchedSignals(text) {
-    const lower = text.toLowerCase();
-    return ALL_SIGNALS.filter(signal => lower.includes(signal));
+    return analyzeBuyingSignals(text).matchedSignals;
 }

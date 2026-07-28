@@ -5,6 +5,7 @@ const logger_1 = require("../../src/lib/logger");
 const supabase_1 = require("../lib/supabase");
 const http_1 = require("../../src/lib/http");
 const outbound_url_1 = require("../../src/lib/security/outbound-url");
+const encryption_1 = require("../../src/lib/encryption");
 /**
  * Sends a Slack Block Kit notification to the user's configured webhook URL
  * when a high-intent lead is found.
@@ -16,18 +17,21 @@ async function notifySlackHandler(job) {
     // 1. Fetch the user's Slack webhook URL and threshold from Supabase
     const { data: profile, error } = await supabase_1.supabaseWorker
         .from('profiles')
-        .select('slack_webhook_url, slack_notify_threshold, business_name')
+        .select('slack_webhook_ciphertext, slack_webhook_url, slack_notify_threshold, business_name')
         .eq('id', userId)
         .single();
     if (error)
         throw new Error(`Unable to load Slack notification settings: ${error.message}`);
     if (!profile)
         return { success: false, reason: 'no_profile' };
-    const { slack_webhook_url, slack_notify_threshold, business_name } = profile;
-    if (!slack_webhook_url) {
+    const { slack_webhook_ciphertext, slack_webhook_url, slack_notify_threshold, business_name } = profile;
+    const webhookUrl = slack_webhook_ciphertext
+        ? (0, encryption_1.decrypt)(slack_webhook_ciphertext)
+        : slack_webhook_url;
+    if (!webhookUrl) {
         return { success: false, reason: 'no_webhook' };
     }
-    if (!(0, outbound_url_1.isAllowedSlackWebhookUrl)(slack_webhook_url)) {
+    if (!(0, outbound_url_1.isAllowedSlackWebhookUrl)(webhookUrl)) {
         throw new Error('Stored Slack webhook URL is not an allowed Slack endpoint');
     }
     const threshold = slack_notify_threshold ?? 70;
@@ -40,7 +44,7 @@ async function notifySlackHandler(job) {
         ? draftText.slice(0, 300) + (draftText.length > 300 ? '…' : '')
         : 'No draft available.';
     const payload = {
-        text: `${scoreEmoji} Scouto found a ${intentScore}% intent lead on r/${subreddit}`,
+        text: `${scoreEmoji} BuyerWatch found a ${intentScore}% intent lead on r/${subreddit}`,
         blocks: [
             {
                 type: 'header',
@@ -84,7 +88,7 @@ async function notifySlackHandler(job) {
                     },
                     {
                         type: 'button',
-                        text: { type: 'plain_text', text: '📋 View in Scouto', emoji: true },
+                        text: { type: 'plain_text', text: '📋 View in BuyerWatch', emoji: true },
                         url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
                     },
                 ],
@@ -97,7 +101,7 @@ async function notifySlackHandler(job) {
                 elements: [
                     {
                         type: 'mrkdwn',
-                        text: `Sent by Scouto · <${process.env.NEXT_PUBLIC_APP_URL}/settings|Manage notifications>`,
+                        text: `Sent by BuyerWatch · <${process.env.NEXT_PUBLIC_APP_URL}/settings|Manage notifications>`,
                     },
                 ],
             },
@@ -105,7 +109,7 @@ async function notifySlackHandler(job) {
     };
     // 3. POST to Slack webhook
     try {
-        const response = await (0, http_1.fetchWithTimeout)(slack_webhook_url, {
+        const response = await (0, http_1.fetchWithTimeout)(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),

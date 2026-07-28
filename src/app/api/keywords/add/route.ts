@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { actionRateLimit, getIp } from '@/lib/ratelimit'
+import { readJsonBody, RequestInputError } from '@/lib/request'
 
 export async function POST(req: Request) {
   try {
@@ -11,12 +13,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await req.json()
+    const body = await readJsonBody<Record<string, unknown>>(req)
     const term = typeof body.term === 'string' ? body.term.trim() : ''
     const platform = typeof body.platform === 'string' ? body.platform : 'reddit'
     let target = typeof body.target === 'string' ? body.target.trim() : ''
 
-    if (!term || !target) {
+    if (!term || !target || term.length > 200 || target.length > 200) {
       return NextResponse.json({ error: 'Missing term or target' }, { status: 400 })
     }
 
@@ -24,10 +26,20 @@ export async function POST(req: Request) {
     if (platform === 'reddit' && target.toLowerCase().startsWith('r/')) {
       target = target.substring(2)
     }
+    if (platform === 'reddit') target = target.toLowerCase()
 
-    const allowedPlatforms = ['reddit', 'bluesky', 'x', 'threads']
+    const allowedPlatforms = [
+      'reddit',
+      'bluesky',
+      ...(process.env.ENABLE_X_DISCOVERY === 'true' ? ['x'] : []),
+      ...(process.env.ENABLE_THREADS_DISCOVERY === 'true' ? ['threads'] : []),
+    ]
     if (!allowedPlatforms.includes(platform)) {
       return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
+    }
+    const rate = await actionRateLimit.limit(`keyword-add:${user.id}:${await getIp()}`)
+    if (!rate.success) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
     }
 
     // Fetch plan
@@ -85,7 +97,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, keyword: data })
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     return NextResponse.json({ error: 'internal_error' }, { status: 500 })
   }
 }

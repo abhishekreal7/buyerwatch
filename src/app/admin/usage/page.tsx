@@ -40,8 +40,16 @@ export default async function AdminUsagePage() {
     .from('usage_logs')
     .select(`
       date,
-      gemini_calls,
-      claude_calls,
+      intent_calls,
+      draft_calls,
+      intent_input_tokens,
+      intent_output_tokens,
+      intent_cost_microusd,
+      intent_model,
+      draft_input_tokens,
+      draft_output_tokens,
+      draft_cost_microusd,
+      draft_model,
       x_spend_cents,
       profiles (
         id,
@@ -60,8 +68,12 @@ export default async function AdminUsagePage() {
   const userStats: Record<string, {
     name: string
     plan: string
-    gemini: number
-    claude: number
+    intent: number
+    drafts: number
+    intentTokens: number
+    draftTokens: number
+    aiCostMicrousd: number
+    models: Set<string>
     x_spend: number
   }> = {}
   
@@ -73,13 +85,25 @@ export default async function AdminUsagePage() {
       userStats[profile.id] = {
         name: profile.business_name || 'Unknown',
         plan: profile.plan,
-        gemini: 0,
-        claude: 0,
+        intent: 0,
+        drafts: 0,
+        intentTokens: 0,
+        draftTokens: 0,
+        aiCostMicrousd: 0,
+        models: new Set<string>(),
         x_spend: 0,
       }
     }
-    userStats[profile.id].gemini += log.gemini_calls
-    userStats[profile.id].claude += log.claude_calls
+    userStats[profile.id].intent += log.intent_calls
+    userStats[profile.id].drafts += log.draft_calls
+    userStats[profile.id].intentTokens +=
+      log.intent_input_tokens + log.intent_output_tokens
+    userStats[profile.id].draftTokens +=
+      log.draft_input_tokens + log.draft_output_tokens
+    userStats[profile.id].aiCostMicrousd +=
+      log.intent_cost_microusd + log.draft_cost_microusd
+    if (log.intent_model) userStats[profile.id].models.add(log.intent_model)
+    if (log.draft_model) userStats[profile.id].models.add(log.draft_model)
     userStats[profile.id].x_spend += log.x_spend_cents
   })
 
@@ -103,15 +127,18 @@ export default async function AdminUsagePage() {
                 <tr className="border-b border-border bg-gray-50 text-sm font-medium text-text-secondary">
                   <th className="px-6 py-4">User / Business</th>
                   <th className="px-6 py-4">Plan</th>
-                  <th className="px-6 py-4 text-right">Gemini Calls</th>
-                  <th className="px-6 py-4 text-right">Claude Calls</th>
+                  <th className="px-6 py-4 text-right">Intent Scores</th>
+                  <th className="px-6 py-4 text-right">Draft Reservations</th>
+                  <th className="px-6 py-4 text-right">Intent Tokens</th>
+                  <th className="px-6 py-4 text-right">Draft Tokens</th>
+                  <th className="px-6 py-4 text-right">AI Spend ($)</th>
                   <th className="px-6 py-4 text-right">X Spend ($)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {Object.values(userStats).length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-text-secondary">
+                    <td colSpan={8} className="px-6 py-8 text-center text-text-secondary">
                       No usage data recorded in the last 7 days.
                     </td>
                   </tr>
@@ -128,8 +155,18 @@ export default async function AdminUsagePage() {
                           {stats.plan}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right tabular-nums">{stats.gemini.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right tabular-nums">{stats.claude.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right tabular-nums">{stats.intent.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right tabular-nums">{stats.drafts.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right tabular-nums">{stats.intentTokens.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right tabular-nums">
+                        {stats.draftTokens.toLocaleString()}
+                        {stats.models.size > 0 && (
+                          <span className="mt-1 block max-w-48 truncate text-xs text-text-secondary" title={[...stats.models].join(', ')}>
+                            {[...stats.models].join(', ')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right tabular-nums font-mono">${(stats.aiCostMicrousd / 1_000_000).toFixed(4)}</td>
                       <td className="px-6 py-4 text-right tabular-nums font-mono">${(stats.x_spend / 100).toFixed(2)}</td>
                     </tr>
                   ))

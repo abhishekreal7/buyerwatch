@@ -15,6 +15,7 @@ import {
   getIntentDisplayLabel,
   parseIntentResult,
 } from '../src/lib/intent'
+import { buildIntentScoringPrompt } from '../src/lib/intent-scorer'
 import {
   buildFallbackSuggestions,
   sanitizeOnboardingSuggestions,
@@ -25,7 +26,7 @@ import {
   validateProductContext,
   validateWebsiteUrl,
 } from '../src/lib/onboarding-validation'
-import { evaluateReplyQuality } from '../src/lib/reply-quality'
+import { cleanDraftOutput, evaluateReplyQuality } from '../src/lib/reply-quality'
 
 describe('buying-signal evidence', () => {
   it('returns the exact evidence and categories behind a commercial match', () => {
@@ -71,6 +72,36 @@ describe('intent result validation', () => {
     { score: 80, label: 'buying', reasoning: 'short' },
   ])('rejects malformed model output', candidate => {
     expect(() => parseIntentResult(candidate)).toThrow()
+  })
+
+  it('rejects inconsistent score and label combinations', () => {
+    expect(() => parseIntentResult({
+      score: 35,
+      label: 'buying',
+      reasoning: 'The label conflicts with the configured scoring rubric.',
+      flag: null,
+    })).toThrow(/inconsistent/)
+  })
+
+  it('scores the title, body, and configured competitor watchlist', () => {
+    const prompt = buildIntentScoringPrompt({
+      platform: 'reddit',
+      externalId: 'post-1',
+      author: 'buyer',
+      title: 'Looking for an alternative to Acme',
+      text: 'Our current workflow keeps breaking.',
+      url: 'https://reddit.example/post-1',
+      createdAt: '2026-07-28T00:00:00.000Z',
+      sourceTarget: 'SaaS',
+    }, {
+      business_name: 'BuyerWatch',
+      business_description: 'Finds relevant buying conversations.',
+      competitors: ['Acme'],
+    })
+
+    expect(prompt).toContain('Title: Looking for an alternative to Acme')
+    expect(prompt).toContain('Body: Our current workflow keeps breaking.')
+    expect(prompt).toContain('Competitor watchlist: Acme')
   })
 
   it('keeps display labels faithful to the model category', () => {
@@ -130,6 +161,28 @@ describe('reply-quality policy', () => {
       platform: 'bluesky',
     })
     expect(result.issues.map(issue => issue.code)).toContain('too_long')
+  })
+
+  it.each([
+    ['Reply: Start with the queue depth.', 'Start with the queue depth.'],
+    ['"Start with the queue depth."', 'Start with the queue depth.'],
+    ['```text\nStart with the queue depth.\n```', 'Start with the queue depth.'],
+  ])('cleans provider framing from publishable output', (draft, expected) => {
+    expect(cleanDraftOutput(draft)).toBe(expected)
+  })
+
+  it('blocks formulaic AI-style openings and assistant framing', () => {
+    const formulaic = evaluateReplyQuality(
+      'Great question! Start by checking the queue depth.',
+      { businessName: 'BuyerWatch', platform: 'reddit' },
+    )
+    const meta = evaluateReplyQuality(
+      'Here is a suggested reply: Start by checking the queue depth.',
+      { businessName: 'BuyerWatch', platform: 'reddit' },
+    )
+
+    expect(formulaic.issues.map(issue => issue.code)).toContain('formulaic_opening')
+    expect(meta.issues.map(issue => issue.code)).toContain('assistant_meta')
   })
 })
 

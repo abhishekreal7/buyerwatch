@@ -4,6 +4,8 @@ import { cookies } from 'next/headers'
 import { sendReplyQueue } from '@/lib/queues'
 import { getSendReplyJobId } from '@/lib/reply-jobs'
 import { evaluateReplyQuality } from '@/lib/reply-quality'
+import { actionRateLimit, getIp } from '@/lib/ratelimit'
+import { boundedString, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 
 /**
  * POST /api/replies/send
@@ -18,6 +20,7 @@ import { evaluateReplyQuality } from '@/lib/reply-quality'
  * send decisions. There must be no duplicate confidence math in this file.
  */
 export async function POST(req: Request) {
+  try {
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,9 +38,15 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { threadId, text } = await req.json()
-  if (!threadId || typeof text !== 'string' || !text.trim() || text.length > 10_000) {
+  const body = await readJsonBody<Record<string, unknown>>(req)
+  const threadId = body.threadId
+  const text = boundedString(body.text, 10_000, { required: true })
+  if (!isUuid(threadId) || text === null) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+  }
+  const rate = await actionRateLimit.limit(`reply-send:${user.id}:${await getIp()}`)
+  if (!rate.success) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
   }
 
   const { data: thread } = await supabase
@@ -64,7 +73,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Profile is incomplete' }, { status: 409 })
   }
 
-  const replyText = text.trim()
+  const replyText = text
   const quality = evaluateReplyQuality(replyText, {
     businessName: profile.business_name,
     platform: thread.platform,
@@ -77,6 +86,11 @@ export async function POST(req: Request) {
   }
 
   // Enqueue the send job. Rate limiting is enforced downstream inside send-reply.ts worker.
+  const jobId = getSendReplyJobId(threadId)
+  const existingJob = await sendReplyQueue.getJob(jobId)
+  if (existingJob && await existingJob.isFailed()) {
+    await existingJob.remove()
+  }
   await sendReplyQueue.add('send', {
     userId: user.id,
     threadExternalId: thread.external_id,
@@ -85,8 +99,15 @@ export async function POST(req: Request) {
     platform: thread.platform,
     triggerType: 'manual',
   }, {
-    jobId: getSendReplyJobId(threadId),
+    jobId,
   })
 
   return NextResponse.json({ success: true })
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    console.error('[replies/send] Failed to enqueue reply', error)
+    return NextResponse.json({ error: 'send_enqueue_failed' }, { status: 500 })
+  }
 }

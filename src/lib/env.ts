@@ -47,6 +47,19 @@ function assertCompleteOptionalGroup(names: readonly string[], label: string): v
   }
 }
 
+export function getConfiguredSecret(value: string | undefined): string {
+  const trimmed = value?.trim() ?? ''
+  if (
+    !trimmed
+    || trimmed.startsWith('#')
+    || trimmed.toLocaleLowerCase().includes('todo')
+    || trimmed.toLocaleLowerCase().includes('placeholder')
+  ) {
+    return ''
+  }
+  return trimmed
+}
+
 export interface ProviderCapabilities {
   aiDrafting: boolean
   billing: boolean
@@ -60,7 +73,7 @@ export interface ProviderCapabilities {
 
 export function getProviderCapabilities(): ProviderCapabilities {
   return {
-    aiDrafting: Boolean(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY),
+    aiDrafting: Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY)),
     billing: Boolean(
       process.env.DODO_PAYMENTS_API_KEY
       && process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
@@ -95,10 +108,6 @@ function validateOptionalProviders(): void {
     'DODO_PAYMENTS_WEBHOOK_SECRET',
   ], 'Dodo billing')
   assertCompleteOptionalGroup([
-    'ANTHROPIC_API_KEY',
-    'ANTHROPIC_MODEL',
-  ], 'Anthropic drafting')
-  assertCompleteOptionalGroup([
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
   ], 'Resend email')
@@ -122,8 +131,8 @@ export function validateAppEnvironment(): void {
   if (process.env.NODE_ENV !== 'production') return
   assertValues(CORE_PRODUCTION_ENV, 'BuyerWatch app')
   validateOptionalProviders()
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
-    throw new Error('BuyerWatch app requires ANTHROPIC_API_KEY or GEMINI_API_KEY')
+  if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
+    throw new Error('BuyerWatch app requires ANTHROPIC_API_KEY')
   }
 }
 
@@ -131,8 +140,8 @@ export function validateWorkerEnvironment(): void {
   if (process.env.NODE_ENV !== 'production') return
   assertValues(WORKER_PRODUCTION_ENV, 'BuyerWatch worker')
   validateOptionalProviders()
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
-    throw new Error('BuyerWatch worker requires ANTHROPIC_API_KEY or GEMINI_API_KEY')
+  if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
+    throw new Error('BuyerWatch worker requires ANTHROPIC_API_KEY')
   }
 }
 

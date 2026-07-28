@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSafeHttpUrl } from '@/lib/security/outbound-url'
+import { actionRateLimit, getIp } from '@/lib/ratelimit'
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token')
   const fallback = new URL('/', req.nextUrl.origin)
-  if (!token) return NextResponse.redirect(fallback, { status: 302 })
+  if (!token || !/^[A-Za-z0-9_-]{4,128}$/.test(token)) {
+    return NextResponse.redirect(fallback, { status: 302 })
+  }
 
   try {
+    const rate = await actionRateLimit.limit(`track-click:${await getIp()}`)
+    if (!rate.success) return NextResponse.redirect(fallback, { status: 302 })
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,

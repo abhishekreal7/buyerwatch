@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('landing page exposes the core product and navigation', async ({ page }) => {
   await page.goto('/')
-  await expect(page).toHaveTitle(/Scouto/i)
+  await expect(page).toHaveTitle(/BuyerWatch/i)
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await expect(page.getByRole('link', { name: /pricing/i }).first()).toBeVisible()
   await expect(page.getByRole('link', { name: /log in/i }).first()).toBeVisible()
@@ -14,14 +14,14 @@ test('liveness and readiness endpoints have stable contracts', async ({ request 
   expect(live.headers()['cache-control']).toMatch(/no-store/)
   expect(await live.json()).toMatchObject({
     status: 'ok',
-    service: 'scouto-web',
+    service: 'buyerwatch-web',
   })
 
   const ready = await request.get('/api/health/ready')
   expect([200, 503]).toContain(ready.status())
   const payload = await ready.json()
   expect(payload).toMatchObject({
-    service: 'scouto-web',
+    service: 'buyerwatch-web',
     checks: {
       database: { status: expect.stringMatching(/^(ok|error)$/) },
       cache: { status: expect.stringMatching(/^(ok|error)$/) },

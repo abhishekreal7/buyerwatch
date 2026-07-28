@@ -1,6 +1,8 @@
 export type ReplyQualityIssueCode =
   | 'empty'
   | 'too_long'
+  | 'formulaic_opening'
+  | 'assistant_meta'
   | 'promotional_language'
   | 'call_to_action'
   | 'unsupported_claim'
@@ -40,6 +42,20 @@ export const UNSUPPORTED_CLAIM_PHRASES = [
   /\b\d+% (?:increase|decrease|improvement|better|faster)\b/i,
 ] as const
 
+export const FORMULAIC_OPENING_PHRASES = [
+  /^(?:great|good|interesting) (?:question|point)[!,.]/i,
+  /^(?:i )?(?:totally|completely) agree\b/i,
+  /^thanks for (?:asking|posting|sharing)\b/i,
+  /^it sounds like\b/i,
+  /^absolutely[!,.]/i,
+] as const
+
+export const ASSISTANT_META_PHRASES = [
+  /^here(?:'s| is) (?:a |the )?(?:suggested )?(?:reply|response|draft)\b/i,
+  /^(?:suggested )?(?:reply|response|draft)\s*:/i,
+  /\bas an ai\b/i,
+] as const
+
 export const DISCLOSURE_PATTERNS = [
   /\bdisclos\w*\b/i,
   /\bi'?m (?:affiliated|associated) with\b/i,
@@ -56,6 +72,33 @@ const PLATFORM_LENGTH_LIMITS: Record<string, number> = {
   x: 280,
   threads: 500,
   reddit: 2_000,
+}
+
+export function cleanDraftOutput(text: string): string {
+  let cleaned = text.trim()
+
+  const fenced = cleaned.match(/^```(?:text|markdown)?\s*\n?([\s\S]*?)\n?```$/i)
+  if (fenced) cleaned = fenced[1].trim()
+
+  cleaned = cleaned
+    .replace(/^(?:suggested )?(?:reply|response|draft)\s*:\s*/i, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  const quotePairs: ReadonlyArray<readonly [string, string]> = [
+    ['"', '"'],
+    ["'", "'"],
+    ['“', '”'],
+    ['‘', '’'],
+  ]
+  const wrappingQuotes = quotePairs.find(
+    ([open, close]) => cleaned.startsWith(open) && cleaned.endsWith(close),
+  )
+  if (wrappingQuotes && cleaned.length > 1) {
+    cleaned = cleaned.slice(wrappingQuotes[0].length, -wrappingQuotes[1].length).trim()
+  }
+
+  return cleaned
 }
 
 export function hasDisclosure(text: string): boolean {
@@ -95,6 +138,18 @@ export function evaluateReplyQuality(
     issues.push({
       code: 'too_long',
       message: `The reply exceeds the ${lengthLimit}-character limit for ${context.platform}.`,
+    })
+  }
+  if (FORMULAIC_OPENING_PHRASES.some(pattern => pattern.test(trimmed))) {
+    issues.push({
+      code: 'formulaic_opening',
+      message: 'The reply starts with generic agreement or acknowledgement instead of useful substance.',
+    })
+  }
+  if (ASSISTANT_META_PHRASES.some(pattern => pattern.test(trimmed))) {
+    issues.push({
+      code: 'assistant_meta',
+      message: 'The reply contains assistant-facing framing instead of publishable text.',
     })
   }
   if (PROMOTIONAL_PHRASES.some(pattern => pattern.test(trimmed))) {

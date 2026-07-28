@@ -7,12 +7,20 @@ import { NormalizedPost } from '../../src/lib/types'
 import * as dotenv from 'dotenv'
 import path from 'path'
 import { randomBytes } from 'crypto'
-import { getSendReplyJobId } from '../../src/lib/reply-jobs'
 import { buildAttributionShortUrl } from '../../src/lib/attribution'
 import { matchedSignals } from '../../src/lib/buying-signal-filter'
 import { getAppUrl } from '../../src/lib/app-url'
 import { IntentLabel } from '../../src/lib/intent'
 import { getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
+import {
+  emptyAiUsage,
+  getAiUsageFromError,
+  recordAiUsage,
+  releaseAiSpend,
+  reserveAiSpend,
+  type AiUsage,
+} from '../../src/lib/ai-usage'
+import { dispatchPendingOutbox } from '../../src/lib/backend-maintenance'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -22,31 +30,37 @@ const INTENT_THRESHOLD = 60
 
 export async function scorePostHandler(job: Job) {
   const { userId, keywordId, post } = job.data as { userId: string; keywordId: string; post: NormalizedPost }
+  let signalReserved = false
+  let draftReserved = false
 
   try {
-    // 1. Check if we already processed this exact post for this user
+    // 1. Resume a checkpointed high-intent thread after a worker/provider
+    // failure. Completed rows only need their durable outbox dispatched.
     const { data: existing, error: existingError } = await supabase
       .from('monitored_threads')
-      .select('id')
+      .select('id, keyword_id, intent_score, intent_label, flag, score_reasoning, matched_signals, status, tracking_sid')
       .eq('user_id', userId)
       .eq('platform', post.platform)
       .eq('external_id', post.externalId)
       .maybeSingle()
 
     if (existingError) throw existingError
-    if (existing) return
+    if (existing && existing.status !== 'pending') {
+      await dispatchPendingOutbox(1, existing.id)
+      return
+    }
 
     // 2. Fetch user profile for context and plan
     const { data: extendedProfile } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
       .eq('id', userId)
       .single()
     let profile = extendedProfile
     if (!profile) {
       const legacyResult = await supabase
         .from('profiles')
-        .select('business_name, business_description, business_url, business_type, writing_style, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+        .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
         .eq('id', userId)
         .single()
       if (legacyResult.error) throw legacyResult.error
@@ -56,17 +70,76 @@ export async function scorePostHandler(job: Job) {
     }
 
     if (!profile) throw new Error('Profile not found for scoring job')
+    const plan = normalizePlan(profile.plan)
+    const planLimits = getPlanLimits(plan)
 
-    // 3. Atomic Budget Check for Scoring (Gemini)
-    const canScore = await checkBudget(userId, profile.plan, 'gemini')
-    if (!canScore) {
-      logger.info(`[Budget] User ${userId} exceeded gemini limit.`)
-      return // Silent skip
+    let scoreResult: Awaited<ReturnType<typeof scoreIntent>>
+    let evidenceSignals: string[]
+    if (existing) {
+      scoreResult = {
+        score: Number(existing.intent_score ?? 0),
+        label: existing.intent_label as IntentLabel,
+        flag: existing.flag ?? undefined,
+        reasoning: existing.score_reasoning ?? 'Restored from a persisted scoring checkpoint.',
+        usage: emptyAiUsage(),
+      }
+      evidenceSignals = existing.matched_signals ?? []
+    } else {
+      // 3. Reserve one monthly signal slot before paid AI work.
+      const canProcessSignal = await reserveMonthlySignal(
+        userId,
+        planLimits.threadsPerMonth,
+      )
+      if (!canProcessSignal) {
+        logger.info({ userId, plan }, 'Monthly signal limit reached')
+        return
+      }
+      signalReserved = true
+
+      // 4. Reserve provider spend and the daily intent allowance atomically.
+      const intentSpend = await reserveAiSpend(supabase, {
+        userId,
+        purpose: 'intent',
+        plan,
+      })
+      if (!intentSpend) {
+        logger.warn({ userId, plan }, 'AI spend cap blocked intent scoring')
+        await safelyReleaseMonthlySignal(userId)
+        signalReserved = false
+        return
+      }
+
+      let canScore: boolean
+      try {
+        canScore = await checkBudget(userId, profile.plan, 'intent')
+      } catch (error) {
+        await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
+        throw error
+      }
+      if (!canScore) {
+        await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
+        logger.info({ userId }, 'Daily intent-scoring limit reached')
+        await safelyReleaseMonthlySignal(userId)
+        signalReserved = false
+        return
+      }
+
+      // 5. Score intent and reconcile the reservation with actual usage.
+      try {
+        scoreResult = await scoreIntent(post, profile)
+        await safelyRecordAiUsage(intentSpend.id, scoreResult.usage, {
+          userId,
+          purpose: 'intent',
+        })
+      } catch (error) {
+        await settleFailedAiSpend(intentSpend.id, error, {
+          userId,
+          purpose: 'intent',
+        })
+        throw error
+      }
+      evidenceSignals = matchedSignals(`${post.title ?? ''} ${post.text ?? ''}`)
     }
-
-    // 4. Score intent
-    const scoreResult = await scoreIntent(post, profile)
-    const evidenceSignals = matchedSignals(`${post.title ?? ''} ${post.text ?? ''}`)
     
     // Save thread early if score is low
     if (scoreResult.score < INTENT_THRESHOLD) {
@@ -80,15 +153,64 @@ export async function scorePostHandler(job: Job) {
         flag: scoreResult.flag,
         reasoning: scoreResult.reasoning,
         evidenceSignals,
-        automationReason: 'draft_budget_exhausted',
+        automationReason: 'low_intent',
       })
+      signalReserved = false
       return
     }
 
-    // 5. Atomic Budget Check for Drafting (Claude)
-    const canDraft = await checkBudget(userId, profile.plan, 'claude')
+    // Persist the paid intent result before drafting. A retry resumes from this
+    // checkpoint and never pays to classify the same user/post twice.
+    if (!existing) {
+      await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'pending',
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        evidenceSignals,
+        automationReason: 'draft_pending',
+      })
+      signalReserved = false
+    }
+
+    // 5. Atomic budget check for reply drafting
+    const draftSpend = await reserveAiSpend(supabase, {
+      userId,
+      purpose: 'draft',
+      plan,
+    })
+    if (!draftSpend) {
+      logger.warn({ userId, plan }, 'AI spend cap blocked reply drafting')
+      await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'needs_manual_reply',
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        evidenceSignals,
+        automationReason: 'ai_spend_limit_reached',
+      })
+      signalReserved = false
+      return
+    }
+
+    let canDraft: boolean
+    try {
+      canDraft = await checkBudget(userId, profile.plan, 'draft')
+    } catch (error) {
+      await safelyReleaseAiSpend(draftSpend.id, { userId, purpose: 'draft' })
+      throw error
+    }
     if (!canDraft) {
-      logger.info(`[Budget] User ${userId} exceeded claude limit.`)
+      await safelyReleaseAiSpend(draftSpend.id, { userId, purpose: 'draft' })
+      logger.info(`[Budget] User ${userId} exceeded reply-draft limit.`)
       // Save as needs manual reply
       await saveThread({
         userId,
@@ -100,9 +222,12 @@ export async function scorePostHandler(job: Job) {
         flag: scoreResult.flag,
         reasoning: scoreResult.reasoning,
         evidenceSignals,
+        automationReason: 'draft_plan_limit_reached',
       })
+      signalReserved = false
       return
     }
+    draftReserved = true
 
     // 6. Draft Reply — generate tracking SID before drafting so Claude can embed it naturally
     const trackingEnabled = profile.referral_tracking_enabled !== false // default true
@@ -111,7 +236,22 @@ export async function scorePostHandler(job: Job) {
       ? buildAttributionShortUrl(getAppUrl(), trackingSid)
       : undefined
 
-    const draftResult = await draftReply(post, profile, scoreResult.score, trackingUrl)
+    let draftResult: Awaited<ReturnType<typeof draftReply>>
+    try {
+      draftResult = await draftReply(post, profile, scoreResult.score, trackingUrl)
+      await safelyRecordAiUsage(draftSpend.id, draftResult.usage, {
+        userId,
+        purpose: 'draft',
+      })
+    } catch (error) {
+      await settleFailedAiSpend(draftSpend.id, error, {
+        userId,
+        purpose: 'draft',
+      })
+      await safelyReleaseMonthlyDraft(userId)
+      draftReserved = false
+      throw error
+    }
     const draftText = draftResult.text
 
     // 7. Auto-send decision — routed through the single unified gatekeeper.
@@ -129,8 +269,15 @@ export async function scorePostHandler(job: Job) {
       post.sourceTarget ?? null
     )
 
-    if (evaluation.approved) {
+    if (evaluation.approved && ['reddit', 'bluesky'].includes(post.platform)) {
       // All gates cleared — save and enqueue for auto-send
+      const autoSendPayload = {
+        userId,
+        threadExternalId: post.externalId,
+        text: draftText,
+        platform: post.platform as 'reddit' | 'bluesky',
+        triggerType: 'auto' as const,
+      }
       const thread = await saveThread({
         userId,
         keywordId,
@@ -145,19 +292,13 @@ export async function scorePostHandler(job: Job) {
         evidenceSignals,
         qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
         automationReason: evaluation.reason,
+        autoSendPayload,
       })
+      signalReserved = false
+      draftReserved = false
       if (thread) {
-        const { sendReplyQueue, notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
-        await sendReplyQueue.add('send', {
-          userId,
-          threadExternalId: post.externalId,
-          threadId: thread.id,
-          text: draftText,
-          platform: post.platform,
-          triggerType: 'auto',
-        }, {
-          jobId: getSendReplyJobId(thread.id),
-        })
+        const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
+        await dispatchPendingOutbox(1, thread.id)
         // Fire-and-forget: check if thread URL ranks on Google for this keyword (Feature 5)
         if (post.url) {
           checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url, matchedKeyword: post.sourceTarget }).catch(() => {})
@@ -191,6 +332,8 @@ export async function scorePostHandler(job: Job) {
         qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
         automationReason: evaluation.reason,
       })
+      signalReserved = false
+      draftReserved = false
       if (thread) {
         const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
         // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
@@ -212,33 +355,116 @@ export async function scorePostHandler(job: Job) {
     }
 
   } catch (error) {
+    if (signalReserved) {
+      await safelyReleaseMonthlySignal(userId)
+    }
+    if (draftReserved) {
+      await safelyReleaseMonthlyDraft(userId)
+    }
     logger.error({ error }, `Failed to score post ${post.externalId} for user ${userId}:`)
     throw error
   }
 }
 
-async function checkBudget(userId: string, plan: string, service: 'gemini' | 'claude') {
-  if (service === 'claude') {
+async function reserveMonthlySignal(userId: string, limit: number): Promise<boolean> {
+  const { data, error } = await supabase.rpc('reserve_monthly_signal', {
+    p_user_id: userId,
+    p_limit: limit,
+  })
+  if (error) {
+    throw new Error(`Signal budget reservation failed: ${error.message}`)
+  }
+  return data === true
+}
+
+async function safelyReleaseMonthlySignal(userId: string): Promise<void> {
+  const { error } = await supabase.rpc('release_monthly_signal', {
+    p_user_id: userId,
+  })
+  if (error) {
+    logger.error({ error, userId }, 'Failed to release monthly signal reservation')
+  }
+}
+
+async function safelyReleaseMonthlyDraft(userId: string): Promise<void> {
+  const { error } = await supabase.rpc('release_monthly_draft', {
+    p_user_id: userId,
+  })
+  if (error) {
+    logger.error({ error, userId }, 'Failed to release monthly draft reservation')
+  }
+}
+
+async function safelyRecordAiUsage(
+  reservationId: string,
+  usage: AiUsage,
+  context: { userId: string; purpose: 'intent' | 'draft' },
+): Promise<void> {
+  try {
+    await recordAiUsage(supabase, { reservationId, usage })
+  } catch (error) {
+    logger.error(
+      { error, reservationId, ...context },
+      'Failed to reconcile AI usage reservation',
+    )
+  }
+}
+
+async function safelyReleaseAiSpend(
+  reservationId: string,
+  context: { userId: string; purpose: 'intent' | 'draft' },
+): Promise<void> {
+  try {
+    await releaseAiSpend(supabase, reservationId)
+  } catch (error) {
+    logger.error(
+      { error, reservationId, ...context },
+      'Failed to release AI spend reservation',
+    )
+  }
+}
+
+async function settleFailedAiSpend(
+  reservationId: string,
+  error: unknown,
+  context: { userId: string; purpose: 'intent' | 'draft' },
+): Promise<void> {
+  const usage = getAiUsageFromError(error)
+  if (
+    usage.inputTokens > 0
+    || usage.outputTokens > 0
+    || usage.estimatedCostMicrousd > 0
+  ) {
+    await safelyRecordAiUsage(reservationId, usage, context)
+    return
+  }
+  await safelyReleaseAiSpend(reservationId, context)
+}
+
+async function checkBudget(userId: string, plan: string, service: 'intent' | 'draft') {
+  if (service === 'draft') {
     const { data, error } = await supabase.rpc('reserve_monthly_draft', {
       p_user_id: userId,
       p_limit: getPlanLimits(normalizePlan(plan)).aiDraftsPerMonth,
     })
-    if (!error) return data
-    logger.warn({ code: error.code }, 'Monthly draft reservation unavailable; using legacy budget counter.')
+    if (error) {
+      throw new Error(`Draft budget reservation failed: ${error.message}`)
+    }
+    return data
   }
 
-  const limits: Record<string, Record<'gemini' | 'claude', number>> = {
-    free:   { gemini: 50,   claude: 40 },   // 40 aligns with plan-limits.ts free.aiDraftsPerMonth
-    pro:    { gemini: 500,  claude: 400 },
-    growth: { gemini: 2000, claude: 2000 },
+  const limits: Record<string, number> = {
+    free: 50,
+    pro: 500,
+    growth: 2000,
   }
   
   const userPlan = limits[plan] ? plan : 'free'
-  const limit = limits[userPlan][service]
+  const limit = limits[userPlan]
 
   const { data, error } = await supabase.rpc('increment_usage_if_under_limit', {
     p_user_id: userId,
-    p_service: service,
+    p_service: 'intent',
     p_limit: limit,
   })
 
@@ -263,6 +489,13 @@ async function saveThread(input: {
   evidenceSignals: string[]
   qualityIssues?: string[]
   automationReason?: string
+  autoSendPayload?: {
+    userId: string
+    threadExternalId: string
+    text: string
+    platform: 'reddit' | 'bluesky'
+    triggerType: 'auto'
+  }
 }) {
   const {
     userId,
@@ -278,48 +511,34 @@ async function saveThread(input: {
     evidenceSignals,
     qualityIssues,
     automationReason,
+    autoSendPayload,
   } = input
-  const { data: thread, error } = await supabase
-    .from('monitored_threads')
-    .insert({
-      user_id: userId,
-      keyword_id: keywordId,
-      platform: post.platform,
-      external_id: post.externalId,
-      author: post.author,
-      title: post.title || null,
-      text_content: post.text,
-      url: post.url,
-      intent_score: intentScore,
-      intent_label: intentLabel,
-      status: status,
-      flag: flag || null,
-      score_reasoning: reasoning || null,
-      matched_signals: evidenceSignals,
-      quality_issues: qualityIssues ?? [],
-      automation_reason: automationReason || null,
-      tracking_sid: trackingSid || null,
-    })
-    .select()
-    .single()
+  const { data: threadId, error } = await supabase.rpc('persist_scored_thread', {
+    p_user_id: userId,
+    p_keyword_id: keywordId,
+    p_platform: post.platform,
+    p_external_id: post.externalId,
+    p_author: post.author,
+    p_title: post.title || null,
+    p_text_content: post.text,
+    p_url: post.url,
+    p_intent_score: intentScore,
+    p_intent_label: intentLabel,
+    p_status: status,
+    p_flag: flag || null,
+    p_reasoning: reasoning || null,
+    p_tracking_sid: trackingSid || null,
+    p_matched_signals: evidenceSignals,
+    p_quality_issues: qualityIssues ?? [],
+    p_automation_reason: automationReason || null,
+    p_draft_text: draftText || null,
+    p_auto_send_payload: autoSendPayload ?? null,
+  })
 
   if (error) {
     throw new Error(`Failed to persist monitored thread: ${error.message}`)
   }
+  if (!threadId) throw new Error('Failed to persist monitored thread: missing id')
 
-  if (draftText && thread) {
-    const { error: analyticsError } = await supabase
-      .from('reply_analytics')
-      .insert({
-        user_id: userId,
-        thread_id: thread.id,
-        draft_text: draftText,
-      })
-      
-    if (analyticsError) {
-      throw new Error(`Failed to persist reply analytics: ${analyticsError.message}`)
-    }
-  }
-
-  return thread
+  return { id: threadId }
 }

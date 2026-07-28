@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { evaluateReplyQuality } from '@/lib/reply-quality'
 import { useDashboardSession } from '@/components/DashboardContext'
+import { fetchAllPages } from '@/lib/supabase-pagination'
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
   const isHigh = score >= 80
@@ -72,12 +73,13 @@ export default function DraftsPage() {
       const [connectionsResult, profileResult, draftsResult] = await Promise.all([
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
         supabase.from('profiles').select('business_name').eq('id', userId).single(),
-        supabase
+        fetchAllPages((from, to) => supabase
           .from('monitored_threads')
           .select('*, reply_analytics(draft_text), keywords(term, target)')
           .eq('user_id', userId)
           .in('status', ['drafted', 'needs_manual_reply'])
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false })
+          .range(from, to)),
       ])
       const conns = connectionsResult.data
       if (conns) setConnections(conns.map(c => c.platform))
@@ -222,7 +224,7 @@ export default function DraftsPage() {
 
     // Reset ref so it doesn't bleed into the next selected draft
     originalDraftRef.current = ''
-    supabase.from('monitored_threads').update({ status: 'dismissed' }).eq('id', threadIdToDismiss).then()
+    supabase.rpc('dismiss_thread', { p_thread_id: threadIdToDismiss }).then()
     setDrafts(prev => prev.filter(d => d.id !== threadIdToDismiss))
     const nextSelected = drafts.find(d => d.id !== threadIdToDismiss) || null
     setSelected(nextSelected)

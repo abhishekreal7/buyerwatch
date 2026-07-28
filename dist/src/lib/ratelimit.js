@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.actionRateLimit = exports.authRateLimit = void 0;
+exports.settingsRateLimit = exports.webhookRateLimit = exports.fetchNowRateLimit = exports.aiRateLimit = exports.actionRateLimit = exports.authRateLimit = void 0;
 exports.getIp = getIp;
 const ratelimit_1 = require("@upstash/ratelimit");
 const headers_1 = require("next/headers");
@@ -39,20 +39,21 @@ const redisAdapter = redisClient
         evalsha: async (sha, keys, args) => redisClient.evalsha(sha, keys.length, ...keys, ...args),
     }
     : null;
-exports.authRateLimit = redisAdapter
-    ? new ratelimit_1.Ratelimit({
-        redis: redisAdapter,
-        limiter: ratelimit_1.Ratelimit.slidingWindow(5, '15 m'),
-        analytics: false,
-    })
-    : new MemoryLimiter(5, 15 * 60_000);
-exports.actionRateLimit = redisAdapter
-    ? new ratelimit_1.Ratelimit({
-        redis: redisAdapter,
-        limiter: ratelimit_1.Ratelimit.slidingWindow(10, '1 m'),
-        analytics: false,
-    })
-    : new MemoryLimiter(10, 60_000);
+function createLimiter(maximum, window, windowMs) {
+    return redisAdapter
+        ? new ratelimit_1.Ratelimit({
+            redis: redisAdapter,
+            limiter: ratelimit_1.Ratelimit.slidingWindow(maximum, window),
+            analytics: false,
+        })
+        : new MemoryLimiter(maximum, windowMs);
+}
+exports.authRateLimit = createLimiter(5, '15 m', 15 * 60_000);
+exports.actionRateLimit = createLimiter(10, '1 m', 60_000);
+exports.aiRateLimit = createLimiter(8, '1 h', 60 * 60_000);
+exports.fetchNowRateLimit = createLimiter(4, '1 h', 60 * 60_000);
+exports.webhookRateLimit = createLimiter(30, '1 m', 60_000);
+exports.settingsRateLimit = createLimiter(20, '1 h', 60 * 60_000);
 async function getIp() {
     const headersList = await (0, headers_1.headers)();
     const forwardedFor = headersList.get('x-forwarded-for');

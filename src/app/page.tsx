@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'fra
 import { RadialGauge } from '@/components/RadialGauge'
 import Link from 'next/link'
 import {
-  Target, Plus, Minus, BadgeCheck, MousePointerClick,
+  Plus, Minus, BadgeCheck, MousePointerClick,
   ChevronRight, SearchCheck, History, Radar, Layers
 } from 'lucide-react'
 import { springs } from '@/lib/motion'
@@ -32,8 +32,6 @@ import {
   LeadDiscoveryWidget,
 } from '@/components/landing/HomeWidgets'
 import { LandingFooter } from '@/components/landing/LandingFooter'
-import { AgentoryFeatureCard } from '@/components/landing/AgentoryFeatureCard'
-import { AgentoryFeatureSection } from '@/components/landing/AgentoryFeatureSection'
 import {
   BeforeAfterTransformation,
   CoreFeatureBento,

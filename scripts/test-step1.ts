@@ -22,7 +22,7 @@ async function runStep1() {
   let allTablesPass = true
 
   for (const table of tables) {
-    const { data, error } = await supabase.from(table).select('*').limit(1)
+    const { error } = await supabase.from(table).select('*').limit(1)
     if (error && error.code === '42P01') {
       console.log(`❌ FAILED: Table '${table}' does NOT exist.`)
       allTablesPass = false
@@ -56,9 +56,9 @@ async function runStep1() {
 
   // Check if increment_usage_if_under_limit exists by calling it with dummy data
   // It expects (uuid, text, int). We can pass dummy data and it should return false or throw a nice error if missing.
-  const { data: fnData, error: fnError } = await supabase.rpc('increment_usage_if_under_limit', {
+  const { error: fnError } = await supabase.rpc('increment_usage_if_under_limit', {
     p_user_id: '00000000-0000-0000-0000-000000000000',
-    p_service: 'gemini',
+    p_service: 'intent',
     p_limit: 5
   })
 

@@ -14,7 +14,6 @@ import {
   Search,
   Settings,
   X,
-  Zap,
 } from 'lucide-react'
 import {
   PiArrowLeftBold,
@@ -222,8 +221,6 @@ export default function DashboardLayout({
   const currentSection = Object.entries(PAGE_SECTIONS).find(([href]) =>
     pathname === href || pathname.startsWith(`${href}/`)
   )?.[1] ?? 'Workspace'
-  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
-
   function openCommandPalette() {
     window.dispatchEvent(new Event('buyerwatch:open-command-palette'))
   }

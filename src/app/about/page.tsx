@@ -39,7 +39,7 @@ export default function AboutPage() {
             </p>
 
             <p>
-              BuyerWatch automates this monitoring process by searching communities 24/7. When a match is found, our dual-stage AI pipeline handles the heavy lifting: first, a buyer-intent analysis (powered by Gemini) determines how warm the lead is; second, a voice-matching agent (powered by Claude) drafts a natural response tailored to your company's profile and custom tone.
+              BuyerWatch automates this monitoring process by searching communities 24/7. When a match is found, our dual-stage Claude pipeline handles the heavy lifting: first, a buyer-intent analysis determines how warm the lead is; second, a voice-matching agent drafts a natural response tailored to your company&apos;s profile and custom tone.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-12 mb-6" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>

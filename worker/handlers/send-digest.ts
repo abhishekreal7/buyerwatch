@@ -11,7 +11,7 @@ const supabase = createClient(
 )
 
 export async function sendDigestHandler(job: Job) {
-  const { userId, email, items } = job.data
+  const { userId, email, items, unsubscribeUrl } = job.data
 
   if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
     logger.info('Digest skipped: email provider is not configured')
@@ -53,8 +53,13 @@ export async function sendDigestHandler(job: Job) {
         totalFound: threadsCount || items.length,
         totalDrafts: draftsCount || 0,
         totalReplies: sentCount || 0,
-        dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
-      })
+        dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+        unsubscribeUrl,
+      }),
+      headers: unsubscribeUrl ? {
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      } : undefined,
     }), 15_000, 'digest email delivery')
 
     logger.info({ userId, messageId: data?.data?.id }, 'Digest sent successfully')

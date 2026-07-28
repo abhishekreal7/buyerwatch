@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { getServiceRoleClient } from '@/lib/admin'
+import { actionRateLimit, getIp } from '@/lib/ratelimit'
+import { boundedString, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 
 export async function POST(request: Request) {
   try {
@@ -10,34 +13,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { 
-      threadId, 
-      originalDraft, 
-      finalDraft, 
-      actionType, 
-      platform, 
-      targetCommunity, 
-      keywordCluster 
-    } = body
+    const body = await readJsonBody<Record<string, unknown>>(request)
+    const threadId = body.threadId
+    const actionType = body.actionType
+    const finalDraft = boundedString(body.finalDraft, 10_000, { trim: false })
 
-    if (!threadId || !actionType) {
+    if (!isUuid(threadId) || typeof actionType !== 'string') {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
     if (!['APPROVED', 'EDITED_APPROVED', 'REJECTED', 'SKIPPED', 'REGENERATE_REQUESTED', 'COPIED'].includes(actionType)) {
       return NextResponse.json({ error: 'Invalid action type' }, { status: 400 })
     }
+    const rate = await actionRateLimit.limit(`feedback:${user.id}:${await getIp()}`)
+    if (!rate.success) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+    }
 
-    // Call the Postgres function we created in schema.sql
-    const { error } = await supabase.rpc('log_draft_feedback', {
+    // The service RPC re-reads the source draft, platform, target, and keyword
+    // from the database. Client-supplied values cannot poison trust metrics.
+    const { error } = await getServiceRoleClient().rpc('log_verified_draft_feedback', {
       p_user_id: user.id,
       p_thread_id: threadId,
-      p_original_draft: originalDraft || null,
       p_final_draft: finalDraft || null,
       p_action_type: actionType,
-      p_platform: platform || null,
-      p_target_community: targetCommunity || null,
-      p_keyword_cluster: keywordCluster || null
     })
 
     if (error) {
@@ -47,6 +45,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Error in feedback API:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }

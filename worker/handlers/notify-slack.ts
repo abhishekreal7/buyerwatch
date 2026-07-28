@@ -3,6 +3,7 @@ import { logger } from '../../src/lib/logger'
 import { supabaseWorker as supabase } from '../lib/supabase'
 import { fetchWithTimeout } from '../../src/lib/http'
 import { isAllowedSlackWebhookUrl } from '../../src/lib/security/outbound-url'
+import { decrypt } from '../../src/lib/encryption'
 
 /**
  * Sends a Slack Block Kit notification to the user's configured webhook URL
@@ -16,19 +17,22 @@ export async function notifySlackHandler(job: Job) {
   // 1. Fetch the user's Slack webhook URL and threshold from Supabase
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('slack_webhook_url, slack_notify_threshold, business_name')
+    .select('slack_webhook_ciphertext, slack_webhook_url, slack_notify_threshold, business_name')
     .eq('id', userId)
     .single()
 
   if (error) throw new Error(`Unable to load Slack notification settings: ${error.message}`)
   if (!profile) return { success: false, reason: 'no_profile' }
 
-  const { slack_webhook_url, slack_notify_threshold, business_name } = profile
+  const { slack_webhook_ciphertext, slack_webhook_url, slack_notify_threshold, business_name } = profile
+  const webhookUrl = slack_webhook_ciphertext
+    ? decrypt(slack_webhook_ciphertext)
+    : slack_webhook_url
 
-  if (!slack_webhook_url) {
+  if (!webhookUrl) {
     return { success: false, reason: 'no_webhook' }
   }
-  if (!isAllowedSlackWebhookUrl(slack_webhook_url)) {
+  if (!isAllowedSlackWebhookUrl(webhookUrl)) {
     throw new Error('Stored Slack webhook URL is not an allowed Slack endpoint')
   }
 
@@ -110,7 +114,7 @@ export async function notifySlackHandler(job: Job) {
 
   // 3. POST to Slack webhook
   try {
-    const response = await fetchWithTimeout(slack_webhook_url, {
+    const response = await fetchWithTimeout(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

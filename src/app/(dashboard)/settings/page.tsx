@@ -306,8 +306,6 @@ export default function SettingsPage() {
       reddit_username: profile.redditUsername,
       referral_tracking_enabled: profile.referralTrackingEnabled,
       notification_preferences: notifications,
-      slack_webhook_url: slack.webhookUrl || null,
-      slack_notify_threshold: slack.threshold,
     }
     const saveProfile = async () => {
       const extendedResult = await supabase.from('profiles').update({
@@ -319,7 +317,17 @@ export default function SettingsPage() {
       return supabase.from('profiles').update(baseProfileUpdates).eq('id', userId)
     }
 
-    const [{ error }, autoSendResponse] = await Promise.all([
+    const slackRequest = slack.webhookUrl
+      ? fetch('/api/settings/slack', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            webhookUrl: slack.webhookUrl,
+            threshold: slack.threshold,
+          }),
+        })
+      : Promise.resolve(new Response(null, { status: 204 }))
+    const [{ error }, autoSendResponse, slackResponse] = await Promise.all([
       saveProfile(),
       fetch('/api/settings/autosend', {
         method: 'PATCH',
@@ -329,10 +337,11 @@ export default function SettingsPage() {
           auto_send_threshold: profile.autoSendThreshold,
         }),
       }),
+      slackRequest,
     ])
 
     setSaving(false)
-    if (error || !autoSendResponse.ok) { toast.error('Failed to save'); return }
+    if (error || !autoSendResponse.ok || !slackResponse.ok) { toast.error('Failed to save'); return }
     setSaveSuccess(true)
     toast.success('Settings saved')
     setTimeout(() => setSaveSuccess(false), 2500)
@@ -381,7 +390,15 @@ export default function SettingsPage() {
   }
 
   const handleDisconnect = async (platform: 'reddit' | 'bluesky') => {
-    await supabase.from('platform_connections').delete().eq('user_id', userId).eq('platform', platform)
+    const response = await fetch('/api/settings/connections', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform }),
+    })
+    if (!response.ok) {
+      toast.error(`Failed to disconnect ${platform}`)
+      return
+    }
     setConnections(p => ({ ...p, [platform]: false }))
     toast.success(`${platform} disconnected`)
   }

@@ -40,21 +40,22 @@ const redisAdapter = redisClient
     }
   : null
 
-export const authRateLimit: Limiter = redisAdapter
-  ? new Ratelimit({
-      redis: redisAdapter as never,
-      limiter: Ratelimit.slidingWindow(5, '15 m'),
-      analytics: false,
-    })
-  : new MemoryLimiter(5, 15 * 60_000)
+function createLimiter(maximum: number, window: `${number} ${'s' | 'm' | 'h'}`, windowMs: number): Limiter {
+  return redisAdapter
+    ? new Ratelimit({
+        redis: redisAdapter as never,
+        limiter: Ratelimit.slidingWindow(maximum, window),
+        analytics: false,
+      })
+    : new MemoryLimiter(maximum, windowMs)
+}
 
-export const actionRateLimit: Limiter = redisAdapter
-  ? new Ratelimit({
-      redis: redisAdapter as never,
-      limiter: Ratelimit.slidingWindow(10, '1 m'),
-      analytics: false,
-    })
-  : new MemoryLimiter(10, 60_000)
+export const authRateLimit = createLimiter(5, '15 m', 15 * 60_000)
+export const actionRateLimit = createLimiter(10, '1 m', 60_000)
+export const aiRateLimit = createLimiter(8, '1 h', 60 * 60_000)
+export const fetchNowRateLimit = createLimiter(4, '1 h', 60 * 60_000)
+export const webhookRateLimit = createLimiter(30, '1 m', 60_000)
+export const settingsRateLimit = createLimiter(20, '1 h', 60 * 60_000)
 
 export async function getIp() {
   const headersList = await headers()

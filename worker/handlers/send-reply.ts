@@ -19,14 +19,6 @@ interface SendReplyData {
   triggerType: 'manual' | 'auto'
 }
 
-async function requireNoError(
-  operation: PromiseLike<{ error: { message: string } | null }>,
-  context: string,
-) {
-  const { error } = await operation
-  if (error) throw new Error(`${context}: ${error.message}`)
-}
-
 export async function sendReplyHandler(job: Job<SendReplyData>) {
   const { userId, threadExternalId, threadId, text, platform, triggerType } = job.data
 
@@ -39,7 +31,7 @@ export async function sendReplyHandler(job: Job<SendReplyData>) {
     )
   }
 
-  const { data: claimed, error: claimError } = await supabase.rpc('claim_thread_for_send', {
+  const { data: claimToken, error: claimError } = await supabase.rpc('claim_thread_for_send_v2', {
     p_thread_id: threadId,
     p_user_id: userId,
   })
@@ -47,7 +39,7 @@ export async function sendReplyHandler(job: Job<SendReplyData>) {
     await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
     throw new Error(`Unable to claim reply: ${claimError.message}`)
   }
-  if (!claimed) {
+  if (!claimToken) {
     await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
     logger.info({ jobId: job.id, threadId }, 'Reply already sent or no longer sendable')
     return { duplicate: true }
@@ -92,28 +84,22 @@ export async function sendReplyHandler(job: Job<SendReplyData>) {
 
     await recordSuccessfulSend(userId, platform, reservation.token)
 
-    await requireNoError(
-      supabase.from('monitored_threads').update({ status: 'replied' }).eq('id', threadId).eq('user_id', userId),
-      'Unable to mark thread replied',
+    const { data: finalized, error: finalizeError } = await supabase.rpc(
+      'finalize_successful_send',
+      {
+        p_thread_id: threadId,
+        p_user_id: userId,
+        p_claim_token: claimToken,
+        p_platform: platform,
+        p_trigger_type: triggerType,
+        p_permalink: result.permalink,
+      },
     )
-    await requireNoError(
-      supabase.from('reply_analytics').update({
-        was_sent: true,
-        sent_at: new Date().toISOString(),
-      }).eq('thread_id', threadId).eq('user_id', userId),
-      'Unable to update reply analytics',
-    )
-    await requireNoError(
-      supabase.from('send_audit_log').insert({
-        user_id: userId,
-        thread_id: threadId,
-        platform,
-        trigger_type: triggerType,
-        status: 'success',
-        permalink: result.permalink,
-      }),
-      'Unable to write send audit',
-    )
+    if (finalizeError || finalized !== true) {
+      throw new Error(
+        `Unable to finalize successful send: ${finalizeError?.message ?? 'claim no longer active'}`,
+      )
+    }
 
     return { success: true, permalink: result.permalink }
   } catch (error) {
@@ -121,41 +107,45 @@ export async function sendReplyHandler(job: Job<SendReplyData>) {
       // The provider accepted the reply. Never make it sendable again: doing so
       // could create a duplicate public post if a persistence call failed.
       await recordSuccessfulSend(userId, platform, reservation.token).catch(() => undefined)
-      await supabase
-        .from('monitored_threads')
-        .update({ status: 'send_reconciliation_required' })
-        .eq('id', threadId)
-        .eq('user_id', userId)
-      await supabase.from('send_audit_log').insert({
-        user_id: userId,
-        thread_id: threadId,
-        platform,
-        trigger_type: triggerType,
-        status: 'reconciliation_required',
-        permalink: externalPermalink,
-        error_message: error instanceof Error ? error.message.slice(0, 500) : 'Post-send persistence error',
+      await supabase.rpc('mark_send_reconciliation', {
+        p_thread_id: threadId,
+        p_user_id: userId,
+        p_claim_token: claimToken,
+        p_platform: platform,
+        p_trigger_type: triggerType,
+        p_permalink: externalPermalink,
+        p_error_message: error instanceof Error
+          ? error.message
+          : 'Post-send persistence error',
       })
       throw error
     }
 
     await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
-    const isRetryable = error instanceof PlatformPostError && error.retryable
+    const isRetryable =
+      !(error instanceof PlatformPostError)
+      || error.retryable
     const attempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1
     const finalAttempt = !isRetryable || job.attemptsMade + 1 >= attempts
 
     // Release the DB claim before BullMQ retries. A concurrently delivered
     // duplicate still cannot claim while this attempt owns `sending`.
-    await requireNoError(
-      supabase
-        .from('monitored_threads')
-        .update({ status: 'drafted' })
-        .eq('id', threadId)
-        .eq('user_id', userId)
-        .eq('status', 'sending'),
-      'Unable to release failed send claim',
+    const { data: released, error: releaseError } = await supabase.rpc(
+      'release_send_claim',
+      {
+        p_thread_id: threadId,
+        p_user_id: userId,
+        p_claim_token: claimToken,
+      },
     )
+    if (releaseError || released !== true) {
+      throw new Error(
+        `Unable to release failed send claim: ${releaseError?.message ?? 'claim no longer active'}`,
+      )
+    }
 
     if (finalAttempt) {
+      if (!isRetryable) job.discard()
       await supabase.from('send_audit_log').insert({
         user_id: userId,
         thread_id: threadId,

@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import Anthropic from '@anthropic-ai/sdk'
 import { fetchPublicText } from '@/lib/security/outbound-url'
+import { getConfiguredSecret } from '@/lib/env'
 import {
   buildFallbackSuggestions,
   sanitizeOnboardingSuggestions,
   type OnboardingSuggestions,
 } from '@/lib/onboarding-intelligence'
 import { normalizeWebsiteUrl } from '@/lib/onboarding-validation'
-
-function cleanApiKey(value: string | undefined): string {
-  const trimmed = value?.trim() ?? ''
-  return trimmed && !trimmed.startsWith('#') && !trimmed.toLowerCase().includes('todo') ? trimmed : ''
-}
+import { aiRateLimit, getIp } from '@/lib/ratelimit'
+import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
+import { getServiceRoleClient } from '@/lib/admin'
+import {
+  calculateAnthropicUsage,
+  recordAiUsage,
+  releaseAiSpend,
+  reserveAiSpend,
+} from '@/lib/ai-usage'
 
 function titleCase(value: string): string {
   return value
@@ -49,19 +53,56 @@ function parseAiJson(value: string): OnboardingSuggestions | null {
   }
 }
 
+const ONBOARDING_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    businessName: { type: 'string' },
+    description: { type: 'string' },
+    subreddits: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    buyerKeywords: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    competitorKeywords: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    painPointKeywords: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+  },
+  required: [
+    'businessName',
+    'description',
+    'subreddits',
+    'buyerKeywords',
+    'competitorKeywords',
+    'painPointKeywords',
+  ],
+  additionalProperties: false,
+} as const
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const payload = await req.json()
+    const payload = await readJsonBody<Record<string, unknown>>(req, 8_192)
     const url = normalizeWebsiteUrl(typeof payload.url === 'string' ? payload.url : '')
-    const businessName = typeof payload.businessName === 'string' ? payload.businessName.trim() : ''
-    const businessDescription = typeof payload.businessDescription === 'string' ? payload.businessDescription.trim() : ''
+    const businessName = boundedString(payload.businessName, 120) ?? ''
+    const businessDescription = boundedString(payload.businessDescription, 4_000) ?? ''
 
     if (!url && !businessName) {
       return NextResponse.json({ error: 'Enter a website URL or business name.' }, { status: 400 })
+    }
+    const rate = await aiRateLimit.limit(`onboarding-ai:${user.id}:${await getIp()}`)
+    if (!rate.success) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
     }
 
     let webpageText = ''
@@ -90,8 +131,8 @@ export async function POST(req: NextRequest) {
             .slice(0, 1500)
           webpageText = `Title: ${title}\nDescription: ${metaDesc}\nContent: ${bodySnippet}`
         }
-      } catch (err) {
-        console.warn('[ai-suggest] Failed to fetch URL, relying on user inputs:', err)
+      } catch {
+        console.warn('[ai-suggest] Website fetch failed; using supplied profile data')
       }
     }
 
@@ -120,38 +161,58 @@ Rules:
 4. painPointKeywords: core problem statements users discuss on Reddit.
 5. NEVER append duplicate words like "reddit reddit". Keep phrases natural.`
 
+    const anthropicKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
     let aiResponse = ''
-    const geminiKey = cleanApiKey(process.env.GEMINI_API_KEY)
-    const anthropicKey = cleanApiKey(process.env.ANTHROPIC_API_KEY)
+    const admin = getServiceRoleClient()
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('plan')
+      .eq('id', user.id)
+      .single()
 
-    if (geminiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(geminiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-        const result = await model.generateContent(prompt, { timeout: 20_000 })
-        aiResponse = result.response.text()
-      } catch (geminiErr) {
-        console.warn('[ai-suggest] Gemini failed, attempting Anthropic...', geminiErr)
+    if (anthropicKey) {
+      const reservation = await reserveAiSpend(admin, {
+        userId: user.id,
+        // Onboarding is bounded and accounted within the same generative-AI
+        // budget as drafts, without consuming a monthly draft allowance.
+        purpose: 'draft',
+        plan: profile?.plan,
+      })
+      if (!reservation) {
+        return NextResponse.json({ error: 'ai_spend_limit_reached' }, { status: 429 })
       }
-    }
-
-    if (!aiResponse && anthropicKey) {
       try {
         const anthropic = new Anthropic({
           apiKey: anthropicKey,
-          timeout: 20_000,
-          maxRetries: 1,
+          timeout: 30_000,
+          maxRetries: 2,
         })
         const response = await anthropic.messages.create({
           model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
-          max_tokens: 1000,
-          system: 'You output strictly valid JSON without explanation or formatting wrappers.',
-          messages: [{ role: 'user', content: prompt }]
+          max_tokens: 800,
+          output_config: {
+            effort: 'high',
+            format: {
+              type: 'json_schema',
+              schema: ONBOARDING_OUTPUT_SCHEMA,
+            },
+          },
+          system: 'You produce precise product-monitoring suggestions grounded only in the supplied context.',
+          messages: [{ role: 'user', content: prompt }],
         })
-        if (response.content[0].type === 'text') {
-          aiResponse = response.content[0].text
+        if (response.stop_reason === 'max_tokens') {
+          throw new Error('Anthropic onboarding response was truncated')
         }
+        aiResponse = response.content
+          .filter(block => block.type === 'text')
+          .map(block => block.text)
+          .join('')
+        await recordAiUsage(admin, {
+          reservationId: reservation.id,
+          usage: calculateAnthropicUsage(response.model, response.usage),
+        })
       } catch (anthropicErr) {
+        await releaseAiSpend(admin, reservation.id).catch(() => undefined)
         console.warn('[ai-suggest] Anthropic failed, using fallback suggestions:', anthropicErr)
       }
     }
@@ -166,6 +227,9 @@ Rules:
 
     return NextResponse.json(result)
   } catch (err) {
+    if (err instanceof RequestInputError) {
+      return NextResponse.json({ error: err.message }, { status: 400 })
+    }
     console.error('[ai-suggest] Error generating suggestions:', err)
     return NextResponse.json({ error: 'suggestion_generation_failed' }, { status: 502 })
   }

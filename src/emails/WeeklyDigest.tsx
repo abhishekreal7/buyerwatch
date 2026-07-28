@@ -26,6 +26,7 @@ interface WeeklyDigestProps {
   totalDrafts: number
   totalReplies: number
   dashboardUrl: string
+  unsubscribeUrl?: string
 }
 
 export const WeeklyDigest = ({
@@ -33,7 +34,8 @@ export const WeeklyDigest = ({
   totalFound = 0,
   totalDrafts = 0,
   totalReplies = 0,
-  dashboardUrl = 'https://app.example.com/dashboard'
+  dashboardUrl = 'https://app.example.com/dashboard',
+  unsubscribeUrl,
 }: WeeklyDigestProps) => (
   <Html>
     <Head />
@@ -86,6 +88,9 @@ export const WeeklyDigest = ({
         <Hr style={hr} />
         <Text style={footer}>
           You are receiving this because you enabled Weekly Reports in BuyerWatch Settings.
+          {unsubscribeUrl && (
+            <> <Link href={unsubscribeUrl} style={footerLink}>Unsubscribe</Link></>
+          )}
         </Text>
       </Container>
     </Body>
@@ -196,6 +201,11 @@ const footer = {
   color: '#94a3b8',
   fontSize: '12px',
   textAlign: 'center' as const,
+}
+
+const footerLink = {
+  color: '#64748b',
+  textDecoration: 'underline',
 }
 
 export default WeeklyDigest

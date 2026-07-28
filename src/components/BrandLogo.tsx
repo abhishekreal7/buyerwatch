@@ -6,8 +6,8 @@ interface BrandLogoProps {
 
 const dimensions = {
   sm: { px: 22, text: 'text-[17px]' },
-  md: { px: 28, text: 'text-[21px]' },
-  lg: { px: 34, text: 'text-[25px]' },
+  md: { px: 30, text: 'text-[22px]' },
+  lg: { px: 36, text: 'text-[27px]' },
 }
 
 export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: BrandLogoProps) {
@@ -15,23 +15,22 @@ export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: Brand
 
   return (
     <span className={`inline-flex items-center gap-2.5 tracking-tight ${tone === 'light' ? 'text-white' : 'text-gray-950'}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/buyerwatch_logo.png"
-        alt="BuyerWatch Logo"
-        width={dim.px}
-        height={dim.px}
-        style={{ width: `${dim.px}px`, height: `${dim.px}px` }}
-        className="rounded-full object-contain shrink-0"
-      />
+      <span className="shrink-0" style={{ width: `${dim.px}px`, height: `${dim.px}px` }}>
+        <img
+          src="/buyerwatch_logo.png"
+          alt={compact ? 'BuyerWatch' : ''}
+          width={dim.px}
+          height={dim.px}
+          className="h-full w-full rounded-full object-contain"
+        />
+      </span>
       {!compact && (
         <span
-          className={`${dim.text} leading-none tracking-normal inline-flex items-baseline gap-1.5`}
+          className={`${dim.text} inline-flex font-semibold leading-none tracking-[-0.045em]`}
           style={{ fontFamily: 'var(--font-serif), "Playfair Display", Georgia, serif' }}
         >
-          <span className="text-[#9E9E9E] font-normal italic">the</span>
-          <span className="text-[#D34519] font-normal">buyer</span>
-          <span className="text-[#2C2C2E] font-normal">Watch</span>
+          <span style={{ color: tone === 'light' ? '#FFFFFF' : '#2155D9' }}>Buyer</span>
+          <span style={{ color: tone === 'light' ? '#FFFFFF' : '#171717' }}>Watch</span>
         </span>
       )}
     </span>

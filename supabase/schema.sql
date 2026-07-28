@@ -5,6 +5,7 @@ drop table if exists ingestion_events cascade;
 drop table if exists reply_analytics cascade;
 drop table if exists monitored_threads cascade;
 drop table if exists keywords cascade;
+drop table if exists ai_spend_reservations cascade;
 drop table if exists usage_logs cascade;
 drop table if exists profiles cascade;
 
@@ -33,6 +34,10 @@ create table profiles (
   plan text not null default 'free' check (plan in ('free', 'pro', 'growth')),
   auto_send_enabled boolean default false,
   auto_send_threshold integer default 85 check (auto_send_threshold between 70 and 100),
+  draft_month date,
+  draft_count integer not null default 0,
+  signal_month date,
+  signal_count integer not null default 0,
   notification_preferences jsonb default '{"emailDigest": true, "highIntentAlerts": true, "weeklyReport": false}'::jsonb,
   last_polled_at timestamptz,
   created_at timestamptz default now()
@@ -86,11 +91,34 @@ create table reply_analytics (
 create table usage_logs (
   user_id uuid references profiles(id) on delete cascade,
   date date default current_date,
-  gemini_calls int default 0,
-  claude_calls int default 0,
+  intent_calls int default 0,
+  draft_calls int default 0,
+  intent_input_tokens bigint not null default 0,
+  intent_output_tokens bigint not null default 0,
+  intent_cost_microusd bigint not null default 0,
+  intent_model text,
+  draft_input_tokens bigint not null default 0,
+  draft_output_tokens bigint not null default 0,
+  draft_cost_microusd bigint not null default 0,
+  draft_model text,
   x_spend_cents int default 0,
   primary key (user_id, date)
 );
+
+create table ai_spend_reservations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  purpose text not null check (purpose in ('intent', 'draft')),
+  estimated_microusd bigint not null check (estimated_microusd > 0),
+  status text not null default 'pending'
+    check (status in ('pending', 'reconciled', 'released')),
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index ai_spend_reservations_pending_idx
+  on ai_spend_reservations (created_at, user_id)
+  where status = 'pending';
 
 -- Row Level Security — enable from day one, not retrofitted
 alter table profiles enable row level security;
@@ -98,6 +126,7 @@ alter table keywords enable row level security;
 alter table monitored_threads enable row level security;
 alter table reply_analytics enable row level security;
 alter table usage_logs enable row level security;
+alter table ai_spend_reservations enable row level security;
 
 create policy "profiles select own" on profiles for select using (auth.uid() = id);
 create policy "profiles insert own" on profiles for insert
@@ -113,6 +142,7 @@ create policy "own keywords" on keywords for all using (auth.uid() = user_id);
 create policy "own threads" on monitored_threads for all using (auth.uid() = user_id);
 create policy "own analytics" on reply_analytics for all using (auth.uid() = user_id);
 create policy "own usage" on usage_logs for all using (auth.uid() = user_id);
+revoke all on table ai_spend_reservations from public, anon, authenticated;
 
 create or replace function mark_thread_reviewed(
   p_user_id uuid,
@@ -145,24 +175,37 @@ create or replace function increment_usage_if_under_limit(
   p_user_id uuid, p_service text, p_limit int
 ) returns boolean
 language plpgsql
+security definer
+set search_path = public, pg_temp
 as $$
 declare current_count int;
 begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
   insert into usage_logs (user_id, date) values (p_user_id, current_date)
     on conflict (user_id, date) do nothing;
 
-  if p_service = 'gemini' then
-    select gemini_calls into current_count from usage_logs where user_id = p_user_id and date = current_date for update;
+  if p_service = 'intent' then
+    select intent_calls into current_count from usage_logs where user_id = p_user_id and date = current_date for update;
     if current_count >= p_limit then return false; end if;
-    update usage_logs set gemini_calls = gemini_calls + 1 where user_id = p_user_id and date = current_date;
+    update usage_logs set intent_calls = intent_calls + 1 where user_id = p_user_id and date = current_date;
+  elsif p_service = 'draft' then
+    select draft_calls into current_count from usage_logs where user_id = p_user_id and date = current_date for update;
+    if current_count >= p_limit then return false; end if;
+    update usage_logs set draft_calls = draft_calls + 1 where user_id = p_user_id and date = current_date;
   else
-    select claude_calls into current_count from usage_logs where user_id = p_user_id and date = current_date for update;
-    if current_count >= p_limit then return false; end if;
-    update usage_logs set claude_calls = claude_calls + 1 where user_id = p_user_id and date = current_date;
+    raise exception 'unsupported usage service';
   end if;
   return true;
 end;
 $$;
+
+revoke all on function increment_usage_if_under_limit(uuid, text, int)
+  from public, anon, authenticated;
+grant execute on function increment_usage_if_under_limit(uuid, text, int)
+  to service_role;
 
 create or replace function increment_x_spend_if_under_limit(
   p_user_id uuid, p_cost_cents int, p_daily_limit_cents int
@@ -422,3 +465,331 @@ revoke all on function log_draft_feedback(uuid, uuid, text, text, text, text, te
   from public, anon;
 grant execute on function log_draft_feedback(uuid, uuid, text, text, text, text, text, text)
   to authenticated;
+
+-- Atomic monthly signal and draft allowances.
+create or replace function reserve_monthly_signal(
+  p_user_id uuid,
+  p_limit integer
+) returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_month date := date_trunc('month', current_date)::date;
+  v_count integer;
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_limit < 1 then
+    raise exception 'invalid signal limit' using errcode = '22023';
+  end if;
+
+  update profiles
+  set
+    signal_month = v_month,
+    signal_count = case when signal_month = v_month then signal_count + 1 else 1 end
+  where id = p_user_id
+    and (signal_month is distinct from v_month or signal_count < p_limit)
+  returning signal_count into v_count;
+
+  return v_count is not null;
+end;
+$$;
+
+revoke all on function reserve_monthly_signal(uuid, integer)
+  from public, anon, authenticated;
+grant execute on function reserve_monthly_signal(uuid, integer)
+  to service_role;
+
+create or replace function release_monthly_signal(
+  p_user_id uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  update profiles
+  set signal_count = greatest(signal_count - 1, 0)
+  where id = p_user_id
+    and signal_month = date_trunc('month', current_date)::date;
+end;
+$$;
+
+revoke all on function release_monthly_signal(uuid)
+  from public, anon, authenticated;
+grant execute on function release_monthly_signal(uuid)
+  to service_role;
+
+create or replace function reserve_monthly_draft(
+  p_user_id uuid,
+  p_limit integer
+) returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_month date := date_trunc('month', current_date)::date;
+  v_count integer;
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_limit < 1 then
+    raise exception 'invalid draft limit' using errcode = '22023';
+  end if;
+
+  update profiles
+  set
+    draft_month = v_month,
+    draft_count = case when draft_month = v_month then draft_count + 1 else 1 end
+  where id = p_user_id
+    and (draft_month is distinct from v_month or draft_count < p_limit)
+  returning draft_count into v_count;
+
+  if v_count is not null then
+    insert into usage_logs (user_id, date, draft_calls)
+    values (p_user_id, current_date, 1)
+    on conflict (user_id, date)
+    do update set draft_calls = usage_logs.draft_calls + 1;
+  end if;
+
+  return v_count is not null;
+end;
+$$;
+
+revoke all on function reserve_monthly_draft(uuid, integer)
+  from public, anon, authenticated;
+grant execute on function reserve_monthly_draft(uuid, integer)
+  to service_role;
+
+create or replace function release_monthly_draft(
+  p_user_id uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  update profiles
+  set draft_count = greatest(draft_count - 1, 0)
+  where id = p_user_id
+    and draft_month = date_trunc('month', current_date)::date;
+
+  update usage_logs
+  set draft_calls = greatest(draft_calls - 1, 0)
+  where user_id = p_user_id
+    and date = current_date;
+end;
+$$;
+
+revoke all on function release_monthly_draft(uuid)
+  from public, anon, authenticated;
+grant execute on function release_monthly_draft(uuid)
+  to service_role;
+
+-- Provider-cost reservations make per-customer and global caps race-safe.
+create or replace function reserve_ai_spend(
+  p_user_id uuid,
+  p_purpose text,
+  p_estimated_microusd bigint,
+  p_user_monthly_limit_microusd bigint,
+  p_global_monthly_limit_microusd bigint
+) returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_month date := date_trunc('month', current_date)::date;
+  v_user_actual bigint;
+  v_user_pending bigint;
+  v_global_actual bigint;
+  v_global_pending bigint;
+  v_reservation_id uuid;
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_purpose not in ('intent', 'draft')
+    or p_estimated_microusd < 1
+    or p_user_monthly_limit_microusd < 1
+    or p_global_monthly_limit_microusd < 1 then
+    raise exception 'invalid AI spend reservation' using errcode = '22023';
+  end if;
+  if not exists (select 1 from profiles where id = p_user_id) then
+    raise exception 'profile not found' using errcode = 'P0002';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('ai-spend-global'), hashtext(v_month::text));
+  perform pg_advisory_xact_lock(hashtext(p_user_id::text), hashtext(v_month::text));
+
+  select coalesce(sum(intent_cost_microusd + draft_cost_microusd), 0)
+  into v_user_actual
+  from usage_logs
+  where user_id = p_user_id
+    and date >= v_month
+    and date < (v_month + interval '1 month')::date;
+
+  select coalesce(sum(estimated_microusd), 0)
+  into v_user_pending
+  from ai_spend_reservations
+  where user_id = p_user_id
+    and status = 'pending'
+    and created_at >= v_month
+    and created_at >= now() - interval '10 minutes';
+
+  if v_user_actual + v_user_pending + p_estimated_microusd
+    > p_user_monthly_limit_microusd then
+    return null;
+  end if;
+
+  select coalesce(sum(intent_cost_microusd + draft_cost_microusd), 0)
+  into v_global_actual
+  from usage_logs
+  where date >= v_month
+    and date < (v_month + interval '1 month')::date;
+
+  select coalesce(sum(estimated_microusd), 0)
+  into v_global_pending
+  from ai_spend_reservations
+  where status = 'pending'
+    and created_at >= v_month
+    and created_at >= now() - interval '10 minutes';
+
+  if v_global_actual + v_global_pending + p_estimated_microusd
+    > p_global_monthly_limit_microusd then
+    return null;
+  end if;
+
+  insert into ai_spend_reservations (user_id, purpose, estimated_microusd)
+  values (p_user_id, p_purpose, p_estimated_microusd)
+  returning id into v_reservation_id;
+
+  return v_reservation_id;
+end;
+$$;
+
+revoke all on function reserve_ai_spend(uuid, text, bigint, bigint, bigint)
+  from public, anon, authenticated;
+grant execute on function reserve_ai_spend(uuid, text, bigint, bigint, bigint)
+  to service_role;
+
+create or replace function record_ai_usage(
+  p_reservation_id uuid,
+  p_model text,
+  p_input_tokens bigint,
+  p_output_tokens bigint,
+  p_cost_microusd bigint
+) returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid;
+  v_purpose text;
+  v_status text;
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_input_tokens < 0 or p_output_tokens < 0 or p_cost_microusd < 0 then
+    raise exception 'invalid AI usage' using errcode = '22023';
+  end if;
+
+  select user_id, purpose, status
+  into v_user_id, v_purpose, v_status
+  from ai_spend_reservations
+  where id = p_reservation_id
+  for update;
+
+  if v_user_id is null then
+    raise exception 'AI spend reservation not found' using errcode = 'P0002';
+  end if;
+  if v_status = 'reconciled' then
+    return true;
+  end if;
+  if v_status <> 'pending' then
+    return false;
+  end if;
+
+  insert into usage_logs (
+    user_id, date,
+    intent_input_tokens, intent_output_tokens, intent_cost_microusd, intent_model,
+    draft_input_tokens, draft_output_tokens, draft_cost_microusd, draft_model
+  )
+  values (
+    v_user_id, current_date,
+    case when v_purpose = 'intent' then p_input_tokens else 0 end,
+    case when v_purpose = 'intent' then p_output_tokens else 0 end,
+    case when v_purpose = 'intent' then p_cost_microusd else 0 end,
+    case when v_purpose = 'intent' then nullif(p_model, '') else null end,
+    case when v_purpose = 'draft' then p_input_tokens else 0 end,
+    case when v_purpose = 'draft' then p_output_tokens else 0 end,
+    case when v_purpose = 'draft' then p_cost_microusd else 0 end,
+    case when v_purpose = 'draft' then nullif(p_model, '') else null end
+  )
+  on conflict (user_id, date) do update set
+    intent_input_tokens = usage_logs.intent_input_tokens
+      + case when v_purpose = 'intent' then p_input_tokens else 0 end,
+    intent_output_tokens = usage_logs.intent_output_tokens
+      + case when v_purpose = 'intent' then p_output_tokens else 0 end,
+    intent_cost_microusd = usage_logs.intent_cost_microusd
+      + case when v_purpose = 'intent' then p_cost_microusd else 0 end,
+    intent_model = case when v_purpose = 'intent' then nullif(p_model, '') else usage_logs.intent_model end,
+    draft_input_tokens = usage_logs.draft_input_tokens
+      + case when v_purpose = 'draft' then p_input_tokens else 0 end,
+    draft_output_tokens = usage_logs.draft_output_tokens
+      + case when v_purpose = 'draft' then p_output_tokens else 0 end,
+    draft_cost_microusd = usage_logs.draft_cost_microusd
+      + case when v_purpose = 'draft' then p_cost_microusd else 0 end,
+    draft_model = case when v_purpose = 'draft' then nullif(p_model, '') else usage_logs.draft_model end;
+
+  update ai_spend_reservations
+  set status = 'reconciled', completed_at = now()
+  where id = p_reservation_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function record_ai_usage(uuid, text, bigint, bigint, bigint)
+  from public, anon, authenticated;
+grant execute on function record_ai_usage(uuid, text, bigint, bigint, bigint)
+  to service_role;
+
+create or replace function release_ai_spend(
+  p_reservation_id uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  update ai_spend_reservations
+  set status = 'released', completed_at = now()
+  where id = p_reservation_id
+    and status = 'pending';
+end;
+$$;
+
+revoke all on function release_ai_spend(uuid)
+  from public, anon, authenticated;
+grant execute on function release_ai_spend(uuid)
+  to service_role;

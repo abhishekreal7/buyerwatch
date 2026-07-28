@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import DodoPayments from 'dodopayments'
+import { readTextBody, RequestInputError } from '@/lib/request'
 
 type BillingPlan = 'pro' | 'growth'
+type BillingStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired'
 
 function getSupabase() {
   return createClient(
@@ -11,8 +13,22 @@ function getSupabase() {
   )
 }
 
-function getPlan(value: unknown): BillingPlan | null {
-  return value === 'pro' || value === 'growth' ? value : null
+function getPlan(productId: string | null): BillingPlan | null {
+  if (productId === process.env.DODO_PAYMENTS_PRO_PRODUCT_ID) return 'pro'
+  if (productId === process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID) return 'growth'
+  return null
+}
+
+function getStatus(eventType: string, value: unknown): BillingStatus | null {
+  if (['pending', 'active', 'on_hold', 'cancelled', 'failed', 'expired'].includes(String(value))) {
+    return value as BillingStatus
+  }
+  if (eventType.includes('active') || eventType.includes('renewed')) return 'active'
+  if (eventType.includes('cancel')) return 'cancelled'
+  if (eventType.includes('fail')) return 'failed'
+  if (eventType.includes('expire')) return 'expired'
+  if (eventType.includes('hold') || eventType.includes('paused')) return 'on_hold'
+  return null
 }
 
 export async function POST(req: Request) {
@@ -23,11 +39,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'webhook_not_configured' }, { status: 503 })
   }
 
-  const rawBody = await req.text()
+  let rawBody: string
+  try {
+    rawBody = await readTextBody(req)
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 413 })
+    }
+    return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+  }
   const client = new DodoPayments({
     bearerToken: apiKey,
     webhookKey: webhookSecret,
-    environment: process.env.NODE_ENV === 'production' ? 'live_mode' : 'test_mode',
+    environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
+      ? 'test_mode'
+      : 'live_mode',
   })
 
   let event: Record<string, any>
@@ -47,17 +73,35 @@ export async function POST(req: Request) {
   const eventType = typeof event.type === 'string' ? event.type : ''
   const data = event.data ?? {}
   const metadata = data.metadata ?? {}
-  const userId = typeof metadata.user_id === 'string' ? metadata.user_id : null
-  const plan = getPlan(metadata.plan)
+  let userId = typeof metadata.user_id === 'string' ? metadata.user_id : null
   const subscriptionId =
     typeof data.subscription_id === 'string' ? data.subscription_id : null
+  let productId =
+    typeof data.product_id === 'string'
+      ? data.product_id
+      : typeof data.product?.product_id === 'string'
+        ? data.product.product_id
+        : null
+  let plan = getPlan(productId)
+  const providerStatus = getStatus(eventType, data.status)
   const customerId =
     typeof data.customer?.customer_id === 'string'
       ? data.customer.customer_id
       : typeof data.customer_id === 'string'
         ? data.customer_id
         : null
-  const eventAt = typeof event.timestamp === 'string' ? event.timestamp : new Date().toISOString()
+  const parsedEventAt = typeof event.timestamp === 'string'
+    ? new Date(event.timestamp)
+    : new Date(Number.NaN)
+  const eventAt = Number.isNaN(parsedEventAt.getTime())
+    ? null
+    : parsedEventAt.toISOString()
+  const periodEndsAt =
+    typeof data.next_billing_date === 'string'
+      ? data.next_billing_date
+      : typeof data.current_period_end === 'string'
+        ? data.current_period_end
+        : null
 
   if (!eventId) {
     return NextResponse.json({ error: 'missing_webhook_id' }, { status: 400 })
@@ -67,7 +111,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true, result: 'ignored' })
   }
 
-  if (!userId || !plan || !subscriptionId) {
+  if ((!userId || !productId) && subscriptionId) {
+    const { data: existing } = await getSupabase()
+      .from('profiles')
+      .select('id, billing_product_id')
+      .eq('billing_subscription_id', subscriptionId)
+      .maybeSingle()
+    userId ??= existing?.id ?? null
+    productId ??= existing?.billing_product_id ?? null
+    plan = getPlan(productId)
+  }
+
+  if (!userId || !plan || !subscriptionId || !productId || !providerStatus || !eventAt) {
     console.error('[billing/webhook] Subscription event has incomplete checkout metadata', {
       eventId,
       eventType,
@@ -75,20 +130,21 @@ export async function POST(req: Request) {
       hasPlan: Boolean(plan),
       hasSubscriptionId: Boolean(subscriptionId),
     })
-    return NextResponse.json({ received: true, result: 'invalid_metadata' })
+    // A signed subscription event that cannot be applied must be retried or
+    // surfaced by the provider, never silently acknowledged.
+    return NextResponse.json({ error: 'invalid_subscription_event' }, { status: 500 })
   }
 
-  if (!['subscription.active', 'subscription.updated', 'subscription.cancelled'].includes(eventType)) {
-    return NextResponse.json({ received: true, result: 'ignored' })
-  }
-
-  const { data: result, error } = await getSupabase().rpc('apply_billing_subscription_event', {
+  const { data: result, error } = await getSupabase().rpc('apply_billing_subscription_event_v2', {
     p_event_id: eventId,
     p_event_type: eventType,
     p_user_id: userId,
     p_subscription_id: subscriptionId,
     p_customer_id: customerId,
     p_plan: plan,
+    p_provider_status: providerStatus,
+    p_product_id: productId,
+    p_period_ends_at: periodEndsAt,
     p_event_at: eventAt,
   })
 

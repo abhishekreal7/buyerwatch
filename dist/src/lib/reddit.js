@@ -19,7 +19,7 @@ async function getRedditToken() {
         headers: {
             'Authorization': `Basic ${authString}`,
             'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+            'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
         },
         body: 'grant_type=client_credentials'
     }, 10_000);
@@ -189,7 +189,7 @@ async function fetchSubredditNew(subreddit, limit = 25) {
             const response = await (0, http_1.fetchWithTimeout)(url, {
                 headers: {
                     'Authorization': `Bearer ${redditApisKey}`,
-                    'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+                    'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
                 }
             }, 10_000);
             if (response.ok) {
@@ -223,7 +223,7 @@ async function fetchSubredditNew(subreddit, limit = 25) {
             const response = await (0, http_1.fetchWithTimeout)(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
-                    'User-Agent': process.env.REDDIT_USER_AGENT || 'scouto/1.0',
+                    'User-Agent': process.env.REDDIT_USER_AGENT || 'buyerwatch/1.0',
                 }
             }, 10_000);
             if (response.ok) {

@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'crypto'
 import { encrypt } from '@/lib/encryption'
 import { fetchWithTimeout } from '@/lib/http'
 import { getAppUrl } from '@/lib/app-url'
+import { getServiceRoleClient } from '@/lib/admin'
 
 const OAUTH_STATE_COOKIE = 'reddit_oauth_state'
 
@@ -65,7 +66,7 @@ export async function GET(req: Request) {
       token: 'developer_access_token',
       expires_at: Date.now() + 3600 * 1000
     }
-    const { error: bypassError } = await supabase.from('platform_connections').upsert({
+    const { error: bypassError } = await getServiceRoleClient().from('platform_connections').upsert({
       user_id: user.id,
       platform: 'reddit',
       access_token: encrypt(JSON.stringify(accessObj)),
@@ -123,7 +124,7 @@ export async function GET(req: Request) {
     expires_at: Date.now() + tokenData.expires_in * 1000
   }
 
-  const { error: saveError } = await supabase.from('platform_connections').upsert({
+  const { error: saveError } = await getServiceRoleClient().from('platform_connections').upsert({
     user_id: user.id,
     platform: 'reddit',
     access_token: encrypt(JSON.stringify(accessObj)),

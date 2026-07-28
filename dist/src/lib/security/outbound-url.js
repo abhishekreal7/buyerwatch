@@ -131,14 +131,18 @@ async function fetchPublicText(input, options = {}) {
         // DNS-rebinding window between validation and connection establishment.
         const dispatcher = new undici_1.Agent({
             connect: {
-                lookup: (_hostname, _options, callback) => {
+                lookup: (_hostname, lookupOptions, callback) => {
+                    if (lookupOptions.all) {
+                        callback(null, [{ address: target.address, family: target.family }]);
+                        return;
+                    }
                     callback(null, target.address, target.family);
                 },
             },
         });
         let response;
         try {
-            response = await fetch(target.url, {
+            response = await (0, undici_1.fetch)(target.url, {
                 headers: options.headers,
                 redirect: 'manual',
                 signal: AbortSignal.timeout(timeoutMs),

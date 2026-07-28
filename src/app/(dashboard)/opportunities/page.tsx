@@ -20,6 +20,7 @@ import { BlueskyIcon, RedditIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
 import { LeadPipelineBoard } from '@/components/LeadPipelineBoard'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
+import { fetchAllPages } from '@/lib/supabase-pagination'
 import { springs, staggers } from '@/lib/motion'
 import { createClient } from '@/utils/supabase/client'
 import { useDashboardSession } from '@/components/DashboardContext'
@@ -119,12 +120,13 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     async function fetchOpportunities() {
-      const { data, error } = await supabase
+      const { data, error } = await fetchAllPages((from, to) => supabase
         .from('monitored_threads')
         .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, created_at, keywords(term, target)')
         .eq('user_id', userId)
         .in('status', ['pending', 'drafted', 'needs_manual_reply'])
         .order('created_at', { ascending: false })
+        .range(from, to))
 
       if (error) {
         toast.error('Unable to load opportunities.')

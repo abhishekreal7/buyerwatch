@@ -1,12 +1,12 @@
 /**
  * Buying-signal pre-filter
  *
- * A zero-cost, deterministic gate that runs before any Gemini call.
+ * A zero-cost, deterministic gate that runs before any intent-model call.
  * Purpose: eliminate posts with no commercial shape so every AI call counts.
  *
  * Philosophy:
  *   - False negatives (missing a real lead) are worse than false positives
- *     (passing a borderline post to Gemini). So signals are intentionally
+ *     (passing a borderline post to the intent model). So signals are intentionally
  *     broad — we're filtering OUT obvious noise, not filtering IN only leads.
  *   - This list is a product decision, not a technical one. Edit freely.
  *   - All matching is case-insensitive, whole-word where marked with \b.

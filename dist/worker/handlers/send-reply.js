@@ -5,19 +5,15 @@ const logger_1 = require("../../src/lib/logger");
 const reddit_post_1 = require("../../src/lib/reddit-post");
 const bluesky_post_1 = require("../../src/lib/bluesky-post");
 const send_limiter_1 = require("../../src/lib/send-limiter");
+const attribution_store_1 = require("../../src/lib/attribution-store");
 const supabase_1 = require("../lib/supabase");
-async function requireNoError(operation, context) {
-    const { error } = await operation;
-    if (error)
-        throw new Error(`${context}: ${error.message}`);
-}
 async function sendReplyHandler(job) {
     const { userId, threadExternalId, threadId, text, platform, triggerType } = job.data;
     const reservation = await (0, send_limiter_1.reserveSendSlot)(userId, platform);
     if ('reason' in reservation) {
         throw new reddit_post_1.PlatformPostError(platform, `Rate limited until ${new Date(reservation.reset).toISOString()}: ${reservation.reason}`, true);
     }
-    const { data: claimed, error: claimError } = await supabase_1.supabaseWorker.rpc('claim_thread_for_send', {
+    const { data: claimToken, error: claimError } = await supabase_1.supabaseWorker.rpc('claim_thread_for_send_v2', {
         p_thread_id: threadId,
         p_user_id: userId,
     });
@@ -25,7 +21,7 @@ async function sendReplyHandler(job) {
         await (0, send_limiter_1.releaseSendSlot)(userId, platform, reservation.token).catch(() => undefined);
         throw new Error(`Unable to claim reply: ${claimError.message}`);
     }
-    if (!claimed) {
+    if (!claimToken) {
         await (0, send_limiter_1.releaseSendSlot)(userId, platform, reservation.token).catch(() => undefined);
         logger_1.logger.info({ jobId: job.id, threadId }, 'Reply already sent or no longer sendable');
         return { duplicate: true };
@@ -33,25 +29,8 @@ async function sendReplyHandler(job) {
     let externalSendSucceeded = false;
     let externalPermalink = null;
     try {
-        const result = platform === 'reddit'
-            ? await (0, reddit_post_1.postRedditReply)(userId, threadExternalId, text)
-            : await (0, bluesky_post_1.postBlueskyReply)(userId, threadExternalId, text);
-        externalSendSucceeded = true;
-        externalPermalink = result.permalink;
-        await (0, send_limiter_1.recordSuccessfulSend)(userId, platform, reservation.token);
-        await requireNoError(supabase_1.supabaseWorker.from('monitored_threads').update({ status: 'replied' }).eq('id', threadId).eq('user_id', userId), 'Unable to mark thread replied');
-        await requireNoError(supabase_1.supabaseWorker.from('reply_analytics').update({
-            was_sent: true,
-            sent_at: new Date().toISOString(),
-        }).eq('thread_id', threadId).eq('user_id', userId), 'Unable to update reply analytics');
-        await requireNoError(supabase_1.supabaseWorker.from('send_audit_log').insert({
-            user_id: userId,
-            thread_id: threadId,
-            platform,
-            trigger_type: triggerType,
-            status: 'success',
-            permalink: result.permalink,
-        }), 'Unable to write send audit');
+        // Persist the redirect mapping before publishing a reply that may contain
+        // the shortlink. If this fails, nothing is posted publicly.
         const { data: threadRow, error: threadError } = await supabase_1.supabaseWorker
             .from('monitored_threads')
             .select('tracking_sid')
@@ -68,16 +47,31 @@ async function sendReplyHandler(job) {
                 .single();
             if (profileError)
                 throw new Error(`Unable to load attribution destination: ${profileError.message}`);
-            const destinationUrl = profile.business_url
-                ? `${profile.business_url.replace(/\/$/, '')}?ref=scouto&sid=${threadRow.tracking_sid}`
-                : null;
-            await requireNoError(supabase_1.supabaseWorker.from('reply_attribution').upsert({
-                user_id: userId,
-                thread_id: threadId,
-                attribution_token: threadRow.tracking_sid,
-                shortcode: threadRow.tracking_sid,
-                destination_url: destinationUrl,
-            }, { onConflict: 'attribution_token' }), 'Unable to persist reply attribution');
+            if (!profile.business_url)
+                throw new Error('Attribution is enabled but no business URL is configured');
+            await (0, attribution_store_1.ensureAttributionMapping)(supabase_1.supabaseWorker, {
+                userId,
+                threadId,
+                token: threadRow.tracking_sid,
+                businessUrl: profile.business_url,
+            });
+        }
+        const result = platform === 'reddit'
+            ? await (0, reddit_post_1.postRedditReply)(userId, threadExternalId, text)
+            : await (0, bluesky_post_1.postBlueskyReply)(userId, threadExternalId, text);
+        externalSendSucceeded = true;
+        externalPermalink = result.permalink;
+        await (0, send_limiter_1.recordSuccessfulSend)(userId, platform, reservation.token);
+        const { data: finalized, error: finalizeError } = await supabase_1.supabaseWorker.rpc('finalize_successful_send', {
+            p_thread_id: threadId,
+            p_user_id: userId,
+            p_claim_token: claimToken,
+            p_platform: platform,
+            p_trigger_type: triggerType,
+            p_permalink: result.permalink,
+        });
+        if (finalizeError || finalized !== true) {
+            throw new Error(`Unable to finalize successful send: ${finalizeError?.message ?? 'claim no longer active'}`);
         }
         return { success: true, permalink: result.permalink };
     }
@@ -86,35 +80,37 @@ async function sendReplyHandler(job) {
             // The provider accepted the reply. Never make it sendable again: doing so
             // could create a duplicate public post if a persistence call failed.
             await (0, send_limiter_1.recordSuccessfulSend)(userId, platform, reservation.token).catch(() => undefined);
-            await supabase_1.supabaseWorker
-                .from('monitored_threads')
-                .update({ status: 'send_reconciliation_required' })
-                .eq('id', threadId)
-                .eq('user_id', userId);
-            await supabase_1.supabaseWorker.from('send_audit_log').insert({
-                user_id: userId,
-                thread_id: threadId,
-                platform,
-                trigger_type: triggerType,
-                status: 'reconciliation_required',
-                permalink: externalPermalink,
-                error_message: error instanceof Error ? error.message.slice(0, 500) : 'Post-send persistence error',
+            await supabase_1.supabaseWorker.rpc('mark_send_reconciliation', {
+                p_thread_id: threadId,
+                p_user_id: userId,
+                p_claim_token: claimToken,
+                p_platform: platform,
+                p_trigger_type: triggerType,
+                p_permalink: externalPermalink,
+                p_error_message: error instanceof Error
+                    ? error.message
+                    : 'Post-send persistence error',
             });
             throw error;
         }
         await (0, send_limiter_1.releaseSendSlot)(userId, platform, reservation.token).catch(() => undefined);
-        const isRetryable = error instanceof reddit_post_1.PlatformPostError && error.retryable;
+        const isRetryable = !(error instanceof reddit_post_1.PlatformPostError)
+            || error.retryable;
         const attempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1;
         const finalAttempt = !isRetryable || job.attemptsMade + 1 >= attempts;
         // Release the DB claim before BullMQ retries. A concurrently delivered
         // duplicate still cannot claim while this attempt owns `sending`.
-        await requireNoError(supabase_1.supabaseWorker
-            .from('monitored_threads')
-            .update({ status: 'drafted' })
-            .eq('id', threadId)
-            .eq('user_id', userId)
-            .eq('status', 'sending'), 'Unable to release failed send claim');
+        const { data: released, error: releaseError } = await supabase_1.supabaseWorker.rpc('release_send_claim', {
+            p_thread_id: threadId,
+            p_user_id: userId,
+            p_claim_token: claimToken,
+        });
+        if (releaseError || released !== true) {
+            throw new Error(`Unable to release failed send claim: ${releaseError?.message ?? 'claim no longer active'}`);
+        }
         if (finalAttempt) {
+            if (!isRetryable)
+                job.discard();
             await supabase_1.supabaseWorker.from('send_audit_log').insert({
                 user_id: userId,
                 thread_id: threadId,

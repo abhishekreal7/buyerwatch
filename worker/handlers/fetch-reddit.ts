@@ -69,7 +69,7 @@ export async function redditFetchHandler(job: Job) {
         const keywordId = (matched ?? keywords[0]).id
 
         // Gate: keyword match always passes. No keyword match requires a buying signal.
-        // This eliminates ~60-70% of noise before any Gemini call.
+        // This eliminates ~60-70% of noise before any intent-model call.
         if (!matched && !hasBuyingSignal(searchable)) {
           skipped++
           continue

@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import DodoPayments from 'dodopayments'
 import { createHash } from 'node:crypto'
 import { getAppUrl } from '@/lib/app-url'
+import { actionRateLimit, getIp } from '@/lib/ratelimit'
+import { readJsonBody, RequestInputError } from '@/lib/request'
 
 /**
  * POST /api/billing/checkout
@@ -25,6 +27,10 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const rate = await actionRateLimit.limit(`billing-checkout:${user.id}:${await getIp()}`)
+    if (!rate.success) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+    }
 
     const apiKey = process.env.DODO_PAYMENTS_API_KEY
     const proProductId = process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
@@ -35,18 +41,15 @@ export async function POST(req: Request) {
     }
 
     // Parse requested plan from body (optional — defaults to 'pro')
-    let body: { plan?: string } = {}
-    try {
-      body = await req.json()
-    } catch {
-      // no body is fine
-    }
+    const body = await readJsonBody<{ plan?: string }>(req, 1_024)
     const requestedPlan = body.plan === 'growth' ? 'growth' : 'pro'
     const productId = requestedPlan === 'growth' ? growthProductId : proProductId
 
     const dodo = new DodoPayments({
       bearerToken: apiKey,
-      environment: process.env.NODE_ENV === 'production' ? 'live_mode' : 'test_mode',
+      environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
+        ? 'test_mode'
+        : 'live_mode',
       timeout: 15_000,
       maxRetries: 1,
     })
@@ -65,20 +68,23 @@ export async function POST(req: Request) {
       return_url: `${getAppUrl()}/dashboard`,
     }, {
       idempotencyKey: createHash('sha256')
-        .update(`${user.id}:${requestedPlan}:${new Date().toISOString().slice(0, 10)}`)
+        .update(`${user.id}:${requestedPlan}:${req.headers.get('idempotency-key')?.slice(0, 100) || Math.floor(Date.now() / 600_000)}`)
         .digest('hex'),
     })
 
     const checkoutUrl = (session as any).checkout_url ?? (session as any).url
 
     if (!checkoutUrl) {
-      console.error('[billing/checkout] Dodo session missing checkout_url:', session)
+      console.error('[billing/checkout] Dodo session did not include a checkout URL')
       return NextResponse.json({ error: 'checkout_url_not_found' }, { status: 500 })
     }
 
     return NextResponse.json({ url: checkoutUrl })
 
   } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('[billing/checkout] Error:', error)
     return NextResponse.json({ error: 'checkout_failed' }, { status: 500 })
   }

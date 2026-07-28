@@ -43,6 +43,7 @@ const express_1 = require("@bull-board/express");
 const Sentry = __importStar(require("@sentry/node"));
 const bullmq_1 = require("bullmq");
 const express_2 = __importDefault(require("express"));
+const node_crypto_1 = require("node:crypto");
 const ioredis_1 = __importDefault(require("ioredis"));
 const http_1 = require("../src/lib/http");
 const logger_1 = require("../src/lib/logger");
@@ -56,6 +57,8 @@ const send_digest_1 = require("./handlers/send-digest");
 const send_reply_1 = require("./handlers/send-reply");
 const notify_slack_1 = require("./handlers/notify-slack");
 const fetch_x_1 = require("./handlers/fetch-x");
+const backend_maintenance_1 = require("../src/lib/backend-maintenance");
+const scheduler_jobs_1 = require("../src/lib/scheduler-jobs");
 const queueEntries = [
     ['fetch-reddit', queues_1.redditFetchQueue],
     ['fetch-bluesky', queues_1.blueskyFetchQueue],
@@ -69,6 +72,20 @@ const queueEntries = [
 ];
 function sanitizeMetricLabel(value) {
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+function safeBearerMatch(value, expected) {
+    const actualBuffer = Buffer.from(value ?? '');
+    const expectedBuffer = Buffer.from(`Bearer ${expected}`);
+    return actualBuffer.length === expectedBuffer.length
+        && (0, node_crypto_1.timingSafeEqual)(actualBuffer, expectedBuffer);
+}
+function utcWeekKey(date) {
+    const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = value.getUTCDay() || 7;
+    value.setUTCDate(value.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+    const week = Math.ceil((((value.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
+    return `${value.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 async function startWorkerRuntime() {
     const release = process.env.SENTRY_RELEASE ?? process.env.VERCEL_GIT_COMMIT_SHA;
@@ -97,6 +114,8 @@ async function startWorkerRuntime() {
     });
     let redisReady = false;
     let shuttingDown = false;
+    let lastSchedulerSuccess = 0;
+    const schedulerStartedAt = Date.now();
     const readyWorkers = new Set();
     const metrics = new Map();
     redis.on('error', (error) => {
@@ -126,6 +145,11 @@ async function startWorkerRuntime() {
                 queueName: job.queueName,
                 jobId: job.id,
                 jobName: job.name,
+                payload: job.data,
+                options: {
+                    attempts: job.opts.attempts,
+                    backoff: job.opts.backoff,
+                },
                 failedAt: new Date().toISOString(),
                 error: error.message.slice(0, 500),
             });
@@ -177,6 +201,52 @@ async function startWorkerRuntime() {
         concurrency: 5,
         limiter: { max: 10, duration: 1_000 },
     });
+    const runScheduledWork = async () => {
+        const now = new Date();
+        const minute = Math.floor(now.getTime() / 60_000);
+        try {
+            await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:monitor:${minute}`, 55_000, () => (0, scheduler_jobs_1.enqueueDueMonitoring)(now));
+            await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:outbox:${minute}`, 55_000, () => (0, backend_maintenance_1.dispatchPendingOutbox)());
+            if (minute % 5 === 0) {
+                await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:send-recovery:${Math.floor(minute / 5)}`, 4 * 60_000, () => (0, backend_maintenance_1.recoverStaleSends)(now));
+            }
+            if (minute % 360 === 0) {
+                await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:billing:${Math.floor(minute / 360)}`, 30 * 60_000, () => (0, backend_maintenance_1.reconcileBillingSubscriptions)());
+            }
+            const week = utcWeekKey(now);
+            const digestMarker = `scheduler:digest-complete:${week}`;
+            const digestWeekday = Number(process.env.DIGEST_WEEKDAY_UTC ?? '1');
+            const digestHour = Number(process.env.DIGEST_HOUR_UTC ?? '8');
+            if (now.getUTCDay() === digestWeekday
+                && now.getUTCHours() === digestHour
+                && !await redis.get(digestMarker)) {
+                await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:digest-lock:${week}`, 30 * 60_000, async () => {
+                    if (await redis.get(digestMarker))
+                        return;
+                    await (0, scheduler_jobs_1.enqueueWeeklyDigests)(now);
+                    await redis.set(digestMarker, '1', 'EX', 9 * 24 * 60 * 60);
+                });
+            }
+            const day = now.toISOString().slice(0, 10);
+            const cleanupMarker = `scheduler:cleanup-complete:${day}`;
+            if (!await redis.get(cleanupMarker)) {
+                await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:cleanup-lock:${day}`, 10 * 60_000, async () => {
+                    if (await redis.get(cleanupMarker))
+                        return;
+                    await (0, backend_maintenance_1.cleanupOperationalData)();
+                    await redis.set(cleanupMarker, '1', 'EX', 3 * 24 * 60 * 60);
+                });
+            }
+            lastSchedulerSuccess = Date.now();
+        }
+        catch (error) {
+            Sentry.captureException(error, { tags: { component: 'worker-scheduler' } });
+            logger_1.logger.error({ error }, 'Scheduled backend maintenance failed');
+        }
+    };
+    void runScheduledWork();
+    const scheduler = setInterval(() => void runScheduledWork(), 60_000);
+    scheduler.unref();
     const heartbeat = process.env.WORKER_HEALTHCHECK_URL
         ? setInterval(() => {
             (0, http_1.fetchWithTimeout)(process.env.WORKER_HEALTHCHECK_URL, {}, 5_000)
@@ -201,7 +271,7 @@ async function startWorkerRuntime() {
             .set('Cache-Control', 'no-store')
             .json({
             status: shuttingDown ? 'stopping' : 'ok',
-            service: 'scouto-worker',
+            service: 'buyerwatch-worker',
             release: release ?? 'development',
         });
     });
@@ -213,19 +283,27 @@ async function startWorkerRuntime() {
         catch {
             pingOk = false;
         }
-        const ready = !shuttingDown && redisReady && pingOk && readyWorkers.size === workers.length;
+        const schedulerHealthy = (lastSchedulerSuccess > 0
+            && Date.now() - lastSchedulerSuccess < 5 * 60_000)
+            || Date.now() - schedulerStartedAt < 2 * 60_000;
+        const ready = !shuttingDown
+            && redisReady
+            && pingOk
+            && readyWorkers.size === workers.length
+            && schedulerHealthy;
         response
             .status(ready ? 200 : 503)
             .set('Cache-Control', 'no-store')
             .json({
             status: ready ? 'ok' : 'degraded',
             redis: redisReady && pingOk ? 'ok' : 'error',
+            scheduler: schedulerHealthy ? 'ok' : 'stale',
             workersReady: readyWorkers.size,
             workersExpected: workers.length,
         });
     });
     const requireAdmin = (request, response, next) => {
-        if (request.headers.authorization !== `Bearer ${adminSecret}`) {
+        if (!safeBearerMatch(request.headers.authorization, adminSecret)) {
             response.status(401).send('Unauthorized');
             return;
         }
@@ -233,27 +311,71 @@ async function startWorkerRuntime() {
     };
     app.get('/metrics', requireAdmin, async (_request, response) => {
         const lines = [
-            '# HELP scouto_worker_jobs_total Jobs observed by this worker process.',
-            '# TYPE scouto_worker_jobs_total counter',
+            '# HELP buyerwatch_worker_jobs_total Jobs observed by this worker process.',
+            '# TYPE buyerwatch_worker_jobs_total counter',
         ];
         for (const [queue, metric] of metrics) {
             const label = sanitizeMetricLabel(queue);
-            lines.push(`scouto_worker_jobs_total{queue="${label}",result="completed"} ${metric.completed}`);
-            lines.push(`scouto_worker_jobs_total{queue="${label}",result="failed"} ${metric.failed}`);
+            lines.push(`buyerwatch_worker_jobs_total{queue="${label}",result="completed"} ${metric.completed}`);
+            lines.push(`buyerwatch_worker_jobs_total{queue="${label}",result="failed"} ${metric.failed}`);
         }
-        lines.push('# HELP scouto_queue_jobs Current BullMQ job counts.');
-        lines.push('# TYPE scouto_queue_jobs gauge');
+        lines.push('# HELP buyerwatch_queue_jobs Current BullMQ job counts.');
+        lines.push('# TYPE buyerwatch_queue_jobs gauge');
         for (const [queueName, queue] of queueEntries) {
             const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'failed');
             const label = sanitizeMetricLabel(queueName);
             for (const [state, value] of Object.entries(counts)) {
-                lines.push(`scouto_queue_jobs{queue="${label}",state="${state}"} ${value}`);
+                lines.push(`buyerwatch_queue_jobs{queue="${label}",state="${state}"} ${value}`);
             }
+            const [oldest] = await queue.getJobs(['waiting'], 0, 0, true);
+            const ageSeconds = oldest?.timestamp
+                ? Math.max(0, Math.floor((Date.now() - oldest.timestamp) / 1_000))
+                : 0;
+            lines.push(`buyerwatch_queue_oldest_waiting_age_seconds{queue="${label}"} ${ageSeconds}`);
         }
         response.type('text/plain; version=0.0.4').send(`${lines.join('\n')}\n`);
     });
+    app.post('/admin/dead-letter/:jobId/replay', requireAdmin, async (request, response) => {
+        const rawDeadLetterId = request.params.jobId;
+        const deadLetterId = Array.isArray(rawDeadLetterId)
+            ? rawDeadLetterId[0]
+            : rawDeadLetterId;
+        if (!deadLetterId || deadLetterId.length > 200) {
+            response.status(400).json({ error: 'invalid_dead_letter_id' });
+            return;
+        }
+        const deadLetter = await queues_1.deadLetterQueue.getJob(deadLetterId);
+        if (!deadLetter) {
+            response.status(404).json({ error: 'dead_letter_not_found' });
+            return;
+        }
+        const payload = deadLetter.data;
+        const target = queueEntries.find(([name]) => name === payload.queueName);
+        if (!target || target[0] === 'dead-letter' || !payload.jobName) {
+            response.status(422).json({ error: 'dead_letter_not_replayable' });
+            return;
+        }
+        if (payload.jobId) {
+            const existing = await target[1].getJob(payload.jobId);
+            if (existing) {
+                if (!await existing.isFailed()) {
+                    response.status(409).json({ error: 'original_job_is_not_failed' });
+                    return;
+                }
+                await existing.remove();
+            }
+        }
+        const replayed = await target[1].add(payload.jobName, payload.payload, {
+            jobId: payload.jobId,
+            attempts: payload.options?.attempts,
+            backoff: payload.options?.backoff,
+        });
+        await deadLetter.remove();
+        logger_1.logger.info({ queue: target[0], jobId: replayed.id, deadLetterId }, 'Dead-letter job replayed');
+        response.status(202).json({ success: true, queue: target[0], jobId: replayed.id });
+    });
     app.use('/admin/queues', requireAdmin, serverAdapter.getRouter());
-    const port = Number(process.env.WORKER_PORT ?? 3001);
+    const port = Number(process.env.PORT ?? process.env.WORKER_PORT ?? 3001);
     let server;
     await new Promise((resolve) => {
         server = app.listen(port, '0.0.0.0', () => {
@@ -269,6 +391,7 @@ async function startWorkerRuntime() {
         logger_1.logger.info({ signal }, 'Graceful worker shutdown started');
         if (heartbeat)
             clearInterval(heartbeat);
+        clearInterval(scheduler);
         const closeOperation = Promise.allSettled([
             closeServer(),
             ...workers.map((worker) => worker.close()),
@@ -288,6 +411,6 @@ async function startWorkerRuntime() {
     };
     process.once('SIGTERM', () => void shutdown('SIGTERM'));
     process.once('SIGINT', () => void shutdown('SIGINT'));
-    logger_1.logger.info({ workers: workers.length }, 'Scouto workers initialized');
+    logger_1.logger.info({ workers: workers.length }, 'BuyerWatch workers initialized');
     return { app, workers, shutdown };
 }

@@ -8,6 +8,14 @@ import { buildAttributionShortUrl } from '@/lib/attribution'
 import { ensureAttributionMapping } from '@/lib/attribution-store'
 import { getAppUrl } from '@/lib/app-url'
 import { getServiceRoleClient } from '@/lib/admin'
+import {
+  getAiUsageFromError,
+  recordAiUsage,
+  releaseAiSpend,
+  reserveAiSpend,
+} from '@/lib/ai-usage'
+import { aiRateLimit, getIp } from '@/lib/ratelimit'
+import { isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 
 export async function POST(req: Request) {
   try {
@@ -18,21 +26,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { threadId } = await req.json()
-    if (!threadId) {
+    const { threadId } = await readJsonBody<Record<string, unknown>>(req)
+    if (!isUuid(threadId)) {
       return NextResponse.json({ error: 'Missing threadId' }, { status: 400 })
+    }
+    const rate = await aiRateLimit.limit(`reply-generate:${user.id}:${await getIp()}`)
+    if (!rate.success) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
     }
 
     // 1. Fetch thread and user profile
     const { data: thread } = await supabase
       .from('monitored_threads')
-      .select('id, external_id, platform, author, title, text_content, url, created_at, intent_score, tracking_sid, keywords(term, target)')
+      .select('id, external_id, platform, author, title, text_content, url, created_at, intent_score, tracking_sid, status, keywords(term, target)')
       .eq('id', threadId)
       .eq('user_id', user.id)
       .single()
 
     if (!thread) {
       return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
+    }
+    if (!['pending', 'drafted', 'needs_manual_reply'].includes(thread.status)) {
+      return NextResponse.json({ error: 'Thread is not draftable' }, { status: 409 })
     }
 
     const { data: extendedProfile } = await supabase
@@ -56,25 +71,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    // 2. Enforce monthly AI draft limit
     const plan = normalizePlan(profile.plan)
     const limits = getPlanLimits(plan)
-    const { data: reserved, error: reserveError } = await supabase.rpc('reserve_monthly_draft', {
-      p_user_id: user.id,
-      p_limit: limits.aiDraftsPerMonth,
-    })
 
-    if (reserveError) {
-      return NextResponse.json({ error: 'draft_usage_check_failed' }, { status: 500 })
-    }
-    if (!reserved) {
-      return NextResponse.json(
-        { error: 'plan_limit_reached', limit: 'ai_drafts' },
-        { status: 403 }
-      )
-    }
-
-    // 3. Map thread to NormalizedPost format for drafting
+    // 2. Map thread to NormalizedPost format for drafting.
     const post: NormalizedPost = {
       externalId: thread.external_id,
       platform: thread.platform,
@@ -86,11 +86,12 @@ export async function POST(req: Request) {
       sourceTarget: (thread.keywords as unknown as { target?: string } | null)?.target || '',
     }
 
-    // 4. Draft reply
+    // 3. Set up attribution before reserving paid AI capacity.
+    const admin = getServiceRoleClient()
     let trackingSid = thread.tracking_sid as string | null
     if (profile.referral_tracking_enabled !== false && profile.business_url && !trackingSid) {
       trackingSid = randomBytes(5).toString('base64url')
-      const { error: trackingError } = await supabase
+      const { error: trackingError } = await admin
         .from('monitored_threads')
         .update({ tracking_sid: trackingSid })
         .eq('id', threadId)
@@ -113,9 +114,77 @@ export async function POST(req: Request) {
         businessUrl: profile.business_url,
       })
     }
-    const draftResult = await draftReply(post, profile, thread.intent_score || 0, trackingUrl)
+    // 4. Enforce both the plan allowance and provider-spend caps.
+    const aiSpend = await reserveAiSpend(admin, {
+      userId: user.id,
+      purpose: 'draft',
+      plan,
+    })
+    if (!aiSpend) {
+      return NextResponse.json(
+        { error: 'ai_spend_limit_reached' },
+        { status: 429 },
+      )
+    }
+
+    const { data: reserved, error: reserveError } = await admin.rpc(
+      'reserve_monthly_draft',
+      {
+        p_user_id: user.id,
+        p_limit: limits.aiDraftsPerMonth,
+      },
+    )
+    if (reserveError) {
+      await releaseAiSpend(admin, aiSpend.id)
+      return NextResponse.json({ error: 'draft_usage_check_failed' }, { status: 500 })
+    }
+    if (!reserved) {
+      await releaseAiSpend(admin, aiSpend.id)
+      return NextResponse.json(
+        { error: 'plan_limit_reached', limit: 'ai_drafts' },
+        { status: 403 },
+      )
+    }
+
+    let draftResult: Awaited<ReturnType<typeof draftReply>>
+    try {
+      draftResult = await draftReply(post, profile, thread.intent_score || 0, trackingUrl)
+      try {
+        await recordAiUsage(admin, {
+          reservationId: aiSpend.id,
+          usage: draftResult.usage,
+        })
+      } catch (usageError) {
+        console.error('Failed to record manual draft AI usage:', usageError)
+      }
+    } catch (draftError) {
+      const failedUsage = getAiUsageFromError(draftError)
+      try {
+        if (
+          failedUsage.inputTokens > 0
+          || failedUsage.outputTokens > 0
+          || failedUsage.estimatedCostMicrousd > 0
+        ) {
+          await recordAiUsage(admin, {
+            reservationId: aiSpend.id,
+            usage: failedUsage,
+          })
+        } else {
+          await releaseAiSpend(admin, aiSpend.id)
+        }
+      } catch (usageError) {
+        console.error('Failed to settle failed manual draft usage:', usageError)
+      }
+      const { error: releaseError } = await admin.rpc('release_monthly_draft', {
+        p_user_id: user.id,
+      })
+      if (releaseError) {
+        console.error('Failed to release manual draft allowance:', releaseError)
+      }
+      throw draftError
+    }
     
-    // 5. Update thread status and save draft
+    // 5. Update thread status and save draft.
     const { error: saveError } = await supabase.rpc('save_generated_draft', {
       p_user_id: user.id,
       p_thread_id: threadId,
@@ -127,6 +196,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, draft: draftResult.text })
   } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Error generating draft:', error)
     return NextResponse.json({ error: 'draft_generation_failed' }, { status: 502 })
   }

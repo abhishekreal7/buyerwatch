@@ -11,7 +11,7 @@ const productionCore = {
   UPSTASH_REDIS_URL: 'rediss://default:password@redis.example.com:6379',
   CRON_SECRET: 'c'.repeat(32),
   ENCRYPTION_KEY: '0'.repeat(64),
-  GEMINI_API_KEY: 'gemini',
+  ANTHROPIC_API_KEY: 'anthropic',
 }
 
 function stubProductionCore() {
@@ -23,8 +23,8 @@ function stubProductionCore() {
     'DODO_PAYMENTS_PRO_PRODUCT_ID',
     'DODO_PAYMENTS_GROWTH_PRODUCT_ID',
     'DODO_PAYMENTS_WEBHOOK_SECRET',
-    'ANTHROPIC_API_KEY',
     'ANTHROPIC_MODEL',
+    'ANTHROPIC_INTENT_MODEL',
     'REDDIT_OAUTH_CLIENT_ID',
     'REDDIT_OAUTH_SECRET',
     'RESEND_API_KEY',
@@ -39,7 +39,7 @@ afterEach(() => {
 })
 
 describe('production capability configuration', () => {
-  it('launches with Gemini while future providers remain absent', () => {
+  it('launches with Anthropic while optional providers remain absent', () => {
     stubProductionCore()
     expect(() => validateAppEnvironment()).not.toThrow()
     expect(getProviderCapabilities()).toMatchObject({
@@ -48,6 +48,19 @@ describe('production capability configuration', () => {
       redditPosting: false,
       email: false,
     })
+  })
+
+  it('requires Anthropic in production', () => {
+    stubProductionCore()
+    vi.stubEnv('ANTHROPIC_API_KEY', '')
+    expect(() => validateAppEnvironment()).toThrow(/requires ANTHROPIC_API_KEY/)
+  })
+
+  it('rejects placeholder Anthropic credentials', () => {
+    stubProductionCore()
+    vi.stubEnv('ANTHROPIC_API_KEY', '# TODO: add key')
+    expect(() => validateAppEnvironment()).toThrow(/requires ANTHROPIC_API_KEY/)
+    expect(getProviderCapabilities().aiDrafting).toBe(false)
   })
 
   it('rejects partially configured optional providers', () => {

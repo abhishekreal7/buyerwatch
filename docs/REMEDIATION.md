@@ -75,6 +75,6 @@ plan executes the 15-minute cron schedule.
   Inline styles remain allowed because the existing visual system uses React
   style attributes; eliminating that final directive is a separate visual
   refactor.
-- Billing, Anthropic, Reddit OAuth, and Resend are complete optional capability
-  groups. The app remains launchable with Gemini while those credentials are
-  pending.
+- Billing, Reddit OAuth, and Resend are complete optional capability groups.
+  Anthropic is required for intent scoring, onboarding intelligence, and reply
+  drafting.

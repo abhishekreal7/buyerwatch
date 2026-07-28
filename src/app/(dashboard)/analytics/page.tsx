@@ -14,6 +14,7 @@ import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { formatDistanceToNow, subDays, startOfDay, isAfter, isBefore, format } from 'date-fns'
 import { useDashboardSession } from '@/components/DashboardContext'
+import { fetchAllPages } from '@/lib/supabase-pagination'
 
 // Custom Label for Horizontal Bar Chart
 const CustomBarLabel = (props: any) => {
@@ -108,10 +109,10 @@ export default function AnalyticsPage() {
       const [profileRes, connsRes, threadsRes, analyticsRes, feedbackRes, attributionRes] = await Promise.all([
         supabase.from('profiles').select('auto_send_enabled').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
-        supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId),
-        supabase.from('reply_analytics').select('was_sent, sent_at').eq('user_id', userId),
+        fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).range(from, to)),
+        fetchAllPages((from, to) => supabase.from('reply_analytics').select('was_sent, sent_at').eq('user_id', userId).range(from, to)),
         supabase.from('draft_feedback').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
-        supabase.from('reply_attribution').select('clicked_at, converted_at, revenue_usd').eq('user_id', userId),
+        fetchAllPages((from, to) => supabase.from('reply_attribution').select('clicked_at, converted_at, revenue_usd').eq('user_id', userId).range(from, to)),
       ])
 
       const threads = threadsRes.data || []

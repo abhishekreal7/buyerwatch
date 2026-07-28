@@ -35,8 +35,20 @@ export function parseIntentResult(value: unknown): IntentResult {
     throw new Error('Intent provider returned an invalid response')
   }
 
+  const roundedScore = Math.round(score)
+  const expectedLabel: IntentLabel = roundedScore >= 80
+    ? 'buying'
+    : roundedScore >= 60
+      ? 'researching'
+      : roundedScore >= 40
+        ? 'complaining'
+        : 'other'
+  if (label !== expectedLabel) {
+    throw new Error('Intent provider returned an inconsistent score and label')
+  }
+
   return {
-    score: Math.round(score),
+    score: roundedScore,
     label: label as IntentLabel,
     reasoning: reasoning.trim(),
     ...(flag === 'COMPETITOR_RISK' ? { flag } : {}),

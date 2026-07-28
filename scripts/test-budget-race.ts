@@ -55,7 +55,7 @@ async function runTest() {
       promises.push(
         supabase.rpc('increment_usage_if_under_limit', {
           p_user_id: userId,
-          p_service: 'gemini',
+          p_service: 'intent',
           p_limit: limit
         })
       )

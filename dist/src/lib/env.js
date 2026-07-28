@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getConfiguredSecret = getConfiguredSecret;
 exports.getProviderCapabilities = getProviderCapabilities;
 exports.validateAppEnvironment = validateAppEnvironment;
 exports.validateWorkerEnvironment = validateWorkerEnvironment;
@@ -44,9 +45,19 @@ function assertCompleteOptionalGroup(names, label) {
         throw new Error(`${label} is partially configured; missing: ${missing.join(', ')}`);
     }
 }
+function getConfiguredSecret(value) {
+    const trimmed = value?.trim() ?? '';
+    if (!trimmed
+        || trimmed.startsWith('#')
+        || trimmed.toLocaleLowerCase().includes('todo')
+        || trimmed.toLocaleLowerCase().includes('placeholder')) {
+        return '';
+    }
+    return trimmed;
+}
 function getProviderCapabilities() {
     return {
-        aiDrafting: Boolean(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY),
+        aiDrafting: Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY)),
         billing: Boolean(process.env.DODO_PAYMENTS_API_KEY
             && process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
             && process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
@@ -72,10 +83,6 @@ function validateOptionalProviders() {
         'DODO_PAYMENTS_WEBHOOK_SECRET',
     ], 'Dodo billing');
     assertCompleteOptionalGroup([
-        'ANTHROPIC_API_KEY',
-        'ANTHROPIC_MODEL',
-    ], 'Anthropic drafting');
-    assertCompleteOptionalGroup([
         'RESEND_API_KEY',
         'RESEND_FROM_EMAIL',
     ], 'Resend email');
@@ -97,19 +104,19 @@ function validateOptionalProviders() {
 function validateAppEnvironment() {
     if (process.env.NODE_ENV !== 'production')
         return;
-    assertValues(CORE_PRODUCTION_ENV, 'Scouto app');
+    assertValues(CORE_PRODUCTION_ENV, 'BuyerWatch app');
     validateOptionalProviders();
-    if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
-        throw new Error('Scouto app requires ANTHROPIC_API_KEY or GEMINI_API_KEY');
+    if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
+        throw new Error('BuyerWatch app requires ANTHROPIC_API_KEY');
     }
 }
 function validateWorkerEnvironment() {
     if (process.env.NODE_ENV !== 'production')
         return;
-    assertValues(WORKER_PRODUCTION_ENV, 'Scouto worker');
+    assertValues(WORKER_PRODUCTION_ENV, 'BuyerWatch worker');
     validateOptionalProviders();
-    if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
-        throw new Error('Scouto worker requires ANTHROPIC_API_KEY or GEMINI_API_KEY');
+    if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
+        throw new Error('BuyerWatch worker requires ANTHROPIC_API_KEY');
     }
 }
 function isDevelopmentMockEnabled(name) {

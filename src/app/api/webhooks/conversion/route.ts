@@ -1,6 +1,8 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getIp, webhookRateLimit } from '@/lib/ratelimit'
+import { readJsonBody, RequestInputError } from '@/lib/request'
 
 function safeEqual(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left)
@@ -10,14 +12,28 @@ function safeEqual(left: string, right: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    const rate = await webhookRateLimit.limit(`conversion:${await getIp()}`)
+    if (!rate.success) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+    }
     const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim()
-    const { shortcode, revenue_usd, replace = false } = await req.json()
-    if (!token || typeof shortcode !== 'string' || !shortcode) {
+    const { shortcode, revenue_usd, replace = false } =
+      await readJsonBody<Record<string, unknown>>(req, 2_048)
+    if (
+      !token
+      || typeof shortcode !== 'string'
+      || !/^[A-Za-z0-9_-]{4,64}$/.test(shortcode)
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     if (
       revenue_usd !== undefined &&
-      (typeof revenue_usd !== 'number' || !Number.isFinite(revenue_usd) || revenue_usd < 0)
+      (
+        typeof revenue_usd !== 'number'
+        || !Number.isFinite(revenue_usd)
+        || revenue_usd < 0
+        || revenue_usd > 1_000_000_000
+      )
     ) {
       return NextResponse.json({ error: 'invalid_revenue' }, { status: 400 })
     }
@@ -55,7 +71,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     return NextResponse.json({ error: 'conversion_processing_failed' }, { status: 500 })
   }
 }

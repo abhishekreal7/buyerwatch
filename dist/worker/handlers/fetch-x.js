@@ -48,37 +48,54 @@ const supabase_1 = require("../lib/supabase");
 async function xFetchHandler(job) {
     const { target, keywordMappings: preloadedMappings } = job.data;
     try {
-        const posts = await (0, x_1.fetchXPosts)(target);
-        if (!posts || posts.length === 0)
-            return;
         // Find all users watching this specific X target
         let keywordMappings = preloadedMappings;
         let error = null;
         if (!keywordMappings) {
-            const result = await supabase_1.supabaseWorker
-                .from('keywords')
-                .select('id, user_id, term')
-                .eq('platform', 'x')
-                .eq('target', target)
-                .eq('is_active', true);
-            keywordMappings = result.data;
-            error = result.error;
+            keywordMappings = [];
+            const pageSize = 500;
+            for (let offset = 0;; offset += pageSize) {
+                const result = await supabase_1.supabaseWorker
+                    .from('keywords')
+                    .select('id, user_id, term')
+                    .eq('platform', 'x')
+                    .eq('target', target)
+                    .eq('is_active', true)
+                    .order('id', { ascending: true })
+                    .range(offset, offset + pageSize - 1);
+                if (result.error) {
+                    error = result.error;
+                    break;
+                }
+                keywordMappings.push(...(result.data ?? []));
+                if ((result.data?.length ?? 0) < pageSize)
+                    break;
+            }
         }
         if (error) {
             throw new Error(`Failed to load X keyword mappings: ${error.message}`);
         }
         if (!keywordMappings || keywordMappings.length === 0)
             return;
+        // Reserve paid X search capacity before making the provider request. One
+        // reservation per customer covers this shared target fetch, not every post.
+        const affordableUsers = new Set();
+        for (const userId of new Set(keywordMappings.map((mapping) => mapping.user_id))) {
+            if (await checkXSpendBudget(userId))
+                affordableUsers.add(userId);
+        }
+        keywordMappings = keywordMappings.filter((mapping) => affordableUsers.has(mapping.user_id));
+        if (keywordMappings.length === 0) {
+            logger_1.logger.info({ target }, '[Budget] X fetch skipped because no watcher has spend capacity');
+            return;
+        }
+        const posts = await (0, x_1.fetchXPosts)(target);
+        if (!posts || posts.length === 0)
+            return;
         for (const post of posts) {
             const postText = `${post.text || ''}`.toLowerCase();
             for (const mapping of keywordMappings) {
                 if (postText.includes(mapping.term.toLowerCase())) {
-                    // Check X spend budget BEFORE enqueueing scoring
-                    const canAfford = await checkXSpendBudget(mapping.user_id);
-                    if (!canAfford) {
-                        logger_1.logger.info(`[Budget] User ${mapping.user_id} exceeded X spend limit. Skipping post.`);
-                        continue;
-                    }
                     // Push to score queue
                     await queues_1.scorePostQueue.add('score', {
                         userId: mapping.user_id,

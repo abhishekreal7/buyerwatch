@@ -8,6 +8,8 @@
 - Worker readiness: `GET /readyz`
 - Worker metrics: `GET /metrics` with `Authorization: Bearer $ADMIN_SECRET`
 - Queue dashboard: `/admin/queues` on the worker with the same bearer token
+- Replay a reviewed dead letter: `POST /admin/dead-letter/{jobId}/replay`
+  with `Authorization: Bearer $ADMIN_SECRET`
 
 Liveness only confirms that the process can answer HTTP. Readiness checks the
 dependencies required to handle work. Load balancers should use readiness for
@@ -23,6 +25,30 @@ traffic and liveness for restart decisions.
 - Cron synthetic failure twice consecutively: page the operator.
 
 Tune thresholds after two weeks of production traffic.
+
+Never replay a send-related dead letter until its thread state has been
+inspected. The send lease will reject known-complete sends, while uncertain
+provider outcomes must be resolved through `/admin/reconciliation`.
+
+## AI margin controls
+
+Anthropic calls are reserved before execution and reconciled to actual input
+tokens, output tokens, model, and estimated cost afterward. The defaults are:
+
+- Free: $1/customer/month
+- Pro: $10/customer/month
+- Growth: $40/customer/month
+- Global: $200/month
+
+Override these with the `ANTHROPIC_*_MONTHLY_SPEND_LIMIT_USD` variables in
+`.env.example`. Also configure the intent and draft reservation estimates high
+enough to cover a normal request. If a cap blocks intent scoring, the worker
+skips that candidate without consuming its monthly signal allowance. If a cap
+blocks drafting, the signal remains visible as needing a manual reply.
+
+Review `/admin/usage` at least weekly during launch. Compare its estimated AI
+spend with the Anthropic invoice and update model rates in `src/lib/ai-usage.ts`
+if provider pricing changes.
 
 ## Send reconciliation
 
@@ -41,8 +67,12 @@ time, evidence, and outcome.
 
 ## Backup and restore
 
-Enable Supabase point-in-time recovery before accepting paying customers.
-Additionally, create a daily logical backup and retain:
+Supabase Free does not provide production-grade automatic backups. Until a paid
+database plan is enabled, run `scripts/backup-database.ps1` daily from a secured
+machine or CI runner and copy the encrypted output to off-site object storage.
+Set `SUPABASE_DATABASE_URL` only in that runner. Before accepting paying
+customers, enable Supabase automatic backups/PITR or an equivalent managed
+backup service. Retain:
 
 - daily backups for 14 days;
 - weekly backups for 8 weeks;
@@ -58,21 +88,55 @@ Run a quarterly restore drill into a new staging project:
 
 Never test a restore by resetting the production project.
 
-## Optional provider launch mode
+## Retention and deletion
 
-The core app requires Supabase, Redis, cron authorization, encryption, and one
-AI provider. These integrations are optional when their complete environment
+The worker's daily maintenance removes completed AI spend reservations after
+90 days, stale pending reservations after one day, dispatched outbox records
+after 30 days, processed extension captures after 90 days, and billing webhook
+receipts after two years. Customer-owned opportunities and analytics remain
+until the customer deletes the account. `GET /api/account/export` provides a
+machine-readable export; `DELETE /api/account` requires a recent login plus the
+literal confirmation `DELETE`, cancels an attached subscription, and then
+removes the Supabase Auth user so database cascades erase customer-owned rows.
+
+## Optional integration launch mode
+
+The core app requires Supabase, Redis, cron authorization, encryption, and
+Anthropic. These integrations are optional when their complete environment
 groups are absent:
 
 - Dodo Payments: paid checkout is disabled and pricing sends users to contact.
-- Anthropic: Gemini handles drafting until an Anthropic key and model are set.
 - Reddit OAuth: direct Reddit posting is unavailable without OAuth credentials.
 - Resend: digest email is unavailable unless both API key and sender are set.
 
-The `ingestion_events` table is the service-write-only contract for a future
-Chrome extension. The extension backend should authenticate the user, validate
-and normalize captured public URLs, and write idempotently using
-`(user_id, source, source_event_id)`.
+The Chrome extension calls `POST /api/extension/ingest` with a Supabase bearer
+token. Set `CHROME_EXTENSION_ORIGINS` to the exact production extension origin.
+Captures are URL-validated, size-limited, idempotent on
+`(user_id, source, source_event_id)`, and queued only when they match one of the
+customer's active keywords.
+
+## Low-cost production topology
+
+- Vercel serves only the Next.js web application.
+- Railway (Dockerfile + `railway.json`) runs one always-on worker and its
+  scheduler. Start with a single replica.
+- Supabase stores durable application state.
+- Upstash Redis holds BullMQ jobs and distributed scheduler locks.
+
+The worker is required: Vercel's daily Hobby cron is only a fallback probe and
+cannot provide 15/30-minute monitoring. Configure Railway's health check as
+`/readyz`. Keep `/metrics` and `/admin/queues` private behind `ADMIN_SECRET`.
+
+## Provider placeholders required before launch
+
+- `ANTHROPIC_API_KEY`
+- all Supabase values plus `SUPABASE_DATABASE_URL` in the backup runner
+- `UPSTASH_REDIS_URL`, `ADMIN_SECRET`, `CRON_SECRET`, and `ENCRYPTION_KEY`
+- Dodo API key, webhook secret, product IDs, and explicit environment
+- Reddit OAuth credentials if direct posting is enabled
+- Resend key, verified sender, and `EMAIL_UNSUBSCRIBE_SECRET`
+- exact `CHROME_EXTENSION_ORIGINS` after the extension ID is assigned
+- Sentry values and an external uptime/heartbeat URL
 
 ## Release procedure
 

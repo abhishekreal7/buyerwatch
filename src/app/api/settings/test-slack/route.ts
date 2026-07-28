@@ -2,16 +2,24 @@
 import { createClient } from '@/utils/supabase/server'
 import { fetchWithTimeout } from '@/lib/http'
 import { isAllowedSlackWebhookUrl } from '@/lib/security/outbound-url'
+import { getIp, settingsRateLimit } from '@/lib/ratelimit'
+import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
 
 export async function POST(req: NextRequest) {
+  try {
   // Auth check
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { webhookUrl } = await req.json()
+  const { webhookUrl: rawWebhookUrl } = await readJsonBody<Record<string, unknown>>(req, 2_048)
+  const webhookUrl = boundedString(rawWebhookUrl, 1_000, { required: true })
   if (!webhookUrl || !isAllowedSlackWebhookUrl(webhookUrl)) {
     return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
+  }
+  const rate = await settingsRateLimit.limit(`slack-test:${user.id}:${await getIp()}`)
+  if (!rate.success) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
   }
 
   const payload = {
@@ -67,4 +75,10 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true })
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'slack_test_failed' }, { status: 502 })
+  }
 }

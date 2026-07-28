@@ -12,6 +12,7 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { normalizePlan } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
+import { fetchAllPages } from '@/lib/supabase-pagination'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
 
@@ -126,7 +127,7 @@ export default function KeywordsPage() {
       const [profileResult, keywordsResult, threadsResult] = await Promise.all([
         supabase.from('profiles').select('plan').eq('id', userId).single(),
         supabase.from('keywords').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('monitored_threads').select('keyword_id, status').eq('user_id', userId),
+        fetchAllPages((from, to) => supabase.from('monitored_threads').select('keyword_id, status').eq('user_id', userId).range(from, to)),
       ])
 
       setUserPlan(normalizePlan(profileResult.data?.plan))
