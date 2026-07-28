@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState } from 'react'
-import { signUpAction, signInWithGoogleAction } from '@/app/actions/auth'
+import { signUpAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
@@ -93,7 +93,7 @@ export default function SignupPage() {
           )}
 
           {/* Social Authentication */}
-          <form action={signInWithGoogleAction} className="mb-5">
+          <form action="/api/auth/google?next=signup" method="get" className="mb-5">
             <button
               type="submit"
               className="w-full h-11 flex items-center justify-center gap-2.5 bg-white border border-black/[0.12] hover:border-black/25 text-[#0A0A0A] rounded-xl font-medium text-[13.5px] transition-all duration-200 hover:bg-[#F9F9F9] active:scale-[0.985] shadow-[0_1px_2px_rgba(0,0,0,0.04)] cursor-pointer"
