@@ -359,28 +359,28 @@ export default function LandingPage() {
             {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
             <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[24px]">
               {[
-                  {
-                    id: 'radar',
-                    title: 'Conversation Radar',
-                    body: "Track Reddit and Bluesky for configured buying signals on your plan's scan cadence"
-                  },
-                  {
-                    id: 'gauge',
-                    title: 'Intent Priority',
-                    body: 'Prioritize each processed conversation with a recorded 0–100 buyer-intent score'
-                  },
-                  {
-                    id: 'pen',
-                    title: 'Contextual Drafting',
-                    body: 'Generate review-ready replies from your product profile, tone examples, and the live thread'
-                  },
-                  {
-                    id: 'layers',
-                    title: 'Guarded Delivery',
-                    body: 'Layer manual review, content safeguards, and eligible opt-in automation before public sends'
-                  },
-                ].map(({ id, title, body }, i) => (
-                  <motion.div key={i} variants={fadeUp} whileHover={{ y: -4 }} transition={springs.snappy} className="flex flex-col">
+                {
+                  id: 'radar',
+                  title: 'Conversation Radar',
+                  body: "Track Reddit and Bluesky for configured buying signals on your plan's scan cadence"
+                },
+                {
+                  id: 'gauge',
+                  title: 'Intent Priority',
+                  body: 'Prioritize each processed conversation with a recorded 0–100 buyer-intent score'
+                },
+                {
+                  id: 'pen',
+                  title: 'Contextual Drafting',
+                  body: 'Generate review-ready replies from your product profile, tone examples, and the live thread'
+                },
+                {
+                  id: 'layers',
+                  title: 'Guarded Delivery',
+                  body: 'Layer manual review, content safeguards, and eligible opt-in automation before public sends'
+                },
+              ].map(({ id, title, body }, i) => (
+                <motion.div key={i} variants={fadeUp} whileHover={{ y: -4 }} transition={springs.snappy} className="flex flex-col">
                   <div className="mb-5 text-[#FF5101]">
                     {id === 'radar' && (
                       <Radar

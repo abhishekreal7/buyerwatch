@@ -4,6 +4,7 @@ import "./globals.css";
 import MotionProvider from "@/components/MotionProvider";
 import { Toaster } from "sonner";
 import { CommandPalette } from "@/components/CommandPalette";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -51,6 +52,7 @@ export default function RootLayout({
         <MotionProvider>
           {children}
         </MotionProvider>
+        <Analytics />
         <CommandPalette />
         <Toaster position="bottom-right" />
       </body>
