@@ -1,131 +1,338 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle, ExternalLink, Clock, MessageSquare } from 'lucide-react'
-import { staggers, springs } from '@/lib/motion'
-import { RedditIcon, BlueskyIcon } from '@/components/Icons'
+import {
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  MessageSquare,
+} from 'lucide-react'
 import { AppPage } from '@/components/AppPage'
-import { PageHeader } from '@/components/PageHeader'
-import { createClient } from '@/utils/supabase/client'
 import { useDashboardSession } from '@/components/DashboardContext'
+import { BlueskyIcon, RedditIcon } from '@/components/Icons'
+import { PageHeader } from '@/components/PageHeader'
 import { fetchAllPages } from '@/lib/supabase-pagination'
+import { staggers, springs } from '@/lib/motion'
+import { createClient } from '@/utils/supabase/client'
+
+interface PostedReply {
+  id: string
+  platform: string
+  sourceLabel: string
+  authorLabel: string
+  matchedKeyword: string
+  title: string
+  body: string
+  discoveredAt: string
+  sentAt: string
+  reply: string
+  threadUrl: string | null
+  score: number
+}
 
 function PlatformBadge({ platform }: { platform: string }) {
+  const isReddit = platform.toLowerCase() === 'reddit'
+
   return (
-    <span className="px-2.5 py-1 rounded-md bg-black/[0.04] text-text-secondary text-[12px] font-[500] capitalize flex items-center gap-1.5 w-fit shrink-0">
-      {platform.toLowerCase() === 'reddit' ? <RedditIcon className="w-3.5 h-3.5 text-[#FF4500]" /> : <BlueskyIcon className="w-3.5 h-3.5 text-[#1185FE]" />}
+    <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-black/[0.06] bg-black/[0.025] px-2.5 py-1 text-[11px] font-semibold capitalize text-text-secondary">
+      {isReddit ? (
+        <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
+      ) : (
+        <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />
+      )}
       {platform}
     </span>
   )
 }
 
-function formatPostedDate(dateString: string) {
-  const d = new Date(dateString)
-  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+function formatRelativeDate(dateString: string) {
+  const date = new Date(dateString)
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
+
+  if (elapsedSeconds < 60) return 'Just now'
+  if (elapsedSeconds < 3600) {
+    const minutes = Math.floor(elapsedSeconds / 60)
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`
+  }
+  if (elapsedSeconds < 86400) {
+    const hours = Math.floor(elapsedSeconds / 3600)
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+  }
+  if (elapsedSeconds < 604800) {
+    const days = Math.floor(elapsedSeconds / 86400)
+    return `${days} ${days === 1 ? 'day' : 'days'} ago`
+  }
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+  })
+}
+
+function formatSentDate(dateString: string) {
+  return new Date(dateString).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatRedditTarget(value: string) {
+  const normalized = value.replace(/^\/?r\//i, '').replace(/^\/+/, '')
+  return normalized ? `r/${normalized}` : 'Reddit'
+}
+
+function formatAuthor(value: string, platform: string) {
+  if (!value || value === 'unknown') return 'Unknown author'
+  if (platform.toLowerCase() === 'reddit') {
+    return value.startsWith('u/') ? value : `u/${value}`
+  }
+  return value.startsWith('@') ? value : `@${value}`
+}
+
+function PostedConversationCard({ item }: { item: PostedReply }) {
+  return (
+    <motion.article
+      variants={staggers.item}
+      transition={springs.smooth}
+      className="group relative"
+    >
+      <div className="relative z-10 rounded-[20px] border border-black/[0.075] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.025),0_8px_24px_rgba(0,0,0,0.035)] transition-[border-color,box-shadow] duration-200 group-hover:border-black/[0.11] group-hover:shadow-[0_2px_4px_rgba(0,0,0,0.03),0_12px_34px_rgba(0,0,0,0.055)] sm:p-6">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <PlatformBadge platform={item.platform} />
+            <span className="truncate text-[13px] font-semibold text-text-primary">
+              {item.sourceLabel}
+            </span>
+            {item.authorLabel && (
+              <>
+                <span className="hidden text-black/20 sm:inline" aria-hidden>
+                  ·
+                </span>
+                <span className="truncate text-[12px] font-medium text-text-tertiary">
+                  {item.authorLabel}
+                </span>
+              </>
+            )}
+          </div>
+
+          <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-[#EAF8F1] px-2.5 py-1 text-[11px] font-semibold text-[#087A52]">
+            <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} />
+            Posted
+          </span>
+        </div>
+
+        <div className="mt-5 max-w-5xl">
+          <h2 className="text-[16px] font-semibold leading-[1.45] tracking-[-0.015em] text-text-primary sm:text-[17px]">
+            {item.title}
+          </h2>
+          {item.body && item.body !== item.title && (
+            <p className="mt-2 line-clamp-3 text-[14px] leading-6 text-text-secondary">
+              {item.body}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-col justify-between gap-3 border-t border-black/[0.055] pt-4 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-text-tertiary">
+              <Clock className="h-3.5 w-3.5" />
+              {item.discoveredAt}
+            </span>
+            {item.matchedKeyword && (
+              <span className="max-w-[240px] truncate rounded-md bg-[#EAF5FF] px-2 py-1 text-[11px] font-semibold text-[#0876B9]">
+                {item.matchedKeyword}
+              </span>
+            )}
+            <span className="rounded-md bg-black/[0.035] px-2 py-1 text-[11px] font-semibold tabular-nums text-text-secondary">
+              {item.score} intent
+            </span>
+          </div>
+
+          {item.threadUrl ? (
+            <a
+              href={item.threadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-10 w-fit items-center gap-1.5 rounded-full border border-black/[0.09] bg-white px-4 text-[12px] font-semibold text-text-primary transition-colors hover:bg-black/[0.035]"
+            >
+              View conversation
+              <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.2} />
+            </a>
+          ) : (
+            <span className="text-[12px] font-medium text-text-tertiary">
+              Original link unavailable
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="relative z-0 -mt-px ml-4 rounded-b-[20px] rounded-tl-[18px] border border-black/[0.065] bg-[#F4F7F9] px-5 pb-5 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] sm:ml-auto sm:w-[82%] sm:px-6">
+        <div className="mb-2.5 flex flex-col justify-between gap-1.5 sm:flex-row sm:items-center">
+          <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#43505A]">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[#0A84FF] shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+              <MessageSquare className="h-3.5 w-3.5" strokeWidth={2.3} />
+            </span>
+            Your reply
+          </span>
+          <span className="text-[11px] font-medium text-text-tertiary">
+            Sent {item.sentAt}
+          </span>
+        </div>
+        <p className="whitespace-pre-wrap text-[14px] leading-6 text-[#20282E] sm:text-[14.5px]">
+          {item.reply}
+        </p>
+      </div>
+    </motion.article>
+  )
+}
+
+function PostedRepliesSkeleton() {
+  return (
+    <div className="space-y-6" aria-label="Loading posted replies" aria-busy="true">
+      {[0, 1].map((item) => (
+        <div key={item} className="animate-pulse">
+          <div className="h-48 rounded-[20px] border border-black/[0.05] bg-white" />
+          <div className="-mt-px ml-4 h-28 rounded-b-[20px] rounded-tl-[18px] bg-[#F4F7F9] sm:ml-auto sm:w-[82%]" />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function PostedPage() {
-  const [posted, setPosted] = useState<any[]>([])
+  const [posted, setPosted] = useState<PostedReply[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
 
   useEffect(() => {
-    async function fetchPosted() {
-      const { data } = await fetchAllPages((from, to) => supabase
-        .from('monitored_threads')
-        .select('*, reply_analytics(draft_text, sent_at)')
-        .eq('user_id', userId)
-        .eq('status', 'replied')
-        .order('created_at', { ascending: false })
-        .range(from, to))
+    let cancelled = false
 
-      if (data) {
-        setPosted(data.map(t => {
-          const analytics = Array.isArray(t.reply_analytics) ? t.reply_analytics[0] : null
-          return {
-            id: t.id, 
-            platform: t.platform, 
-            target: t.author || 'unknown', 
-            threadTitle: t.text_content ? t.text_content.slice(0, 80) + '...' : 'Unknown thread',
-            sentAt: analytics?.sent_at ? formatPostedDate(analytics.sent_at) : formatPostedDate(t.created_at),
-            reply: analytics?.draft_text || 'Reply logged.',
-            threadUrl: t.url || null,
-            score: Number(t.intent_score) || 0
-          }
-        }))
+    async function fetchPosted() {
+      setLoading(true)
+      setLoadFailed(false)
+
+      const { data, error } = await fetchAllPages((from, to) =>
+        supabase
+          .from('monitored_threads')
+          .select(
+            'id, platform, author, title, text_content, url, intent_score, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target)',
+          )
+          .eq('user_id', userId)
+          .eq('status', 'replied')
+          .order('created_at', { ascending: false })
+          .range(from, to),
+      )
+
+      if (cancelled) return
+
+      if (error) {
+        setLoadFailed(true)
+        setLoading(false)
+        return
       }
+
+      setPosted(
+        (data ?? []).map((thread) => {
+          const analytics = Array.isArray(thread.reply_analytics)
+            ? thread.reply_analytics[0]
+            : thread.reply_analytics
+          const keyword = Array.isArray(thread.keywords)
+            ? thread.keywords[0]
+            : thread.keywords
+          const platform = thread.platform || 'unknown'
+          const author = thread.author || 'unknown'
+          const title = thread.title?.trim() || thread.text_content?.trim() || 'Original conversation'
+          const body = thread.title?.trim() ? thread.text_content?.trim() || '' : ''
+
+          return {
+            id: thread.id,
+            platform,
+            sourceLabel:
+              platform.toLowerCase() === 'reddit'
+                ? formatRedditTarget(keyword?.target || '')
+                : formatAuthor(author, platform),
+            authorLabel:
+              platform.toLowerCase() === 'reddit' ? formatAuthor(author, platform) : '',
+            matchedKeyword: keyword?.term || '',
+            title,
+            body,
+            discoveredAt: formatRelativeDate(thread.created_at),
+            sentAt: formatSentDate(analytics?.sent_at || thread.created_at),
+            reply: analytics?.edited_text || analytics?.draft_text || 'Reply logged.',
+            threadUrl: thread.url || null,
+            score: Math.round(Number(thread.intent_score) || 0),
+          }
+        }),
+      )
+      setLoading(false)
     }
-    fetchPosted()
+
+    void fetchPosted()
+
+    return () => {
+      cancelled = true
+    }
   }, [supabase, userId])
 
   return (
     <AppPage>
-      <div className="w-full flex flex-col">
-        <PageHeader title="Posted Replies" />
+      <div className="flex w-full flex-col">
+        <PageHeader
+          title="Posted Replies"
+          subtitle="See each source conversation together with the reply you sent."
+          action={
+            !loading && posted.length > 0 ? (
+              <span className="rounded-full border border-black/[0.07] bg-white px-3.5 py-2 text-[12px] font-semibold tabular-nums text-text-secondary">
+                {posted.length} {posted.length === 1 ? 'reply' : 'replies'}
+              </span>
+            ) : undefined
+          }
+        />
 
-      {posted.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center surface-ceramic border border-transparent">
-          <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mb-5">
-            <CheckCircle className="w-8 h-8" strokeWidth={2.5} />
+        {loading ? (
+          <PostedRepliesSkeleton />
+        ) : loadFailed ? (
+          <div className="surface-ceramic flex flex-col items-center justify-center border border-transparent py-24 text-center">
+            <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#FFF3E8] text-[#D34519]">
+              <MessageSquare className="h-7 w-7" strokeWidth={2.2} />
+            </div>
+            <h2 className="mb-2 text-[18px] font-semibold text-text-primary">
+              We couldn&apos;t load your replies
+            </h2>
+            <p className="max-w-sm text-[14px] leading-relaxed text-text-secondary">
+              Refresh the page to try again. Your posted replies have not been changed.
+            </p>
           </div>
-          <h3 className="text-[20px] font-display font-semibold text-text-primary mb-2">No replies posted yet</h3>
-          <p className="text-text-secondary text-[15px] max-w-sm leading-relaxed">Once you mark a draft as posted, it will appear here with a link back to the original thread.</p>
-        </div>
-      ) : (
-        <motion.div variants={staggers.container} initial="initial" animate="animate" className="space-y-4">
-          {posted.map(p => (
-            <motion.div 
-              key={p.id} 
-              variants={staggers.item} 
-              transition={springs.smooth} 
-              className="surface-ceramic border border-transparent p-5 sm:p-6"
-            >
-              {/* Header row */}
-              <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <PlatformBadge platform={p.platform} />
-                  <span className="text-[14px] font-semibold text-text-primary">{p.platform === 'reddit' ? `r/${p.target}` : p.target}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[12px] font-medium text-text-tertiary whitespace-nowrap shrink-0">
-                  <Clock className="w-3.5 h-3.5" strokeWidth={2.5} />{p.sentAt}
-                </div>
-              </div>
-
-              {/* Thread title */}
-              <div className="flex items-center justify-between gap-4 mb-3">
-                <h3 className="text-[16px] font-semibold text-text-primary line-clamp-1 flex-1 tracking-tight">{p.threadTitle}</h3>
-                {p.threadUrl ? (
-                  <a href={p.threadUrl} target="_blank" rel="noopener noreferrer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent/5 text-accent transition-opacity hover:opacity-80" aria-label="Open original thread">
-                    <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
-                  </a>
-                ) : (
-                  <span className="text-text-tertiary/40 shrink-0 bg-black/[0.03] p-2 rounded-full" title="No thread URL available">
-                    <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
-                  </span>
-                )}
-              </div>
-
-              {/* Reply preview */}
-              <div className="p-4 rounded-[16px] bg-surface-secondary border border-transparent mb-5">
-                <div className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5" strokeWidth={2.5} /> Your reply
-                </div>
-                <p className="text-[15px] text-text-primary leading-relaxed line-clamp-3">{p.reply}</p>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-wider text-success">
-                  <CheckCircle className="w-4 h-4" strokeWidth={3} /> Posted
-                </span>
-                <span className="opacity-30">·</span>
-                <span className="text-[13px] text-text-tertiary font-medium tabular-nums">Intent score: {p.score}</span>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
+        ) : posted.length === 0 ? (
+          <div className="surface-ceramic flex flex-col items-center justify-center border border-transparent py-32 text-center">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#EAF8F1] text-[#087A52]">
+              <CheckCircle2 className="h-8 w-8" strokeWidth={2.5} />
+            </div>
+            <h2 className="mb-2 text-[20px] font-display font-semibold text-text-primary">
+              No replies posted yet
+            </h2>
+            <p className="max-w-sm text-[15px] leading-relaxed text-text-secondary">
+              Once you approve or post a reply, the original conversation and your response will appear together here.
+            </p>
+          </div>
+        ) : (
+          <motion.div
+            variants={staggers.container}
+            initial="initial"
+            animate="animate"
+            className="space-y-6"
+          >
+            {posted.map((item) => (
+              <PostedConversationCard key={item.id} item={item} />
+            ))}
+          </motion.div>
+        )}
       </div>
     </AppPage>
   )
