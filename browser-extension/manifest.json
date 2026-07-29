@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "BuyerWatch",
+  "description": "Capture high-value community conversations for BuyerWatch analysis.",
+  "version": "0.1.0",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://buyerwatch.co/*",
+    "https://www.buyerwatch.co/*",
+    "http://localhost:3000/*",
+    "https://*.supabase.co/*",
+    "https://www.reddit.com/*",
+    "https://reddit.com/*",
+    "https://bsky.app/*",
+    "https://x.com/*",
+    "https://twitter.com/*"
+  ],
+  "action": {
+    "default_title": "Capture with BuyerWatch",
+    "default_popup": "popup.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.reddit.com/*",
+        "https://reddit.com/*",
+        "https://bsky.app/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

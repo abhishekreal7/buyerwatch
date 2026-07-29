@@ -24,7 +24,7 @@ export type PipelineOpportunity = {
   createdAt: string
   title: string
   content: string
-  score: number
+  score: number | null
   label: string
   intentLabel?: IntentLabel
   keyword: string
@@ -92,7 +92,11 @@ export function LeadPipelineBoard({
         {columns.map((col) => {
           const colItems = opportunities
             .filter(col.statusCheck)
-            .sort((a, b) => (sortOrder === 'desc' ? b.score - a.score : a.score - b.score))
+            .sort((a, b) => {
+              const aScore = a.score ?? -1
+              const bScore = b.score ?? -1
+              return sortOrder === 'desc' ? bScore - aScore : aScore - bScore
+            })
 
           return (
             <div key={col.id} className="flex flex-col rounded-2xl bg-[#F6F6F4]/70 p-3 border border-[#ECECE9]">
@@ -139,7 +143,7 @@ export function LeadPipelineBoard({
                             </div>
                             <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-400">
                               <Zap className="h-3 w-3" />
-                              {item.score}%
+                              {item.score === null ? 'Awaiting analysis' : `${item.score}%`}
                             </span>
                           </div>
 
@@ -175,7 +179,7 @@ export function LeadPipelineBoard({
                               <span>{formatShortDate(item.createdAt)}</span>
                             </div>
 
-                            {item.status === 'pending' && (
+                            {item.status === 'pending' && item.score !== null && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -212,7 +216,7 @@ export function LeadPipelineBoard({
                             {item.title || item.keyword}
                           </h4>
                           <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10.5px] font-bold text-gray-700">
-                            {item.score}
+                            {item.score ?? 'Pending'}
                           </span>
                         </div>
 

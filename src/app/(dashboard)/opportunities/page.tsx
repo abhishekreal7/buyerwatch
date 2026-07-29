@@ -25,7 +25,7 @@ import { springs, staggers } from '@/lib/motion'
 import { createClient } from '@/utils/supabase/client'
 import { useDashboardSession } from '@/components/DashboardContext'
 
-const FILTERS = ['All', 'Buying intent', 'Researching', 'Pain signals', 'Reddit', 'Bluesky']
+const FILTERS = ['All', 'Buying intent', 'Researching', 'Pain signals', 'Reddit', 'Bluesky', 'X']
 
 type OpportunityStatus = 'pending' | 'drafted' | 'needs_manual_reply'
 
@@ -37,7 +37,7 @@ type Opportunity = {
   createdAt: string
   title: string
   content: string
-  score: number
+  score: number | null
   label: string
   intentLabel?: IntentLabel
   keyword: string
@@ -60,7 +60,15 @@ const AUTOMATION_REASON_LABELS: Record<string, string> = {
   draft_budget_exhausted: 'The monthly AI draft allowance was reached.',
 }
 
-function ScoreBadge({ score, label }: { score: number; label: string }) {
+function ScoreBadge({ score, label }: { score: number | null; label: string }) {
+  if (score === null) {
+    return (
+      <div className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[12px] font-semibold text-blue-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+        Awaiting analysis
+      </div>
+    )
+  }
   const tone = score >= 80
     ? 'bg-success/10 text-success border-success/20'
     : score >= 60
@@ -135,7 +143,7 @@ export default function OpportunitiesPage() {
 
       setOpportunities((data ?? []).map(thread => {
         const keyword = getKeywordRelation(thread.keywords)
-        const score = Number(thread.intent_score) || 0
+        const score = thread.intent_score === null ? null : Number(thread.intent_score)
         const intentLabel = thread.intent_label as IntentLabel | undefined
         return {
           id: thread.id,
@@ -146,7 +154,7 @@ export default function OpportunitiesPage() {
           title: thread.title || '',
           content: thread.text_content || '',
           score,
-          label: getIntentDisplayLabel(intentLabel, score),
+          label: score === null ? 'Awaiting analysis' : getIntentDisplayLabel(intentLabel, score),
           intentLabel,
           keyword: keyword.term || 'Monitoring rule',
           reasoning: thread.score_reasoning || '',
@@ -203,9 +211,14 @@ export default function OpportunitiesPage() {
       if (activeFilter === 'Pain signals') return opportunity.intentLabel === 'complaining'
       if (activeFilter === 'Reddit') return opportunity.platform === 'reddit'
       if (activeFilter === 'Bluesky') return opportunity.platform === 'bluesky'
+      if (activeFilter === 'X') return opportunity.platform === 'x'
       return true
     })
-    .sort((a, b) => sortOrder === 'desc' ? b.score - a.score : a.score - b.score)
+    .sort((a, b) => {
+      const aScore = a.score ?? -1
+      const bScore = b.score ?? -1
+      return sortOrder === 'desc' ? bScore - aScore : aScore - bScore
+    })
 
   return (
     <AppPage>

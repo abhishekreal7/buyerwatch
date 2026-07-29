@@ -1,13 +1,24 @@
-import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { scorePostQueue } from '@/lib/queues'
 import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
+import {
+  buildExtensionExternalId,
+  buildExtensionScoreJobId,
+  isExtensionPlatform,
+  isValidExtensionSourceUrl,
+} from '@/lib/extension-ingest'
 
 function allowedOrigin(origin: string | null): string | null {
   if (!origin) return null
+  if (
+    process.env.NODE_ENV !== 'production'
+    && origin.startsWith('chrome-extension://')
+  ) {
+    return origin
+  }
   const configured = (process.env.CHROME_EXTENSION_ORIGINS ?? '')
     .split(',')
     .map((value) => value.trim())
@@ -73,7 +84,7 @@ export async function POST(request: Request) {
       : new Date(now).toISOString()
 
     if (
-      (platform !== 'reddit' && platform !== 'bluesky')
+      !isExtensionPlatform(platform)
       || !sourceEventId
       || !sourceUrl
       || text === null
@@ -81,16 +92,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json({ error: 'invalid_capture' }, { status: 400, headers })
     }
-    let parsedUrl: URL
-    try {
-      parsedUrl = new URL(sourceUrl)
-    } catch {
-      return NextResponse.json({ error: 'invalid_source_url' }, { status: 400, headers })
-    }
-    const expectedHost = platform === 'reddit'
-      ? /(^|\.)reddit\.com$/i
-      : /(^|\.)bsky\.app$/i
-    if (parsedUrl.protocol !== 'https:' || !expectedHost.test(parsedUrl.hostname)) {
+    if (!isValidExtensionSourceUrl(platform, sourceUrl)) {
       return NextResponse.json({ error: 'invalid_source_url' }, { status: 400, headers })
     }
 
@@ -144,30 +146,79 @@ export async function POST(request: Request) {
       event = existingEvent
     }
 
-    const externalId = `${platform}:extension:${sourceEventId}`
-    const safeId = createHash('sha256').update(externalId).digest('hex').slice(0, 32)
-    await scorePostQueue.add('score', {
-      userId: user.id,
-      keywordId: keyword.id,
-      post: {
+    const externalId = buildExtensionExternalId(platform, sourceEventId)
+    const { error: pendingError } = await admin
+      .from('monitored_threads')
+      .upsert({
+        user_id: user.id,
+        keyword_id: keyword.id,
         platform,
-        externalId,
-        author,
-        title: title || undefined,
-        text,
+        external_id: externalId,
+        author: author || null,
+        title: title || null,
+        text_content: text,
         url: sourceUrl,
-        createdAt: capturedAt,
-        sourceTarget: community || keyword.target,
-      },
-    }, {
-      jobId: `score-${user.id}-${safeId}`,
-    })
-    await admin
-      .from('ingestion_events')
-      .update({ processed_at: new Date().toISOString() })
-      .eq('id', event.id)
+        intent_score: null,
+        intent_label: null,
+        status: 'pending',
+        score_reasoning: 'Awaiting analysis',
+        automation_reason: 'analysis_pending',
+      }, {
+        onConflict: 'user_id,platform,external_id',
+        ignoreDuplicates: true,
+      })
+    if (pendingError) throw pendingError
 
-    return NextResponse.json({ success: true, eventId: event.id }, { status: 202, headers })
+    const canQueue = Boolean(
+      process.env.UPSTASH_REDIS_URL?.trim()
+      && process.env.ANTHROPIC_API_KEY?.trim(),
+    )
+    if (!canQueue) {
+      return NextResponse.json({
+        success: true,
+        eventId: event.id,
+        queued: false,
+        status: 'awaiting_analysis',
+      }, { status: 202, headers })
+    }
+
+    try {
+      await scorePostQueue.add('score', {
+        userId: user.id,
+        keywordId: keyword.id,
+        post: {
+          platform,
+          externalId,
+          author,
+          title: title || undefined,
+          text,
+          url: sourceUrl,
+          createdAt: capturedAt,
+          sourceTarget: community || keyword.target,
+        },
+      }, {
+        jobId: buildExtensionScoreJobId(user.id, externalId),
+      })
+      await admin
+        .from('ingestion_events')
+        .update({ processed_at: new Date().toISOString() })
+        .eq('id', event.id)
+    } catch (queueError) {
+      console.error('[extension/ingest] Capture saved but queueing failed', queueError)
+      return NextResponse.json({
+        success: true,
+        eventId: event.id,
+        queued: false,
+        status: 'awaiting_analysis',
+      }, { status: 202, headers })
+    }
+
+    return NextResponse.json({
+      success: true,
+      eventId: event.id,
+      queued: true,
+      status: 'queued',
+    }, { status: 202, headers })
   } catch (error) {
     if (error instanceof RequestInputError) {
       return NextResponse.json({ error: error.message }, { status: 400, headers })

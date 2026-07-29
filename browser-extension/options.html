@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BuyerWatch extension settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">BuyerWatch extension</div>
+      <h1>Connection settings</h1>
+      <p>Use the production URL normally. Switch to localhost only while developing BuyerWatch on this computer.</p>
+      <form id="settings-form">
+        <label for="app-url">BuyerWatch URL</label>
+        <input id="app-url" type="url" required>
+        <button type="submit">Save and test connection</button>
+      </form>
+      <div class="origin-card">
+        <span>Extension origin</span>
+        <code id="extension-origin"></code>
+        <p>Add this exact value to <strong>CHROME_EXTENSION_ORIGINS</strong> in production.</p>
+      </div>
+      <p id="result" role="status"></p>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
