@@ -110,7 +110,7 @@ export function GettingStartedChecklist({
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 24, stiffness: 300 }}
             id="setup-progress-panel"
-            className="fixed inset-x-3 bottom-[132px] z-[60] space-y-4 overflow-hidden rounded-3xl border border-black/10 bg-white p-5 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[336px] lg:bottom-20"
+            className="fixed inset-x-3 bottom-[156px] z-[60] space-y-4 overflow-hidden rounded-3xl border border-black/10 bg-white p-5 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[336px] lg:bottom-[104px]"
           >
             {/* Header */}
             <div className="flex items-center justify-between">

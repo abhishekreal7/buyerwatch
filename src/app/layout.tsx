@@ -35,6 +35,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "BuyerWatch | Premium Lead Generation",
   description: "Advanced signal intelligence and reply automation.",
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    shortcut: ['/icon.svg'],
+  },
 };
 
 export default function RootLayout({
