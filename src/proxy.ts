@@ -44,6 +44,23 @@ function strictContentSecurityPolicy(nonce: string): string {
 }
 
 export async function proxy(request: NextRequest) {
+  const isOAuthFallbackReturn =
+    request.nextUrl.pathname === '/'
+    && (
+      request.nextUrl.searchParams.has('code')
+      || request.nextUrl.searchParams.has('error')
+      || request.nextUrl.searchParams.has('error_description')
+    )
+
+  // Supabase falls back to the configured Site URL when an exact OAuth
+  // redirect URL is not allow-listed. Preserve the OAuth parameters and route
+  // that fallback through the normal PKCE callback handler.
+  if (isOAuthFallbackReturn) {
+    const callbackUrl = request.nextUrl.clone()
+    callbackUrl.pathname = '/auth/callback'
+    return NextResponse.redirect(callbackUrl)
+  }
+
   if (!isSessionRoute(request.nextUrl.pathname)) {
     return NextResponse.next()
   }
