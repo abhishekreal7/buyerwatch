@@ -5,15 +5,14 @@ interface BrandLogoProps {
 }
 
 const dimensions = {
-  sm: { icon: 22, text: 'text-[16px]' },
-  md: { icon: 28, text: 'text-[20px]' },
-  lg: { icon: 34, text: 'text-[24px]' },
+  sm: { icon: 22, width: 121, height: 28 },
+  md: { icon: 28, width: 151, height: 35 },
+  lg: { icon: 34, width: 181, height: 42 },
 }
 
 export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: BrandLogoProps) {
   const dim = dimensions[size]
   const iconColor = tone === 'light' ? '#FFFFFF' : '#182A67'
-  const wordmarkColor = tone === 'light' ? '#FFFFFF' : '#182A67'
 
   const mark = (
     <svg
@@ -41,13 +40,16 @@ export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: Brand
     </span>
   ) : (
     <span
-      className={`${dim.text} inline-flex items-center gap-[0.34em] whitespace-nowrap leading-none tracking-[-0.035em]`}
-      style={{ fontFamily: 'var(--font-inter), Inter, Arial, sans-serif', color: wordmarkColor }}
+      className="inline-flex shrink-0 overflow-hidden"
+      style={{ width: `${dim.width}px`, height: `${dim.height}px` }}
       role="img"
       aria-label="BuyerWatch"
     >
-      {mark}
-      <span className="font-semibold">BuyerWatch</span>
+      <img
+        src="/buyerwatch-logo.svg"
+        alt=""
+        className="h-full w-full object-cover object-center"
+      />
     </span>
   )
 }
