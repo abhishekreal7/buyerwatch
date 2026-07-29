@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getProviderCapabilities, validateAppEnvironment } from '../src/lib/env'
+import {
+  getProviderCapabilities,
+  validateAppEnvironment,
+  validateWebRuntimeEnvironment,
+} from '../src/lib/env'
 
 const productionCore = {
   NODE_ENV: 'production',
@@ -39,6 +43,31 @@ afterEach(() => {
 })
 
 describe('production capability configuration', () => {
+  it('boots the web runtime without unrelated backend integrations', () => {
+    stubProductionCore()
+    for (const name of [
+      'NEXT_PUBLIC_SUPPORT_EMAIL',
+      'SUPABASE_SERVICE_ROLE_KEY',
+      'UPSTASH_REDIS_URL',
+      'CRON_SECRET',
+      'ENCRYPTION_KEY',
+      'ANTHROPIC_API_KEY',
+    ]) {
+      vi.stubEnv(name, '')
+    }
+
+    expect(() => validateWebRuntimeEnvironment()).not.toThrow()
+  })
+
+  it('requires public Supabase credentials to boot the web runtime', () => {
+    stubProductionCore()
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '')
+
+    expect(() => validateWebRuntimeEnvironment()).toThrow(
+      /NEXT_PUBLIC_SUPABASE_ANON_KEY/,
+    )
+  })
+
   it('launches with Anthropic while optional providers remain absent', () => {
     stubProductionCore()
     expect(() => validateAppEnvironment()).not.toThrow()

@@ -9,6 +9,12 @@
   'ENCRYPTION_KEY',
 ] as const
 
+const WEB_RUNTIME_ENV = [
+  'NEXT_PUBLIC_APP_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+] as const
+
 const WORKER_PRODUCTION_ENV = [
   ...CORE_PRODUCTION_ENV,
   'ADMIN_SECRET',
@@ -134,6 +140,18 @@ export function validateAppEnvironment(): void {
   if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
     throw new Error('BuyerWatch app requires ANTHROPIC_API_KEY')
   }
+}
+
+/**
+ * Validate only the configuration required to boot the Next.js request runtime.
+ *
+ * Provider, worker, and maintenance credentials are intentionally excluded:
+ * instrumentation runs before every server function and throwing for an
+ * unrelated integration would otherwise take public routes such as OAuth down.
+ */
+export function validateWebRuntimeEnvironment(): void {
+  if (process.env.NODE_ENV !== 'production') return
+  assertValues(WEB_RUNTIME_ENV, 'BuyerWatch web runtime')
 }
 
 export function validateWorkerEnvironment(): void {
