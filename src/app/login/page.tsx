@@ -81,9 +81,9 @@ function LoginContent() {
           )}
 
           {/* Social Authentication */}
-          <form action="/api/auth/google?next=login" method="get" className="mb-5">
-            <button
-              type="submit"
+          <div className="mb-5">
+            <a
+              href="/api/auth/google?next=login"
               className="w-full h-11 flex items-center justify-center gap-2.5 bg-white border border-black/[0.12] hover:border-black/25 text-[#0A0A0A] rounded-xl font-medium text-[13.5px] transition-all duration-200 hover:bg-[#F9F9F9] active:scale-[0.985] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -93,8 +93,8 @@ function LoginContent() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
               <span>Continue with Google</span>
-            </button>
-          </form>
+            </a>
+          </div>
 
           {/* Elegant Divider */}
           <div className="relative flex items-center justify-center my-6">
