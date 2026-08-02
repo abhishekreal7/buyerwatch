@@ -749,7 +749,7 @@ export default function LandingPage() {
               <span className={`inline-flex items-center rounded-full bg-[#0A0A0A] px-2.5 py-0.5 text-[11px] font-semibold text-white transition-all duration-200 ${annualHome ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>Save 20%</span>
             </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid items-center gap-5 lg:grid-cols-3">
+            <motion.div variants={staggerContainer} className="grid items-start gap-5 lg:grid-cols-3 lg:pt-6">
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
                 const rawPrice = parseInt(plan.price.replace('$', ''), 10)
