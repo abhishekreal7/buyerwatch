@@ -76,6 +76,7 @@ function Section({ children, className = '', delay = 0, id }: { children: React.
 
 export default function LandingPage() {
   const [activeAccordion, setActiveAccordion] = useState(0)
+  const [annualHome, setAnnualHome] = useState(false)
 
   // Navbar scroll animation
   const { scrollY } = useScroll()
@@ -734,20 +735,32 @@ export default function LandingPage() {
               </h2>
             </motion.div>
 
-            <motion.p variants={fadeUp} className="text-center text-[14px] text-[#6B6B6B] mb-12">
-              Monthly plans. Start free without a credit card.
-            </motion.p>
+            {/* Annual/Monthly toggle */}
+            <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-12">
+              <span className={`text-[14px] font-medium transition-colors ${!annualHome ? 'text-[#0A0A0A]' : 'text-[#999]'}`}>Monthly</span>
+              <button
+                onClick={() => setAnnualHome(a => !a)}
+                aria-label="Toggle annual billing"
+                className="relative h-7 w-[52px] rounded-full bg-[#D4D4D4] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-2"
+              >
+                <span className={`absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)] transition-[left] duration-200 ${annualHome ? 'left-[27px]' : 'left-[3px]'}`} />
+              </button>
+              <span className={`text-[14px] font-medium transition-colors ${annualHome ? 'text-[#0A0A0A]' : 'text-[#999]'}`}>Annual</span>
+              <span className={`inline-flex items-center rounded-full bg-[#0A0A0A] px-2.5 py-0.5 text-[11px] font-semibold text-white transition-all duration-200 ${annualHome ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>Save 20%</span>
+            </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid items-stretch gap-5 lg:grid-cols-3">
+            <motion.div variants={staggerContainer} className="grid items-center gap-5 lg:grid-cols-3">
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
+                const rawPrice = parseInt(plan.price.replace('$', ''), 10)
+                const displayPrice = isNaN(rawPrice) ? plan.price : annualHome ? `$${Math.round(rawPrice * 0.8)}` : plan.price
                 return (
                   <motion.article
                     key={plan.id}
                     variants={fadeUp}
                     className={`relative flex flex-col rounded-[20px] p-8 transition-shadow duration-300 ${
                       isHighlighted
-                        ? 'bg-[#0A0A0A] text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)] lg:-mt-4 lg:mb-4'
+                        ? 'bg-[#0A0A0A] text-white shadow-[0_24px_64px_rgba(0,0,0,0.25)] lg:-mt-6 lg:mb-6'
                         : 'bg-white border border-[#E8E8E8] shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
                     }`}
                   >
@@ -765,8 +778,10 @@ export default function LandingPage() {
                     </p>
                     {/* Price */}
                     <div className="mb-4 flex items-baseline gap-1">
-                      <span className={`text-[46px] font-bold leading-none tracking-tight ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>{plan.price}</span>
-                      <span className={`text-[14px] font-medium ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>{plan.period}</span>
+                      <span className={`text-[46px] font-bold leading-none tracking-tight ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>{displayPrice}</span>
+                      <span className={`text-[14px] font-medium ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>
+                        {plan.price === '$0' ? 'forever' : annualHome ? '/mo, billed annually' : plan.period}
+                      </span>
                     </div>
                     <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>
                     {/* CTA */}
