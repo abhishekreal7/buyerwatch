@@ -749,7 +749,7 @@ export default function LandingPage() {
               <span className={`inline-flex items-center rounded-full bg-[#0A0A0A] px-2.5 py-0.5 text-[11px] font-semibold text-white transition-all duration-200 ${annualHome ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>Save 20%</span>
             </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid items-start gap-5 lg:grid-cols-3 lg:pt-6">
+            <motion.div variants={staggerContainer} className="grid gap-5 lg:grid-cols-3">
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
                 const rawPrice = parseInt(plan.price.replace('$', ''), 10)
@@ -760,7 +760,7 @@ export default function LandingPage() {
                     variants={fadeUp}
                     className={`relative flex flex-col rounded-[20px] p-8 transition-shadow duration-300 ${
                       isHighlighted
-                        ? 'bg-[#0A0A0A] text-white shadow-[0_24px_64px_rgba(0,0,0,0.25)] lg:-mt-6 lg:mb-6'
+                        ? 'bg-[#0A0A0A] text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)] lg:-mt-4 lg:mb-4'
                         : 'bg-white border border-[#E8E8E8] shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
                     }`}
                   >
