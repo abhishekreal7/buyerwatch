@@ -2,6 +2,8 @@
 
 alter table profiles
   add column if not exists referral_tracking_enabled boolean not null default true,
+  add column if not exists competitors text[] not null default '{}',
+  add column if not exists tone_examples text,
   add column if not exists webhook_secret text,
   add column if not exists billing_subscription_id text,
   add column if not exists billing_customer_id text,
@@ -274,6 +276,7 @@ before insert or update of user_id on keywords
 for each row execute function enforce_keyword_plan_limit();
 
 drop policy if exists "own keywords insert under plan limit" on keywords;
+drop policy if exists "own keywords insert" on keywords;
 create policy "own keywords insert"
   on keywords for insert to authenticated
   with check (auth.uid() = user_id);

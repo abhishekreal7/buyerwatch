@@ -27,6 +27,7 @@ export async function POST(req: Request) {
       target = target.substring(2)
     }
     if (platform === 'reddit') target = target.toLowerCase()
+    if (platform === 'bluesky') target = target.replace(/\s+/g, ' ')
 
     const allowedPlatforms = [
       'reddit',

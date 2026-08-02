@@ -32,10 +32,11 @@ const backendHardeningMigration = readFileSync(
 describe('plan and scheduler contracts', () => {
   it('applies explicit polling intervals to every plan', () => {
     const now = Date.parse('2026-07-24T12:00:00.000Z')
-    expect(isPollingDue('growth', '2026-07-24T11:44:59.000Z', now)).toBe(true)
-    expect(isPollingDue('growth', '2026-07-24T11:50:00.000Z', now)).toBe(false)
-    expect(isPollingDue('pro', '2026-07-24T11:29:59.000Z', now)).toBe(true)
-    expect(isPollingDue('free', '2026-07-24T06:00:01.000Z', now)).toBe(false)
+    expect(isPollingDue('growth', '2026-07-24T11:54:59.000Z', now)).toBe(true)
+    expect(isPollingDue('growth', '2026-07-24T11:55:01.000Z', now)).toBe(false)
+    expect(isPollingDue('pro', '2026-07-24T11:54:59.000Z', now)).toBe(true)
+    expect(isPollingDue('free', '2026-07-24T10:59:59.000Z', now)).toBe(true)
+    expect(isPollingDue('free', '2026-07-24T11:00:01.000Z', now)).toBe(false)
   })
 
   it('keeps reply job identity stable across manual and automatic producers', () => {

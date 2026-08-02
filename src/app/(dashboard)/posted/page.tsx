@@ -12,9 +12,11 @@ import { AppPage } from '@/components/AppPage'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { BlueskyIcon, RedditIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
-import { fetchAllPages } from '@/lib/supabase-pagination'
 import { staggers, springs } from '@/lib/motion'
 import { createClient } from '@/utils/supabase/client'
+import { IntentBadge } from '@/components/IntentBadge'
+
+const PAGE_SIZE = 40
 
 interface PostedReply {
   id: string
@@ -28,6 +30,10 @@ interface PostedReply {
   sentAt: string
   reply: string
   threadUrl: string | null
+  replyUrl: string | null
+  clickedAt: string | null
+  convertedAt: string | null
+  revenueUsd: number
   score: number
 }
 
@@ -147,9 +153,7 @@ function PostedConversationCard({ item }: { item: PostedReply }) {
                 {item.matchedKeyword}
               </span>
             )}
-            <span className="rounded-md bg-black/[0.035] px-2 py-1 text-[11px] font-semibold tabular-nums text-text-secondary">
-              {item.score} intent
-            </span>
+            <IntentBadge score={item.score} />
           </div>
 
           {item.threadUrl ? (
@@ -178,9 +182,22 @@ function PostedConversationCard({ item }: { item: PostedReply }) {
             </span>
             Your reply
           </span>
-          <span className="text-[11px] font-medium text-text-tertiary">
-            Sent {item.sentAt}
-          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] font-medium text-text-tertiary">
+            {item.clickedAt && <span className="rounded-full bg-white px-2 py-1 text-[#0876B9]">Clicked</span>}
+            {item.convertedAt && <span className="rounded-full bg-[#EAF8F1] px-2 py-1 text-[#087A52]">Converted</span>}
+            {item.revenueUsd > 0 && <span className="rounded-full bg-white px-2 py-1 text-text-primary">${item.revenueUsd.toFixed(2)}</span>}
+            <span>Sent {item.sentAt}</span>
+            {item.replyUrl && (
+              <a
+                href={item.replyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold text-[#0876B9] hover:underline"
+              >
+                View reply <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
         </div>
         <p className="whitespace-pre-wrap text-[14px] leading-6 text-[#20282E] sm:text-[14.5px]">
           {item.reply}
@@ -203,9 +220,59 @@ function PostedRepliesSkeleton() {
   )
 }
 
+function parsePostedThreads(data: any[]): PostedReply[] {
+  return data.map((thread) => {
+    const analytics = Array.isArray(thread.reply_analytics)
+      ? thread.reply_analytics[0]
+      : thread.reply_analytics
+    const keyword = Array.isArray(thread.keywords)
+      ? thread.keywords[0]
+      : thread.keywords
+    const platform = thread.platform || 'unknown'
+    const author = thread.author || 'unknown'
+    const title = thread.title?.trim() || thread.text_content?.trim() || 'Original conversation'
+    const body = thread.title?.trim() ? thread.text_content?.trim() || '' : ''
+    const sendAudits = Array.isArray(thread.send_audit_log)
+      ? thread.send_audit_log
+      : thread.send_audit_log ? [thread.send_audit_log] : []
+    const successfulSend = sendAudits
+      .filter((audit: any) => audit.status === 'success')
+      .sort((left: any, right: any) => String(right.created_at).localeCompare(String(left.created_at)))[0]
+    const attribution = Array.isArray(thread.reply_attribution)
+      ? thread.reply_attribution[0]
+      : thread.reply_attribution
+
+    return {
+      id: thread.id,
+      platform,
+      sourceLabel:
+        platform.toLowerCase() === 'reddit'
+          ? formatRedditTarget(keyword?.target || '')
+          : formatAuthor(author, platform),
+      authorLabel:
+        platform.toLowerCase() === 'reddit' ? formatAuthor(author, platform) : '',
+      matchedKeyword: keyword?.term || '',
+      title,
+      body,
+      discoveredAt: formatRelativeDate(thread.created_at),
+      sentAt: formatSentDate(analytics?.sent_at || thread.created_at),
+      reply: analytics?.edited_text || analytics?.draft_text || 'Reply logged.',
+      threadUrl: thread.url || null,
+      replyUrl: successfulSend?.permalink || null,
+      clickedAt: attribution?.clicked_at || null,
+      convertedAt: attribution?.converted_at || null,
+      revenueUsd: Number(attribution?.revenue_usd) || 0,
+      score: Math.round(Number(thread.intent_score) || 0),
+    }
+  })
+}
+
 export default function PostedPage() {
   const [posted, setPosted] = useState<PostedReply[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
   const [loadFailed, setLoadFailed] = useState(false)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
@@ -217,17 +284,23 @@ export default function PostedPage() {
       setLoading(true)
       setLoadFailed(false)
 
-      const { data, error } = await fetchAllPages((from, to) =>
+      const [pageResult, countResult] = await Promise.all([
         supabase
           .from('monitored_threads')
           .select(
-            'id, platform, author, title, text_content, url, intent_score, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target)',
+            'id, platform, author, title, text_content, url, intent_score, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)',
           )
           .eq('user_id', userId)
           .eq('status', 'replied')
           .order('created_at', { ascending: false })
-          .range(from, to),
-      )
+          .range(0, PAGE_SIZE - 1),
+        supabase
+          .from('monitored_threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('status', 'replied'),
+      ])
+      const { data, error } = pageResult
 
       if (cancelled) return
 
@@ -237,39 +310,9 @@ export default function PostedPage() {
         return
       }
 
-      setPosted(
-        (data ?? []).map((thread) => {
-          const analytics = Array.isArray(thread.reply_analytics)
-            ? thread.reply_analytics[0]
-            : thread.reply_analytics
-          const keyword = Array.isArray(thread.keywords)
-            ? thread.keywords[0]
-            : thread.keywords
-          const platform = thread.platform || 'unknown'
-          const author = thread.author || 'unknown'
-          const title = thread.title?.trim() || thread.text_content?.trim() || 'Original conversation'
-          const body = thread.title?.trim() ? thread.text_content?.trim() || '' : ''
-
-          return {
-            id: thread.id,
-            platform,
-            sourceLabel:
-              platform.toLowerCase() === 'reddit'
-                ? formatRedditTarget(keyword?.target || '')
-                : formatAuthor(author, platform),
-            authorLabel:
-              platform.toLowerCase() === 'reddit' ? formatAuthor(author, platform) : '',
-            matchedKeyword: keyword?.term || '',
-            title,
-            body,
-            discoveredAt: formatRelativeDate(thread.created_at),
-            sentAt: formatSentDate(analytics?.sent_at || thread.created_at),
-            reply: analytics?.edited_text || analytics?.draft_text || 'Reply logged.',
-            threadUrl: thread.url || null,
-            score: Math.round(Number(thread.intent_score) || 0),
-          }
-        }),
-      )
+      setPosted(parsePostedThreads(data ?? []))
+      setTotalCount(countResult.count ?? data?.length ?? 0)
+      setHasMore((data?.length ?? 0) === PAGE_SIZE)
       setLoading(false)
     }
 
@@ -280,6 +323,27 @@ export default function PostedPage() {
     }
   }, [supabase, userId])
 
+  async function loadMorePosted() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const from = posted.length
+    const { data, error } = await supabase
+      .from('monitored_threads')
+      .select('id, platform, author, title, text_content, url, intent_score, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)')
+      .eq('user_id', userId)
+      .eq('status', 'replied')
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (error) {
+      setLoadFailed(true)
+    } else {
+      setPosted(current => [...current, ...parsePostedThreads(data ?? [])])
+      setHasMore((data?.length ?? 0) === PAGE_SIZE)
+    }
+    setLoadingMore(false)
+  }
+
   return (
     <AppPage>
       <div className="flex w-full flex-col">
@@ -287,9 +351,9 @@ export default function PostedPage() {
           title="Posted Replies"
           subtitle="See each source conversation together with the reply you sent."
           action={
-            !loading && posted.length > 0 ? (
+            !loading && totalCount > 0 ? (
               <span className="rounded-full border border-black/[0.07] bg-white px-3.5 py-2 text-[12px] font-semibold tabular-nums text-text-secondary">
-                {posted.length} {posted.length === 1 ? 'reply' : 'replies'}
+                {totalCount} {totalCount === 1 ? 'reply' : 'replies'}
               </span>
             ) : undefined
           }
@@ -331,6 +395,18 @@ export default function PostedPage() {
             {posted.map((item) => (
               <PostedConversationCard key={item.id} item={item} />
             ))}
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={loadMorePosted}
+                  disabled={loadingMore}
+                  className="rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-[13px] font-semibold text-text-primary shadow-sm transition-colors hover:bg-black/[0.025] disabled:opacity-50"
+                >
+                  {loadingMore ? 'Loading…' : 'Load more replies'}
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </div>

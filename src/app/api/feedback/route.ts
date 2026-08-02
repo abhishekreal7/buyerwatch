@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { boundedString, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
+import { recordEngagementEvent } from '@/lib/automation-audit'
 
 export async function POST(request: Request) {
   try {
@@ -31,7 +32,8 @@ export async function POST(request: Request) {
 
     // The service RPC re-reads the source draft, platform, target, and keyword
     // from the database. Client-supplied values cannot poison trust metrics.
-    const { error } = await getServiceRoleClient().rpc('log_verified_draft_feedback', {
+    const admin = getServiceRoleClient()
+    const { error } = await admin.rpc('log_verified_draft_feedback', {
       p_user_id: user.id,
       p_thread_id: threadId,
       p_final_draft: finalDraft || null,
@@ -42,6 +44,26 @@ export async function POST(request: Request) {
       console.error('Error logging draft feedback:', error)
       return NextResponse.json({ error: 'Failed to log feedback' }, { status: 500 })
     }
+
+    const { data: thread } = await admin
+      .from('monitored_threads')
+      .select('platform')
+      .eq('id', threadId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    const eventType = ['REJECTED', 'SKIPPED'].includes(actionType) ? 'dismissed' : 'draft_reviewed'
+    await recordEngagementEvent(admin, {
+      userId: user.id,
+      threadId,
+      eventType,
+      platform: thread?.platform ?? null,
+      actorType: 'user',
+      source: 'draft_feedback',
+      metadata: { actionType, finalDraftLength: finalDraft?.length ?? 0 },
+      idempotencyKey: `${threadId}:feedback:${actionType}`,
+    }).catch((auditError) => {
+      console.error('[feedback] Engagement audit failed', auditError)
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

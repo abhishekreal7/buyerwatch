@@ -1,5 +1,5 @@
 {
-  "name": "scouto",
+  "name": "buyerwatch",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,6 +7,7 @@
     "build": "next build",
     "build:worker": "tsc -p tsconfig.worker.json",
     "deploy:worker:gcp": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-worker-gcp.ps1",
+    "setup:qstash": "node scripts/setup-qstash-schedule.mjs",
     "start": "next start",
     "lint": "eslint src worker tests e2e playwright.config.ts --max-warnings=0",
     "typecheck": "tsc --noEmit --incremental false && tsc -p tsconfig.worker.json --noEmit --incremental false",
@@ -28,6 +29,7 @@
     "@sentry/node": "^10.63.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
+    "@upstash/qstash": "^2.11.3",
     "@upstash/ratelimit": "^2.0.8",
     "@vercel/analytics": "^2.0.1",
     "bullmq": "^5.79.2",

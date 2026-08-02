@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getConfiguredSecret = getConfiguredSecret;
+exports.hasRedditDiscoveryProvider = hasRedditDiscoveryProvider;
 exports.getProviderCapabilities = getProviderCapabilities;
 exports.validateAppEnvironment = validateAppEnvironment;
+exports.validateWebRuntimeEnvironment = validateWebRuntimeEnvironment;
 exports.validateWorkerEnvironment = validateWorkerEnvironment;
 exports.isDevelopmentMockEnabled = isDevelopmentMockEnabled;
 const CORE_PRODUCTION_ENV = [
@@ -14,6 +16,11 @@ const CORE_PRODUCTION_ENV = [
     'UPSTASH_REDIS_URL',
     'CRON_SECRET',
     'ENCRYPTION_KEY',
+];
+const WEB_RUNTIME_ENV = [
+    'NEXT_PUBLIC_APP_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
 ];
 const WORKER_PRODUCTION_ENV = [
     ...CORE_PRODUCTION_ENV,
@@ -55,6 +62,13 @@ function getConfiguredSecret(value) {
     }
     return trimmed;
 }
+function hasRedditDiscoveryProvider() {
+    const proxyConfigured = Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY));
+    const approvedOauthConfigured = process.env.REDDIT_API_APPROVED === 'true'
+        && Boolean(getConfiguredSecret(process.env.REDDIT_CLIENT_ID))
+        && Boolean(getConfiguredSecret(process.env.REDDIT_CLIENT_SECRET));
+    return proxyConfigured || approvedOauthConfigured;
+}
 function getProviderCapabilities() {
     return {
         aiDrafting: Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY)),
@@ -62,8 +76,7 @@ function getProviderCapabilities() {
             && process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
             && process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
             && process.env.DODO_PAYMENTS_WEBHOOK_SECRET),
-        redditDiscovery: Boolean(process.env.REDDITAPIS_API_KEY
-            || (process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET)),
+        redditDiscovery: hasRedditDiscoveryProvider(),
         redditPosting: Boolean(process.env.REDDIT_OAUTH_CLIENT_ID
             && process.env.REDDIT_OAUTH_SECRET),
         bluesky: Boolean(process.env.BLUESKY_HANDLE && process.env.BLUESKY_APP_PASSWORD),
@@ -110,6 +123,18 @@ function validateAppEnvironment() {
         throw new Error('BuyerWatch app requires ANTHROPIC_API_KEY');
     }
 }
+/**
+ * Validate only the configuration required to boot the Next.js request runtime.
+ *
+ * Provider, worker, and maintenance credentials are intentionally excluded:
+ * instrumentation runs before every server function and throwing for an
+ * unrelated integration would otherwise take public routes such as OAuth down.
+ */
+function validateWebRuntimeEnvironment() {
+    if (process.env.NODE_ENV !== 'production')
+        return;
+    assertValues(WEB_RUNTIME_ENV, 'BuyerWatch web runtime');
+}
 function validateWorkerEnvironment() {
     if (process.env.NODE_ENV !== 'production')
         return;
@@ -117,6 +142,9 @@ function validateWorkerEnvironment() {
     validateOptionalProviders();
     if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
         throw new Error('BuyerWatch worker requires ANTHROPIC_API_KEY');
+    }
+    if (!hasRedditDiscoveryProvider()) {
+        throw new Error('BuyerWatch worker requires REDDITAPIS_API_KEY or approved Reddit OAuth discovery credentials');
     }
 }
 function isDevelopmentMockEnabled(name) {

@@ -9,10 +9,10 @@ import {
   ExternalLink,
   MessageCircle,
   Sparkles,
-  Zap,
 } from 'lucide-react'
 import { BlueskyIcon, RedditIcon } from '@/components/Icons'
 import { type IntentLabel } from '@/lib/intent'
+import { IntentBadge } from '@/components/IntentBadge'
 
 export type OpportunityStatus = 'pending' | 'drafted' | 'needs_manual_reply' | 'posted'
 
@@ -141,10 +141,7 @@ export function LeadPipelineBoard({
                               <PlatformIcon platform={item.platform} />
                               <span className="text-[11px] font-medium text-gray-300 capitalize">{item.target}</span>
                             </div>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-400">
-                              <Zap className="h-3 w-3" />
-                              {item.score === null ? 'Awaiting analysis' : `${item.score}%`}
-                            </span>
+                            <IntentBadge score={item.score} label={item.label} className="shrink-0" />
                           </div>
 
                           <h4 className="text-[14.5px] font-semibold text-white leading-snug line-clamp-2 mb-1.5">
@@ -215,9 +212,7 @@ export function LeadPipelineBoard({
                           <h4 className="text-[14px] font-bold text-[#1C1C1A] leading-snug line-clamp-1 group-hover:text-blue-600 transition-colors">
                             {item.title || item.keyword}
                           </h4>
-                          <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10.5px] font-bold text-gray-700">
-                            {item.score ?? 'Pending'}
-                          </span>
+                          <IntentBadge score={item.score} label={item.label} className="shrink-0" />
                         </div>
 
                         <p className="text-[12px] text-[#63635E] line-clamp-2 leading-relaxed mb-3">

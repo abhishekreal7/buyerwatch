@@ -5,9 +5,9 @@ export const X_DAILY_SPEND_LIMIT_CENTS: Record<string, number> = {
 }
 
 export const PLAN_POLL_INTERVAL_MINUTES: Record<PlanTier, number> = {
-  free: 360,
-  pro: 30,
-  growth: 15,
+  free: 60,
+  pro: 5,
+  growth: 5,
 }
 
 export const PLAN_LIMITS = {

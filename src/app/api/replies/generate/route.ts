@@ -16,6 +16,7 @@ import {
 } from '@/lib/ai-usage'
 import { aiRateLimit, getIp } from '@/lib/ratelimit'
 import { isUuid, readJsonBody, RequestInputError } from '@/lib/request'
+import { recordEngagementEvent } from '@/lib/automation-audit'
 
 export async function POST(req: Request) {
   try {
@@ -193,6 +194,22 @@ export async function POST(req: Request) {
     if (saveError) {
       return NextResponse.json({ error: 'draft_save_failed' }, { status: 500 })
     }
+
+    await recordEngagementEvent(admin, {
+      userId: user.id,
+      threadId,
+      eventType: 'draft_generated',
+      platform: thread.platform,
+      actorType: 'system',
+      source: 'manual_generation',
+      metadata: {
+        purpose: 'draft',
+        textLength: draftResult.text.length,
+      },
+      idempotencyKey: `${threadId}:draft-generated:${aiSpend.id}`,
+    }).catch((auditError) => {
+      console.error('[replies/generate] Draft audit failed', auditError)
+    })
 
     return NextResponse.json({ success: true, draft: draftResult.text })
   } catch (error) {

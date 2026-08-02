@@ -5,28 +5,27 @@ import { redirect } from 'next/navigation'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+  const claims = claimsData?.claims
+  const userId = typeof claims?.sub === 'string' ? claims.sub : null
 
-  if (!user) {
+  if (claimsError || !claims || !userId) {
     redirect('/login')
   }
 
-  const [profileResult, opportunitiesResult, draftsResult] = await Promise.all([
+  const [profileResult, unreviewedResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('auto_send_enabled, plan, draft_count, draft_month, business_name')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single(),
     supabase
       .from('monitored_threads')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'needs_manual_reply']),
-    supabase
-      .from('monitored_threads')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('status', 'drafted'),
+      .select('id')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+      .is('reviewed_at', null)
+      .limit(1),
   ])
 
   const profile = profileResult.data
@@ -36,23 +35,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const used = profile?.draft_month === currentMonth
     ? Math.min(Math.max(profile.draft_count ?? 0, 0), limit)
     : 0
-  const userMetadata = user.user_metadata
-  const userName = userMetadata?.full_name || userMetadata?.name || profile?.business_name || (user.email ? user.email.split('@')[0] : 'Iona Rollins')
+  const userMetadata = (claims.user_metadata ?? {}) as Record<string, string | undefined>
+  const email = typeof claims.email === 'string' ? claims.email : undefined
+  const userName = userMetadata.full_name || userMetadata.name || profile?.business_name || (email ? email.split('@')[0] : 'Iona Rollins')
   const bootstrap: DashboardBootstrap = {
     autoSend: profile?.auto_send_enabled ?? false,
     plan,
     credits: { used, limit },
-    opportunityCount: opportunitiesResult.count ?? 0,
-    draftCount: draftsResult.count ?? 0,
+    hasUnreviewedOpportunities: (unreviewedResult.data?.length ?? 0) > 0,
     user: {
       name: userName,
-      email: user.email,
-      avatarUrl: userMetadata?.avatar_url || userMetadata?.picture,
+      email,
+      avatarUrl: userMetadata.avatar_url || userMetadata.picture,
     },
   }
 
   return (
-    <DashboardLayout userId={user.id} initialData={bootstrap}>
+    <DashboardLayout userId={userId} initialData={bootstrap}>
       {children}
     </DashboardLayout>
   )

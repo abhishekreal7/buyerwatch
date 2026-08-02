@@ -12,6 +12,7 @@ import { matchedSignals } from '../../src/lib/buying-signal-filter'
 import { getAppUrl } from '../../src/lib/app-url'
 import { IntentLabel } from '../../src/lib/intent'
 import { getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
+import { getConfiguredSecret } from '../../src/lib/env'
 import {
   emptyAiUsage,
   getAiUsageFromError,
@@ -21,6 +22,10 @@ import {
   type AiUsage,
 } from '../../src/lib/ai-usage'
 import { dispatchPendingOutbox } from '../../src/lib/backend-maintenance'
+import { checkGoogleRankQueue, notifySlackQueue } from '../../src/lib/queues'
+import { recordAutomationDecision, recordEngagementEvent } from '../../src/lib/automation-audit'
+import { getPlatformCapabilities } from '../../src/lib/platform-capabilities'
+import { isRedditDirectPostingConfigured } from '../../src/lib/reddit-post'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -28,8 +33,30 @@ import { supabaseWorker as supabase } from '../lib/supabase'
 
 const INTENT_THRESHOLD = 60
 
+export type ScorePostPayload = {
+  userId: string
+  keywordId: string
+  post: NormalizedPost
+}
+
+type ScorePostOptions = {
+  allowAutoSend?: boolean
+  enqueueFollowUpJobs?: boolean
+  providerRetries?: number
+}
+
 export async function scorePostHandler(job: Job) {
-  const { userId, keywordId, post } = job.data as { userId: string; keywordId: string; post: NormalizedPost }
+  return processScorePost(job.data as ScorePostPayload)
+}
+
+export async function processScorePost(
+  payload: ScorePostPayload,
+  options: ScorePostOptions = {},
+) {
+  const { userId, keywordId, post } = payload
+  const allowAutoSend = options.allowAutoSend !== false
+  const enqueueFollowUpJobs = options.enqueueFollowUpJobs !== false
+  const providerRetries = options.providerRetries
   let signalReserved = false
   let draftReserved = false
 
@@ -46,7 +73,7 @@ export async function scorePostHandler(job: Job) {
 
     if (existingError) throw existingError
     if (existing && existing.status !== 'pending') {
-      await dispatchPendingOutbox(1, existing.id)
+      if (enqueueFollowUpJobs) await dispatchPendingOutbox(1, existing.id)
       return
     }
     const hasScoringCheckpoint = Boolean(
@@ -58,7 +85,7 @@ export async function scorePostHandler(job: Job) {
     // 2. Fetch user profile for context and plan
     const { data: extendedProfile } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, auto_send_platforms, auto_send_communities, auto_send_daily_limit, referral_tracking_enabled')
       .eq('id', userId)
       .single()
     let profile = extendedProfile
@@ -70,13 +97,21 @@ export async function scorePostHandler(job: Job) {
         .single()
       if (legacyResult.error) throw legacyResult.error
       profile = legacyResult.data
-        ? { ...legacyResult.data, tone_archetype: null, style_guardrails: [] }
+        ? {
+            ...legacyResult.data,
+            tone_archetype: null,
+            style_guardrails: [],
+            auto_send_platforms: ['bluesky'],
+            auto_send_communities: [],
+            auto_send_daily_limit: 3,
+          }
         : null
     }
 
     if (!profile) throw new Error('Profile not found for scoring job')
     const plan = normalizePlan(profile.plan)
     const planLimits = getPlanLimits(plan)
+    const hasAnthropic = Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY))
 
     let scoreResult: Awaited<ReturnType<typeof scoreIntent>>
     let evidenceSignals: string[]
@@ -101,47 +136,55 @@ export async function scorePostHandler(job: Job) {
       }
       signalReserved = true
 
-      // 4. Reserve provider spend and the daily intent allowance atomically.
-      const intentSpend = await reserveAiSpend(supabase, {
-        userId,
-        purpose: 'intent',
-        plan,
-      })
-      if (!intentSpend) {
-        logger.warn({ userId, plan }, 'AI spend cap blocked intent scoring')
-        await safelyReleaseMonthlySignal(userId)
-        signalReserved = false
-        return
-      }
-
-      let canScore: boolean
-      try {
-        canScore = await checkBudget(userId, profile.plan, 'intent')
-      } catch (error) {
-        await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
-        throw error
-      }
-      if (!canScore) {
-        await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
-        logger.info({ userId }, 'Daily intent-scoring limit reached')
-        await safelyReleaseMonthlySignal(userId)
-        signalReserved = false
-        return
-      }
-
-      // 5. Score intent and reconcile the reservation with actual usage.
-      try {
-        scoreResult = await scoreIntent(post, profile)
-        await safelyRecordAiUsage(intentSpend.id, scoreResult.usage, {
+      if (hasAnthropic) {
+        // Reserve provider spend and the daily intent allowance atomically.
+        const intentSpend = await reserveAiSpend(supabase, {
           userId,
           purpose: 'intent',
+          plan,
         })
-      } catch (error) {
-        await settleFailedAiSpend(intentSpend.id, error, {
-          userId,
-          purpose: 'intent',
+        if (!intentSpend) {
+          logger.warn({ userId, plan }, 'AI spend cap blocked intent scoring')
+          await safelyReleaseMonthlySignal(userId)
+          signalReserved = false
+          return
+        }
+
+        let canScore: boolean
+        try {
+          canScore = await checkBudget(userId, profile.plan, 'intent')
+        } catch (error) {
+          await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
+          throw error
+        }
+        if (!canScore) {
+          await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
+          logger.info({ userId }, 'Daily intent-scoring limit reached')
+          await safelyReleaseMonthlySignal(userId)
+          signalReserved = false
+          return
+        }
+
+        // Score intent and reconcile the reservation with actual usage.
+        try {
+          scoreResult = await scoreIntent(post, profile, {
+            maxRetries: providerRetries,
+          })
+          await safelyRecordAiUsage(intentSpend.id, scoreResult.usage, {
+            userId,
+            purpose: 'intent',
+          })
+        } catch (error) {
+          await settleFailedAiSpend(intentSpend.id, error, {
+            userId,
+            purpose: 'intent',
+          })
+          throw error
+        }
+      } else {
+        scoreResult = await scoreIntent(post, profile, {
+          maxRetries: providerRetries,
         })
-        throw error
       }
       evidenceSignals = matchedSignals(`${post.title ?? ''} ${post.text ?? ''}`)
     }
@@ -180,6 +223,23 @@ export async function scorePostHandler(job: Job) {
         automationReason: 'draft_pending',
       })
       signalReserved = false
+    }
+
+    if (!hasAnthropic) {
+      await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'needs_manual_reply',
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        evidenceSignals,
+        automationReason: 'ai_provider_unavailable',
+      })
+      signalReserved = false
+      return
     }
 
     // 5. Atomic budget check for reply drafting
@@ -243,7 +303,13 @@ export async function scorePostHandler(job: Job) {
 
     let draftResult: Awaited<ReturnType<typeof draftReply>>
     try {
-      draftResult = await draftReply(post, profile, scoreResult.score, trackingUrl)
+      draftResult = await draftReply(
+        post,
+        profile,
+        scoreResult.score,
+        trackingUrl,
+        { maxRetries: providerRetries },
+      )
       await safelyRecordAiUsage(draftSpend.id, draftResult.usage, {
         userId,
         purpose: 'draft',
@@ -262,7 +328,7 @@ export async function scorePostHandler(job: Job) {
     // 7. Auto-send decision — routed through the single unified gatekeeper.
     //    All safeguards (disclosure, tone, cold-start, confidence threshold)
     //    are enforced inside evaluateAutoSend(). DO NOT inline duplicate logic here.
-    const evaluation = await evaluateAutoSend(
+    const trustEvaluation = await evaluateAutoSend(
       userId,
       post.platform,
       draftResult,
@@ -273,8 +339,45 @@ export async function scorePostHandler(job: Job) {
       },
       post.sourceTarget ?? null
     )
+    const capabilities = getPlatformCapabilities(post.platform, {
+      redditDirectPosting: isRedditDirectPostingConfigured(),
+    })
+    const { data: platformConnection } = ['reddit', 'bluesky'].includes(post.platform)
+      ? await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('platform', post.platform)
+        .maybeSingle()
+      : { data: null }
+    const enabledPlatforms = Array.isArray(profile.auto_send_platforms)
+      ? profile.auto_send_platforms
+      : ['bluesky']
+    const allowedCommunities = Array.isArray(profile.auto_send_communities)
+      ? profile.auto_send_communities.map(value => value.trim().toLocaleLowerCase()).filter(Boolean)
+      : []
+    const normalizedTarget = (post.sourceTarget ?? '').trim().toLocaleLowerCase()
+    let evaluation = trustEvaluation
 
-    if (evaluation.approved && ['reddit', 'bluesky'].includes(post.platform)) {
+    if (evaluation.approved && !enabledPlatforms.includes(post.platform)) {
+      evaluation = blockAutomation(evaluation, 'auto_send_platform_disabled')
+    } else if (evaluation.approved && capabilities.delivery === 'direct' && !platformConnection) {
+      evaluation = blockAutomation(evaluation, 'platform_connection_required')
+    } else if (
+      evaluation.approved
+      && allowedCommunities.length > 0
+      && !allowedCommunities.includes(normalizedTarget)
+    ) {
+      evaluation = blockAutomation(evaluation, 'auto_send_target_out_of_scope')
+    } else if (evaluation.approved && (!allowAutoSend || capabilities.delivery !== 'direct')) {
+      evaluation = blockAutomation(evaluation, 'assisted_delivery_required')
+    }
+
+    if (
+      evaluation.approved
+      && capabilities.delivery === 'direct'
+      && ['reddit', 'bluesky'].includes(post.platform)
+    ) {
       // All gates cleared — save and enqueue for auto-send
       const autoSendPayload = {
         userId,
@@ -302,7 +405,18 @@ export async function scorePostHandler(job: Job) {
       signalReserved = false
       draftReserved = false
       if (thread) {
-        const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
+        await recordInitialAutomationAudit({
+          userId,
+          threadId: thread.id,
+          post,
+          scoreResult,
+          draftResult,
+          evaluation,
+          deliveryMode: capabilities.delivery,
+          hasAnthropic,
+        })
+      }
+      if (thread && enqueueFollowUpJobs) {
         await dispatchPendingOutbox(1, thread.id)
         // Fire-and-forget: check if thread URL ranks on Google for this keyword (Feature 5)
         if (post.url) {
@@ -340,7 +454,18 @@ export async function scorePostHandler(job: Job) {
       signalReserved = false
       draftReserved = false
       if (thread) {
-        const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js')
+        await recordInitialAutomationAudit({
+          userId,
+          threadId: thread.id,
+          post,
+          scoreResult,
+          draftResult,
+          evaluation,
+          deliveryMode: capabilities.delivery,
+          hasAnthropic,
+        })
+      }
+      if (thread && enqueueFollowUpJobs) {
         // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
         if (post.url) {
           checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url }).catch(() => {})
@@ -366,9 +491,119 @@ export async function scorePostHandler(job: Job) {
     if (draftReserved) {
       await safelyReleaseMonthlyDraft(userId)
     }
-    logger.error({ error }, `Failed to score post ${post.externalId} for user ${userId}:`)
+    logger.error({ err: error }, `Failed to score post ${post.externalId} for user ${userId}:`)
     throw error
   }
+}
+
+function blockAutomation(
+  evaluation: Awaited<ReturnType<typeof evaluateAutoSend>>,
+  reason: string,
+): Awaited<ReturnType<typeof evaluateAutoSend>> {
+  return { ...evaluation, approved: false, reason }
+}
+
+async function recordInitialAutomationAudit(input: {
+  userId: string
+  threadId: string
+  post: NormalizedPost
+  scoreResult: Awaited<ReturnType<typeof scoreIntent>>
+  draftResult: Awaited<ReturnType<typeof draftReply>>
+  evaluation: Awaited<ReturnType<typeof evaluateAutoSend>>
+  deliveryMode: 'direct' | 'assisted' | 'manual' | 'unsupported'
+  hasAnthropic: boolean
+}) {
+  const {
+    userId,
+    threadId,
+    post,
+    scoreResult,
+    draftResult,
+    evaluation,
+    deliveryMode,
+    hasAnthropic,
+  } = input
+  const source = post.externalId.includes(':extension:') ? 'chrome_extension' : 'scheduled_monitor'
+
+  await Promise.all([
+    recordEngagementEvent(supabase, {
+      userId,
+      threadId,
+      eventType: 'signal_discovered',
+      platform: post.platform,
+      source,
+      metadata: {
+        externalId: post.externalId,
+        sourceTarget: post.sourceTarget,
+        sourceCreatedAt: post.createdAt,
+      },
+      idempotencyKey: `${threadId}:signal-discovered`,
+      occurredAt: post.createdAt,
+    }),
+    recordEngagementEvent(supabase, {
+      userId,
+      threadId,
+      eventType: 'intent_scored',
+      platform: post.platform,
+      metadata: {
+        score: scoreResult.score,
+        label: scoreResult.label,
+        reasoning: scoreResult.reasoning,
+        provider: hasAnthropic ? 'anthropic' : 'deterministic',
+      },
+      idempotencyKey: `${threadId}:intent-scored`,
+    }),
+    recordEngagementEvent(supabase, {
+      userId,
+      threadId,
+      eventType: 'draft_generated',
+      platform: post.platform,
+      metadata: {
+        provider: 'anthropic',
+        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+        qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
+        mentionedProduct: draftResult.mentionedProduct,
+        hasDisclosure: draftResult.hasDisclosure,
+      },
+      idempotencyKey: `${threadId}:initial-draft-generated`,
+    }),
+    recordEngagementEvent(supabase, {
+      userId,
+      threadId,
+      eventType: 'automation_evaluated',
+      platform: post.platform,
+      metadata: {
+        approved: evaluation.approved,
+        reason: evaluation.reason,
+        confidence: evaluation.automationConfidence,
+        threshold: evaluation.dynamicThreshold,
+        deliveryMode,
+      },
+      idempotencyKey: `${threadId}:initial-automation-evaluated`,
+    }),
+    recordAutomationDecision(supabase, {
+      userId,
+      threadId,
+      platform: post.platform,
+      deliveryMode,
+      evaluation,
+      idempotencyKey: `${threadId}:initial-automation-decision`,
+      contentPolicy: {
+        flagged: draftResult.flagged,
+        qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
+        mentionedProduct: draftResult.mentionedProduct,
+        hasDisclosure: draftResult.hasDisclosure,
+        hasCommercialLink: draftResult.hasCommercialLink,
+      },
+      modelContext: {
+        intentProvider: hasAnthropic ? 'anthropic' : 'deterministic',
+        intentModel: process.env.ANTHROPIC_INTENT_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+        draftProvider: 'anthropic',
+        draftModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+        policyVersion: 'earned-automation-v1',
+      },
+    }),
+  ])
 }
 
 async function reserveMonthlySignal(userId: string, limit: number): Promise<boolean> {

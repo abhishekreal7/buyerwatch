@@ -20,12 +20,14 @@ import { BlueskyIcon, RedditIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
 import { LeadPipelineBoard } from '@/components/LeadPipelineBoard'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
-import { fetchAllPages } from '@/lib/supabase-pagination'
 import { springs, staggers } from '@/lib/motion'
 import { createClient } from '@/utils/supabase/client'
+import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { useDashboardSession } from '@/components/DashboardContext'
+import { IntentBadge } from '@/components/IntentBadge'
 
 const FILTERS = ['All', 'Buying intent', 'Researching', 'Pain signals', 'Reddit', 'Bluesky', 'X']
+const PAGE_SIZE = 60
 
 type OpportunityStatus = 'pending' | 'drafted' | 'needs_manual_reply'
 
@@ -58,32 +60,10 @@ const AUTOMATION_REASON_LABELS: Record<string, string> = {
   cold_start_insufficient_data: 'Manual review is required until enough approval history exists.',
   below_dynamic_threshold: 'The draft did not clear your confidence threshold.',
   draft_budget_exhausted: 'The monthly AI draft allowance was reached.',
-}
-
-function ScoreBadge({ score, label }: { score: number | null; label: string }) {
-  if (score === null) {
-    return (
-      <div className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[12px] font-semibold text-blue-700">
-        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-        Awaiting analysis
-      </div>
-    )
-  }
-  const tone = score >= 80
-    ? 'bg-success/10 text-success border-success/20'
-    : score >= 60
-      ? 'bg-accent/10 text-accent border-accent/20'
-      : 'bg-black/[0.05] text-black/60 border-black/[0.08]'
-  const dot = score >= 80 ? 'bg-success' : score >= 60 ? 'bg-accent' : 'bg-black/35'
-
-  return (
-    <div className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-semibold ${tone}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-      <span className="tabular-nums">{score}</span>
-      <span className="opacity-45">/</span>
-      {label}
-    </div>
-  )
+  auto_send_platform_disabled: 'Automation is not enabled for this platform.',
+  platform_connection_required: 'Connect this platform before direct posting can be considered.',
+  auto_send_target_out_of_scope: 'This community is outside your approved automation scope.',
+  assisted_delivery_required: 'This platform requires your review and final submit.',
 }
 
 function PlatformBadge({ platform }: { platform: string }) {
@@ -115,6 +95,34 @@ function getKeywordRelation(value: unknown): { term?: string; target?: string } 
   return (value ?? {}) as { term?: string; target?: string }
 }
 
+function parseOpportunities(data: any[]): Opportunity[] {
+  return data.map(thread => {
+    const keyword = getKeywordRelation(thread.keywords)
+    const score = thread.intent_score === null ? null : Number(thread.intent_score)
+    const intentLabel = thread.intent_label as IntentLabel | undefined
+    return {
+      id: thread.id,
+      platform: thread.platform,
+      author: thread.author || 'Unknown author',
+      target: keyword.target || thread.platform,
+      createdAt: thread.created_at,
+      title: thread.title || '',
+      content: thread.text_content || '',
+      score,
+      label: score === null ? 'Awaiting analysis' : getIntentDisplayLabel(intentLabel, score),
+      intentLabel,
+      keyword: keyword.term || 'Monitoring rule',
+      reasoning: thread.score_reasoning || '',
+      matchedSignals: Array.isArray(thread.matched_signals) ? thread.matched_signals : [],
+      qualityIssues: Array.isArray(thread.quality_issues) ? thread.quality_issues : [],
+      automationReason: thread.automation_reason || '',
+      url: thread.url || null,
+      status: thread.status as OpportunityStatus,
+      flag: thread.flag || undefined,
+    }
+  })
+}
+
 export default function OpportunitiesPage() {
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
@@ -123,52 +131,65 @@ export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
   const [draftingId, setDraftingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchOpportunities() {
-      const { data, error } = await fetchAllPages((from, to) => supabase
-        .from('monitored_threads')
-        .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, created_at, keywords(term, target)')
-        .eq('user_id', userId)
-        .in('status', ['pending', 'drafted', 'needs_manual_reply'])
-        .order('created_at', { ascending: false })
-        .range(from, to))
+      const [pageResult, countResult] = await Promise.all([
+        supabase
+          .from('monitored_threads')
+          .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, created_at, keywords(term, target)')
+          .eq('user_id', userId)
+          .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+          .order('created_at', { ascending: false })
+          .range(0, PAGE_SIZE - 1),
+        supabase
+          .from('monitored_threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .in('status', ['pending', 'drafted', 'needs_manual_reply']),
+      ])
+      const { data, error } = pageResult
 
       if (error) {
         toast.error('Unable to load opportunities.')
+        setLoading(false)
         return
       }
 
-      setOpportunities((data ?? []).map(thread => {
-        const keyword = getKeywordRelation(thread.keywords)
-        const score = thread.intent_score === null ? null : Number(thread.intent_score)
-        const intentLabel = thread.intent_label as IntentLabel | undefined
-        return {
-          id: thread.id,
-          platform: thread.platform,
-          author: thread.author || 'Unknown author',
-          target: keyword.target || thread.platform,
-          createdAt: thread.created_at,
-          title: thread.title || '',
-          content: thread.text_content || '',
-          score,
-          label: score === null ? 'Awaiting analysis' : getIntentDisplayLabel(intentLabel, score),
-          intentLabel,
-          keyword: keyword.term || 'Monitoring rule',
-          reasoning: thread.score_reasoning || '',
-          matchedSignals: Array.isArray(thread.matched_signals) ? thread.matched_signals : [],
-          qualityIssues: Array.isArray(thread.quality_issues) ? thread.quality_issues : [],
-          automationReason: thread.automation_reason || '',
-          url: thread.url || null,
-          status: thread.status as OpportunityStatus,
-          flag: thread.flag || undefined,
-        }
-      }))
+      setOpportunities(parseOpportunities(data ?? []))
+      setTotalCount(countResult.count ?? data?.length ?? 0)
+      setHasMore((data?.length ?? 0) === PAGE_SIZE)
+      setLoading(false)
     }
-    fetchOpportunities()
+    void fetchOpportunities()
   }, [supabase, userId])
+
+  async function loadMoreOpportunities() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const from = opportunities.length
+    const { data, error } = await supabase
+      .from('monitored_threads')
+      .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, created_at, keywords(term, target)')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (error) {
+      toast.error('Unable to load more opportunities.')
+    } else {
+      setOpportunities(current => [...current, ...parseOpportunities(data ?? [])])
+      setHasMore((data?.length ?? 0) === PAGE_SIZE)
+    }
+    setLoadingMore(false)
+  }
 
   const handleDraftReply = async (id: string) => {
     if (draftingId) return
@@ -183,6 +204,7 @@ export default function OpportunitiesPage() {
       if (!response.ok) {
         throw new Error(payload?.error || 'Failed to generate draft')
       }
+      clearSupabaseReadCache()
       setOpportunities(current => current.map(opportunity => (
         opportunity.id === id ? { ...opportunity, status: 'drafted' } : opportunity
       )))
@@ -231,22 +253,22 @@ export default function OpportunitiesPage() {
                 {opportunities.length > 0 && <span className="absolute inset-0 animate-ping rounded-full bg-[#0A84FF] opacity-40" />}
                 <span className={`h-1.5 w-1.5 rounded-full ${opportunities.length > 0 ? 'bg-[#0A84FF]' : 'bg-white/40'}`} />
               </span>
-              {opportunities.length} active
+              {totalCount} active
             </div>
           )}
         />
 
-        <div className="mb-6 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 px-1 pb-1">
-          <div className="inline-flex items-center gap-1 rounded-[14px] border border-black/[0.06] bg-surface p-1 shadow-sm overflow-x-auto no-scrollbar">
+        <div className="mb-6 flex flex-col gap-3 border-y border-[#E7E7E3] py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {FILTERS.map(filter => (
               <button
                 key={filter}
                 type="button"
                 onClick={() => setActiveFilter(filter)}
-                className={`min-h-11 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] transition-all duration-150 sm:min-h-0 ${
+                className={`min-h-9 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] transition-colors duration-150 ${
                   activeFilter === filter
-                    ? 'bg-text-primary font-semibold text-white shadow-sm'
-                    : 'font-medium text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
+                    ? 'bg-[#EFEFEC] font-semibold text-text-primary'
+                    : 'font-medium text-text-secondary hover:bg-[#F6F6F3] hover:text-text-primary'
                 }`}
               >
                 <span className="flex items-center gap-1.5">
@@ -258,34 +280,34 @@ export default function OpportunitiesPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             {/* View Mode Switcher Toggle */}
-            <div className="inline-flex items-center gap-1 rounded-[14px] border border-black/[0.06] bg-surface p-1 shadow-2xs shrink-0">
+            <div className="inline-flex shrink-0 items-center rounded-[10px] border border-[#DEDEDA] bg-white p-0.5">
               <button
                 type="button"
                 onClick={() => setViewMode('board')}
-                className={`flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12.5px] font-semibold transition-all duration-150 ${
+                className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors duration-150 ${
                   viewMode === 'board'
                     ? 'bg-text-primary text-white shadow-xs'
                     : 'text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
                 }`}
                 title="Board View (Pipeline)"
+                aria-label="Board view"
               >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                Board
+                <LayoutGrid className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
-                className={`flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12.5px] font-semibold transition-all duration-150 ${
+                className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors duration-150 ${
                   viewMode === 'list'
                     ? 'bg-text-primary text-white shadow-xs'
                     : 'text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
                 }`}
                 title="List View (Feed)"
+                aria-label="List view"
               >
-                <List className="h-3.5 w-3.5" />
-                List
+                <List className="h-4 w-4" />
               </button>
             </div>
 
@@ -297,14 +319,14 @@ export default function OpportunitiesPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search thread"
-                className="w-full rounded-2xl border border-gray-200/90 bg-white py-2 pl-9 pr-4 text-xs font-normal text-gray-800 shadow-2xs placeholder-gray-500 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20 focus:border-[#0A84FF] transition-all"
+                className="h-9 w-full rounded-[10px] border border-[#DEDEDA] bg-white pl-9 pr-4 text-xs font-normal text-gray-800 placeholder-gray-500 transition-colors hover:border-gray-300 focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15"
               />
             </div>
 
             <button
               type="button"
               onClick={() => setSortOrder(current => current === 'desc' ? 'asc' : 'desc')}
-              className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-[14px] border border-black/[0.06] bg-surface px-3.5 py-2 text-[13px] font-semibold text-text-primary shadow-sm transition-all hover:bg-white sm:min-h-0 shrink-0"
+              className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-[#DEDEDA] bg-white px-3 text-[13px] font-semibold text-text-primary transition-colors hover:bg-[#F7F7F4]"
             >
               {sortOrder === 'desc'
                 ? <ChevronDown className="h-4 w-4 text-text-secondary" />
@@ -314,7 +336,13 @@ export default function OpportunitiesPage() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-4 lg:grid-cols-3" aria-busy="true" aria-label="Loading opportunities">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="h-48 animate-pulse rounded-[18px] border border-black/[0.05] bg-white" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="surface-ceramic flex flex-col items-center justify-center border border-transparent px-5 py-20 text-center sm:py-32">
             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">
               <Target className="h-8 w-8" strokeWidth={2.25} />
@@ -348,7 +376,7 @@ export default function OpportunitiesPage() {
                   {opportunity.flag === 'COMPETITOR_RISK' && (
                     <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">Competitor mention</span>
                   )}
-                  <ScoreBadge score={opportunity.score} label={opportunity.label} />
+                  <IntentBadge score={opportunity.score} label={opportunity.label} />
                 </div>
 
                 {opportunity.title && <h3 className="mb-2.5 text-[17px] font-semibold leading-snug tracking-tight text-text-primary">{opportunity.title}</h3>}
@@ -428,6 +456,18 @@ export default function OpportunitiesPage() {
               </motion.article>
             ))}
           </motion.div>
+        )}
+        {!loading && hasMore && (
+          <div className="flex justify-center pt-6">
+            <button
+              type="button"
+              onClick={loadMoreOpportunities}
+              disabled={loadingMore}
+              className="rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-[13px] font-semibold text-text-primary shadow-sm transition-colors hover:bg-black/[0.025] disabled:opacity-50"
+            >
+              {loadingMore ? 'Loading…' : 'Load more opportunities'}
+            </button>
+          </div>
         )}
       </div>
     </AppPage>

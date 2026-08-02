@@ -14,6 +14,20 @@ export class PlatformPostError extends Error {
   }
 }
 
+function configured(value: string | undefined): boolean {
+  const normalized = value?.trim() ?? ''
+  return Boolean(normalized && !normalized.includes('TODO'))
+}
+
+export function isRedditDirectPostingConfigured(): boolean {
+  const paidProxy = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
+    && configured(process.env.REDDITAPIS_API_KEY)
+  const oauth = process.env.REDDIT_DIRECT_POSTING_ENABLED === 'true'
+    && configured(process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID)
+    && configured(process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET)
+  return paidProxy || oauth
+}
+
 async function getDecryptedRedditConnection(userId: string) {
   const { data, error } = await supabase
     .from('platform_connections')
@@ -124,8 +138,9 @@ function parseRedditJsonError(data: any): string | null {
 
 export async function postRedditReply(userId: string, threadExternalId: string, text: string) {
   const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
+  const paidFallbackEnabled = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
   
-  if (redditApisKey && !redditApisKey.includes('TODO')) {
+  if (paidFallbackEnabled && redditApisKey && !redditApisKey.includes('TODO')) {
     console.log(`[reddit] Posting reply using redditapis.com proxy for thread ${threadExternalId}`)
     const response = await fetchWithTimeout('https://api.redditapis.com/api/comment', {
       method: 'POST',
@@ -226,8 +241,9 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
 
 export async function submitRedditPost(userId: string, subreddit: string, title: string, text: string) {
   const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
+  const paidFallbackEnabled = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
 
-  if (redditApisKey && !redditApisKey.includes('TODO')) {
+  if (paidFallbackEnabled && redditApisKey && !redditApisKey.includes('TODO')) {
     console.log(`[reddit] Submitting post using redditapis.com proxy to r/${subreddit}`)
     const response = await fetchWithTimeout('https://api.redditapis.com/api/submit', {
       method: 'POST',

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, Edit3, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search } from 'lucide-react'
+import { AlertTriangle, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search } from 'lucide-react'
 import { springs, staggers } from '@/lib/motion'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -12,23 +12,13 @@ import { toast } from 'sonner'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { evaluateReplyQuality } from '@/lib/reply-quality'
 import { useDashboardSession } from '@/components/DashboardContext'
-import { fetchAllPages } from '@/lib/supabase-pagination'
+import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
+import { IntentBadge } from '@/components/IntentBadge'
+import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
+import { useExtensionStatus } from '@/components/ExtensionInstall'
+import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
 
-function ScoreBadge({ score, label }: { score: number; label: string }) {
-  const isHigh = score >= 80
-  const isMid = score >= 60 && score < 80
-
-  return (
-    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold ${
-      isHigh ? 'bg-success/10 text-success border border-success/20' : 
-      isMid ? 'bg-accent/10 text-accent border border-accent/20' : 
-      'bg-black/[0.05] text-black/60 border border-black/[0.08]'
-    }`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${isHigh ? 'bg-success' : isMid ? 'bg-accent' : 'bg-black/35'}`} />
-      <span className="tabular-nums">{score}</span> · {label}
-    </div>
-  )
-}
+const PAGE_SIZE = 40
 
 function PlatformBadge({ platform }: { platform: string }) {
   return (
@@ -49,6 +39,30 @@ function formatTimeAgo(dateString: string) {
   return `${Math.floor(diffInSeconds / 86400)} days ago`
 }
 
+function parseDrafts(data: any[]) {
+  return data.map(t => {
+    const keyword = Array.isArray(t.keywords) ? t.keywords[0] : t.keywords
+    const score = Number(t.intent_score) || 0
+    return {
+      id: t.id,
+      platform: t.platform,
+      target: t.author || 'unknown',
+      community: keyword?.target || t.platform,
+      timeAgo: formatTimeAgo(t.created_at),
+      title: t.title || '',
+      content: t.text_content,
+      score,
+      label: getIntentDisplayLabel(t.intent_label as IntentLabel | undefined, score),
+      draft: t.reply_analytics?.[0]?.draft_text || '',
+      matchedKeyword: keyword?.term || 'Monitoring rule',
+      url: t.url || null,
+      qualityIssues: Array.isArray(t.quality_issues) ? t.quality_issues : [],
+      automationReason: t.automation_reason || '',
+      reasoning: t.score_reasoning || '',
+    }
+  })
+}
+
 export default function DraftsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [drafts, setDrafts] = useState<any[]>([])
@@ -63,23 +77,35 @@ export default function DraftsPage() {
   const [copied, setCopied] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
+  const [isEditingReply, setIsEditingReply] = useState(false)
+  const [manualPostReadyId, setManualPostReadyId] = useState<string | null>(null)
   const [connections, setConnections] = useState<string[]>([])
   const [businessName, setBusinessName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
+  const { isInstalled: extensionInstalled } = useExtensionStatus()
 
   useEffect(() => {
     async function fetchDrafts() {
-      const [connectionsResult, profileResult, draftsResult] = await Promise.all([
+      const [connectionsResult, profileResult, draftsResult, draftCountResult] = await Promise.all([
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
         supabase.from('profiles').select('business_name').eq('id', userId).single(),
-        fetchAllPages((from, to) => supabase
+        supabase
           .from('monitored_threads')
           .select('*, reply_analytics(draft_text), keywords(term, target)')
           .eq('user_id', userId)
           .in('status', ['drafted', 'needs_manual_reply'])
           .order('created_at', { ascending: false })
-          .range(from, to)),
+          .range(0, PAGE_SIZE - 1),
+        supabase
+          .from('monitored_threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .in('status', ['drafted', 'needs_manual_reply']),
       ])
       const conns = connectionsResult.data
       if (conns) setConnections(conns.map(c => c.platform))
@@ -88,34 +114,38 @@ export default function DraftsPage() {
       const data = draftsResult.data
 
       if (data && data.length > 0) {
-        const parsed = data.map(t => {
-          const keyword = Array.isArray(t.keywords) ? t.keywords[0] : t.keywords
-          const score = Number(t.intent_score) || 0
-          return {
-            id: t.id,
-            platform: t.platform,
-            target: t.author || 'unknown',
-            community: keyword?.target || t.platform,
-            timeAgo: formatTimeAgo(t.created_at),
-            title: t.title || '',
-            content: t.text_content,
-            score,
-            label: getIntentDisplayLabel(t.intent_label as IntentLabel | undefined, score),
-            draft: t.reply_analytics?.[0]?.draft_text || '',
-            matchedKeyword: keyword?.term || 'Monitoring rule',
-            url: t.url || null,
-            qualityIssues: Array.isArray(t.quality_issues) ? t.quality_issues : [],
-            automationReason: t.automation_reason || '',
-            reasoning: t.score_reasoning || '',
-          }
-        })
+        const parsed = parseDrafts(data)
         setDrafts(parsed)
         setSelected(parsed[0])
         setDraftContent(parsed[0].draft)
       }
+      setHasMore((data?.length ?? 0) === PAGE_SIZE)
+      setTotalCount(draftCountResult.count ?? data?.length ?? 0)
+      setLoading(false)
     }
-    fetchDrafts()
+    void fetchDrafts()
   }, [supabase, userId])
+
+  async function loadMoreDrafts() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const from = drafts.length
+    const { data, error } = await supabase
+      .from('monitored_threads')
+      .select('*, reply_analytics(draft_text), keywords(term, target)')
+      .eq('user_id', userId)
+      .in('status', ['drafted', 'needs_manual_reply'])
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (error) {
+      toast.error('Unable to load more drafts.')
+    } else {
+      setDrafts(current => [...current, ...parseDrafts(data ?? [])])
+      setHasMore((data?.length ?? 0) === PAGE_SIZE)
+    }
+    setLoadingMore(false)
+  }
 
   const handleSelect = (d: any) => {
     setSelected(d)
@@ -124,6 +154,8 @@ export default function DraftsPage() {
     // for edit-distance comparison in handleApproveAndSend.
     originalDraftRef.current = d.draft
     setCopied(false)
+    setIsEditingReply(false)
+    setManualPostReadyId(null)
   }
 
   // Also sync ref on initial load (first draft auto-selected)
@@ -141,6 +173,32 @@ export default function DraftsPage() {
 
   const handleApproveAndSend = async () => {
     if (!selected) return
+    if (manualPostReadyId === selected.id) {
+      setIsSending(true)
+      try {
+        const response = await fetch('/api/replies/mark-posted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ threadId: selected.id, text: draftContent, platform: selected.platform }),
+        })
+        if (!response.ok) throw new Error('Could not confirm this reply as posted')
+        clearSupabaseReadCache()
+        const postedId = selected.id
+        const remaining = drafts.filter(draft => draft.id !== postedId)
+        setDrafts(remaining)
+        setTotalCount(current => Math.max(0, current - 1))
+        setSelected(remaining[0] ?? null)
+        setDraftContent(remaining[0]?.draft ?? '')
+        originalDraftRef.current = remaining[0]?.draft ?? ''
+        setManualPostReadyId(null)
+        toast.success('Marked as posted')
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not confirm this reply as posted')
+      } finally {
+        setIsSending(false)
+      }
+      return
+    }
     const quality = evaluateReplyQuality(draftContent, {
       businessName,
       platform: selected.platform,
@@ -149,7 +207,7 @@ export default function DraftsPage() {
       toast.error(quality.issues[0]?.message || 'Resolve the publishing checks before posting.')
       return
     }
-    if (!connections.includes(selected.platform)) {
+    if (selected.platform !== 'reddit' && !connections.includes(selected.platform)) {
       toast.error(`Please connect your ${selected.platform} account in Settings first.`)
       return
     }
@@ -168,9 +226,28 @@ export default function DraftsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ threadId: threadIdToSend, platform: platformToSend, text: replyTextToSend, triggerType: 'manual' })
       })
-      const payload = await res.json().catch(() => null)
+      const payload = await res.json().catch(() => null) as (ReplySendResult & { error?: string; issues?: Array<{ message?: string }> }) | null
       if (!res.ok) {
         throw new Error(payload?.issues?.[0]?.message || payload?.error || 'Failed to queue reply')
+      }
+      clearSupabaseReadCache()
+
+      if (payload?.mode === 'manual') {
+        const mode = await openRedditAssistedReply({
+          threadId: payload.threadId,
+          text: payload.text,
+          postUrl: payload.postUrl,
+          extensionInstalled,
+        })
+        setManualPostReadyId(selected.id)
+        if (mode === 'copy') {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        }
+        toast.success(mode === 'prefill'
+          ? 'Opening Reddit with your reply prefilled. Review it, then submit on Reddit.'
+          : 'Reply copied. Post it on Reddit, then confirm it here.')
+        return
       }
 
       const actionType = originalReplyText === replyTextToSend ? 'APPROVED' : 'EDITED_APPROVED'
@@ -188,15 +265,19 @@ export default function DraftsPage() {
         }),
       })
       if (!feedbackResponse.ok) {
-        toast.warning('Reply queued, but review history could not be updated.')
+        toast.warning('Reply is posting, but review history could not be updated.')
       }
 
+      toast.info('Posting reply...')
+      await waitForReplyDelivery(threadIdToSend)
       setDrafts(prev => prev.filter(d => d.id !== threadIdToSend))
+      setTotalCount(current => Math.max(0, current - 1))
       const nextSelected = drafts.find(d => d.id !== threadIdToSend) || null
       setSelected(nextSelected)
       setDraftContent(nextSelected?.draft || '')
+      setIsEditingReply(false)
       originalDraftRef.current = nextSelected?.draft || ''
-      toast.success('Reply queued for posting')
+      toast.success('Reply posted successfully')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to send reply')
     } finally {
@@ -225,10 +306,13 @@ export default function DraftsPage() {
     // Reset ref so it doesn't bleed into the next selected draft
     originalDraftRef.current = ''
     supabase.rpc('dismiss_thread', { p_thread_id: threadIdToDismiss }).then()
+    clearSupabaseReadCache()
     setDrafts(prev => prev.filter(d => d.id !== threadIdToDismiss))
+    setTotalCount(current => Math.max(0, current - 1))
     const nextSelected = drafts.find(d => d.id !== threadIdToDismiss) || null
     setSelected(nextSelected)
     if (nextSelected) setDraftContent(nextSelected.draft)
+    setIsEditingReply(false)
     toast.success('Draft dismissed')
   }
 
@@ -251,6 +335,7 @@ export default function DraftsPage() {
         return
       }
       const { draft: newDraft } = await res.json()
+      clearSupabaseReadCache()
       // Update the textarea
       setDraftContent(newDraft)
       // Update the in-memory list so re-selecting this draft shows the new text
@@ -286,14 +371,14 @@ export default function DraftsPage() {
 
   return (
     <AppPage>
-      <div className="flex w-full flex-col xl:h-[calc(100vh-144px)] xl:overflow-hidden">
+      <div className="flex w-full min-w-0 flex-col 2xl:h-[calc(100vh-144px)] 2xl:overflow-hidden">
         <PageHeader title="Drafts Ready" />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-visible xl:flex-row xl:gap-8 xl:overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-visible 2xl:flex-row 2xl:gap-8 2xl:overflow-hidden">
         {/* Draft list */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="pb-4 shrink-0 px-1 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-            <p className="text-[14px] font-medium text-text-secondary"><span className="tabular-nums font-bold text-text-primary">{filteredDrafts.length}</span> drafts awaiting review</p>
+            <p className="text-[14px] font-medium text-text-secondary"><span className="tabular-nums font-bold text-text-primary">{searchQuery.trim() ? filteredDrafts.length : totalCount}</span> drafts awaiting review</p>
             
             <div className="relative flex-1 max-w-xs">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none" strokeWidth={2} />
@@ -306,7 +391,10 @@ export default function DraftsPage() {
               />
             </div>
           </div>
-          <motion.div variants={staggers.container} initial="initial" animate="animate" className="flex-1 space-y-4 px-1 pb-4 xl:overflow-y-auto">
+          <motion.div variants={staggers.container} initial="initial" animate="animate" className="flex-1 space-y-4 px-1 pb-4 2xl:overflow-y-auto">
+            {loading && Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-40 animate-pulse rounded-[18px] border border-black/[0.05] bg-white" />
+            ))}
             {filteredDrafts.map(d => (
               <motion.div
                 key={d.id}
@@ -337,120 +425,181 @@ export default function DraftsPage() {
                 </div>
                 {d.title && <p className="text-[16px] font-semibold text-text-primary mb-2 leading-snug tracking-tight line-clamp-1">{d.title}</p>}
                 <p className="text-[14px] text-text-secondary line-clamp-2 mb-4 leading-relaxed">{d.content}</p>
-                <div className="flex items-center justify-between pt-4 border-t border-black/[0.04]">
-                  <ScoreBadge score={d.score} label={d.label} />
-                  <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-accent">
-                    <Edit3 className="w-3.5 h-3.5" strokeWidth={2.5} /> Draft ready
-                  </div>
+                <div className="flex items-center pt-4 border-t border-black/[0.04]">
+                  <IntentBadge score={d.score} label={d.label} />
                 </div>
               </motion.div>
             ))}
+            {!loading && hasMore && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={loadMoreDrafts}
+                  disabled={loadingMore}
+                  className="rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-[13px] font-semibold text-text-primary shadow-sm transition-colors hover:bg-black/[0.025] disabled:opacity-50"
+                >
+                  {loadingMore ? 'Loading…' : 'Load more drafts'}
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
 
-        {/* Reply Panel - Elevated Layer */}
+        {/* Conversation review panel */}
         {selected && (
-          <div className="order-first flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-[24px] border border-transparent bg-surface shadow-elevation-3 xl:order-last xl:w-[48%] xl:max-w-[600px]">
-            <div className="px-6 py-5 border-b border-black/[0.06] flex justify-between items-center bg-surface shrink-0">
-              <h3 className="font-semibold text-text-primary text-[16px]">Review & Post</h3>
+          <div className="order-first flex min-h-0 min-w-0 w-full shrink-0 flex-col overflow-hidden rounded-[24px] border border-black/[0.06] bg-surface shadow-elevation-3 2xl:order-last 2xl:w-[48%] 2xl:max-w-[600px]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-2.5">
+                {selected.platform.toLowerCase() === 'reddit' ? (
+                  <RedditIcon className="h-5 w-5 shrink-0 text-[#FF4500]" />
+                ) : (
+                  <BlueskyIcon className="h-5 w-5 shrink-0 text-[#1185FE]" />
+                )}
+                <div className="min-w-0">
+                  <h3 className="truncate text-[15px] font-semibold text-text-primary">Conversation</h3>
+                  <span className="block truncate text-[11px] font-medium text-text-tertiary">
+                    {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
+                  </span>
+                </div>
+              </div>
               {selected.url ? (
                 <a
                   href={selected.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-accent hover:opacity-80 text-[14px] font-semibold flex items-center gap-1.5 transition-opacity"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-accent transition-colors hover:bg-accent/5"
                 >
-                  Open Thread <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
+                  Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
                 </a>
               ) : (
-                <span className="text-[14px] font-medium text-text-tertiary flex items-center gap-1.5">
-                  Open Thread <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
+                <span className="flex items-center gap-1.5 text-[13px] font-medium text-text-tertiary">
+                  Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
                 </span>
               )}
             </div>
 
-            <div className="flex-1 space-y-8 bg-surface p-4 sm:p-6 xl:overflow-y-auto">
-              {/* Original Post context */}
-              <div className="p-5 rounded-[16px] bg-background border border-black/[0.04]">
-                <div className="text-[11px] font-bold text-text-tertiary uppercase tracking-wider mb-2.5">Original Post Preview</div>
-                {selected.title && <h4 className="text-[15px] font-semibold text-text-primary mb-2">{selected.title}</h4>}
-                <p className="text-text-secondary text-[14px] leading-relaxed">{selected.content}</p>
-              </div>
-
-              {/* AI Draft */}
-              <div>
-                <div className="flex justify-between items-end mb-3">
-                  <div className="text-[12px] font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
-                    <Edit3 className="w-4 h-4" strokeWidth={2.5} /> AI Draft Reply
+            <div className="flex-1 space-y-5 bg-surface p-4 sm:p-6 2xl:overflow-y-auto">
+              <div className="flex justify-start">
+                <div className="w-fit max-w-[88%] rounded-[18px] rounded-bl-md border border-black/[0.04] bg-[#F1F1EF] px-4 py-3.5">
+                  <div className="mb-2 flex items-center gap-2 text-[10.5px] font-medium text-text-tertiary">
+                    {selected.platform.toLowerCase() === 'reddit' ? (
+                      <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
+                    ) : (
+                      <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />
+                    )}
+                    <span>{selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}</span>
                   </div>
-                  <span className="text-[12px] font-medium text-text-tertiary">{draftContent.length} chars</span>
+                  {selected.title && (
+                    <h4 className="mb-1 line-clamp-2 text-[13px] font-semibold leading-snug text-text-primary">
+                      {selected.title}
+                    </h4>
+                  )}
+                  <p className="line-clamp-3 text-[12.5px] leading-relaxed text-text-secondary">{selected.content}</p>
+                  <p className="mt-1.5 text-right text-[10px] font-medium text-text-tertiary">{selected.timeAgo}</p>
                 </div>
-                <textarea
-                  value={draftContent}
-                  onChange={e => setDraftContent(e.target.value)}
-                  className="w-full h-[280px] bg-surface-secondary border border-transparent rounded-[16px] p-5 text-text-primary placeholder-text-tertiary focus:outline-none focus:bg-surface-secondary focus:ring-4 focus:ring-accent/20 focus:shadow-elevation-1 transition-all duration-300 resize-none leading-relaxed text-[15px]"
-                />
               </div>
 
-              <div>
-                <div className="text-[13px] font-semibold text-text-primary mb-4">Publishing checks</div>
-                {currentQuality?.blocksAutomation ? (
-                  <ul className="space-y-3 text-[13px] font-medium text-amber-800">
-                    {currentQuality.issues.map(issue => (
-                      <li key={issue.code} className="flex min-w-0 items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
-                        <AlertTriangle className="mt-0.5 h-[17px] w-[17px] shrink-0 text-amber-600" />
-                        <span className="min-w-0 break-words">{issue.message}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <ul className="space-y-3 text-[14px] text-text-secondary font-medium">
-                    <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">No deterministic promotional or call-to-action language detected</span></li>
-                    <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">Commercial references include an affiliation disclosure</span></li>
-                    <li className="flex items-start gap-3 min-w-0"><Check className="w-[18px] h-[18px] text-success mt-0.5 shrink-0" strokeWidth={3} /><span className="break-words min-w-0">Platform length limit is satisfied; final relevance remains your decision</span></li>
-                  </ul>
-                )}
-              </div>
+              {isEditingReply ? (
+                <div className="ml-auto w-full max-w-[92%]">
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <span className="text-[11px] font-semibold text-text-secondary">Your reply</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingReply(false)}
+                      className="rounded-lg px-2 py-1 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/5"
+                    >
+                      Done
+                    </button>
+                  </div>
+                  <div className="rounded-[20px] rounded-br-md bg-accent p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                    <textarea
+                      value={draftContent}
+                      onChange={event => setDraftContent(event.target.value)}
+                      className="min-h-[240px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary focus:ring-2 focus:ring-white/60"
+                      placeholder="Write your reply..."
+                      autoFocus
+                      spellCheck
+                    />
+                  </div>
+                  <p className="mt-1.5 px-1 text-right text-[10.5px] tabular-nums text-text-tertiary">{draftContent.length} characters</p>
+                </div>
+              ) : (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => draftContent ? setIsEditingReply(true) : void handleRegenerate()}
+                    disabled={isRegenerating || isSending}
+                    className="group w-fit max-w-[82%] rounded-[20px] rounded-br-md bg-accent px-4 py-3 text-left text-white shadow-[0_4px_18px_rgba(10,132,255,0.16)] transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-70"
+                  >
+                    {draftContent ? (
+                      <p className="line-clamp-4 whitespace-pre-line text-[13px] leading-relaxed text-white">{draftContent}</p>
+                    ) : (
+                      <p className="text-[13px] font-semibold text-white">{isRegenerating ? 'Preparing reply...' : 'Generate reply'}</p>
+                    )}
+                    <div className="mt-2 flex items-center justify-end gap-2 text-[10px] font-medium text-white/65">
+                      <span>{draftContent ? 'Draft' : 'Not generated'}</span>
+                      <span aria-hidden="true">&middot;</span>
+                      <span className="group-hover:text-white/90">{draftContent ? 'Open full reply' : 'Create preview'}</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {draftContent && currentQuality?.blocksAutomation && (
+                <div className="space-y-2">
+                  {currentQuality.issues.map(issue => (
+                    <div key={issue.code} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12px] font-medium text-amber-800">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <span>{issue.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Action Footer */}
-            <div className="flex shrink-0 flex-wrap gap-3 border-t border-black/[0.06] bg-surface p-4 sm:p-5">
-              {/* Dismiss */}
-              <button onClick={handleDismiss} className="btn-icon min-h-11 min-w-11 bg-background border border-black/[0.04]" title="Dismiss" aria-label="Dismiss draft">
-                <X className="w-5 h-5" strokeWidth={2} />
-              </button>
-              {/* Regenerate */}
+            <div className="shrink-0 border-t border-black/[0.06] bg-surface p-4 sm:p-5">
               <button
-                onClick={handleRegenerate}
-                disabled={isRegenerating || isSending}
-                className="btn-icon min-h-11 min-w-11 bg-background border border-black/[0.04] disabled:opacity-40"
-                title="Regenerate Draft"
-                aria-label="Regenerate draft"
-              >
-                <RefreshCcw className={`w-5 h-5 ${isRegenerating ? 'animate-spin' : ''}`} strokeWidth={2} />
-              </button>
-              <div className="flex-1" />
-              {/* Copy */}
-              <button onClick={handleCopy} className="btn-secondary flex min-h-11 items-center gap-2 !rounded-[12px] px-4">
-                {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-              {/* Approve & Post */}
-              <button 
+                type="button"
                 onClick={handleApproveAndSend}
-                disabled={isSending || currentQuality?.blocksAutomation}
-                className="btn-primary min-h-11 min-w-[160px] !rounded-[12px] px-5 flex items-center gap-2 flex-1 sm:flex-none justify-center"
+                disabled={!draftContent || isSending || currentQuality?.blocksAutomation}
+                className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 !rounded-[14px] disabled:opacity-40"
               >
                 {isSending ? (
-                  <span className="flex items-center gap-2">
-                    <RefreshCcw className="w-4 h-4 animate-spin" /> Sending...
-                  </span>
+                  <><RefreshCcw className="h-4 w-4 animate-spin" /> {selected?.platform === 'reddit' ? 'Preparing...' : 'Posting...'}</>
                 ) : (
-                  <span className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" strokeWidth={2.5} /> Approve & Post
-                  </span>
+                  <><CheckCircle className="h-4 w-4" strokeWidth={2.5} /> {
+                    manualPostReadyId === selected?.id
+                      ? 'Mark as Posted'
+                      : selected?.platform === 'reddit'
+                        ? (extensionInstalled ? 'Prefill in Reddit' : 'Copy & Open Reddit')
+                        : 'Post through Bluesky'
+                  }</>
                 )}
               </button>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5">
+                  <button onClick={handleDismiss} className="btn-icon min-h-10 min-w-10 bg-background border border-black/[0.04]" title="Dismiss" aria-label="Dismiss draft">
+                    <X className="h-4 w-4" strokeWidth={2} />
+                  </button>
+                  <button
+                    onClick={handleRegenerate}
+                    disabled={isRegenerating || isSending}
+                    className="btn-icon min-h-10 min-w-10 bg-background border border-black/[0.04] disabled:opacity-40"
+                    title="Regenerate draft"
+                    aria-label="Regenerate draft"
+                  >
+                    <RefreshCcw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} strokeWidth={2} />
+                  </button>
+                </div>
+                <button
+                  onClick={handleCopy}
+                  disabled={!draftContent}
+                  className="btn-secondary flex min-h-10 items-center gap-2 !rounded-[12px] px-4 disabled:opacity-40"
+                >
+                  {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
             </div>
           </div>
         )}

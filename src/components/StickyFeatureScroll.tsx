@@ -157,23 +157,19 @@ export const StickyFeatureScroll = () => {
   return (
     <section
       ref={sectionRef}
-      id="features"
-      className="relative w-full py-20"
-      style={{ backgroundColor: '#FFFFFF' }}
+      id="workflow-details"
+      className="relative w-full bg-transparent pt-8 pb-20 sm:pt-12 sm:pb-24 lg:pt-[72px] lg:pb-[112px]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       <div className="max-w-[1140px] mx-auto px-6 font-sans">
         {/* Flexbox Row Layout (Black Card LEFT, Text RIGHT) */}
-        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '48px', width: '100%' }}>
+        <div className="flex w-full flex-col items-stretch gap-10 lg:flex-row lg:items-center lg:gap-12">
           
           {/* Left Column: TALL BLACK VERTICAL CARD WINDOW */}
           <div
-            className="relative overflow-hidden flex flex-col justify-between p-6 shrink-0"
+            className="relative flex h-[520px] w-full max-w-[360px] shrink-0 self-center flex-col justify-between overflow-hidden p-6 lg:h-[560px] lg:w-[360px] lg:min-w-[360px]"
             style={{
-              width: '360px',
-              minWidth: '360px',
-              height: '560px',
               borderRadius: '28px',
               backgroundColor: '#121315',
               border: '1px solid rgba(255, 255, 255, 0.08)',

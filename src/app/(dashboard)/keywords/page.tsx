@@ -13,6 +13,8 @@ import { toast } from 'sonner'
 import { normalizePlan } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
+import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
+import { useExtensionStatus } from '@/components/ExtensionInstall'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
 
@@ -107,6 +109,7 @@ export default function KeywordsPage() {
   const termRef = useRef<HTMLInputElement>(null)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
+  const { requireExtension } = useExtensionStatus()
 
 
   useEffect(() => {
@@ -152,6 +155,7 @@ export default function KeywordsPage() {
   }, [supabase, userId])
 
   const handleAdd = async () => {
+    if (newPlatform === 'reddit' && !requireExtension('Install the BuyerWatch extension before creating a Reddit monitoring rule.')) return
     if (!newTerm.trim() || !newTarget.trim()) { toast.error('Fill in keyword and target'); return }
     setSaving(true)
 
@@ -181,6 +185,7 @@ export default function KeywordsPage() {
       }
 
       const data = payload.keyword
+      clearSupabaseReadCache()
       setKeywords(prev => [data, ...prev])
       setNewTerm(''); setNewTarget(''); setShowAdd(false)
 
@@ -412,7 +417,7 @@ export default function KeywordsPage() {
         <div className="w-full bg-white rounded-[20px] border border-[#E6E6E3] p-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
           
           {/* Header Row Bar */}
-          <div className="hidden sm:grid grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 rounded-[16px] bg-[#F5F5F3] border border-[#ECECE9] px-6 py-3.5 mb-1.5 text-[13px] font-medium text-[#8C8C86]">
+          <div className="hidden xl:grid grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 rounded-[16px] bg-[#F5F5F3] border border-[#ECECE9] px-6 py-3.5 mb-1.5 text-[13px] font-medium text-[#8C8C86]">
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -472,10 +477,10 @@ export default function KeywordsPage() {
               return (
                 <div
                   key={kw.id}
-                  className="group grid grid-cols-[1fr_auto] sm:grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 px-6 py-4 transition-colors duration-150 hover:bg-[#F9F9F8] rounded-xl"
+                  className="group grid grid-cols-[1fr_auto] xl:grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 px-4 py-4 sm:px-6 transition-colors duration-150 hover:bg-[#F9F9F8] rounded-xl"
                 >
                   {/* Checkbox column */}
-                  <div className="hidden sm:flex items-center">
+                  <div className="hidden xl:flex items-center">
                     <input
                       type="checkbox"
                       className="w-5 h-5 rounded-[7px] border border-[#DDDCD8] bg-white text-gray-900 focus:ring-0 cursor-pointer shadow-2xs hover:border-[#B5B5B0]"
@@ -484,7 +489,7 @@ export default function KeywordsPage() {
                   </div>
 
                   {/* ID column */}
-                  <span className="hidden sm:block text-[13.5px] font-medium text-[#6E6E68] tabular-nums">
+                  <span className="hidden xl:block text-[13.5px] font-medium text-[#6E6E68] tabular-nums">
                     {String(index + 1).padStart(2, '0')}
                   </span>
 
@@ -496,7 +501,7 @@ export default function KeywordsPage() {
                   </div>
 
                   {/* Contact / Community Pill column (Exact pill styling from screenshot) */}
-                  <div className="hidden sm:flex items-center">
+                  <div className="hidden xl:flex items-center">
                     <div className="inline-flex items-center gap-2.5 rounded-full border border-[#E2E2DF] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] truncate max-w-full">
                       {kw.platform === 'reddit' ? (
                         <RedditIcon className="h-4.5 w-4.5 shrink-0 text-[#FF4500]" />
@@ -510,12 +515,12 @@ export default function KeywordsPage() {
                   </div>
 
                   {/* Email / Leads Found column */}
-                  <div className="hidden sm:block text-[13.5px] font-normal text-[#787872] truncate">
+                  <div className="hidden xl:block text-[13.5px] font-normal text-[#787872] truncate">
                     {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
                   </div>
 
                   {/* Value / Reply Rate column */}
-                  <div className="hidden sm:block text-[14px] font-semibold text-[#1C1C1A] tabular-nums">
+                  <div className="hidden xl:block text-[14px] font-semibold text-[#1C1C1A] tabular-nums">
                     {successRate}%
                   </div>
 

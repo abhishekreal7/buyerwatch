@@ -1,13 +1,12 @@
 'use server'
 
-import { createHash } from 'node:crypto'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { getServiceRoleClient } from '@/lib/admin'
 import { logger } from '@/lib/logger'
 import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
-import { redditFetchQueue, blueskyFetchQueue, xFetchQueue } from '@/lib/queues'
+import { publishMonitoringRun } from '@/lib/qstash'
 import {
   normalizeWebsiteUrl,
   validateOnboardingData,
@@ -171,27 +170,15 @@ export async function completeOnboardingAction(data: OnboardingData) {
     return { error: 'We could not launch monitoring. Please try again.' }
   }
 
-  const bucket = Date.now().toString()
-  const queueResults = await Promise.allSettled(inserted.map(async (keyword) => {
-    const queue =
-      keyword.platform === 'reddit'
-        ? redditFetchQueue
-        : keyword.platform === 'bluesky'
-          ? blueskyFetchQueue
-          : xFetchQueue
-    const targetHash = createHash('sha256').update(keyword.target).digest('hex').slice(0, 16)
-    await queue.add(
-      'fetch',
-      {
-        target: keyword.target,
-        keywordMappings: [{ id: keyword.id, user_id: user.id, term: keyword.term }],
-      },
-      { jobId: `${keyword.platform}-${targetHash}-onboarding-${bucket}` },
-    )
-  }))
-
-  if (queueResults.some((result) => result.status === 'rejected')) {
-    logger.error({ userId: user.id }, 'Onboarding saved but one or more initial fetch jobs failed to enqueue')
+  if (inserted.some((keyword) => keyword.platform === 'reddit')) {
+    try {
+      const messageId = await publishMonitoringRun(user.id)
+      if (!messageId) {
+        logger.warn({ userId: user.id }, 'Onboarding saved while QStash monitoring is not configured')
+      }
+    } catch (error) {
+      logger.error({ error, userId: user.id }, 'Onboarding saved but initial monitoring dispatch failed')
+    }
   }
 
   redirect('/dashboard')

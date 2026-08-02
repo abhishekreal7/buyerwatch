@@ -8,6 +8,10 @@ export interface AutoSendEvaluation {
   reason: string
   dynamicThreshold: number
   automationConfidence: number
+  configuredThreshold: number
+  userTrust: number
+  communityTrust: number
+  totalDraftsReviewed: number
 }
 
 interface TrustMetrics {
@@ -31,45 +35,38 @@ export function computeThreshold(avgEditDistance: number): number {
   return 85 - ((avgEditDistance - 0.5) * 10)
 }
 
+function blockedDecision(reason: string): AutoSendEvaluation {
+  return {
+    approved: false,
+    reason,
+    dynamicThreshold: 100,
+    automationConfidence: 0,
+    configuredThreshold: 100,
+    userTrust: 0,
+    communityTrust: 0,
+    totalDraftsReviewed: 0,
+  }
+}
+
 export function evaluateAutoSendContentPolicy(
   draftResult: DraftSafetyResult,
   profile: { auto_send_enabled: boolean; plan: string },
 ): AutoSendEvaluation | null {
   if (profile.plan === 'free') {
-    return {
-      approved: false,
-      reason: 'auto_send_requires_paid_plan',
-      dynamicThreshold: 100,
-      automationConfidence: 0,
-    }
+    return blockedDecision('auto_send_requires_paid_plan')
   }
   if (!profile.auto_send_enabled) {
-    return {
-      approved: false,
-      reason: 'auto_send_disabled',
-      dynamicThreshold: 100,
-      automationConfidence: 0,
-    }
+    return blockedDecision('auto_send_disabled')
   }
   if (draftResult.flagged) {
-    return {
-      approved: false,
-      reason: 'reply_quality_blocked',
-      dynamicThreshold: 100,
-      automationConfidence: 0,
-    }
+    return blockedDecision('reply_quality_blocked')
   }
 
   const hasCommercialReference = Boolean(
     draftResult.mentionedProduct || draftResult.hasCommercialLink,
   )
   if (hasCommercialReference && !draftResult.hasDisclosure) {
-    return {
-      approved: false,
-      reason: 'missing_disclosure',
-      dynamicThreshold: 100,
-      automationConfidence: 0,
-    }
+    return blockedDecision('missing_disclosure')
   }
   return null
 }
@@ -90,6 +87,10 @@ export function calculateAutomationDecision(input: {
     reason: approved ? 'confidence_cleared' : 'below_dynamic_threshold',
     dynamicThreshold,
     automationConfidence,
+    configuredThreshold,
+    userTrust: input.userTrust,
+    communityTrust: input.communityTrust,
+    totalDraftsReviewed: 0,
   }
 }
 
@@ -141,47 +142,39 @@ export async function evaluateAutoSend(
   },
   targetCommunity?: string | null,
 ): Promise<AutoSendEvaluation> {
-  const contentDecision = evaluateAutoSendContentPolicy(draftResult, profile)
-  if (contentDecision) return contentDecision
-
   const userMetrics = await getUserTrustMetrics(userId)
   const totalReviewed = userMetrics?.total_drafts_reviewed ?? 0
-
-  let learnedThreshold: number
-  let userTrust: number
-
-  if (totalReviewed < MIN_FEEDBACK_FOR_TRUST) {
-    const communityMetrics = await getCommunityMetrics(platform, targetCommunity)
-    const hasSufficientCommunityData =
-      communityMetrics && communityMetrics.total_engagements >= MIN_COMMUNITY_SAMPLE
-
-    if (!hasSufficientCommunityData) {
-      return {
-        approved: false,
-        reason: 'cold_start_insufficient_data',
-        dynamicThreshold: 100,
-        automationConfidence: 0,
-      }
-    }
-
-    const communityTrustProxy = 1 - Number(communityMetrics.rejection_rate)
-    learnedThreshold = computeThreshold(communityTrustProxy)
-    userTrust = communityTrustProxy * 100
-  } else {
-    const avgEditDistance = Number(userMetrics!.avg_edit_distance)
-    learnedThreshold = computeThreshold(avgEditDistance)
-    userTrust = avgEditDistance * 100
+  const contentDecision = evaluateAutoSendContentPolicy(draftResult, profile)
+  if (contentDecision) {
+    return { ...contentDecision, totalDraftsReviewed: totalReviewed }
   }
 
+  // Community performance can make an earned decision stricter, but it can
+  // never replace the user's first ten explicit reviews.
+  if (totalReviewed < MIN_FEEDBACK_FOR_TRUST) {
+    return {
+      ...blockedDecision('cold_start_insufficient_data'),
+      configuredThreshold: Math.min(100, Math.max(70, profile.auto_send_threshold ?? 85)),
+      totalDraftsReviewed: totalReviewed,
+    }
+  }
+
+  const avgDraftSimilarity = Number(userMetrics!.avg_edit_distance)
+  const learnedThreshold = computeThreshold(avgDraftSimilarity)
+  const userTrust = avgDraftSimilarity * 100
   const communityMetrics = await getCommunityMetrics(platform, targetCommunity)
   const communityTrust = communityMetrics
+    && communityMetrics.total_engagements >= MIN_COMMUNITY_SAMPLE
     ? (1 - Number(communityMetrics.rejection_rate)) * 100
     : 80
 
-  return calculateAutomationDecision({
-    userTrust,
-    communityTrust,
-    learnedThreshold,
-    configuredThreshold: profile.auto_send_threshold,
-  })
+  return {
+    ...calculateAutomationDecision({
+      userTrust,
+      communityTrust,
+      learnedThreshold,
+      configuredThreshold: profile.auto_send_threshold,
+    }),
+    totalDraftsReviewed: totalReviewed,
+  }
 }

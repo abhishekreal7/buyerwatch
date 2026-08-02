@@ -77,6 +77,16 @@ export interface ProviderCapabilities {
   sentry: boolean
 }
 
+export function hasRedditDiscoveryProvider(): boolean {
+  const proxyConfigured = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
+    && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
+  const approvedOauthConfigured = process.env.REDDIT_API_APPROVED === 'true'
+    && Boolean(getConfiguredSecret(process.env.REDDIT_CLIENT_ID))
+    && Boolean(getConfiguredSecret(process.env.REDDIT_CLIENT_SECRET))
+
+  return proxyConfigured || approvedOauthConfigured
+}
+
 export function getProviderCapabilities(): ProviderCapabilities {
   return {
     aiDrafting: Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY)),
@@ -86,15 +96,14 @@ export function getProviderCapabilities(): ProviderCapabilities {
       && process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
       && process.env.DODO_PAYMENTS_WEBHOOK_SECRET
     ),
-    redditDiscovery: Boolean(
-      process.env.REDDITAPIS_API_KEY
-      || (process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET)
-    ),
+    redditDiscovery: hasRedditDiscoveryProvider(),
     redditPosting: Boolean(
       process.env.REDDIT_OAUTH_CLIENT_ID
       && process.env.REDDIT_OAUTH_SECRET
     ),
-    bluesky: Boolean(process.env.BLUESKY_HANDLE && process.env.BLUESKY_APP_PASSWORD),
+    // Public Bluesky discovery is keyless. Credentials are only needed when a
+    // user connects their own account for posting.
+    bluesky: true,
     x: Boolean(
       process.env.X_API_KEY
       && process.env.X_API_SECRET
@@ -160,6 +169,11 @@ export function validateWorkerEnvironment(): void {
   validateOptionalProviders()
   if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
     throw new Error('BuyerWatch worker requires ANTHROPIC_API_KEY')
+  }
+  if (!hasRedditDiscoveryProvider()) {
+    throw new Error(
+      'BuyerWatch worker requires an enabled Reddit proxy or approved Reddit OAuth discovery credentials',
+    )
   }
 }
 

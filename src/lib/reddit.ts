@@ -1,5 +1,6 @@
 ﻿import { NormalizedPost } from './types'
 import { fetchWithTimeout } from './http'
+import { redis } from './redis'
 
 let cachedToken: string | null = null
 let tokenExpiry: number = 0
@@ -121,6 +122,7 @@ function decodeXmlEntities(str: string): string {
 
 export async function fetchSubredditNew(subreddit: string, limit: number = 25): Promise<NormalizedPost[]> {
   const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
+  const paidFallbackEnabled = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
   const isApproved = process.env.REDDIT_API_APPROVED === 'true'
   const forceLive = process.env.REDDITAPIS_FORCE_LIVE === 'true'
 
@@ -132,7 +134,6 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   const CACHE_TTL = 300 // 5 minutes
 
   try {
-    const { redis } = await import('./redis.js')
     redisClient = redis
     const cached = await redis.get(cacheKey)
     if (cached) {
@@ -169,31 +170,9 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
       }
       console.warn(`[reddit] RSS returned 0 parseable posts for r/${subreddit}, falling back`)
     } else if (rssResponse.status === 429) {
-      console.warn(`[reddit] RSS 429 for r/${subreddit} — rate limited. Waiting 2s and retrying with search RSS...`)
-      // Wait 2 seconds then try search-based RSS as alternative
-      await new Promise(r => setTimeout(r, 2000))
-      try {
-        const searchUrl = `https://www.reddit.com/r/${subreddit}/new/.rss?limit=${limit}&after=`
-        const retryResponse = await fetchWithTimeout(searchUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'application/rss+xml, application/xml;q=0.9',
-          }
-        }, 10_000)
-        if (retryResponse.ok) {
-          const xml = await retryResponse.text()
-          const posts = parseRedditRss(xml, subreddit)
-          if (posts.length > 0) {
-            console.log(`[reddit] RSS retry: ${posts.length} posts from r/${subreddit}`)
-            if (redisClient) {
-              await redisClient.set(cacheKey, JSON.stringify(posts), 'EX', CACHE_TTL).catch(() => {})
-            }
-            return posts
-          }
-        }
-      } catch (retryErr) {
-        console.warn(`[reddit] RSS retry also failed for r/${subreddit}:`, retryErr)
-      }
+      // A second immediate Reddit request only extends the rate limit. Let the
+      // scheduler retry later or use an explicitly enabled provider fallback.
+      console.warn(`[reddit] RSS 429 for r/${subreddit} — deferring the poll`)
     } else {
       console.warn(`[reddit] RSS ${rssResponse.status} for r/${subreddit}, falling back`)
     }
@@ -202,7 +181,12 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   }
 
   // ── FALLBACK 1: redditapis.com proxy ($0.002/call) ─────────────────────────
-  if (redditApisKey && !redditApisKey.includes('TODO') && (process.env.NODE_ENV !== 'development' || forceLive)) {
+  if (
+    paidFallbackEnabled
+    && redditApisKey
+    && !redditApisKey.includes('TODO')
+    && (process.env.NODE_ENV !== 'development' || forceLive)
+  ) {
     try {
       console.log(`[reddit] Falling back to redditapis.com proxy for r/${subreddit}`)
       const url = `https://api.redditapis.com/r/${subreddit}/new?limit=${limit}`
@@ -269,7 +253,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   }
 
   // ── FALLBACK 3: Public .json endpoint (dev only) ───────────────────────────
-  if (!isApproved && !redditApisKey) {
+  if (process.env.NODE_ENV !== 'production' && !isApproved && !paidFallbackEnabled) {
     try {
       console.log(`[reddit] Attempting public JSON feed for r/${subreddit}`)
       const url = `https://www.reddit.com/r/${subreddit}/new.json?limit=${limit}`

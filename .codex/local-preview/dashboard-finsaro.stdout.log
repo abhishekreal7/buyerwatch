@@ -1,0 +1,21 @@
+
+> buyerwatch@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.2.11 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.20.10.2:3000
+- Environments: .env.local
+✓ Ready in 827ms
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+ GET /login 200 in 3.3s (next.js: 581ms, proxy.ts: 71ms, application-code: 2.6s)
+ GET /login 200 in 73ms (next.js: 5ms, proxy.ts: 6ms, application-code: 62ms)
+ GET /api/auth/google?next=login 307 in 3.0s (next.js: 3.0s, proxy.ts: 5ms, application-code: 21ms)
+ GET /login 200 in 589ms (next.js: 11ms, proxy.ts: 462ms, application-code: 116ms)
+ GET /api/auth/google?next=login 307 in 193ms (next.js: 7ms, proxy.ts: 12ms, application-code: 173ms)
+ GET /login 200 in 74ms (next.js: 4ms, proxy.ts: 10ms, application-code: 60ms)
+ GET /api/auth/google?next=login 307 in 38ms (next.js: 7ms, proxy.ts: 7ms, application-code: 24ms)
+ GET /login 200 in 299ms (next.js: 16ms, proxy.ts: 31ms, application-code: 252ms)
+ GET /api/auth/google?next=login 307 in 53ms (next.js: 19ms, proxy.ts: 18ms, application-code: 16ms)

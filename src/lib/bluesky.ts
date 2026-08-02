@@ -1,27 +1,28 @@
 import { NormalizedPost } from './types'
 import { isDevelopmentMockEnabled } from './env'
-import { createTimeoutFetch } from './http'
-let agent: any = null
+import { fetchWithTimeout } from './http'
+import { redis } from './redis'
 
-async function getBlueskyAgent(): Promise<any> {
-  if (agent) return agent
+const APPVIEW_HOSTS = [
+  'https://public.api.bsky.app',
+  'https://api.bsky.app',
+] as const
 
-  const { BskyAgent } = await import('@atproto/api')
-  agent = new BskyAgent({
-    service: 'https://bsky.social',
-    fetch: createTimeoutFetch(15_000),
-  })
-  
-  const handle = process.env.BLUESKY_HANDLE
-  const password = process.env.BLUESKY_APP_PASSWORD
-
-  if (!handle || !password) {
-    throw new Error('Bluesky credentials missing')
+type BlueskySearchPost = {
+  uri: string
+  author: {
+    did?: string
+    handle?: string
   }
+  record?: {
+    text?: string
+    createdAt?: string
+  }
+  indexedAt?: string
+}
 
-  await agent.login({ identifier: handle, password })
-  
-  return agent
+type BlueskySearchResponse = {
+  posts?: BlueskySearchPost[]
 }
 
 export async function searchBlueskyPosts(query: string, limit: number = 25): Promise<NormalizedPost[]> {
@@ -39,35 +40,64 @@ export async function searchBlueskyPosts(query: string, limit: number = 25): Pro
     ]
   }
 
-  const bskyAgent = await getBlueskyAgent()
-  
-  const response = await bskyAgent.app.bsky.feed.searchPosts({
-    q: query,
-    limit,
-    sort: 'latest'
-  })
-  
-  if (!response.success) {
-    throw new Error(`Bluesky search failed for query: ${query}`)
+  const normalizedQuery = query.trim()
+  if (!normalizedQuery) return []
+
+  const boundedLimit = Math.min(Math.max(Math.floor(limit), 1), 100)
+  const cacheKey = `search:bluesky:${normalizedQuery.toLocaleLowerCase()}:${boundedLimit}`
+  try {
+    const cached = await redis.get(cacheKey)
+    if (cached) return JSON.parse(cached) as NormalizedPost[]
+  } catch {
+    // Monitoring remains available if Redis has a transient cache failure.
   }
 
-  const posts = response.data.posts || []
-  
-  return posts.map((post: any): NormalizedPost => {
-    // Constructing the URL manually since the API doesn't return a direct web URL
-    const uriParts = post.uri.split('/')
-    const postId = uriParts[uriParts.length - 1]
-    const authorHandle = post.author.handle
-    const url = `https://bsky.app/profile/${authorHandle}/post/${postId}`
+  let payload: BlueskySearchResponse | null = null
+  let failureStatus = 503
+  for (const host of APPVIEW_HOSTS) {
+    const url = new URL('/xrpc/app.bsky.feed.searchPosts', host)
+    url.searchParams.set('q', normalizedQuery)
+    url.searchParams.set('limit', String(boundedLimit))
+    url.searchParams.set('sort', 'latest')
 
-    return {
-      platform: 'bluesky',
-      externalId: post.uri, // URI serves as unique identifier in AT Protocol
-      author: authorHandle,
-      text: (post.record as any)?.text || '',
-      url,
-      createdAt: (post.record as any)?.createdAt || new Date().toISOString(),
-      sourceTarget: query
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'BuyerWatch/1.0 (support@buyerwatch.co)',
+      },
+    }, 15_000)
+    if (response.ok) {
+      payload = await response.json() as BlueskySearchResponse
+      break
     }
+
+    failureStatus = response.status
+    // The cached public hostname can be unavailable in some regions. The
+    // canonical AppView is an official fallback; rate limits are not bypassed.
+    if (![401, 403, 404].includes(response.status) && response.status < 500) break
+  }
+  if (!payload) {
+    throw new Error(`Bluesky public search failed (${failureStatus})`)
+  }
+
+  const posts = (payload.posts ?? []).flatMap((post): NormalizedPost[] => {
+    const postId = post.uri.split('/').at(-1)
+    const profile = post.author.did || post.author.handle
+    if (!postId || !profile) return []
+
+    const authorHandle = post.author.handle || profile
+
+    return [{
+      platform: 'bluesky',
+      externalId: post.uri,
+      author: authorHandle,
+      text: post.record?.text || '',
+      url: `https://bsky.app/profile/${profile}/post/${postId}`,
+      createdAt: post.record?.createdAt || post.indexedAt || new Date().toISOString(),
+      sourceTarget: normalizedQuery,
+    }]
   })
+
+  await redis.set(cacheKey, JSON.stringify(posts), 'EX', 120).catch(() => {})
+  return posts
 }

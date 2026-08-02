@@ -21,9 +21,9 @@ export default function AboutPage() {
       {/* Main Content */}
       <main className="mx-auto max-w-3xl px-4 pt-12 sm:px-6 sm:pt-16">
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 1, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.22 }}
         >
           <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 mb-6" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
             About BuyerWatch
@@ -39,7 +39,7 @@ export default function AboutPage() {
             </p>
 
             <p>
-              BuyerWatch automates this monitoring process by searching communities 24/7. When a match is found, our dual-stage Claude pipeline handles the heavy lifting: first, a buyer-intent analysis determines how warm the lead is; second, a voice-matching agent drafts a natural response tailored to your company&apos;s profile and custom tone.
+              BuyerWatch monitors configured communities for relevant conversations. When a match is found, it evaluates buyer intent, keeps the source evidence attached, and prepares a product-aware draft in your configured voice for review.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-12 mb-6" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>

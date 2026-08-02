@@ -38,12 +38,13 @@ import {
 } from '@/components/landing/PremiumFeatureSections'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
 import { Reveal } from '@/components/Reveal'
+import { PRICING_PLANS } from '@/lib/pricing-plans'
 
 
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] as any } }
+  hidden: { opacity: 1, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as any } }
 }
 const staggerContainer = {
   hidden: {},
@@ -96,10 +97,10 @@ export default function LandingPage() {
           </Link>
           <div className="hidden md:flex items-center gap-7">
             {['Features', 'How it works', 'Pricing'].map((label) => (
-              <Link key={label} href={`#${label.toLowerCase().replace(' ', '-')}`}
+              <a key={label} href={`#${label.toLowerCase().replace(' ', '-')}`}
                 className="text-[14px] font-[450] text-[#6B6B6B] hover:text-[#0A0A0A] transition-colors duration-150">
                 {label}
-              </Link>
+              </a>
             ))}
             <Link href="/login" className="text-[14px] font-[450] text-[#6B6B6B] hover:text-[#0A0A0A] transition-colors duration-150">Log in</Link>
           </div>
@@ -122,9 +123,9 @@ export default function LandingPage() {
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 32 }}
+          initial={{ opacity: 1, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
           className="relative z-10 flex flex-col items-center text-center max-w-[880px] mx-auto"
         >
           <EyebrowBadge />
@@ -148,10 +149,10 @@ export default function LandingPage() {
               </PremiumCtaButton>
             </motion.div>
             <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.975 }} transition={springs.snappy}>
-              <Link href="#how-it-works" className="w-full sm:w-auto px-7 py-[14px] rounded-full font-[500] text-[15px] text-[#0A0A0A] hover:bg-black/[0.04] border border-black/[0.10] flex items-center justify-center gap-2 transition-colors duration-200">
+              <a href="#how-it-works" className="w-full sm:w-auto px-7 py-[14px] rounded-full font-[500] text-[15px] text-[#0A0A0A] hover:bg-black/[0.04] border border-black/[0.10] flex items-center justify-center gap-2 transition-colors duration-200">
                 See how it works
                 <ChevronRight className="w-4 h-4" strokeWidth={2} />
-              </Link>
+              </a>
             </motion.div>
           </div>
 
@@ -285,7 +286,7 @@ export default function LandingPage() {
         {/* FEATURES */}
 
 
-        <Section id="product-overview" className="bg-white pt-[50px] pb-[100px]">
+        <Section id="features" className="bg-white pt-[50px] pb-[100px]">
           <div className="max-w-[1200px] mx-auto px-[24px]">
             <SectionBadge color="#0A84FF" text="Features" />
 
@@ -348,7 +349,7 @@ export default function LandingPage() {
 
               {/* Right: Mockup Card */}
               <motion.div variants={fadeUp} className="relative">
-                <div className="myniq-card p-[28px] relative z-10 flex flex-col h-[400px]">
+                <div className="buyerwatch-card p-[28px] relative z-10 flex flex-col h-[400px]">
                   <LeadDiscoveryWidget />
                 </div>
               </motion.div>
@@ -448,9 +449,9 @@ export default function LandingPage() {
         </Section>
 
         {/* ━ ━ ━ ━  section separator: MORE FEATURES (Bento Grid) ━ ━ ━ ━  */}
-        <Section className="bg-white pt-[100px] pb-[100px]">
+        <Section className="bg-white pt-[100px] pb-16 sm:pb-20">
           <div className="max-w-[1200px] mx-auto px-[24px] text-center">
-            <SectionBadge color="#0A84FF" text="More Features" />
+            <SectionBadge color="#0A84FF" text="Product preview" />
             <motion.h2 variants={fadeUp} className="mx-auto mb-[52px]"
               style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 52px)', letterSpacing: '-0.04em', lineHeight: 1.05, color: '#0A0A0A', maxWidth: '560px' }}>
               Measure what happens<br />after the reply
@@ -459,12 +460,15 @@ export default function LandingPage() {
             <div className="flex flex-col gap-[12px] text-left">
               <motion.div variants={staggerContainer} className="grid md:grid-cols-5 gap-[12px]">
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col h-[400px] md:col-span-3 justify-between">
+                <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] flex flex-col h-[400px] md:col-span-3 justify-between">
                   <BentoTrafficWidget />
                 </motion.div>
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col h-[400px] md:col-span-2">
+                <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] flex flex-col h-[400px] md:col-span-2">
+                  <span className="self-end rounded-full border border-[#E4E4E1] bg-[#F7F7F5] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#8A8A84]">
+                    Example data
+                  </span>
                   <div className="flex-1 flex flex-col items-center justify-center mb-4">
                     <RadialGauge percentage={72} label="Drafted / Posted" />
                     <div className="flex items-center gap-4 mt-3" style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', fontWeight: 500, color: '#ADADAD' }}>
@@ -482,7 +486,7 @@ export default function LandingPage() {
 
               <motion.div variants={staggerContainer} className="grid md:grid-cols-3 gap-[12px]">
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="myniq-card p-[28px] flex flex-col">
+                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card p-[28px] flex flex-col">
                   <div className="flex-1 flex flex-col justify-center w-full py-3">
                     <BentoPlatformSourcesWidget />
                   </div>
@@ -491,7 +495,7 @@ export default function LandingPage() {
                 </motion.div>
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="myniq-card p-[28px] flex flex-col">
+                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card p-[28px] flex flex-col">
                   <div className="flex-1 flex flex-col justify-center items-center h-full pt-4">
                     <ChatSimulation />
                   </div>
@@ -500,7 +504,7 @@ export default function LandingPage() {
                 </motion.div>
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="myniq-card p-[28px] flex flex-col">
+                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card p-[28px] flex flex-col">
                   <div className="flex-1 flex flex-col justify-center gap-2.5 mb-6">
                     {[
                       { label: 'Buying', score: '94', dot: '#FF5101' },
@@ -528,7 +532,15 @@ export default function LandingPage() {
         </Section>
 
         {/* ━ ━ ━ ━  section separator: ANALYTICS ━ ━ ━ ━  */}
-        <Section className="bg-[#F8F8F8] pt-[140px] pb-[140px]">
+        {true && (
+        <>
+        <div
+          className="relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 10%, #F8F8F8 30%, #F8F8F8 55%, #FBFBFB 78%, #FFFFFF 100%)',
+          }}
+        >
+        <Section className="relative bg-transparent pt-20 pb-24 sm:pt-24 sm:pb-28 lg:pt-[104px] lg:pb-[128px]">
           <div className="max-w-[1140px] mx-auto px-[24px] text-center">
             <SectionBadge color="#FF5101" text="Controls & Safeguards" />
             <motion.h2
@@ -537,7 +549,7 @@ export default function LandingPage() {
               viewport={{ once: true, margin: "-100px" }}
               variants={fadeUp}
               className="mb-5 text-[#0A0A0A]"
-              style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(44px, 6vw, 68px)', letterSpacing: '-0.04em', lineHeight: 1.05 }}
+              style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(38px, 6vw, 68px)', letterSpacing: '-0.04em', lineHeight: 1.05 }}
             >
               Automation earns trust<br />before it acts.
             </motion.h2>
@@ -546,7 +558,7 @@ export default function LandingPage() {
               whileInView="show"
               viewport={{ once: true, margin: "-100px" }}
               variants={fadeUp}
-              className="text-[#6b7280] text-[16px] max-w-[620px] mx-auto mb-20 leading-relaxed"
+              className="mx-auto mb-14 max-w-[620px] text-[15px] leading-relaxed text-[#6b7280] sm:text-[16px] md:mb-20"
               style={{ fontFamily: 'var(--font-inter)' }}
             >
               From signal rules to delivery, every stage stays visible, reviewable, and controlled.
@@ -557,7 +569,7 @@ export default function LandingPage() {
               whileInView="show"
               viewport={{ once: true, margin: "-100px" }}
               variants={staggerContainer}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-14 gap-y-20 text-center"
+              className="grid grid-cols-1 gap-x-14 gap-y-14 text-center md:grid-cols-2 md:gap-y-20 lg:grid-cols-3"
             >
               {[
                 { icon: CustomKeywordRulesIcon, title: 'Buying-Signal Rules', body: 'Monitor configured competitor names, pain points, and buying phrases across Reddit and Bluesky.' },
@@ -599,6 +611,7 @@ export default function LandingPage() {
         <div id="workflow">
           <StickyFeatureScroll />
         </div>
+        </div>
 
         {/* ━ ━ ━ ━  section separator: PRODUCT EVIDENCE ━ ━ ━ ━  */}
         <Section className="bg-white pt-[100px] pb-[100px]">
@@ -615,7 +628,7 @@ export default function LandingPage() {
 
             <motion.div variants={staggerContainer} className="grid md:grid-cols-3 gap-[12px] auto-rows-min">
               {/* Attribution */}
-              <motion.div variants={fadeUp} className="myniq-card p-[28px] md:col-span-2">
+              <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] md:col-span-2">
                 <MousePointerClick className="w-7 h-7 text-[#0A84FF] mb-4" strokeWidth={1.5} />
                 <h3 className="text-[18px] font-bold tracking-[-0.02em] mb-2">Reply-level attribution</h3>
                 <p style={{ fontFamily: 'var(--font-inter)', fontSize: '15px', color: '#6B6B6B', lineHeight: 1.7 }}>
@@ -624,14 +637,14 @@ export default function LandingPage() {
               </motion.div>
 
               {/* Attribution path */}
-              <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col justify-end min-h-[200px]">
+              <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] flex flex-col justify-end min-h-[200px]">
                 <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '40px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A', marginBottom: '8px' }}>Click → sale</div>
                 <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '3px' }}>Attribution path</div>
                 <div style={{ fontFamily: 'var(--font-inter)', fontSize: '13px', color: '#9B9B9B' }}>with optional revenue reporting</div>
               </motion.div>
 
               {/* Rank context */}
-              <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col justify-between min-h-[190px]">
+              <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] flex flex-col justify-between min-h-[190px]">
                 <div>
                   <SearchCheck className="w-6 h-6 text-[#0A84FF] mb-3" strokeWidth={1.5} />
                   <h3 className="text-[17px] font-bold tracking-[-0.02em] mb-2">Google rank context</h3>
@@ -643,13 +656,13 @@ export default function LandingPage() {
               </motion.div>
 
               {/* Intent score */}
-              <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col justify-end min-h-[190px]">
+              <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] flex flex-col justify-end min-h-[190px]">
                 <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: '56px', letterSpacing: '-0.045em', lineHeight: 1, color: '#0A0A0A', marginBottom: '6px' }}>0–100</div>
                 <div style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 600, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A' }}>Recorded intent score</div>
               </motion.div>
 
               {/* Audit trail */}
-              <motion.div variants={fadeUp} className="myniq-card p-[28px] flex flex-col justify-between min-h-[190px]">
+              <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] flex flex-col justify-between min-h-[190px]">
                 <div>
                   <History className="w-6 h-6 text-[#0A84FF] mb-3" strokeWidth={1.5} />
                   <h3 className="text-[17px] font-bold tracking-[-0.02em] mb-2">Send audit history</h3>
@@ -661,7 +674,7 @@ export default function LandingPage() {
               </motion.div>
 
               {/* Evidence summary */}
-              <motion.div variants={fadeUp} className="myniq-card p-[28px] md:col-span-3">
+              <motion.div variants={fadeUp} className="buyerwatch-card p-[28px] md:col-span-3">
                 <BadgeCheck className="w-7 h-7 text-[#0A84FF] mb-4" strokeWidth={1.5} />
                 <h3 className="text-[18px] font-bold tracking-[-0.02em] mb-2">Evidence stays attached to the opportunity</h3>
                 <p style={{ fontFamily: 'var(--font-inter)', fontSize: '16px', color: '#0A0A0A', lineHeight: 1.7, marginBottom: '20px', maxWidth: '680px' }}>
@@ -676,6 +689,39 @@ export default function LandingPage() {
         <CoreFeatureBento />
 
         <BeforeAfterTransformation />
+        </>
+        )}
+
+        <Section id="workflow" className="bg-[#F8F8F6] py-[100px]">
+          <div className="mx-auto max-w-[1120px] px-6">
+            <motion.div variants={fadeUp} className="mb-14 max-w-[650px]">
+              <SectionBadge color="#0A84FF" text="Verified workflow" />
+              <h2 className="mb-4 text-[clamp(34px,4vw,52px)] font-extrabold leading-[1.05] tracking-[-0.04em] text-[#0A0A0A]" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif' }}>
+                Evidence stays attached from signal to outcome.
+              </h2>
+              <p className="max-w-[580px] text-[16px] leading-7 text-[#6B6B6B]" style={{ fontFamily: 'var(--font-inter)' }}>
+                Every opportunity keeps its source, review history, and delivery state together, so your team can inspect what happened without relying on decorative claims.
+              </p>
+            </motion.div>
+
+            <motion.div variants={staggerContainer} className="grid gap-3 md:grid-cols-3">
+              {[
+                { icon: Radar, step: '01', title: 'Source captured', body: 'The original thread, platform, matching rule, and intent reasoning remain attached to each opportunity.' },
+                { icon: BadgeCheck, step: '02', title: 'Draft reviewed', body: 'Product context, policy checks, edits, and manual approval are recorded before a reply is sent.' },
+                { icon: History, step: '03', title: 'Outcome recorded', body: 'Permalink, send state, failures, and optional click or conversion events remain available for review.' },
+              ].map(({ icon: Icon, step, title, body }) => (
+                <motion.article key={step} variants={fadeUp} className="rounded-[20px] border border-[#E4E4E1] bg-white p-7 shadow-[0_1px_2px_rgba(10,10,10,0.03)]">
+                  <div className="mb-10 flex items-center justify-between">
+                    <span className="text-[12px] font-semibold tabular-nums text-[#9A9A94]">{step}</span>
+                    <Icon className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.7} />
+                  </div>
+                  <h3 className="mb-2 text-[18px] font-bold tracking-[-0.02em] text-[#151513]">{title}</h3>
+                  <p className="text-[14px] leading-6 text-[#6B6B66]">{body}</p>
+                </motion.article>
+              ))}
+            </motion.div>
+          </div>
+        </Section>
 
 
         {/* ━ ━ ━ ━  section separator: PRICING ━ ━ ━ ━  */}
@@ -692,6 +738,47 @@ export default function LandingPage() {
               Monthly plans. Start free without a credit card.
             </motion.p>
 
+            <motion.div variants={staggerContainer} className="grid items-stretch gap-6 lg:grid-cols-3">
+              {PRICING_PLANS.map((plan) => (
+                <motion.article
+                  key={plan.id}
+                  variants={fadeUp}
+                  className={`relative flex flex-col rounded-[20px] bg-white p-8 ${
+                    plan.highlight
+                      ? 'border-2 border-[#0A0A0A] shadow-[0_8px_24px_rgba(0,0,0,0.08)]'
+                      : 'border border-[#EAEAEC]'
+                  }`}
+                >
+                  {plan.highlight && (
+                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[#0A0A0A] px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+                      Recommended
+                    </span>
+                  )}
+                  <h3 className="mb-4 text-[20px] font-medium tracking-tight text-[#18181B]">{plan.name}</h3>
+                  <div className="mb-4 flex items-baseline">
+                    <span className="text-[44px] font-bold leading-none tracking-[-0.03em] text-[#18181B]">{plan.price}</span>
+                    <span className="ml-1.5 text-[14px] text-[#71717A]">{plan.period}</span>
+                  </div>
+                  <p className="mb-6 min-h-[44px] text-[14px] leading-relaxed text-[#52525B]">{plan.description}</p>
+                  <PremiumCtaButton href={plan.href} fullWidth className="mb-6">
+                    {plan.cta}
+                  </PremiumCtaButton>
+                  <div className="mb-6 border-t border-dotted border-[#E2E2E6]" />
+                  <ul className="flex flex-col gap-3.5">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5 text-left">
+                        <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden>
+                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#0A84FF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span className="text-[14px] leading-snug text-[#3F3F46]">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </motion.article>
+              ))}
+            </motion.div>
+
+            {false && (
             <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-6 items-stretch">
               {/* Free / Starter Card */}
               <motion.div
@@ -861,6 +948,7 @@ export default function LandingPage() {
                 </div>
               </motion.div>
             </motion.div>
+            )}
 
             {/* Overage & Custom Limits Messaging */}
             <motion.div variants={fadeUp} className="text-center mt-10">

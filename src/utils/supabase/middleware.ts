@@ -32,9 +32,8 @@ export async function updateSession(request: NextRequest, requestHeaders = reque
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+  const isAuthenticated = !claimsError && Boolean(claimsData?.claims?.sub)
 
   // Protected routes list
   const protectedRoutes = [
@@ -50,13 +49,13 @@ export async function updateSession(request: NextRequest, requestHeaders = reque
   ]
   const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
-  if (!user && isProtectedRoute) {
+  if (!isAuthenticated && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
+  if (isAuthenticated && request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

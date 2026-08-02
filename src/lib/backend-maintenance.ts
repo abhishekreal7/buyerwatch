@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import DodoPayments from 'dodopayments'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { sendReplyQueue } from './queues'
-import { getSendReplyJobId } from './reply-jobs'
 import { logger } from './logger'
+import { publishQStashJson } from './qstash'
 
 type OutboxPayload = {
   userId: string
@@ -47,14 +46,11 @@ export async function dispatchPendingOutbox(
   for (const entry of data ?? []) {
     const payload = entry.payload as OutboxPayload
     try {
-      const jobId = getSendReplyJobId(entry.thread_id)
-      const existingJob = await sendReplyQueue.getJob(jobId)
-      if (existingJob && await existingJob.isFailed()) {
-        await existingJob.remove()
-      }
-      await sendReplyQueue.add('send', payload, {
-        jobId,
+      const messageId = await publishQStashJson('/api/jobs/send', payload, {
+        retries: 4,
+        timeout: '4m',
       })
+      if (!messageId) throw new Error('QStash reply delivery is not configured')
       const { error: updateError } = await supabase
         .from('job_outbox')
         .update({

@@ -1,8 +1,15 @@
 {
   "manifest_version": 3,
   "name": "BuyerWatch",
-  "description": "Capture high-value community conversations for BuyerWatch analysis.",
-  "version": "0.1.0",
+  "description": "Capture Reddit conversations and safely prefill BuyerWatch replies.",
+  "version": "0.4.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtFhrw6DsLtjSfYEx7nTBzRLVk2z3R7PFRk/sGpH+w4CKrVCTeh+MGQPhnewCvSZnF6+Uzu+QlmFX22UdGlop7chtciFXyN2Mrv1LFxXra5X/NdjhbDsCF9hlXQfY0mNWiCCo+DhzW+fc7uD2pG5eV0mZlbYVoVq0mx8mfq+0ifcSO92zKCoIi8GbxHyAP9BV/N6Ij677Mq44VKU8h3TLtYjcM+l2ifwFNoY4yBRtb3kKX0+/Hmi4Ho+GbIA6zrmgsPm8rPkWOALogYmm5BRDyLXBGnEAdyX4ubKjQHkixrW6EUfKTkji/e8tznJY8YFTMMOJoDEncxOSfsYC5fQJcwIDAQAB",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "activeTab",
     "storage"
@@ -12,14 +19,15 @@
     "https://www.buyerwatch.co/*",
     "http://localhost:3000/*",
     "https://*.supabase.co/*",
-    "https://www.reddit.com/*",
-    "https://reddit.com/*",
-    "https://bsky.app/*",
-    "https://x.com/*",
-    "https://twitter.com/*"
+    "https://*.reddit.com/*",
+    "https://reddit.com/*"
   ],
   "action": {
     "default_title": "Capture with BuyerWatch",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    },
     "default_popup": "popup.html"
   },
   "options_ui": {
@@ -29,11 +37,19 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.reddit.com/*",
-        "https://reddit.com/*",
-        "https://bsky.app/*",
-        "https://x.com/*",
-        "https://twitter.com/*"
+        "https://buyerwatch.co/*",
+        "https://www.buyerwatch.co/*",
+        "http://localhost:3000/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://*.reddit.com/*",
+        "https://reddit.com/*"
       ],
       "js": [
         "content.js"

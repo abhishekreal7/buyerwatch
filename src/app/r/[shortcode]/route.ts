@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { redis } from '@/lib/redis'
 import { getSafeHttpUrl } from '@/lib/security/outbound-url'
+import { recordEngagementEvent } from '@/lib/automation-audit'
 
 const BOT_REGEX = /bot|crawler|spider|facebookexternalhit|redditbot|slackbot|meta-externalagent|twitterbot|discordbot|curl|wget/i
 
@@ -21,7 +22,7 @@ export async function GET(
     )
     const { data, error } = await supabase
       .from('reply_attribution')
-      .select('destination_url, clicked_at')
+      .select('destination_url, clicked_at, user_id, thread_id')
       .eq('shortcode', shortcode)
       .maybeSingle()
 
@@ -29,6 +30,7 @@ export async function GET(
     if (error || !destination) {
       return NextResponse.redirect(fallbackUrl, { status: 302 })
     }
+    const attribution = data!
 
     const userAgent = req.headers.get('user-agent') ?? ''
     const referrer = req.headers.get('referer')
@@ -48,11 +50,24 @@ export async function GET(
       const firstRecentClick = await redis.set(dedupKey, '1', 'EX', 600, 'NX')
 
       if (firstRecentClick) {
-        await supabase
+        const { data: updated } = await supabase
           .from('reply_attribution')
           .update({ clicked_at: new Date().toISOString() })
           .eq('shortcode', shortcode)
           .is('clicked_at', null)
+          .select('id')
+          .maybeSingle()
+        if (updated && attribution.user_id) {
+          await recordEngagementEvent(supabase, {
+            userId: attribution.user_id,
+            threadId: attribution.thread_id,
+            eventType: 'clicked',
+            actorType: 'user',
+            source: 'tracked_redirect',
+            metadata: { shortcode },
+            idempotencyKey: `${attribution.thread_id ?? shortcode}:clicked`,
+          }).catch(() => undefined)
+        }
       }
     }
 

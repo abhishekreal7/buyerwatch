@@ -2,59 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { sourcePlatforms } from './HomeVisuals'
 import { springs } from '@/lib/motion'
 
-export const RetryStackAlertCycler = () => {
-  const alerts = [
-    { title: 'Exponential Retry Backoff', status: '5s → 10s → 20s', color: '#EF4444' },
-    { title: 'API Timeout Caught', status: 'Retry Scheduled', color: '#F59E0B' },
-    { title: 'Failed Job Recorded', status: 'Visible for Review', color: '#0A84FF' }
-  ]
-  const [idx, setIdx] = useState(0)
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { margin: '120px' })
-
-  useEffect(() => {
-    if (!inView) return
-    const timer = setInterval(() => {
-      setIdx((prev) => (prev + 1) % alerts.length)
-    }, 2600)
-    return () => clearInterval(timer)
-  }, [inView, alerts.length])
-
-  return (
-    <div ref={ref} className="my-auto relative h-[88px] flex items-center justify-center">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={idx}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -14 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="w-full bg-white rounded-[16px] p-4 border border-black/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.06)] flex items-center gap-3.5 relative z-10"
-        >
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${alerts[idx].color}15`, color: alerts[idx].color }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </div>
-          <div>
-            <div className="text-[12px] font-semibold text-[#8E8E93]" style={{ fontFamily: 'var(--font-inter)' }}>
-              {alerts[idx].title}
-            </div>
-            <div className="text-[13px] font-bold text-[#1C1C1E]">
-              {alerts[idx].status}
-            </div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-      <div className="absolute top-2.5 inset-x-3 h-full bg-white/60 rounded-[16px] border border-black/[0.04] -z-10 transform scale-95" />
-    </div>
-  )
-}
 export const ChatSimulation = () => {
   const [messages, setMessages] = useState<number[]>([0])
   const ref = useRef<HTMLDivElement>(null)
@@ -103,48 +54,49 @@ export const ChatSimulation = () => {
 }
 
 const leadDiscoveryData = [
-  { name: 'Jan', discovered: 120, qualified: 40 },
-  { name: 'Jan-mid', discovered: 240, qualified: 90 },
-  { name: 'Feb', discovered: 450, qualified: 180 },
-  { name: 'Feb-mid', discovered: 380, qualified: 120 },
-  { name: 'Mar', discovered: 550, qualified: 210 },
-  { name: 'Mar-mid', discovered: 510, qualified: 190 },
-  { name: 'Apr', discovered: 847, qualified: 289 },
-  { name: 'Apr-mid', discovered: 680, qualified: 210 },
-  { name: 'May', discovered: 620, qualified: 190 },
-  { name: 'May-mid', discovered: 790, qualified: 240 }
+  { date: 'Jan 1, 2025', discovered: 120, qualified: 40 },
+  { date: 'Jan 15, 2025', discovered: 240, qualified: 90 },
+  { date: 'Feb 1, 2025', discovered: 450, qualified: 180 },
+  { date: 'Feb 15, 2025', discovered: 380, qualified: 120 },
+  { date: 'Mar 1, 2025', discovered: 550, qualified: 210 },
+  { date: 'Mar 15, 2025', discovered: 510, qualified: 190 },
+  { date: 'Apr 1, 2025', discovered: 847, qualified: 289 },
+  { date: 'Apr 15, 2025', discovered: 680, qualified: 210 },
+  { date: 'May 1, 2025', discovered: 620, qualified: 190 },
+  { date: 'May 15, 2025', discovered: 790, qualified: 240 }
 ]
 
 const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const cleanLabel = label.split('-')[0] + ' 2025'
+    const discovered = payload.find((entry: any) => entry.dataKey === 'discovered')
+    const qualified = payload.find((entry: any) => entry.dataKey === 'qualified')
     return (
       <div style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0,0,0,0.07)',
-        borderRadius: '14px',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
-        padding: '12px 16px',
-        minWidth: '168px',
+        background: '#1C1C1A',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '11px',
+        boxShadow: '0 12px 30px rgba(0,0,0,0.16)',
+        padding: '10px 12px',
+        minWidth: '154px',
         fontFamily: 'var(--font-inter), sans-serif',
       }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: '#0A0A0A', marginBottom: '10px', letterSpacing: '-0.01em' }}>
-          {cleanLabel}
+        <div style={{ fontSize: '10px', fontWeight: 600, color: '#A7A7A1', marginBottom: '8px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+          {label}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0 }} />
-              Threads Found
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#D0D0CB', fontWeight: 500 }}>
+              <span style={{ width: '12px', height: '2px', borderRadius: '999px', background: '#8A8A84', flexShrink: 0 }} />
+              Discovered
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0A84FF' }}>{payload[0]?.value}</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#FFFFFF', fontVariantNumeric: 'tabular-nums' }}>{discovered?.value}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9B9B9B', fontWeight: 500 }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0 }} />
-              High-Intent
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#D0D0CB', fontWeight: 500 }}>
+              <span style={{ width: '12px', height: '2px', borderRadius: '999px', background: '#0A84FF', flexShrink: 0 }} />
+              High intent
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0A84FF' }}>{payload[1]?.value}</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#62B4FF', fontVariantNumeric: 'tabular-nums' }}>{qualified?.value}</span>
           </div>
         </div>
       </div>
@@ -156,81 +108,98 @@ const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
 export const LeadDiscoveryWidget = () => {
   return (
     <div className="w-full h-full flex flex-col justify-between">
-      {/* Header row: title + legend */}
-      <div className="flex items-center justify-between mb-4">
-        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>
-          Lead Discovery
-        </h4>
-        {/* Legend pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontFamily: 'var(--font-inter), sans-serif', fontSize: '12px',
-            color: '#9B9B9B', fontWeight: 500,
-          }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0, display: 'inline-block' }} />
-            Threads Found
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div>
+          <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '16px', color: '#1C1C1A', letterSpacing: '-0.025em', lineHeight: 1.2 }}>
+            Lead discovery
+          </h4>
+          <p style={{ marginTop: '4px', fontFamily: 'var(--font-inter), sans-serif', fontSize: '11px', color: '#8A8A84', lineHeight: 1.45 }}>
+            Matched conversations over time
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 pt-0.5">
+          <span className="rounded-full border border-[#E4E4E1] bg-[#F7F7F5] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#8A8A84]">
+            Example data
           </span>
           <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontFamily: 'var(--font-inter), sans-serif', fontSize: '12px',
-            color: '#9B9B9B', fontWeight: 500,
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            fontFamily: 'var(--font-inter), sans-serif', fontSize: '10.5px',
+            color: '#777771', fontWeight: 500, whiteSpace: 'nowrap',
           }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0A84FF', flexShrink: 0, display: 'inline-block' }} />
-            High-Intent
+            <span style={{ width: '14px', height: '2px', borderRadius: '999px', background: '#8A8A84', flexShrink: 0, display: 'inline-block' }} />
+            Discovered
+          </span>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            fontFamily: 'var(--font-inter), sans-serif', fontSize: '10.5px',
+            color: '#777771', fontWeight: 500, whiteSpace: 'nowrap',
+          }}>
+            <span style={{ width: '14px', height: '2px', borderRadius: '999px', background: '#0A84FF', flexShrink: 0, display: 'inline-block' }} />
+            High intent
           </span>
         </div>
       </div>
 
       <div className="flex-1 w-full min-h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={leadDiscoveryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+          <AreaChart accessibilityLayer data={leadDiscoveryData} margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
             <defs>
-              {/* Primary series area fill */}
               <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0} />
+                <stop offset="5%" stopColor="#8A8A84" stopOpacity={0.055} />
+                <stop offset="88%" stopColor="#8A8A84" stopOpacity={0} />
               </linearGradient>
-              {/* Secondary: #0A84FF blue, 10% → 0% */}
               <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.10} />
-                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0.0} />
+                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.13} />
+                <stop offset="88%" stopColor="#0A84FF" stopOpacity={0} />
               </linearGradient>
             </defs>
 
-            {/* No gridlines — clean design-system spec */}
+            <CartesianGrid
+              vertical={false}
+              stroke="#ECECE8"
+              strokeDasharray="2 5"
+            />
             <XAxis
-              dataKey="name"
-              tickFormatter={(tick) => (tick.includes('-') ? '' : tick)}
+              dataKey="date"
+              tickFormatter={(value) => (value.includes(' 1,') ? value.slice(0, 3) : '')}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: '#9B9B9B', fontSize: 12, fontFamily: 'var(--font-inter), sans-serif' }}
+              tick={{ fill: '#A0A09A', fontSize: 10.5, fontWeight: 500, fontFamily: 'var(--font-inter), sans-serif' }}
+              interval={0}
+              tickMargin={9}
             />
             <YAxis
-              ticks={[0, 250, 500, 1000]}
+              domain={[0, 1000]}
+              ticks={[0, 500, 1000]}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: '#9B9B9B', fontSize: 12, fontFamily: 'var(--font-inter), sans-serif' }}
+              tick={{ fill: '#A0A09A', fontSize: 10.5, fontWeight: 500, fontFamily: 'var(--font-inter), sans-serif' }}
+              tickFormatter={(value) => (value === 1000 ? '1k' : String(value))}
+              width={31}
             />
-            <Tooltip content={<LeadDiscoveryTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
+            <Tooltip
+              content={<LeadDiscoveryTooltip />}
+              labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
+              cursor={{ stroke: '#D3D3CE', strokeWidth: 1, strokeDasharray: '3 4' }}
+            />
 
-            {/* Primary series — Threads Found */}
             <Area
-              type="monotone"
+              type="monotoneX"
               dataKey="discovered"
-              stroke="#0A84FF"
-              strokeWidth={2}
+              stroke="#777771"
+              strokeWidth={1.75}
               fill="url(#colorDiscovered)"
-              activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
+              dot={false}
+              activeDot={{ r: 3.5, fill: '#777771', stroke: '#FFFFFF', strokeWidth: 2 }}
             />
-            {/* Secondary series — High-Intent Matches — #0A84FF blue (intentional) */}
             <Area
-              type="monotone"
+              type="monotoneX"
               dataKey="qualified"
               stroke="#0A84FF"
               strokeWidth={2}
               fill="url(#colorQualified)"
-              activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
+              dot={false}
+              activeDot={{ r: 3.5, fill: '#0A84FF', stroke: '#FFFFFF', strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -270,62 +239,63 @@ export const BentoPlatformSourcesWidget = () => {
 }
 
 export const BentoTrafficWidget = () => {
+  const trafficSources = [
+    { name: 'Reddit', value: 40, color: '#FF5101', track: '#FFF0EA' },
+    { name: 'X', value: 80, color: '#1C1C1A', track: '#ECECE9' },
+    { name: 'Bluesky', value: 20, color: '#0A84FF', track: '#EAF4FF' },
+  ]
+
   return (
-    <div className="w-full h-full flex flex-col justify-between relative min-h-[280px]">
-      <div className="flex items-center justify-between mb-2 z-10">
-        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>Traffic</h4>
+    <div className="relative flex h-full min-h-[280px] w-full flex-col justify-between">
+      <div className="z-10 mb-2 flex items-center justify-between">
+        <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '18px', color: '#0A0A0A', letterSpacing: '-0.02em' }}>
+          Traffic
+        </h4>
       </div>
 
-      <div className="flex-1 relative flex flex-col justify-center gap-5 px-1 py-2 z-10">
-        {/* Grid lines background */}
-        <div className="absolute inset-0 flex justify-between pointer-events-none opacity-[0.06] px-1">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="w-[1px] border-r border-dashed border-[#0A0A0A] h-full" />
+      <div className="relative z-10 flex flex-1 flex-col justify-center gap-5 px-1 py-2">
+        <div className="pointer-events-none absolute inset-0 flex justify-between px-1 opacity-[0.06]">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-full w-px border-r border-dashed border-[#0A0A0A]" />
           ))}
         </div>
 
-        {/* Bar 1: Reddit */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[12px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[12px]" style={{ width: '40%' }} />
-            <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">40%</span>
-          </div>
-        </div>
-
-        {/* Bar 2: X */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[12px] bg-[#F0F7FF] border border-[#0A84FF]/20 flex items-center relative shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
-            <div className="h-full bg-[#0A84FF] rounded-[12px] flex items-center justify-end pr-1.5 transition-all duration-500 shadow-[0_1px_3px_rgba(0,0,0,0.05)]" style={{ width: '80%' }}>
-              <div className="bg-white border border-[#0A84FF]/30 rounded-full px-2 py-0.5 text-[11px] font-bold text-[#0A0A0A] shadow-[0_1px_3px_rgba(0,0,0,0.05)] mr-1">
-                80%
-              </div>
+        {trafficSources.map(source => (
+          <div key={source.name} className="relative w-full">
+            <div
+              className="relative flex h-10 w-full items-center overflow-hidden rounded-[12px]"
+              style={{ backgroundColor: source.track }}
+              role="progressbar"
+              aria-label={`${source.name} relative traffic`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={source.value}
+            >
+              <div
+                className="h-full rounded-[12px]"
+                style={{ width: `${source.value}%`, backgroundColor: source.color }}
+              />
+              <span
+                className="absolute top-1/2 flex h-6 w-10 -translate-y-1/2 items-center justify-center rounded-full border bg-white text-[11px] font-bold tabular-nums text-[#0A0A0A] shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
+                style={{
+                  left: `max(8px, calc(${source.value}% - 52px))`,
+                  borderColor: `${source.color}4D`,
+                }}
+              >
+                {source.value}%
+              </span>
             </div>
           </div>
-        </div>
-
-        {/* Bar 3: Bluesky */}
-        <div className="relative w-full">
-          <div className="w-full h-10 rounded-[12px] bg-black/[0.03] flex items-center justify-between relative overflow-hidden">
-            <div className="h-full bg-black/[0.015] rounded-l-[12px]" style={{ width: '20%' }} />
-            <span className="absolute right-4 text-[11px] font-bold text-[#0A0A0A]">20%</span>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center justify-start gap-8 mt-2 text-[13px] font-medium z-10" style={{ fontFamily: 'var(--font-inter)' }}>
-        <div className="flex items-center gap-2 text-[#ADADAD]">
-          <span className="w-2 h-2 rounded-full bg-black/[0.08]" />
-          Reddit
-        </div>
-        <div className="flex items-center gap-2 text-[#0A0A0A]">
-          <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-          X
-        </div>
-        <div className="flex items-center gap-2 text-[#ADADAD]">
-          <span className="w-2 h-2 rounded-full bg-black/[0.08]" />
-          Bluesky
-        </div>
+      <div className="z-10 mt-2 flex items-center justify-start gap-8 text-[13px] font-medium" style={{ fontFamily: 'var(--font-inter)' }}>
+        {trafficSources.map(source => (
+          <div key={source.name} className="flex items-center gap-2 text-[#0A0A0A]">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: source.color }} aria-hidden />
+            {source.name}
+          </div>
+        ))}
       </div>
     </div>
   )

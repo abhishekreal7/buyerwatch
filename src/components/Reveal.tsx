@@ -25,7 +25,7 @@ const easeOutPremium: [number, number, number, number] = [0.16, 1, 0.3, 1]
 export function Reveal({
   children,
   delay = 0,
-  duration = 0.65,
+  duration = 0.28,
   className,
   style,
 }: RevealProps) {
@@ -43,7 +43,7 @@ export function Reveal({
     <motion.div
       className={className}
       style={style}
-      initial={{ opacity: 0, y: 36 }}
+      initial={{ opacity: 1, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.25, margin: '0px 0px -10% 0px' }}
       transition={{ duration, delay, ease: easeOutPremium }}

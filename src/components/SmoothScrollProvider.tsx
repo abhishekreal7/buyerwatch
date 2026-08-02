@@ -73,7 +73,39 @@ export default function SmoothScrollProvider({ children }: { children: ReactNode
         node.closest?.('[data-lenis-prevent]') != null,
     })
 
+    const scrollToHash = () => {
+      const id = decodeURIComponent(window.location.hash.slice(1))
+      if (!id) return
+      const target = document.getElementById(id)
+      if (target) lenis.scrollTo(target, { offset: -72, immediate: true })
+    }
+
+    const handleAnchorClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const anchor = target.closest<HTMLAnchorElement>('a[href*="#"]')
+      if (!anchor) return
+
+      const url = new URL(anchor.href, window.location.href)
+      if (url.origin !== window.location.origin || url.pathname !== window.location.pathname || !url.hash) return
+      const section = document.getElementById(decodeURIComponent(url.hash.slice(1)))
+      if (!section) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+      lenis.scrollTo(section, { offset: -72, duration: 0.7 })
+    }
+
+    const frame = window.requestAnimationFrame(scrollToHash)
+    window.addEventListener('hashchange', scrollToHash)
+    document.addEventListener('click', handleAnchorClick, true)
+
     return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('hashchange', scrollToHash)
+      document.removeEventListener('click', handleAnchorClick, true)
       lenis.destroy()
     }
   }, [pathname])

@@ -6,6 +6,10 @@
 -- carry a plan-limit WITH CHECK independently of SELECT/UPDATE/DELETE.
 
 drop policy if exists "own keywords" on keywords;
+drop policy if exists "own keywords select" on keywords;
+drop policy if exists "own keywords update" on keywords;
+drop policy if exists "own keywords delete" on keywords;
+drop policy if exists "own keywords insert under plan limit" on keywords;
 
 create policy "own keywords select"
   on keywords for select

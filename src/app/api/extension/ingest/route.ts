@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
-import { scorePostQueue } from '@/lib/queues'
+import { hasQStashConfiguration, publishQStashJson } from '@/lib/qstash'
 import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
 import {
   buildExtensionExternalId,
-  buildExtensionScoreJobId,
   isExtensionPlatform,
   isValidExtensionSourceUrl,
 } from '@/lib/extension-ingest'
+
+const PACKAGED_EXTENSION_ORIGIN = 'chrome-extension://akfjpaggkndebeidadabipjpkbchlhfe'
 
 function allowedOrigin(origin: string | null): string | null {
   if (!origin) return null
@@ -23,7 +24,7 @@ function allowedOrigin(origin: string | null): string | null {
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)
-  return configured.includes(origin) ? origin : null
+  return configured.includes(origin) || origin === PACKAGED_EXTENSION_ORIGIN ? origin : null
 }
 
 function corsHeaders(origin: string | null): HeadersInit {
@@ -169,11 +170,12 @@ export async function POST(request: Request) {
       })
     if (pendingError) throw pendingError
 
-    const canQueue = Boolean(
-      process.env.UPSTASH_REDIS_URL?.trim()
+    const canDispatch = Boolean(
+      platform === 'reddit'
+      && hasQStashConfiguration()
       && process.env.ANTHROPIC_API_KEY?.trim(),
     )
-    if (!canQueue) {
+    if (!canDispatch) {
       return NextResponse.json({
         success: true,
         eventId: event.id,
@@ -183,7 +185,8 @@ export async function POST(request: Request) {
     }
 
     try {
-      await scorePostQueue.add('score', {
+      const messageId = await publishQStashJson('/api/jobs/score', {
+        eventId: event.id,
         userId: user.id,
         keywordId: keyword.id,
         post: {
@@ -196,15 +199,10 @@ export async function POST(request: Request) {
           createdAt: capturedAt,
           sourceTarget: community || keyword.target,
         },
-      }, {
-        jobId: buildExtensionScoreJobId(user.id, externalId),
       })
-      await admin
-        .from('ingestion_events')
-        .update({ processed_at: new Date().toISOString() })
-        .eq('id', event.id)
+      if (!messageId) throw new Error('QStash is not configured')
     } catch (queueError) {
-      console.error('[extension/ingest] Capture saved but queueing failed', queueError)
+      console.error('[extension/ingest] Capture saved but dispatch failed', queueError)
       return NextResponse.json({
         success: true,
         eventId: event.id,

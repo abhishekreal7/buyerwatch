@@ -12,6 +12,7 @@ import {
   normalizePlan,
 } from './plan-limits'
 import { createUnsubscribeUrl } from './email-preferences'
+import { redis } from './redis'
 
 type KeywordRow = {
   id: string
@@ -73,6 +74,8 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
   }
 
   const xEnabled = process.env.ENABLE_X_DISCOVERY === 'true'
+  const pollKeys = rows.map((keyword) => `poll:keyword:${keyword.id}`)
+  const lastPolledValues = pollKeys.length > 0 ? await redis.mget(...pollKeys) : []
   const dueUsers = new Set<string>()
   const jobs = new Map<string, {
     platform: KeywordRow['platform']
@@ -80,12 +83,16 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
     mappings: Array<{ id: string; user_id: string; term: string }>
   }>()
 
-  for (const keyword of rows) {
+  for (const [index, keyword] of rows.entries()) {
     const profile = Array.isArray(keyword.profiles)
       ? keyword.profiles[0]
       : keyword.profiles
     const plan = normalizePlan(profile?.plan)
-    if (!isPollingDue(plan, profile?.last_polled_at, now.getTime())) continue
+    if (!isPollingDue(
+      plan,
+      lastPolledValues[index] || profile?.last_polled_at,
+      now.getTime(),
+    )) continue
     if (keyword.platform === 'threads') continue
     if (
       keyword.platform === 'x'
@@ -113,6 +120,7 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
   }
 
   const bucket = jobBucket(now)
+  const enqueuedKeywordIds: string[] = []
   for (const job of jobs.values()) {
     const queue =
       job.platform === 'reddit'
@@ -126,6 +134,16 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
       { target: job.target, keywordMappings: job.mappings },
       { jobId: targetId(job.platform, job.target, bucket) },
     )
+    enqueuedKeywordIds.push(...job.mappings.map(({ id }) => id))
+  }
+
+  if (enqueuedKeywordIds.length > 0) {
+    const pipeline = redis.pipeline()
+    const timestamp = now.toISOString()
+    for (const keywordId of new Set(enqueuedKeywordIds)) {
+      pipeline.set(`poll:keyword:${keywordId}`, timestamp, 'EX', 7 * 24 * 60 * 60)
+    }
+    await pipeline.exec()
   }
 
   const userIds = [...dueUsers]

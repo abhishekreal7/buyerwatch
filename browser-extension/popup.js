@@ -9,6 +9,13 @@ const statusMessage = document.querySelector('#status-message')
 const loginStatus = document.querySelector('#login-status')
 const captureButton = document.querySelector('#capture-button')
 
+function normalizeAppUrl(value) {
+  const raw = String(value || DEFAULT_APP_URL).trim().replace(/\/+$/, '')
+  if (/^https?:\/\//i.test(raw)) return raw
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(raw)) return `http://${raw}`
+  return `https://${raw}`
+}
+
 function showView(name) {
   Object.entries(views).forEach(([key, element]) => {
     element.classList.toggle('hidden', key !== name)
@@ -22,7 +29,7 @@ function setStatus(message, tone = '') {
 
 async function getAppUrl() {
   const { appUrl } = await chrome.storage.sync.get('appUrl')
-  return String(appUrl || DEFAULT_APP_URL).replace(/\/+$/, '')
+  return normalizeAppUrl(appUrl)
 }
 
 async function getConfig() {
@@ -72,7 +79,11 @@ async function signIn(config, email, password) {
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new Error(payload.error_description || payload.msg || 'Unable to sign in.')
+    const message = payload.error_description || payload.msg || 'Unable to sign in.'
+    if (/invalid login credentials/i.test(message)) {
+      throw new Error('If you use Google sign-in, refresh BuyerWatch and reopen this extension.')
+    }
+    throw new Error(message)
   }
   const session = {
     ...payload,
@@ -86,8 +97,6 @@ function platformForUrl(url) {
   try {
     const hostname = new URL(url).hostname.toLowerCase()
     if (hostname.endsWith('reddit.com')) return { id: 'reddit', name: 'Reddit conversation', icon: 'R' }
-    if (hostname === 'bsky.app') return { id: 'bluesky', name: 'Bluesky conversation', icon: 'B' }
-    if (hostname === 'x.com' || hostname === 'twitter.com') return { id: 'x', name: 'X conversation', icon: 'X' }
   } catch {
     return null
   }
@@ -104,8 +113,8 @@ async function updateCurrentSite() {
   if (!platform) {
     icon.textContent = 'BW'
     icon.className = 'site-icon'
-    name.textContent = 'Open a supported conversation'
-    detail.textContent = 'Reddit, Bluesky, or X'
+    name.textContent = 'Open a Reddit conversation'
+    detail.textContent = 'BuyerWatch captures Reddit posts'
     captureButton.disabled = true
     return
   }
@@ -119,7 +128,7 @@ async function updateCurrentSite() {
 
 function captureErrorMessage(error) {
   const messages = {
-    unsupported_site: 'Open a Reddit, Bluesky, or X conversation first.',
+    unsupported_site: 'Open a Reddit conversation first.',
     conversation_not_found: 'BuyerWatch could not find the conversation on this page.',
     no_matching_keyword: 'This conversation does not match an active monitoring rule.',
     invalid_capture: 'The page did not contain a valid conversation.',

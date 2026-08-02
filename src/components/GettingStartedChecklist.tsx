@@ -6,6 +6,7 @@ import { CheckCircle2, X, Sparkles, ArrowRight, Trophy } from 'lucide-react'
 import Link from 'next/link'
 
 interface GettingStartedChecklistProps {
+  extensionInstalled: boolean
   keywordsCount: number
   hasInspectedLead: boolean
   hasCopiedOrApproved: boolean
@@ -13,6 +14,7 @@ interface GettingStartedChecklistProps {
 }
 
 export function GettingStartedChecklist({
+  extensionInstalled,
   keywordsCount,
   hasInspectedLead,
   hasCopiedOrApproved,
@@ -23,6 +25,13 @@ export function GettingStartedChecklist({
   const [dismissed, setDismissed] = useState(false)
 
   const steps = [
+    {
+      id: 'extension',
+      title: 'Reddit Extension Installed',
+      desc: 'Connect Chrome to BuyerWatch',
+      done: extensionInstalled,
+      link: '/settings?section=extension',
+    },
     {
       id: 'keyword',
       title: 'Topic Monitored',
@@ -68,8 +77,11 @@ export function GettingStartedChecklist({
 
   // Trigger smooth pop-up whenever a new step is completed!
   useEffect(() => {
-    if (completedCount > prevCompletedRef.current && prevCompletedRef.current !== 0) {
-      const newlyDone = steps.find(s => s.done && !prevCompletedRef.current)
+    const previousCount = prevCompletedRef.current
+    prevCompletedRef.current = completedCount
+
+    if (completedCount > previousCount && previousCount !== 0) {
+      const newlyDone = steps.filter(s => s.done)[completedCount - 1]
       setJustCompletedStep(newlyDone?.title || 'Setup Step Completed!')
       setVisible(true)
 
@@ -79,27 +91,23 @@ export function GettingStartedChecklist({
       }, 4500)
       return () => clearTimeout(timer)
     }
-    prevCompletedRef.current = completedCount
-  }, [completedCount, keywordsCount, hasInspectedLead, hasCopiedOrApproved, autoSendEnabled])
+  }, [completedCount, extensionInstalled, keywordsCount, hasInspectedLead, hasCopiedOrApproved, autoSendEnabled])
 
   if (dismissed) return null
 
   return (
-    <>
-      {/* Sleek Floating Header Action Trigger (Clean white glassmorphism pill) */}
-      <div className="fixed bottom-[76px] right-3 z-40 sm:right-6 lg:bottom-6">
-        <button
-          onClick={() => setVisible(prev => !prev)}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 py-2 text-xs font-bold text-gray-900 shadow-lg ring-1 ring-black/[0.04] backdrop-blur-md transition-all hover:bg-white hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]"
-          aria-expanded={visible}
-          aria-controls="setup-progress-panel"
-        >
-          <div className="w-5 h-5 rounded-full bg-blue-50 text-[#0A84FF] flex items-center justify-center font-extrabold text-[11px] border border-blue-100">
-            {completedCount}
-          </div>
-          <span>Setup Progress ({completedCount}/{steps.length})</span>
-        </button>
-      </div>
+    <div className="relative z-40">
+      <button
+        onClick={() => setVisible(prev => !prev)}
+        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#E3E3E0] bg-white px-3 py-2 text-xs font-semibold text-[#4F5865] shadow-xs transition-colors hover:bg-[#F7F7F5] hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF] sm:min-h-0"
+        aria-expanded={visible}
+        aria-controls="setup-progress-panel"
+      >
+        <div className="w-5 h-5 rounded-full bg-blue-50 text-[#0A84FF] flex items-center justify-center font-extrabold text-[11px] border border-blue-100">
+          {completedCount}
+        </div>
+        <span>Setup {completedCount}/{steps.length}</span>
+      </button>
 
       {/* Smooth Pop-Up Animated Toast Modal */}
       <AnimatePresence>
@@ -110,7 +118,7 @@ export function GettingStartedChecklist({
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 24, stiffness: 300 }}
             id="setup-progress-panel"
-            className="fixed inset-x-3 bottom-[156px] z-[60] space-y-4 overflow-hidden rounded-3xl border border-black/10 bg-white p-5 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[336px] lg:bottom-[104px]"
+            className="fixed inset-x-3 top-[132px] z-[60] space-y-4 overflow-hidden rounded-3xl border border-black/10 bg-white p-5 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+0.75rem)] sm:w-[336px]"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -185,6 +193,6 @@ export function GettingStartedChecklist({
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   )
 }

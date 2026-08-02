@@ -3,6 +3,7 @@ import {
   getProviderCapabilities,
   validateAppEnvironment,
   validateWebRuntimeEnvironment,
+  validateWorkerEnvironment,
 } from '../src/lib/env'
 
 const productionCore = {
@@ -96,5 +97,45 @@ describe('production capability configuration', () => {
     stubProductionCore()
     vi.stubEnv('DODO_PAYMENTS_API_KEY', 'configured')
     expect(() => validateAppEnvironment()).toThrow(/Dodo billing is partially configured/)
+  })
+
+  it('does not claim unapproved Reddit OAuth can power discovery', () => {
+    stubProductionCore()
+    vi.stubEnv('REDDIT_CLIENT_ID', 'client-id')
+    vi.stubEnv('REDDIT_CLIENT_SECRET', 'client-secret')
+    vi.stubEnv('REDDIT_API_APPROVED', 'false')
+
+    expect(getProviderCapabilities().redditDiscovery).toBe(false)
+  })
+
+  it('requires a production Reddit provider for the worker', () => {
+    stubProductionCore()
+    vi.stubEnv('ADMIN_SECRET', 'a'.repeat(32))
+    vi.stubEnv('REDDITAPIS_API_KEY', '')
+    vi.stubEnv('REDDIT_CLIENT_ID', '')
+    vi.stubEnv('REDDIT_CLIENT_SECRET', '')
+    vi.stubEnv('REDDIT_API_APPROVED', 'false')
+
+    expect(() => validateWorkerEnvironment()).toThrow(/requires an enabled Reddit proxy/)
+  })
+
+  it('does not enable a paid Reddit proxy from its key alone', () => {
+    stubProductionCore()
+    vi.stubEnv('ADMIN_SECRET', 'a'.repeat(32))
+    vi.stubEnv('REDDITAPIS_API_KEY', 'proxy-key')
+    vi.stubEnv('REDDITAPIS_FALLBACK_ENABLED', 'false')
+
+    expect(() => validateWorkerEnvironment()).toThrow(/requires an enabled Reddit proxy/)
+    expect(getProviderCapabilities().redditDiscovery).toBe(false)
+  })
+
+  it('accepts the configured Reddit proxy for the production worker', () => {
+    stubProductionCore()
+    vi.stubEnv('ADMIN_SECRET', 'a'.repeat(32))
+    vi.stubEnv('REDDITAPIS_API_KEY', 'proxy-key')
+    vi.stubEnv('REDDITAPIS_FALLBACK_ENABLED', 'true')
+
+    expect(() => validateWorkerEnvironment()).not.toThrow()
+    expect(getProviderCapabilities().redditDiscovery).toBe(true)
   })
 })

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { analyzeBuyingSignals } from './buying-signal-filter'
 import {
   AiUsageError,
   calculateAnthropicUsage,
@@ -54,6 +55,39 @@ function labelForScore(score: number): IntentResult['label'] {
   return 'other'
 }
 
+function scoreWithoutProvider(
+  post: NormalizedPost,
+  userProfile: IntentScoringProfile,
+): IntentScoringResult {
+  const text = `${post.title ?? ''} ${post.text ?? ''}`.trim()
+  const analysis = analyzeBuyingSignals(text)
+  const weights = analysis.categories.map((category) => {
+    if (category === 'purchase') return 88
+    if (category === 'seeking') return 78
+    if (category === 'research') return 68
+    return 55
+  })
+  const score = weights.length === 0
+    ? 35
+    : Math.min(95, Math.max(...weights) + Math.max(0, weights.length - 1) * 4)
+  const normalizedText = text.toLocaleLowerCase()
+  const competitorRisk = (userProfile.competitors ?? []).some((competitor) => {
+    const normalized = competitor.trim().toLocaleLowerCase()
+    return normalized.length > 1 && normalizedText.includes(normalized)
+  })
+  const evidence = analysis.matchedSignals.slice(0, 3)
+
+  return {
+    score,
+    label: labelForScore(score),
+    reasoning: evidence.length > 0
+      ? `Deterministic fallback matched: ${evidence.join(', ')}.`
+      : 'Deterministic fallback found only weak commercial intent.',
+    flag: competitorRisk ? 'COMPETITOR_RISK' : undefined,
+    usage: emptyAiUsage(),
+  }
+}
+
 export function buildIntentScoringPrompt(
   post: NormalizedPost,
   userProfile: IntentScoringProfile,
@@ -98,6 +132,7 @@ Requirements:
 export async function scoreIntent(
   post: NormalizedPost,
   userProfile: IntentScoringProfile,
+  options: { maxRetries?: number } = {},
 ): Promise<IntentScoringResult> {
   if (isDevelopmentMockEnabled('USE_MOCK_DRAFTS')) {
     const score = Math.floor(Math.random() * 101)
@@ -114,13 +149,14 @@ export async function scoreIntent(
 
   const apiKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not configured for intent scoring')
+    logger.warn('Anthropic is not configured; using deterministic intent scoring')
+    return scoreWithoutProvider(post, userProfile)
   }
 
   const anthropic = new Anthropic({
     apiKey,
     timeout: 30_000,
-    maxRetries: 2,
+    maxRetries: options.maxRetries ?? 2,
   })
   const model = process.env.ANTHROPIC_INTENT_MODEL
     || process.env.ANTHROPIC_MODEL
@@ -172,11 +208,11 @@ export async function scoreIntent(
       }
     } catch (error) {
       lastError = error
-      logger.warn({ error, attempt, model }, 'Anthropic intent scoring attempt failed')
+      logger.warn({ err: error, attempt, model }, 'Anthropic intent scoring attempt failed')
     }
   }
 
-  logger.error({ error: lastError, model }, 'Anthropic intent scoring failed')
+  logger.error({ err: lastError, model }, 'Anthropic intent scoring failed')
   throw new AiUsageError(
     'Intent scoring provider failed',
     aggregateUsage,

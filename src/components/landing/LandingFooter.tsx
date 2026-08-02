@@ -3,11 +3,11 @@
 import type { ReactNode } from 'react'
 import { useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
-import Link from 'next/link'
-import { Plus, Target } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { springs } from '@/lib/motion'
 import { NewsletterForm } from '@/components/NewsletterForm'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
+import { BrandLogo } from '@/components/BrandLogo'
 
 const faqs = [
   { q: 'What is BuyerWatch?', a: 'It monitors Reddit and Bluesky for people looking for solutions like yours, scores their intent, and drafts a reply for review.' },
@@ -21,8 +21,8 @@ const faqs = [
 ]
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] as const } },
+  hidden: { opacity: 1, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const } },
 }
 
 function Section({ children, className = '', id }: { children: ReactNode; className?: string; id?: string }) {
@@ -116,9 +116,8 @@ export function LandingFooter() {
         <footer className="bg-[#0A0A0A] text-white py-20 px-6">
           <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div className="md:col-span-1">
-              <div className="flex items-center gap-2 mb-4" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.025em' }}>
-                <Target className="w-4.5 h-4.5 text-[#0A84FF]" strokeWidth={2.2} />
-                BuyerWatch
+              <div className="mb-4">
+                <BrandLogo size="sm" tone="light" />
               </div>
               <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.42)', lineHeight: 1.65 }}>
                 Find your customers where they're already talking.
@@ -129,9 +128,9 @@ export function LandingFooter() {
                 {
                   label: 'Product',
                   links: [
-                    { name: 'Features', href: '#features' },
-                    { name: 'Pricing', href: '#pricing' },
-                    { name: 'How it Works', href: '#how-it-works' },
+                    { name: 'Features', href: '/#features' },
+                    { name: 'Pricing', href: '/#pricing' },
+                    { name: 'How it Works', href: '/#how-it-works' },
                   ],
                 },
                 {
@@ -153,7 +152,7 @@ export function LandingFooter() {
                   <div style={{ fontFamily: 'var(--font-inter)', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
                   <div className="flex flex-col gap-3">
                     {links.map(({ name, href }) => (
-                      <Link key={name} href={href} style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.38)' }} className="hover:text-white transition-colors duration-150">{name}</Link>
+                      <a key={name} href={href} style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: 'rgba(255,255,255,0.38)' }} className="hover:text-white transition-colors duration-150">{name}</a>
                     ))}
                   </div>
                 </div>

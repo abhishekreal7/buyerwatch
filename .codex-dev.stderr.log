@@ -1,0 +1,58 @@
+⨯ ReferenceError: Zap is not defined
+    at IntentDecisionVisual (src\components\landing\PremiumFeatureSections.tsx:208:14)
+  206 |         >
+  207 |           <div className="mb-2 flex items-center gap-1.5 rounded-full bg-blue-500/10 bord...
+> 208 |             <Zap className="h-3 w-3" />
+      |              ^
+  209 |             <span>AI INTENT SCORED</span>
+  210 |           </div>
+  211 | {
+  digest: '223780090'
+}
+[browser] Uncaught Error: Switched to client rendering because the server rendering errored:
+
+Zap is not defined
+    at IntentDecisionVisual (src\components\landing\PremiumFeatureSections.tsx:208:14)
+  206 |         >
+  207 |           <div className="mb-2 flex items-center gap-1.5 rounded-full bg-blue-500/10 bord...
+> 208 |             <Zap className="h-3 w-3" />
+      |              ^
+  209 |             <span>AI INTENT SCORED</span>
+  210 |           </div>
+  211 |
+[browser] ReferenceError: Zap is not defined
+    at IntentDecisionVisual (src/components/landing/PremiumFeatureSections.tsx:208:14)
+  206 |         >
+  207 |           <div className="mb-2 flex items-center gap-1.5 rounded-full bg-blue-500/10 bord...
+> 208 |             <Zap className="h-3 w-3" />
+      |              ^
+  209 |             <span>AI INTENT SCORED</span>
+  210 |           </div>
+  211 | (src/app/error.tsx:13:13)
+[browser] ReferenceError: Zap is not defined
+    at IntentDecisionVisual (src/components/landing/PremiumFeatureSections.tsx:208:14)
+  206 |         >
+  207 |           <div className="mb-2 flex items-center gap-1.5 rounded-full bg-blue-500/10 bord...
+> 208 |             <Zap className="h-3 w-3" />
+      |              ^
+  209 |             <span>AI INTENT SCORED</span>
+  210 |           </div>
+  211 | (src/app/error.tsx:13:13)
+[browser] ReferenceError: Zap is not defined
+    at IntentDecisionVisual (src/components/landing/PremiumFeatureSections.tsx:208:14)
+  206 |         >
+  207 |           <div className="mb-2 flex items-center gap-1.5 rounded-full bg-blue-500/10 bord...
+> 208 |             <Zap className="h-3 w-3" />
+      |              ^
+  209 |             <span>AI INTENT SCORED</span>
+  210 |           </div>
+  211 | (src/app/error.tsx:13:13)
+[browser] ReferenceError: Zap is not defined
+    at IntentDecisionVisual (src/components/landing/PremiumFeatureSections.tsx:208:14)
+  206 |         >
+  207 |           <div className="mb-2 flex items-center gap-1.5 rounded-full bg-blue-500/10 bord...
+> 208 |             <Zap className="h-3 w-3" />
+      |              ^
+  209 |             <span>AI INTENT SCORED</span>
+  210 |           </div>
+  211 | (src/app/error.tsx:13:13)

@@ -15,6 +15,15 @@ alter table public.profiles
   check (billing_status in ('free', 'pending', 'active', 'on_hold', 'cancelled', 'failed', 'expired'));
 
 alter table public.profiles
+  drop constraint if exists profiles_business_name_length_check,
+  drop constraint if exists profiles_business_description_length_check,
+  drop constraint if exists profiles_business_type_length_check,
+  drop constraint if exists profiles_writing_style_length_check,
+  drop constraint if exists profiles_tone_examples_length_check,
+  drop constraint if exists profiles_competitors_count_check,
+  drop constraint if exists profiles_notification_preferences_size_check;
+
+alter table public.profiles
   add constraint profiles_business_name_length_check
   check (business_name is null or char_length(business_name) between 1 and 120) not valid,
   add constraint profiles_business_description_length_check
@@ -31,6 +40,10 @@ alter table public.profiles
   check (pg_column_size(notification_preferences) <= 4096) not valid;
 
 alter table public.keywords
+  drop constraint if exists keywords_term_length_check,
+  drop constraint if exists keywords_target_length_check;
+
+alter table public.keywords
   add constraint keywords_term_length_check
   check (char_length(term) between 1 and 200) not valid,
   add constraint keywords_target_length_check
@@ -39,6 +52,8 @@ alter table public.keywords
 alter table public.monitored_threads
   add column if not exists send_claim_token uuid,
   add column if not exists send_claimed_at timestamptz,
+  drop constraint if exists monitored_threads_external_id_length_check,
+  drop constraint if exists monitored_threads_content_length_check,
   add constraint monitored_threads_external_id_length_check
   check (char_length(external_id) between 1 and 1000) not valid,
   add constraint monitored_threads_content_length_check

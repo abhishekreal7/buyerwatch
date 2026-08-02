@@ -3,7 +3,6 @@ import { Inter, Geist_Mono, Plus_Jakarta_Sans, Playfair_Display } from "next/fon
 import "./globals.css";
 import MotionProvider from "@/components/MotionProvider";
 import { Toaster } from "sonner";
-import { CommandPalette } from "@/components/CommandPalette";
 import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
@@ -36,8 +35,25 @@ export const metadata: Metadata = {
   title: "BuyerWatch | Premium Lead Generation",
   description: "Advanced signal intelligence and reply automation.",
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
-    shortcut: ['/icon.svg'],
+    icon: [
+      {
+        url: '/buyerwatch-icon.png?v=2',
+        type: 'image/png',
+        sizes: '128x128',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/buyerwatch-icon-dark.png?v=2',
+        type: 'image/png',
+        sizes: '128x128',
+        media: '(prefers-color-scheme: dark)',
+      },
+    ],
+    shortcut: [
+      { url: '/buyerwatch-icon.png?v=2', media: '(prefers-color-scheme: light)' },
+      { url: '/buyerwatch-icon-dark.png?v=2', media: '(prefers-color-scheme: dark)' },
+    ],
+    apple: [{ url: '/buyerwatch-icon.png', type: 'image/png', sizes: '128x128' }],
   },
 };
 
@@ -57,7 +73,6 @@ export default function RootLayout({
           {children}
         </MotionProvider>
         <Analytics />
-        <CommandPalette />
         <Toaster position="bottom-right" />
       </body>
     </html>

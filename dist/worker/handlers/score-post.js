@@ -73,6 +73,9 @@ async function scorePostHandler(job) {
             await (0, backend_maintenance_1.dispatchPendingOutbox)(1, existing.id);
             return;
         }
+        const hasScoringCheckpoint = Boolean(existing
+            && existing.intent_score !== null
+            && existing.intent_label);
         // 2. Fetch user profile for context and plan
         const { data: extendedProfile } = await supabase_1.supabaseWorker
             .from('profiles')
@@ -98,7 +101,7 @@ async function scorePostHandler(job) {
         const planLimits = (0, plan_limits_1.getPlanLimits)(plan);
         let scoreResult;
         let evidenceSignals;
-        if (existing) {
+        if (hasScoringCheckpoint && existing) {
             scoreResult = {
                 score: Number(existing.intent_score ?? 0),
                 label: existing.intent_label,
@@ -179,7 +182,7 @@ async function scorePostHandler(job) {
         }
         // Persist the paid intent result before drafting. A retry resumes from this
         // checkpoint and never pays to classify the same user/post twice.
-        if (!existing) {
+        if (!hasScoringCheckpoint) {
             await saveThread({
                 userId,
                 keywordId,

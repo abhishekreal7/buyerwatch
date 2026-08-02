@@ -1,0 +1,14 @@
+
+> buyerwatch@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.11 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.20.10.2:3000
+- Environments: .env.local
+✓ Ready in 774ms
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+ GET /login 200 in 488ms (next.js: 216ms, proxy.ts: 4ms, application-code: 267ms)
+✓ Compiled in 1013ms

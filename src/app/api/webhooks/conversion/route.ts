@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getIp, webhookRateLimit } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
+import { recordEngagementEvent } from '@/lib/automation-audit'
 
 function safeEqual(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left)
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     )
     const { data: attribution } = await supabase
       .from('reply_attribution')
-      .select('id, user_id, converted_at, revenue_usd')
+      .select('id, user_id, thread_id, converted_at, revenue_usd')
       .eq('shortcode', shortcode)
       .maybeSingle()
     const { data: profile } = attribution
@@ -69,6 +70,16 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: 'conversion_update_failed' }, { status: 500 })
     }
+
+    await recordEngagementEvent(supabase, {
+      userId: attribution.user_id,
+      threadId: attribution.thread_id,
+      eventType: 'converted',
+      actorType: 'provider',
+      source: 'conversion_webhook',
+      metadata: { revenueUsd: revenue_usd ?? attribution.revenue_usd ?? 0 },
+      idempotencyKey: `${attribution.thread_id ?? attribution.id}:converted`,
+    }).catch(() => undefined)
 
     return NextResponse.json({ success: true })
   } catch (error) {

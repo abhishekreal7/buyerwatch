@@ -114,6 +114,7 @@ create table if not exists ingestion_events (
 );
 
 alter table ingestion_events enable row level security;
+drop policy if exists "own ingestion events select" on ingestion_events;
 create policy "own ingestion events select"
   on ingestion_events for select to authenticated
   using (auth.uid() = user_id);

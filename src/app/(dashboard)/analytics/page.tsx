@@ -12,9 +12,10 @@ import { AppPage } from '@/components/AppPage'
 import { RadialGauge } from '@/components/RadialGauge'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
-import { formatDistanceToNow, subDays, startOfDay, isAfter, isBefore, format } from 'date-fns'
+import { formatDistanceToNow, subDays, startOfDay, isAfter, format } from 'date-fns'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
+import { useExtensionStatus } from '@/components/ExtensionInstall'
 
 // Custom Label for Horizontal Bar Chart
 const CustomBarLabel = (props: any) => {
@@ -102,41 +103,53 @@ export default function AnalyticsPage() {
 
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
+  const { status: extensionStatus, openInstall } = useExtensionStatus()
 
   useEffect(() => {
     async function loadData() {
-      // Parallel fetching for performance
-      const [profileRes, connsRes, threadsRes, analyticsRes, feedbackRes, attributionRes] = await Promise.all([
-        supabase.from('profiles').select('auto_send_enabled').eq('id', userId).single(),
-        supabase.from('platform_connections').select('platform').eq('user_id', userId),
-        fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).range(from, to)),
-        fetchAllPages((from, to) => supabase.from('reply_analytics').select('was_sent, sent_at').eq('user_id', userId).range(from, to)),
-        supabase.from('draft_feedback').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
-        fetchAllPages((from, to) => supabase.from('reply_attribution').select('clicked_at, converted_at, revenue_usd').eq('user_id', userId).range(from, to)),
-      ])
-
-      const threads = threadsRes.data || []
-      const analytics = analyticsRes.data || []
-      const feedback = feedbackRes.data || []
-      const conns = connsRes.data || []
-      const profile = profileRes.data
-
       const now = new Date()
       const thirtyDaysAgo = subDays(now, 30)
       const sixtyDaysAgo = subDays(now, 60)
+      const thirtyDaysAgoIso = thirtyDaysAgo.toISOString()
+      const sixtyDaysAgoIso = sixtyDaysAgo.toISOString()
+      // Parallel fetching for performance
+      const [
+        profileRes,
+        connsRes,
+        threadsRes,
+        totalSentRes,
+        sentThisMonthRes,
+        sentLastMonthRes,
+        feedbackRes,
+        clicksRes,
+        conversionsRes,
+        revenueRes,
+      ] = await Promise.all([
+        supabase.from('profiles').select('auto_send_enabled').eq('id', userId).single(),
+        supabase.from('platform_connections').select('platform').eq('user_id', userId),
+        fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).range(from, to)),
+        supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).not('sent_at', 'is', null),
+        supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).gte('sent_at', thirtyDaysAgoIso),
+        supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).gte('sent_at', sixtyDaysAgoIso).lt('sent_at', thirtyDaysAgoIso),
+        supabase.from('draft_feedback').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('clicked_at', 'is', null),
+        supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('converted_at', 'is', null),
+        fetchAllPages((from, to) => supabase.from('reply_attribution').select('revenue_usd').eq('user_id', userId).not('revenue_usd', 'is', null).range(from, to)),
+      ])
+
+      const threads = threadsRes.data || []
+      const feedback = feedbackRes.data || []
+      const conns = connsRes.data || []
+      const profile = profileRes.data
 
       // --- STATS ---
       const found = threads.length
       const draftedThreads = threads.filter(t => t.status === 'drafted' || t.status === 'needs_manual_reply')
       const draftedCount = draftedThreads.length
 
-      const sentAnalytics = analytics.filter(a => a.was_sent && a.sent_at)
-      const totalSent = sentAnalytics.length
-
-      const sentThisMonth = sentAnalytics.filter(a => isAfter(new Date(a.sent_at), thirtyDaysAgo)).length
-      const sentLastMonth = sentAnalytics.filter(a =>
-        isAfter(new Date(a.sent_at), sixtyDaysAgo) && isBefore(new Date(a.sent_at), thirtyDaysAgo)
-      ).length
+      const totalSent = totalSentRes.count ?? 0
+      const sentThisMonth = sentThisMonthRes.count ?? 0
+      const sentLastMonth = sentLastMonthRes.count ?? 0
 
       // --- TREND DATA (Last 30 Days) ---
       const discoveredMap: Record<string, number> = {}
@@ -227,10 +240,9 @@ export default function AnalyticsPage() {
       }
 
       // --- ATTRIBUTION STATS ---
-      const attributions = attributionRes.data || []
-      const clicks = attributions.filter(a => a.clicked_at).length
-      const conversions = attributions.filter(a => a.converted_at).length
-      const totalRevenue = attributions.reduce((sum, a) => sum + (Number(a.revenue_usd) || 0), 0)
+      const clicks = clicksRes.count ?? 0
+      const conversions = conversionsRes.count ?? 0
+      const totalRevenue = (revenueRes.data || []).reduce((sum, a) => sum + (Number(a.revenue_usd) || 0), 0)
 
       // --- TOP KEYWORDS ---
       const kwMap: Record<string, { term: string; count: number }> = {}
@@ -263,13 +275,37 @@ export default function AnalyticsPage() {
   if (loading || !data) {
     return (
       <AppPage>
-        <div className="flex min-h-[50vh] w-full flex-col items-center justify-center">
-          <div className="w-8 h-8 rounded-full border-2 border-black/[0.08] border-t-text-primary animate-spin" />
-          <p className="mt-4 text-text-tertiary text-sm font-medium">Loading analytics…</p>
+        <div className="space-y-6" aria-busy="true" aria-label="Loading analytics">
+          <div className="space-y-2">
+            <div className="h-8 w-36 animate-pulse rounded-md bg-[#E5E5E1]" />
+            <div className="h-3 w-64 max-w-full animate-pulse rounded bg-[#EFEFED]" />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-28 animate-pulse rounded-[16px] border border-black/[0.05] bg-white" />
+            ))}
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="h-[380px] animate-pulse rounded-[18px] border border-black/[0.05] bg-white lg:col-span-2" />
+            <div className="h-[380px] animate-pulse rounded-[18px] border border-black/[0.05] bg-white" />
+          </div>
         </div>
       </AppPage>
     )
   }
+
+  const needsAttention = extensionStatus === 'missing'
+    ? [
+        {
+          id: 'extension',
+          type: 'warning',
+          label: 'Extension not installed',
+          actionLabel: 'Set up extension →',
+          onClick: () => openInstall('Install the BuyerWatch extension to capture Reddit conversations.'),
+        },
+        ...data.needsAttention,
+      ]
+    : data.needsAttention
 
   return (
     <AppPage>
@@ -435,8 +471,8 @@ export default function AnalyticsPage() {
               <div className="px-6 pt-6 pb-4 border-b border-black/[0.04]">
                 <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Needs Attention</h3>
               </div>
-              <div className="flex-1 p-6 bg-surface-secondary/30">
-                {data.needsAttention.length === 0 ? (
+              <div className="flex-1 bg-white p-6">
+                {needsAttention.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center">
                     <div className="w-12 h-12 rounded-full bg-[#10B981]/10 flex items-center justify-center mb-3">
                       <CheckCircle className="w-6 h-6 text-[#10B981]" strokeWidth={2.5} />
@@ -446,15 +482,25 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {data.needsAttention.map(alert => (
+                    {needsAttention.map(alert => (
                       <div key={alert.id} className="bg-surface border border-black/[0.06] rounded-[14px] p-4 flex flex-col shadow-sm">
                         <div className="flex items-center gap-3 mb-3">
                           <AlertTriangle className={`w-4 h-4 ${alert.type === 'error' ? 'text-[#EF4444]' : 'text-[#F59E0B]'}`} strokeWidth={2.5} />
                           <p className="text-[14px] font-semibold text-text-primary">{alert.label}</p>
                         </div>
-                        <Link href={alert.href} className="text-[13px] font-semibold text-[#0A84FF] hover:text-[#0A84FF]/80 flex items-center gap-1 transition-colors w-fit">
-                          {alert.actionLabel}
-                        </Link>
+                        {alert.onClick ? (
+                          <button
+                            type="button"
+                            onClick={alert.onClick}
+                            className="flex w-fit items-center gap-1 text-[13px] font-semibold text-[#0A84FF] transition-colors hover:text-[#0A84FF]/80"
+                          >
+                            {alert.actionLabel}
+                          </button>
+                        ) : (
+                          <Link href={alert.href} className="text-[13px] font-semibold text-[#0A84FF] hover:text-[#0A84FF]/80 flex items-center gap-1 transition-colors w-fit">
+                            {alert.actionLabel}
+                          </Link>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -477,17 +523,17 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white border border-gray-200/80 p-5 rounded-2xl shadow-2xs">
+              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
                 <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Replies Clicked</p>
                 <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{data.attributionStats?.clicks || 0}</p>
                 <p className="text-xs text-gray-500 mt-1.5 font-medium">Tracked replies with at least one verified click</p>
               </div>
-              <div className="bg-blue-50/40 border border-blue-200/60 p-5 rounded-2xl shadow-2xs">
+              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
                 <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-wider mb-1">Conversions</p>
                 <p className="text-3xl font-extrabold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
                 <p className="text-xs text-gray-600 mt-1.5 font-medium">Attributed signups / payments</p>
               </div>
-              <div className="bg-emerald-50/40 border border-emerald-200/60 p-5 rounded-2xl shadow-2xs">
+              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
                 <p className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-wider mb-1">Attributed Revenue</p>
                 <p className="text-3xl font-extrabold text-emerald-600 tracking-tight">
                   {'$' + (data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

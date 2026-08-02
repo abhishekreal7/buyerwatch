@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Bell, CreditCard, Save, Check,
   Globe, AtSign, Shield,
-  Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info
+  Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info, Puzzle
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
+import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { AppPage } from '@/components/AppPage'
 import { toast } from 'sonner'
 import { PLAN_LIMITS, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
@@ -21,11 +22,13 @@ import {
   type StyleGuardrail,
   type ToneArchetype,
 } from '@/lib/writing-style'
+import { ExtensionSettingsPanel, useExtensionStatus } from '@/components/ExtensionInstall'
 
 /* ─── Nav sections ────────────────────────────────────────────────── */
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User, description: 'Business info & writing style' },
   { id: 'connections', label: 'Connections', icon: Link, description: 'Platform accounts & automation' },
+  { id: 'extension', label: 'Browser Extension', icon: Puzzle, description: 'Reddit capture setup' },
   { id: 'notifications', label: 'Notifications', icon: Bell, description: 'Alerts & digest preferences' },
   { id: 'plan', label: 'Plan & Billing', icon: CreditCard, description: 'Subscription & usage' },
 ]
@@ -125,6 +128,14 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
+  const { status: extensionStatus } = useExtensionStatus()
+
+  useEffect(() => {
+    const requestedSection = new URLSearchParams(window.location.search).get('section')
+    if (SECTIONS.some((section) => section.id === requestedSection)) {
+      setActiveSection(requestedSection as string)
+    }
+  }, [])
 
   const [profile, setProfile] = useState({
     businessName: '',
@@ -139,8 +150,12 @@ export default function SettingsPage() {
     redditUsername: '',
     autoSendEnabled: false,
     autoSendThreshold: 85,
+    autoSendDailyLimit: 3,
+    autoSendPlatforms: ['bluesky'] as string[],
+    autoSendCommunities: '',
     referralTrackingEnabled: true,
   })
+  const [activationAcknowledged, setActivationAcknowledged] = useState(false)
 
   const [connections, setConnections] = useState({ reddit: false, bluesky: false, redditUsername: '' })
   const [bskyHandle, setBskyHandle] = useState('')
@@ -185,7 +200,7 @@ export default function SettingsPage() {
       ] = await Promise.all([
         supabase
           .from('profiles')
-          .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
+          .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
           .eq('id', userId)
           .single(),
         supabase.from('platform_connections').select('platform, external_username').eq('user_id', userId),
@@ -209,7 +224,14 @@ export default function SettingsPage() {
           .eq('id', userId)
           .single()
         p = legacyProfile
-          ? { ...legacyProfile, tone_archetype: null, style_guardrails: [] }
+          ? {
+              ...legacyProfile,
+              tone_archetype: null,
+              style_guardrails: [],
+              auto_send_daily_limit: 3,
+              auto_send_platforms: ['bluesky'],
+              auto_send_communities: [],
+            }
           : null
       }
       if (p) {
@@ -226,6 +248,9 @@ export default function SettingsPage() {
           redditUsername: p.reddit_username || '',
           autoSendEnabled: p.auto_send_enabled || false,
           autoSendThreshold: p.auto_send_threshold || 85,
+          autoSendDailyLimit: p.auto_send_daily_limit || 3,
+          autoSendPlatforms: Array.isArray(p.auto_send_platforms) ? p.auto_send_platforms : ['bluesky'],
+          autoSendCommunities: Array.isArray(p.auto_send_communities) ? p.auto_send_communities.join(', ') : '',
           referralTrackingEnabled: p.referral_tracking_enabled !== false, // default true
         })
         if (p.notification_preferences) setNotifications(p.notification_preferences)
@@ -335,6 +360,13 @@ export default function SettingsPage() {
         body: JSON.stringify({
           auto_send_enabled: profile.autoSendEnabled,
           auto_send_threshold: profile.autoSendThreshold,
+          auto_send_daily_limit: profile.autoSendDailyLimit,
+          auto_send_platforms: profile.autoSendPlatforms,
+          auto_send_communities: profile.autoSendCommunities
+            .split(',')
+            .map(value => value.trim())
+            .filter(Boolean),
+          activation_acknowledged: activationAcknowledged,
         }),
       }),
       slackRequest,
@@ -342,7 +374,9 @@ export default function SettingsPage() {
 
     setSaving(false)
     if (error || !autoSendResponse.ok || !slackResponse.ok) { toast.error('Failed to save'); return }
+    clearSupabaseReadCache()
     setSaveSuccess(true)
+    setActivationAcknowledged(false)
     toast.success('Settings saved')
     setTimeout(() => setSaveSuccess(false), 2500)
   }
@@ -381,6 +415,7 @@ export default function SettingsPage() {
     })
     setBskyConnecting(false)
     if (res.ok) {
+      clearSupabaseReadCache()
       setConnections(p => ({ ...p, bluesky: true }))
       setBskyPassword('')
       toast.success('Bluesky connected')
@@ -399,6 +434,7 @@ export default function SettingsPage() {
       toast.error(`Failed to disconnect ${platform}`)
       return
     }
+    clearSupabaseReadCache()
     setConnections(p => ({ ...p, [platform]: false }))
     toast.success(`${platform} disconnected`)
   }
@@ -410,6 +446,7 @@ export default function SettingsPage() {
     { value: 'creator', label: 'Creator / Content' },
     { value: 'other', label: 'Other' },
   ]
+  const canActivateAutomation = planState.plan !== 'free' && draftsReviewed >= 10
 
   return (
     <AppPage>
@@ -434,6 +471,9 @@ export default function SettingsPage() {
                   >
                     <s.icon className={`w-4 h-4 shrink-0 ${activeSection === s.id ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={2} />
                     <span className="text-[13.5px] font-medium">{s.label}</span>
+                    {s.id === 'extension' && extensionStatus === 'missing' && (
+                      <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 ring-2 ring-amber-100" aria-label="Extension setup required" />
+                    )}
                   </button>
                 </li>
               ))}
@@ -681,77 +721,155 @@ export default function SettingsPage() {
                       </div>
                     </SectionCard>
 
-                    <SectionCard title="Automation" description="Control how BuyerWatch handles high-confidence matches.">
+                    <SectionCard title="Automation" description="Set the boundaries BuyerWatch must satisfy before it can act.">
                       <div className="space-y-5">
                         <div className="flex items-start justify-between gap-6">
                           <div className="flex-1">
-                            <p className="text-[14px] font-semibold text-gray-900">Auto-send high-confidence replies</p>
-                            {planState.plan === 'free' ? (
-                              <p className="text-[13px] text-gray-500 mt-1">
-                                Auto-send unlocks at Professional — you&apos;ve reviewed{' '}
-                                <span className="font-semibold text-gray-900">{draftsReviewed} of 10</span>{' '}
-                                drafts needed to activate it.
-                              </p>
-                            ) : (
-                              <p className="text-[13px] text-gray-500 mt-1">
-                                Automatically post replies when the intent score exceeds the threshold below. Only triggers when a platform is connected.
-                              </p>
-                            )}
+                            <p className="text-[14px] font-semibold text-gray-900">Earned auto-send</p>
+                            <p className="mt-1 text-[13px] text-gray-500">
+                              {planState.plan === 'free'
+                                ? `Professional plan required. ${draftsReviewed} of 10 trust reviews complete.`
+                                : draftsReviewed < 10
+                                  ? `${draftsReviewed} of 10 personal reviews complete. Community history cannot bypass this gate.`
+                                  : 'Your trust gate is complete. Set the delivery limits below before activation.'}
+                            </p>
                           </div>
-                          {planState.plan === 'free' ? (
+                          {profile.autoSendEnabled || canActivateAutomation ? (
+                            <Toggle
+                              label="Toggle earned auto-send"
+                              checked={profile.autoSendEnabled}
+                              onChange={value => {
+                                if (value && !activationAcknowledged) {
+                                  toast.info('Confirm the activation acknowledgement first.')
+                                  return
+                                }
+                                setProfile(current => ({ ...current, autoSendEnabled: value }))
+                              }}
+                            />
+                          ) : (
                             <div className="relative shrink-0">
-                              <div className="w-10 h-[22px] rounded-full bg-gray-200 opacity-50 cursor-not-allowed" />
-                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-gray-400 rounded-full flex items-center justify-center">
-                                <Shield className="w-2.5 h-2.5 text-white" strokeWidth={2.5} />
+                              <div className="h-[22px] w-10 cursor-not-allowed rounded-full bg-gray-200 opacity-50" />
+                              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-400">
+                                <Shield className="h-2.5 w-2.5 text-white" strokeWidth={2.5} />
                               </span>
                             </div>
-                          ) : (
-                            <Toggle label="Toggle auto-send" checked={profile.autoSendEnabled} onChange={v => setProfile(p => ({ ...p, autoSendEnabled: v }))} />
                           )}
                         </div>
 
-                        {/* Feature 4: Educational Earn Auto-Send Callout */}
-                        <div className="p-4 bg-[#F8F9FA] border border-black/5 rounded-xl text-[12.5px] text-gray-600 leading-relaxed space-y-1">
-                          <p className="font-semibold text-gray-900 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                            How Auto-Send Earns Your Trust
+                        <div className="space-y-1 rounded-xl border border-black/5 bg-[#F8F9FA] p-4 text-[12.5px] leading-relaxed text-gray-600">
+                          <p className="flex items-center gap-1.5 font-semibold text-gray-900">
+                            <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+                            How BuyerWatch earns permission
                           </p>
                           <p>
-                            BuyerWatch combines your review history with community rejection data. Your selected threshold remains the minimum: learned risk can make sending stricter, but never more permissive than your setting.
+                            Your first ten reviews are mandatory. After that, your threshold, quality checks, platform capability, target scope, and daily limit must all clear for every reply.
                           </p>
                         </div>
 
+                        {canActivateAutomation && !profile.autoSendEnabled && (
+                          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#DFDFDB] bg-white p-3.5">
+                            <input
+                              type="checkbox"
+                              checked={activationAcknowledged}
+                              onChange={event => setActivationAcknowledged(event.target.checked)}
+                              className="mt-0.5 h-4 w-4 accent-gray-900"
+                            />
+                            <span className="text-[12.5px] leading-5 text-gray-600">
+                              I understand that direct auto-send can publish without individual review, and I can pause it instantly from the dashboard.
+                            </span>
+                          </label>
+                        )}
+
                         <AnimatePresence>
-                          {profile.autoSendEnabled && (
+                          {(profile.autoSendEnabled || canActivateAutomation) && (
                             <motion.div
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: 'auto' }}
                               exit={{ opacity: 0, height: 0 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <div className="pt-4 border-t border-gray-100 space-y-4">
-                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2.5">
-                                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                                  <p className="text-[12.5px] text-amber-700 leading-relaxed">
-                                    Auto-send will post on your behalf without review. Start with a high threshold (90+) and monitor your audit log.
+                              <div className="space-y-5 border-t border-gray-100 pt-4">
+                                <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                  <p className="text-[12.5px] leading-relaxed text-amber-700">
+                                    Reddit remains assisted: BuyerWatch may prefill the reply, but you submit it. Direct automation is enabled only for supported connected providers.
                                   </p>
                                 </div>
+
                                 <div>
-                                  <div className="flex items-center justify-between mb-2">
+                                  <div className="mb-2 flex items-center justify-between">
                                     <label className="text-[13px] font-medium text-gray-700">Minimum confidence threshold</label>
-                                    <span className="text-[13px] font-bold text-gray-900 tabular-nums">{profile.autoSendThreshold}</span>
+                                    <span className="text-[13px] font-bold tabular-nums text-gray-900">{profile.autoSendThreshold}</span>
                                   </div>
                                   <input
-                                    type="range" min="70" max="99"
+                                    type="range"
+                                    min="70"
+                                    max="99"
                                     value={profile.autoSendThreshold}
-                                    onChange={e => setProfile(p => ({ ...p, autoSendThreshold: parseInt(e.target.value) }))}
-                                    className="w-full accent-gray-900 cursor-pointer"
+                                    onChange={event => setProfile(current => ({ ...current, autoSendThreshold: Number(event.target.value) }))}
+                                    className="w-full cursor-pointer accent-gray-900"
                                   />
-                                  <div className="flex justify-between text-[11px] text-gray-400 mt-1">
-                                    <span>70 — Learned floor applies</span>
-                                    <span>99 — Strict</span>
+                                  <div className="mt-1 flex justify-between text-[11px] text-gray-400">
+                                    <span>70, learned floor still applies</span>
+                                    <span>99, strict</span>
                                   </div>
                                 </div>
+
+                                <div>
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <label className="text-[13px] font-medium text-gray-700">Maximum automated replies per day</label>
+                                    <span className="text-[13px] font-bold tabular-nums text-gray-900">{profile.autoSendDailyLimit}</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="10"
+                                    value={profile.autoSendDailyLimit}
+                                    onChange={event => setProfile(current => ({ ...current, autoSendDailyLimit: Number(event.target.value) }))}
+                                    className="w-full cursor-pointer accent-gray-900"
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <p className="text-[13px] font-medium text-gray-700">Direct delivery platforms</p>
+                                  <label className={`flex items-center justify-between rounded-xl border px-3.5 py-3 ${connections.bluesky ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'}`}>
+                                    <span className="flex items-center gap-2.5 text-[12.5px] font-medium">
+                                      <BlueskyIcon className="h-4 w-4 text-[#1185FE]" />
+                                      Bluesky
+                                      <span className="font-normal text-gray-400">Direct</span>
+                                    </span>
+                                    <input
+                                      type="checkbox"
+                                      disabled={!connections.bluesky}
+                                      checked={profile.autoSendPlatforms.includes('bluesky')}
+                                      onChange={event => setProfile(current => ({
+                                        ...current,
+                                        autoSendPlatforms: event.target.checked
+                                          ? [...new Set([...current.autoSendPlatforms, 'bluesky'])]
+                                          : current.autoSendPlatforms.filter(platform => platform !== 'bluesky'),
+                                      }))}
+                                      className="h-4 w-4 accent-gray-900"
+                                    />
+                                  </label>
+                                  <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3.5 py-3 text-[12.5px]">
+                                    <span className="flex items-center gap-2.5 font-medium text-gray-700">
+                                      <RedditIcon className="h-4 w-4 text-[#FF4500]" />
+                                      Reddit
+                                      <span className="font-normal text-gray-400">Assisted submission</span>
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-gray-500">You submit</span>
+                                  </div>
+                                </div>
+
+                                <Field label="Allowed targets" hint="Optional">
+                                  <input
+                                    value={profile.autoSendCommunities}
+                                    onChange={event => setProfile(current => ({ ...current, autoSendCommunities: event.target.value }))}
+                                    placeholder="r/SaaS, product feedback"
+                                    className={inputCls}
+                                  />
+                                  <p className="mt-1.5 text-[11px] leading-4 text-gray-400">Comma-separated. Leave empty to use every monitored target on enabled platforms.</p>
+                                </Field>
                               </div>
                             </motion.div>
                           )}
@@ -790,6 +908,11 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </>
+                )}
+
+                {/* ── BROWSER EXTENSION ───────────────────────────── */}
+                {activeSection === 'extension' && (
+                  <ExtensionSettingsPanel />
                 )}
 
                 {/* ── NOTIFICATIONS ────────────────────────────────── */}

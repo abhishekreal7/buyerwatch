@@ -22,9 +22,11 @@ CREATE TABLE IF NOT EXISTS reply_attribution (
 );
 
 ALTER TABLE reply_attribution ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own attributions" ON reply_attribution;
 CREATE POLICY "own attributions" ON reply_attribution FOR ALL USING (auth.uid() = user_id);
 
 -- Public insert allowed for the /api/track/click endpoint (no auth session on click)
+DROP POLICY IF EXISTS "public click tracking" ON reply_attribution;
 CREATE POLICY "public click tracking" ON reply_attribution
   FOR UPDATE USING (true)
   WITH CHECK (true);

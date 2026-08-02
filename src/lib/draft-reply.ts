@@ -54,6 +54,7 @@ export async function draftReply(
   userProfile: UserProfile,
   intentScore: number,
   trackingUrl?: string,
+  options: { maxRetries?: number } = {},
 ): Promise<DraftReplyResult> {
   if (isDevelopmentMockEnabled('USE_MOCK_DRAFTS')) {
     const mockDraft = getMockDraft(post, userProfile)
@@ -148,7 +149,7 @@ Before writing, silently identify the author's actual need, the most useful grou
   const anthropic = new Anthropic({
     apiKey,
     timeout: 30_000,
-    maxRetries: 2,
+    maxRetries: options.maxRetries ?? 2,
   })
   const modelName = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5'
   generateText = async (instruction: string) => {
