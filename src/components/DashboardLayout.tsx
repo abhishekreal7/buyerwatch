@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -277,7 +277,7 @@ function DashboardShell({
                           <SidebarIcon
                             aria-hidden
                             strokeWidth={1.75}
-                            className={`${isFilledSidebarIcon ? 'h-4 w-4' : 'h-[17px] w-[17px]'} transition-colors ${
+                            className={`h-[17px] w-[17px] transition-colors ${
                               isFilledSidebarIcon
                                 ? isActive
                                   ? 'text-[#5D5D58]'
