@@ -238,10 +238,10 @@ function DashboardShell({
       <div className="h-screen w-screen overflow-hidden bg-[#F4F4F2] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
         {/* Desktop Sidebar sitting directly on warm stone background */}
-        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F4F4F2] px-2 py-2.5 h-full lg:flex select-none">
+        <aside className="hidden w-[220px] shrink-0 flex-col bg-white rounded-[20px] border border-[#E5E5E2] shadow-[0_2px_12px_rgba(0,0,0,0.06)] px-3 py-3 h-full lg:flex select-none">
           <div className="flex flex-col h-full">
             {/* Logo Header */}
-            <div className="mb-2 flex h-9 shrink-0 items-center px-3">
+            <div className="mb-3 flex h-10 shrink-0 items-center px-2">
               <Link
                 href="/dashboard"
                 className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
@@ -251,7 +251,7 @@ function DashboardShell({
             </div>
 
             {/* Navigation Items */}
-            <nav className="space-y-0.5" aria-label="Primary navigation">
+            <nav className="space-y-[2px]" aria-label="Primary navigation">
               {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 const SidebarIcon = item.sidebarIcon
@@ -267,39 +267,32 @@ function DashboardShell({
                       onFocus={() => prepareRoute(item.href)}
                       onTouchStart={() => prepareRoute(item.href)}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`group flex h-9 items-center justify-between rounded-[10px] px-3 text-[13.5px] transition-all duration-150 ${isActive
-                          ? 'border border-[#E2E2DE] bg-white font-semibold text-[#111110] shadow-[0_1px_2.5px_rgba(0,0,0,0.035)]'
-                          : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EBEBE8] hover:text-[#1C1C1A]'
-                        }`}
+                      className={`group flex h-9 items-center justify-between rounded-[10px] px-2.5 text-[13.5px] transition-all duration-150 ${
+                        isActive
+                          ? 'bg-[#F4F4F2] font-semibold text-[#111110]'
+                          : 'font-medium text-[#6B6B66] hover:bg-[#F4F4F2] hover:text-[#1C1C1A]'
+                      }`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <span className="grid h-5 w-5 shrink-0 place-items-center">
                           <SidebarIcon
                             aria-hidden
-                            strokeWidth={1.75}
+                            strokeWidth={isActive ? 2 : 1.75}
                             className={`h-[17px] w-[17px] transition-colors ${
-                              isFilledSidebarIcon
-                                ? isActive
-                                  ? 'text-[#5D5D58]'
-                                  : 'text-[#777771] group-hover:text-[#5D5D58]'
-                                : isActive
-                                  ? 'text-[#2D2D2A]'
-                                  : 'text-[#5D5D58] group-hover:text-[#30302D]'
+                              isActive ? 'text-[#1C1C1A]' : 'text-[#8E8E88] group-hover:text-[#3A3A36]'
                             }`}
                           />
                         </span>
                         <span className="truncate">{item.name}</span>
                         {showOpportunityIndicator && (
                           <span
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#1687E8] ${
-                              isActive ? 'ring-2 ring-white' : 'ring-2 ring-[#F4F4F2]'
-                            }`}
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#1687E8] ring-2 ring-white"
                             aria-label="Unreviewed opportunities available"
                           />
                         )}
                       </span>
                       {showExtensionAlert && !showOpportunityIndicator && (
-                        <span className="ml-2 h-2 w-2 shrink-0 rounded-full bg-amber-500 ring-2 ring-amber-100" title="Browser extension setup required" aria-label="Browser extension setup required" />
+                        <span className="ml-2 h-2 w-2 shrink-0 rounded-full bg-amber-400" title="Extension setup required" aria-label="Extension setup required" />
                       )}
                     </Link>
                   </div>
@@ -307,13 +300,14 @@ function DashboardShell({
               })}
             </nav>
 
-            {/* Bottom Navigation & Unified User Widget grouped with mt-auto */}
+            {/* Separator + Bottom section */}
             <div className="mt-auto shrink-0 flex flex-col gap-2 pt-3">
+              <div className="mb-1 h-px w-full bg-[#F0F0EE]" />
               <Link
                 href="/contact"
-                className="group flex h-8 items-center gap-2 rounded-xl px-2.5 text-[13px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
+                className="group flex h-8 items-center gap-2 rounded-[10px] px-2.5 text-[13px] font-medium text-[#6B6B66] transition-colors hover:bg-[#F4F4F2] hover:text-[#1C1C1A]"
               >
-                <PiQuestionFill className="h-[16px] w-[16px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
+                <PiQuestionFill className="h-[15px] w-[15px] text-[#9E9E98] group-hover:text-[#3A3A36]" aria-hidden />
                 Help center
               </Link>
 
