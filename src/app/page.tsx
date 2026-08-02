@@ -738,44 +738,66 @@ export default function LandingPage() {
               Monthly plans. Start free without a credit card.
             </motion.p>
 
-            <motion.div variants={staggerContainer} className="grid items-stretch gap-6 lg:grid-cols-3">
-              {PRICING_PLANS.map((plan) => (
-                <motion.article
-                  key={plan.id}
-                  variants={fadeUp}
-                  className={`relative flex flex-col rounded-[20px] bg-white p-8 ${
-                    plan.highlight
-                      ? 'border-2 border-[#0A0A0A] shadow-[0_8px_24px_rgba(0,0,0,0.08)]'
-                      : 'border border-[#EAEAEC]'
-                  }`}
-                >
-                  {plan.highlight && (
-                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[#0A0A0A] px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
-                      Recommended
-                    </span>
-                  )}
-                  <h3 className="mb-4 text-[20px] font-medium tracking-tight text-[#18181B]">{plan.name}</h3>
-                  <div className="mb-4 flex items-baseline">
-                    <span className="text-[44px] font-bold leading-none tracking-[-0.03em] text-[#18181B]">{plan.price}</span>
-                    <span className="ml-1.5 text-[14px] text-[#71717A]">{plan.period}</span>
-                  </div>
-                  <p className="mb-6 min-h-[44px] text-[14px] leading-relaxed text-[#52525B]">{plan.description}</p>
-                  <PremiumCtaButton href={plan.href} fullWidth className="mb-6">
-                    {plan.cta}
-                  </PremiumCtaButton>
-                  <div className="mb-6 border-t border-dotted border-[#E2E2E6]" />
-                  <ul className="flex flex-col gap-3.5">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2.5 text-left">
-                        <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden>
-                          <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#0A84FF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <span className="text-[14px] leading-snug text-[#3F3F46]">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </motion.article>
-              ))}
+            <motion.div variants={staggerContainer} className="grid items-stretch gap-5 lg:grid-cols-3">
+              {PRICING_PLANS.map((plan) => {
+                const isHighlighted = plan.highlight
+                return (
+                  <motion.article
+                    key={plan.id}
+                    variants={fadeUp}
+                    className={`relative flex flex-col rounded-[20px] p-8 transition-shadow duration-300 ${
+                      isHighlighted
+                        ? 'bg-[#0A0A0A] text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)] lg:-mt-4 lg:mb-4'
+                        : 'bg-white border border-[#E8E8E8] shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
+                    }`}
+                  >
+                    {isHighlighted && (
+                      <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-white px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[#0A0A0A]">
+                        Recommended
+                      </span>
+                    )}
+                    {/* Plan name */}
+                    <p className={`font-[family-name:var(--font-jakarta)] text-[20px] font-medium tracking-[-0.01em] mb-0.5 ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                      {plan.name}
+                    </p>
+                    <p className={`text-[13px] mb-5 ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>
+                      {plan.id === 'free' ? 'For exploring the platform' : plan.id === 'pro' ? 'For active founders' : 'For growing teams'}
+                    </p>
+                    {/* Price */}
+                    <div className="mb-4 flex items-baseline gap-1">
+                      <span className={`text-[46px] font-bold leading-none tracking-tight ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>{plan.price}</span>
+                      <span className={`text-[14px] font-medium ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>{plan.period}</span>
+                    </div>
+                    <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>
+                    {/* CTA */}
+                    <a
+                      href={plan.href}
+                      className={`mb-6 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-semibold transition-all duration-200 ${
+                        isHighlighted ? 'bg-white text-[#0A0A0A] hover:bg-white/90' : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
+                      }`}
+                    >
+                      {plan.cta}
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden><path d="M3 13L13 3M13 3H6M13 3V10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </a>
+                    {/* Divider */}
+                    <div className={`mb-5 h-px w-full ${isHighlighted ? 'bg-white/10' : 'bg-[#EBEBEB]'}`} />
+                    <p className={`mb-3 text-[12px] font-semibold uppercase tracking-widest ${isHighlighted ? 'text-white/40' : 'text-[#999]'}`}>What&apos;s included</p>
+                    {/* Features */}
+                    <ul className="flex flex-col gap-3">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2.5 text-left">
+                          <span className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full ${isHighlighted ? 'bg-white/15' : 'bg-[#0A0A0A]'}`}>
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                              <path d="M1.5 5L3.8 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </span>
+                          <span className={`text-[14px] leading-snug ${isHighlighted ? 'text-white/80' : 'text-[#444]'}`}>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </motion.article>
+                )
+              })}
             </motion.div>
 
             {false && (
