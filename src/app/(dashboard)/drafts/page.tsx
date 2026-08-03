@@ -510,9 +510,8 @@ export default function DraftsPage() {
                   // ══════════════════════════════════════════════════════
                   <div className="max-w-3xl mx-auto px-3 py-3 space-y-1" style={{ fontFamily: 'IBM Plex Sans, system-ui, sans-serif' }}>
 
-                    {/* Post card */}
+                    {/* Post card - clamped so reply box stays visible */}
                     <div className="rounded-md bg-white border border-[#EDEFF1] overflow-hidden">
-                      {/* Vote + meta row */}
                       <div className="flex">
                         <div className="w-10 bg-[#F8F9FA] flex flex-col items-center pt-2 gap-0.5">
                           <button className="text-[#878A8C] hover:text-[#FF4500] transition-colors" aria-label="upvote">
@@ -532,10 +531,10 @@ export default function DraftsPage() {
                             <span>{selected.timeAgo}</span>
                           </div>
                           {selected.title && (
-                            <h3 className="text-[16px] font-semibold text-[#222222] mb-2 leading-snug">{selected.title}</h3>
+                            <h3 className="text-[15px] font-semibold text-[#222222] mb-1.5 leading-snug">{selected.title}</h3>
                           )}
-                          <p className="text-[13.5px] text-[#3C3C3C] leading-relaxed">{selected.content}</p>
-                          {/* Reddit action bar */}
+                          {/* Clamped to 4 lines — click Open thread to read full */}
+                          <p className="text-[13px] text-[#4A4A4A] leading-relaxed line-clamp-4">{selected.content}</p>
                           <div className="flex items-center gap-3 mt-3 text-[11.5px] font-bold text-[#878A8C]">
                             <button className="flex items-center gap-1 hover:bg-[#F6F7F8] px-2 py-1 rounded transition-colors">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -566,7 +565,7 @@ export default function DraftsPage() {
                             value={draftContent}
                             onChange={e => setDraftContent(e.target.value)}
                             className="w-full px-3 py-2.5 text-[13.5px] leading-relaxed text-[#1C1C1B] resize-none focus:outline-none bg-white"
-                            rows={7}
+                            rows={5}
                             spellCheck
                             placeholder="What are your thoughts?"
                           />
@@ -634,7 +633,7 @@ export default function DraftsPage() {
                           {selected.title && (
                             <p className="text-[14.5px] font-semibold text-[#0F1419] mb-1">{selected.title}</p>
                           )}
-                          <p className="text-[14.5px] text-[#0F1419] leading-relaxed">{selected.content}</p>
+                          <p className="text-[14px] text-[#0F1419] leading-relaxed line-clamp-4">{selected.content}</p>
                           {/* Bluesky engagement row */}
                           <div className="flex items-center gap-6 mt-3 text-[#536471]">
                             <button className="flex items-center gap-1.5 hover:text-[#0085FF] transition-colors text-[12.5px]">
@@ -672,8 +671,8 @@ export default function DraftsPage() {
                             <textarea
                               value={draftContent}
                               onChange={e => setDraftContent(e.target.value)}
-                              className="w-full text-[14.5px] leading-relaxed text-[#0F1419] resize-none focus:outline-none bg-transparent placeholder:text-[#536471]"
-                              rows={6}
+                              className="w-full text-[14px] leading-relaxed text-[#0F1419] resize-none focus:outline-none bg-transparent placeholder:text-[#536471]"
+                              rows={5}
                               spellCheck
                               placeholder="Write your reply…"
                             />
