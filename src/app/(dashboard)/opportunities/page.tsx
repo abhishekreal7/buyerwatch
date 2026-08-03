@@ -1,26 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import {
   AtSign,
+  Calendar,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   ExternalLink,
-  LayoutGrid,
   List,
   MessageCircle,
   Search,
+  Sparkles,
   Target,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppPage } from '@/components/AppPage'
 import { BlueskyIcon, RedditIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
-import { LeadPipelineBoard } from '@/components/LeadPipelineBoard'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
-import { springs, staggers } from '@/lib/motion'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { useDashboardSession } from '@/components/DashboardContext'
@@ -66,24 +66,17 @@ const AUTOMATION_REASON_LABELS: Record<string, string> = {
   assisted_delivery_required: 'This platform requires your review and final submit.',
 }
 
-function PlatformBadge({ platform }: { platform: string }) {
-  const normalized = platform.toLocaleLowerCase()
-  return (
-    <span className="flex w-fit shrink-0 items-center gap-1.5 rounded-md bg-black/[0.04] px-2.5 py-1 text-[12px] font-medium capitalize text-text-secondary">
-      {normalized === 'reddit' && <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />}
-      {normalized === 'bluesky' && <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />}
-      {normalized === 'x' && <AtSign className="h-3.5 w-3.5" />}
-      {!['reddit', 'bluesky', 'x'].includes(normalized) && <MessageCircle className="h-3.5 w-3.5" />}
-      {platform}
-    </span>
-  )
+function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm' | 'md' }) {
+  const cls = size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5'
+  const norm = platform.toLowerCase()
+  if (norm === 'reddit') return <RedditIcon className={`${cls} text-[#FF4500]`} />
+  if (norm === 'bluesky') return <BlueskyIcon className={`${cls} text-[#0284C7]`} />
+  if (norm === 'x') return <AtSign className={`${cls} text-[#0F1419]`} />
+  return <MessageCircle className={`${cls} text-gray-500`} />
 }
 
 function formatTimeAgo(dateString: string) {
-  const elapsedSeconds = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(dateString).getTime()) / 1000),
-  )
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / 1000))
   if (elapsedSeconds < 60) return `${elapsedSeconds}s ago`
   if (elapsedSeconds < 3600) return `${Math.floor(elapsedSeconds / 60)}m ago`
   if (elapsedSeconds < 86400) return `${Math.floor(elapsedSeconds / 3600)}h ago`
@@ -123,20 +116,237 @@ function parseOpportunities(data: any[]): Opportunity[] {
   })
 }
 
+// ─── Left Panel: Compact Lead Row ───────────────────────────────────────────
+
+function LeadRow({
+  opportunity,
+  isActive,
+  onClick,
+}: {
+  opportunity: Opportunity
+  isActive: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left px-4 py-3.5 border-b border-[#F0F0ED] transition-colors duration-100 group ${
+        isActive
+          ? 'bg-[#FFF8F5] border-l-2 border-l-[#FF5101]'
+          : 'bg-white border-l-2 border-l-transparent hover:bg-[#FAFAF8]'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        <h4 className={`text-[13.5px] font-semibold leading-snug line-clamp-1 transition-colors ${
+          isActive ? 'text-[#1C1C1A]' : 'text-[#1C1C1A] group-hover:text-[#FF5101]'
+        }`}>
+          {opportunity.title || opportunity.keyword || 'Conversation Lead'}
+        </h4>
+        <IntentBadge score={opportunity.score} label={opportunity.label} className="shrink-0 text-[10.5px]" />
+      </div>
+
+      <p className="text-[12px] text-[#6B6B66] line-clamp-2 leading-relaxed mb-2">
+        {opportunity.content || opportunity.reasoning}
+      </p>
+
+      <div className="flex items-center gap-2 text-[11px] text-[#8C8C85]">
+        <PlatformIcon platform={opportunity.platform} />
+        <span className="font-medium text-[#4A4A45] truncate max-w-[80px]">{opportunity.target}</span>
+        <span className="opacity-40">·</span>
+        <span>{formatTimeAgo(opportunity.createdAt)}</span>
+        {opportunity.flag === 'COMPETITOR_RISK' && (
+          <>
+            <span className="opacity-40">·</span>
+            <span className="text-amber-600 font-semibold">Competitor</span>
+          </>
+        )}
+        <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-30 group-hover:opacity-60 transition-opacity shrink-0" />
+      </div>
+    </button>
+  )
+}
+
+// ─── Right Panel: Full Detail View ───────────────────────────────────────────
+
+function DetailPanel({
+  opportunity,
+  draftingId,
+  onDraftReply,
+  onClose,
+}: {
+  opportunity: Opportunity
+  draftingId: string | null
+  onDraftReply: (id: string) => void
+  onClose: () => void
+}) {
+  const [reasoningOpen, setReasoningOpen] = useState(true)
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Detail Header */}
+      <div className="px-6 py-4 border-b border-[#EDEDEA] flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <PlatformIcon platform={opportunity.platform} size="md" />
+          <span className="text-[13px] font-semibold text-[#1C1C1A] truncate">{opportunity.target}</span>
+          <span className="text-[13px] text-[#8C8C85]">·</span>
+          <span className="text-[13px] text-[#8C8C85] truncate">{opportunity.author}</span>
+          <span className="text-[13px] text-[#8C8C85]">·</span>
+          <span className="text-[12px] text-[#8C8C85]">{formatTimeAgo(opportunity.createdAt)}</span>
+        </div>
+        <IntentBadge score={opportunity.score} label={opportunity.label} />
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-7 w-7 flex items-center justify-center rounded-lg text-[#8C8C85] hover:bg-[#F0F0ED] hover:text-[#1C1C1A] transition-colors shrink-0"
+          title="Close panel"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Scrollable Body */}
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+        {/* Title + Content */}
+        <div>
+          {opportunity.title && (
+            <h2 className="text-[18px] font-bold leading-snug tracking-tight text-[#1C1C1A] mb-3">
+              {opportunity.title}
+            </h2>
+          )}
+          <p className="text-[14px] leading-relaxed text-[#4A4A45] whitespace-pre-line">
+            {opportunity.content}
+          </p>
+        </div>
+
+        {/* Matched Signals */}
+        {opportunity.matchedSignals.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold text-[#8C8C85] uppercase tracking-wider mb-2">Matched Signals</p>
+            <div className="flex flex-wrap gap-1.5">
+              {opportunity.matchedSignals.map(signal => (
+                <span
+                  key={signal}
+                  className="rounded-full bg-[#F2F2EF] px-2.5 py-1 text-[11.5px] font-medium text-[#4A4A45]"
+                >
+                  {signal}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Reasoning */}
+        {opportunity.reasoning && (
+          <div className="rounded-xl border border-[#E8E8E5] bg-[#FAFAF8] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setReasoningOpen(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left"
+            >
+              <span className="text-[12px] font-semibold text-[#4A4A45]">Why this opportunity matters</span>
+              {reasoningOpen
+                ? <ChevronUp className="h-4 w-4 text-[#8C8C85]" />
+                : <ChevronDown className="h-4 w-4 text-[#8C8C85]" />}
+            </button>
+            {reasoningOpen && (
+              <p className="px-4 pb-4 pt-0 text-[13px] leading-relaxed text-[#5A5A55] border-t border-[#E8E8E5]">
+                {opportunity.reasoning}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Automation Note */}
+        {opportunity.automationReason && opportunity.automationReason !== 'confidence_cleared' && (
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-[12.5px] leading-relaxed text-amber-800">
+            <span className="font-semibold">Review status: </span>
+            {AUTOMATION_REASON_LABELS[opportunity.automationReason] || 'This reply requires manual review.'}
+            {opportunity.qualityIssues.length > 0 && (
+              <span className="ml-1 text-amber-700">
+                Checks: {opportunity.qualityIssues.join(', ').replaceAll('_', ' ')}.
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Keyword Match */}
+        <div className="flex items-center gap-1.5 text-[12px] text-[#8C8C85]">
+          <span>Matched keyword:</span>
+          <span className="font-semibold text-[#4A4A45]">&ldquo;{opportunity.keyword}&rdquo;</span>
+        </div>
+      </div>
+
+      {/* Sticky Footer Actions */}
+      <div className="shrink-0 px-6 py-4 border-t border-[#EDEDEA] bg-white flex items-center gap-3">
+        {opportunity.url && (
+          <a
+            href={opportunity.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg border border-[#DEDEDA] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#4A4A45] hover:bg-[#F7F7F4] transition-colors"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View source
+          </a>
+        )}
+        <div className="flex-1" />
+        {opportunity.status === 'pending' ? (
+          <button
+            type="button"
+            onClick={() => onDraftReply(opportunity.id)}
+            disabled={draftingId === opportunity.id}
+            className="flex items-center gap-2 rounded-lg bg-[#1C1C1A] px-4 py-2 text-[13px] font-semibold text-white hover:bg-black transition-colors disabled:opacity-50 shadow-sm"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {draftingId === opportunity.id ? 'Drafting…' : 'Generate draft'}
+          </button>
+        ) : (
+          <Link
+            href="/drafts"
+            className="flex items-center gap-2 rounded-lg bg-[#1C1C1A] px-4 py-2 text-[13px] font-semibold text-white hover:bg-black transition-colors shadow-sm"
+          >
+            {opportunity.status === 'drafted' ? 'Review draft' : 'Write reply'}
+          </Link>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Empty Detail Placeholder ─────────────────────────────────────────────────
+
+function EmptyDetail() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center px-8">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F2F2EF]">
+        <Target className="h-7 w-7 text-[#8C8C85]" strokeWidth={1.75} />
+      </div>
+      <p className="text-[14px] font-semibold text-[#4A4A45] mb-1">Select an opportunity</p>
+      <p className="text-[13px] text-[#8C8C85] max-w-[240px] leading-relaxed">
+        Pick a lead from the list on the left to review its full details and generate a reply.
+      </p>
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function OpportunitiesPage() {
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
   const [activeFilter, setActiveFilter] = useState('All')
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const [draftingId, setDraftingId] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function fetchOpportunities() {
@@ -155,16 +365,16 @@ export default function OpportunitiesPage() {
           .in('status', ['pending', 'drafted', 'needs_manual_reply']),
       ])
       const { data, error } = pageResult
-
       if (error) {
         toast.error('Unable to load opportunities.')
         setLoading(false)
         return
       }
-
-      setOpportunities(parseOpportunities(data ?? []))
+      const parsed = parseOpportunities(data ?? [])
+      setOpportunities(parsed)
       setTotalCount(countResult.count ?? data?.length ?? 0)
       setHasMore((data?.length ?? 0) === PAGE_SIZE)
+      if (parsed.length > 0) setSelectedId(parsed[0].id)
       setLoading(false)
     }
     void fetchOpportunities()
@@ -242,9 +452,13 @@ export default function OpportunitiesPage() {
       return sortOrder === 'desc' ? bScore - aScore : aScore - bScore
     })
 
+  const selectedOpportunity = filtered.find(o => o.id === selectedId) ?? null
+
   return (
     <AppPage>
-      <div className="flex w-full flex-col">
+      <div className="flex w-full flex-col" style={{ height: 'calc(100vh - 56px)' }}>
+
+        {/* ── Top Bar ─────────────────────────────────────────────── */}
         <PageHeader
           title="Opportunities"
           action={(
@@ -258,7 +472,8 @@ export default function OpportunitiesPage() {
           )}
         />
 
-        <div className="mb-6 flex flex-col gap-3 border-y border-[#E7E7E3] py-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* ── Filter Bar ──────────────────────────────────────────── */}
+        <div className="mb-0 flex flex-col gap-3 border-y border-[#E7E7E3] py-3 sm:flex-row sm:items-center sm:justify-between px-0 shrink-0">
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {FILTERS.map(filter => (
               <button
@@ -280,193 +495,103 @@ export default function OpportunitiesPage() {
             ))}
           </div>
 
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            {/* View Mode Switcher Toggle */}
-            <div className="inline-flex shrink-0 items-center rounded-[10px] border border-[#DEDEDA] bg-white p-0.5">
-              <button
-                type="button"
-                onClick={() => setViewMode('board')}
-                className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors duration-150 ${
-                  viewMode === 'board'
-                    ? 'bg-text-primary text-white shadow-xs'
-                    : 'text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
-                }`}
-                title="Board View (Pipeline)"
-                aria-label="Board view"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors duration-150 ${
-                  viewMode === 'list'
-                    ? 'bg-text-primary text-white shadow-xs'
-                    : 'text-text-secondary hover:bg-black/[0.04] hover:text-text-primary'
-                }`}
-                title="List View (Feed)"
-                aria-label="List view"
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Search thread pill input */}
-            <div className="relative flex-1 sm:w-56">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none" strokeWidth={2} />
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" strokeWidth={2} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search thread"
-                className="h-9 w-full rounded-[10px] border border-[#DEDEDA] bg-white pl-9 pr-4 text-xs font-normal text-gray-800 placeholder-gray-500 transition-colors hover:border-gray-300 focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15"
+                className="h-9 w-48 rounded-[10px] border border-[#DEDEDA] bg-white pl-9 pr-4 text-xs font-normal text-gray-800 placeholder-gray-400 focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15"
               />
             </div>
-
+            {/* Sort */}
             <button
               type="button"
-              onClick={() => setSortOrder(current => current === 'desc' ? 'asc' : 'desc')}
-              className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-[#DEDEDA] bg-white px-3 text-[13px] font-semibold text-text-primary transition-colors hover:bg-[#F7F7F4]"
+              onClick={() => setSortOrder(curr => curr === 'desc' ? 'asc' : 'desc')}
+              className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-[#DEDEDA] bg-white px-3 text-[13px] font-medium text-text-secondary transition-colors hover:bg-[#F7F7F4]"
             >
-              {sortOrder === 'desc'
-                ? <ChevronDown className="h-4 w-4 text-text-secondary" />
-                : <ChevronUp className="h-4 w-4 text-text-secondary" />}
-              <span className="font-medium text-text-secondary hidden sm:inline">Sort:</span> Intent
+              {sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              <span className="hidden sm:inline">Sort:</span> Intent
             </button>
           </div>
         </div>
 
+        {/* ── Split Panel Body ────────────────────────────────────── */}
         {loading ? (
-          <div className="grid gap-4 lg:grid-cols-3" aria-busy="true" aria-label="Loading opportunities">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-48 animate-pulse rounded-[18px] border border-black/[0.05] bg-white" />
-            ))}
+          <div className="flex-1 grid grid-cols-[380px_1fr] overflow-hidden">
+            <div className="border-r border-[#E7E7E3] space-y-px pt-2 px-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-[88px] animate-pulse rounded-lg bg-[#F2F2EF] mb-2" />
+              ))}
+            </div>
+            <div className="flex items-center justify-center">
+              <div className="h-6 w-32 animate-pulse rounded-full bg-[#F2F2EF]" />
+            </div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="surface-ceramic flex flex-col items-center justify-center border border-transparent px-5 py-20 text-center sm:py-32">
+          <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">
               <Target className="h-8 w-8" strokeWidth={2.25} />
             </div>
-            <h3 className="mb-2 text-[20px] font-display font-semibold text-text-primary">No active opportunities</h3>
-            <p className="max-w-sm text-[15px] leading-relaxed text-text-secondary">New qualified conversations will appear here with their source evidence and draft status.</p>
+            <h3 className="mb-2 text-[20px] font-semibold text-text-primary">No active opportunities</h3>
+            <p className="max-w-sm text-[15px] leading-relaxed text-text-secondary">
+              New qualified conversations will appear here with their source evidence and draft status.
+            </p>
           </div>
-        ) : viewMode === 'board' ? (
-          <LeadPipelineBoard
-            opportunities={filtered}
-            onDraftReply={handleDraftReply}
-            draftingId={draftingId}
-          />
         ) : (
-          <motion.div variants={staggers.container} initial="initial" animate="animate" className="space-y-4 px-1 pb-4">
-            {filtered.map(opportunity => (
-              <motion.article
-                key={opportunity.id}
-                variants={staggers.item}
-                transition={springs.smooth}
-                className="surface-ceramic border border-transparent p-5 sm:p-6"
-              >
-                <div className="mb-4 flex flex-wrap items-center gap-2.5 text-[13px] text-text-secondary">
-                  <PlatformBadge platform={opportunity.platform} />
-                  <span className="font-semibold text-text-primary">{opportunity.target}</span>
-                  <span className="opacity-35">/</span>
-                  <span>{opportunity.author}</span>
-                  <span className="opacity-35">/</span>
-                  <span>{formatTimeAgo(opportunity.createdAt)}</span>
-                  <div className="flex-1" />
-                  {opportunity.flag === 'COMPETITOR_RISK' && (
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">Competitor mention</span>
-                  )}
-                  <IntentBadge score={opportunity.score} label={opportunity.label} />
-                </div>
+          <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: '380px 1fr' }}>
 
-                {opportunity.title && <h3 className="mb-2.5 text-[17px] font-semibold leading-snug tracking-tight text-text-primary">{opportunity.title}</h3>}
-                <p className="mb-4 line-clamp-3 text-[15px] leading-relaxed text-text-secondary">{opportunity.content}</p>
-
-                {opportunity.matchedSignals.length > 0 && (
-                  <div className="mb-4 flex flex-wrap gap-1.5">
-                    {opportunity.matchedSignals.slice(0, 4).map(signal => (
-                      <span key={signal} className="rounded-full bg-black/[0.035] px-2.5 py-1 text-[11px] font-medium text-text-tertiary">
-                        {signal}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {opportunity.reasoning && (
-                  <div className="mb-4 rounded-xl border border-black/[0.05] bg-black/[0.018]">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(current => current === opportunity.id ? null : opportunity.id)}
-                      aria-expanded={expandedId === opportunity.id}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left text-[12px] font-semibold text-text-secondary"
-                    >
-                      Why this conversation matters
-                      {expandedId === opportunity.id
-                        ? <ChevronUp className="h-4 w-4" />
-                        : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {expandedId === opportunity.id && (
-                      <p className="border-t border-black/[0.05] px-4 py-3 text-[13px] leading-relaxed text-text-secondary">
-                        {opportunity.reasoning}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {opportunity.automationReason && opportunity.automationReason !== 'confidence_cleared' && (
-                  <div className="mb-4 rounded-xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-[12px] leading-relaxed text-amber-800">
-                    <span className="font-semibold">Review status: </span>
-                    {AUTOMATION_REASON_LABELS[opportunity.automationReason] || 'This reply requires manual review.'}
-                    {opportunity.qualityIssues.length > 0 && (
-                      <span className="ml-1 text-amber-700">
-                        Checks: {opportunity.qualityIssues.join(', ').replaceAll('_', ' ')}.
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-3 border-t border-black/[0.04] pt-4">
-                  <span className="text-[12px] font-medium text-text-tertiary">Matched: &quot;{opportunity.keyword}&quot;</span>
-                  <div className="flex-1" />
-                  {opportunity.url && (
-                    <a
-                      href={opportunity.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text-primary"
-                    >
-                      View source <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  )}
-                  {opportunity.status === 'pending' ? (
-                    <button
-                      type="button"
-                      onClick={() => handleDraftReply(opportunity.id)}
-                      disabled={draftingId === opportunity.id}
-                      className="btn-primary flex items-center gap-2 px-4 py-2 text-[13px] disabled:opacity-50 !rounded-full"
-                    >
-                      {draftingId === opportunity.id ? 'Drafting...' : 'Generate draft'}
-                    </button>
-                  ) : (
-                    <Link href="/drafts" className="btn-primary flex items-center gap-2 px-4 py-2 text-[13px] !rounded-full">
-                      {opportunity.status === 'drafted' ? 'Review draft' : 'Write reply'}
-                    </Link>
-                  )}
-                </div>
-              </motion.article>
-            ))}
-          </motion.div>
-        )}
-        {!loading && hasMore && (
-          <div className="flex justify-center pt-6">
-            <button
-              type="button"
-              onClick={loadMoreOpportunities}
-              disabled={loadingMore}
-              className="rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-[13px] font-semibold text-text-primary shadow-sm transition-colors hover:bg-black/[0.025] disabled:opacity-50"
+            {/* LEFT: Scrollable Lead List */}
+            <div
+              ref={listRef}
+              className="overflow-y-auto border-r border-[#E7E7E3]"
+              style={{ scrollbarWidth: 'thin' }}
             >
-              {loadingMore ? 'Loading…' : 'Load more opportunities'}
-            </button>
+              {filtered.map(opportunity => (
+                <LeadRow
+                  key={opportunity.id}
+                  opportunity={opportunity}
+                  isActive={selectedId === opportunity.id}
+                  onClick={() => setSelectedId(opportunity.id)}
+                />
+              ))}
+
+              {/* Load More */}
+              {hasMore && (
+                <div className="px-4 py-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMoreOpportunities}
+                    disabled={loadingMore}
+                    className="rounded-full border border-black/[0.08] bg-white px-5 py-2 text-[12px] font-semibold text-text-primary shadow-xs transition-colors hover:bg-black/[0.025] disabled:opacity-50"
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                </div>
+              )}
+
+              {/* List count footer */}
+              <div className="px-4 py-3 text-center">
+                <span className="text-[11px] text-[#8C8C85]">{filtered.length} of {totalCount} opportunities</span>
+              </div>
+            </div>
+
+            {/* RIGHT: Detail Panel */}
+            <div className="overflow-hidden">
+              {selectedOpportunity ? (
+                <DetailPanel
+                  opportunity={selectedOpportunity}
+                  draftingId={draftingId}
+                  onDraftReply={handleDraftReply}
+                  onClose={() => setSelectedId(null)}
+                />
+              ) : (
+                <EmptyDetail />
+              )}
+            </div>
           </div>
         )}
       </div>
