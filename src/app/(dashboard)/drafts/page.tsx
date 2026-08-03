@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
-import { AlertTriangle, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search } from 'lucide-react'
-import { springs, staggers } from '@/lib/motion'
+import { AlertTriangle, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search, AtSign, MessageCircle } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { PageHeader } from '@/components/PageHeader'
@@ -20,22 +18,22 @@ import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
 
 const PAGE_SIZE = 40
 
-function PlatformBadge({ platform }: { platform: string }) {
-  return (
-    <span className="px-2.5 py-1 rounded-md bg-black/[0.04] text-text-secondary text-[12px] font-[500] capitalize flex items-center gap-1.5 w-fit shrink-0">
-      {platform.toLowerCase() === 'reddit' ? <RedditIcon className="w-3.5 h-3.5 text-[#FF4500]" /> : <BlueskyIcon className="w-3.5 h-3.5 text-[#1185FE]" />}
-      {platform}
-    </span>
-  )
+function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm' | 'md' }) {
+  const cls = size === 'md' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5'
+  const norm = platform.toLowerCase()
+  if (norm === 'reddit') return <RedditIcon className={`${cls} text-[#FF4500]`} />
+  if (norm === 'bluesky') return <BlueskyIcon className={`${cls} text-[#1185FE]`} />
+  if (norm === 'x') return <AtSign className={`${cls} text-[#0F1419]`} />
+  return <MessageCircle className={`${cls} text-gray-500`} />
 }
 
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString)
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
+  if (diffInSeconds < 60) return `${diffInSeconds}s ago`
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
   return `${Math.floor(diffInSeconds / 86400)} days ago`
 }
 
@@ -77,7 +75,6 @@ export default function DraftsPage() {
   const [copied, setCopied] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
-  const [isEditingReply, setIsEditingReply] = useState(false)
   const [manualPostReadyId, setManualPostReadyId] = useState<string | null>(null)
   const [connections, setConnections] = useState<string[]>([])
   const [businessName, setBusinessName] = useState('')
@@ -118,6 +115,7 @@ export default function DraftsPage() {
         setDrafts(parsed)
         setSelected(parsed[0])
         setDraftContent(parsed[0].draft)
+        originalDraftRef.current = parsed[0].draft
       }
       setHasMore((data?.length ?? 0) === PAGE_SIZE)
       setTotalCount(draftCountResult.count ?? data?.length ?? 0)
@@ -154,7 +152,6 @@ export default function DraftsPage() {
     // for edit-distance comparison in handleApproveAndSend.
     originalDraftRef.current = d.draft
     setCopied(false)
-    setIsEditingReply(false)
     setManualPostReadyId(null)
   }
 
@@ -275,7 +272,6 @@ export default function DraftsPage() {
       const nextSelected = drafts.find(d => d.id !== threadIdToSend) || null
       setSelected(nextSelected)
       setDraftContent(nextSelected?.draft || '')
-      setIsEditingReply(false)
       originalDraftRef.current = nextSelected?.draft || ''
       toast.success('Reply posted successfully')
     } catch (error) {
@@ -288,7 +284,7 @@ export default function DraftsPage() {
   const handleDismiss = () => {
     if (!selected) return
     const threadIdToDismiss = selected.id
-    
+
     fetch('/api/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -312,7 +308,6 @@ export default function DraftsPage() {
     const nextSelected = drafts.find(d => d.id !== threadIdToDismiss) || null
     setSelected(nextSelected)
     if (nextSelected) setDraftContent(nextSelected.draft)
-    setIsEditingReply(false)
     toast.success('Draft dismissed')
   }
 
@@ -371,239 +366,267 @@ export default function DraftsPage() {
 
   return (
     <AppPage>
-      <div className="flex w-full min-w-0 flex-col 2xl:h-[calc(100vh-144px)] 2xl:overflow-hidden">
+      <div className="flex w-full flex-col" style={{ height: 'calc(100vh - 56px)' }}>
+
+        {/* ── Page Header ─────────────────────────────────────── */}
         <PageHeader title="Drafts Ready" />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-visible 2xl:flex-row 2xl:gap-8 2xl:overflow-hidden">
-        {/* Draft list */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="pb-4 shrink-0 px-1 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-            <p className="text-[14px] font-medium text-text-secondary"><span className="tabular-nums font-bold text-text-primary">{searchQuery.trim() ? filteredDrafts.length : totalCount}</span> drafts awaiting review</p>
-            
-            <div className="relative flex-1 max-w-xs">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-900 pointer-events-none" strokeWidth={2} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search thread"
-                className="w-full rounded-2xl border border-gray-200/90 bg-white py-2 pl-9 pr-4 text-xs font-normal text-gray-800 shadow-2xs placeholder-gray-500 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20 focus:border-[#0A84FF] transition-all"
-              />
-            </div>
-          </div>
-          <motion.div variants={staggers.container} initial="initial" animate="animate" className="flex-1 space-y-4 px-1 pb-4 2xl:overflow-y-auto">
-            {loading && Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-40 animate-pulse rounded-[18px] border border-black/[0.05] bg-white" />
-            ))}
-            {filteredDrafts.map(d => (
-              <motion.div
-                key={d.id}
-                variants={staggers.item}
-                onClick={() => handleSelect(d)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    handleSelect(d)
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-pressed={selected?.id === d.id}
-                whileHover={selected?.id === d.id ? {} : { y: -2, boxShadow: 'var(--shadow-elevation-2)' }}
-                transition={springs.smooth}
-                className={`surface-ceramic p-6 cursor-pointer transition-all duration-300 ${
-                  selected?.id === d.id 
-                    ? 'ring-2 ring-accent shadow-elevation-2 z-10 relative' 
-                    : 'shadow-elevation-1 hover:shadow-elevation-2 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 mb-3 flex-wrap">
-                  <PlatformBadge platform={d.platform} />
-                  <span className="text-[13px] font-semibold text-text-primary">{d.platform === 'reddit' ? `r/${d.target}` : `"${d.target}"`}</span>
-                  <span className="opacity-50 text-[13px]">·</span>
-                  <span className="text-[13px] font-medium text-text-secondary ml-auto">{d.timeAgo}</span>
-                </div>
-                {d.title && <p className="text-[16px] font-semibold text-text-primary mb-2 leading-snug tracking-tight line-clamp-1">{d.title}</p>}
-                <p className="text-[14px] text-text-secondary line-clamp-2 mb-4 leading-relaxed">{d.content}</p>
-                <div className="flex items-center pt-4 border-t border-black/[0.04]">
-                  <IntentBadge score={d.score} label={d.label} />
-                </div>
-              </motion.div>
-            ))}
-            {!loading && hasMore && (
-              <div className="flex justify-center pt-2">
-                <button
-                  type="button"
-                  onClick={loadMoreDrafts}
-                  disabled={loadingMore}
-                  className="rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-[13px] font-semibold text-text-primary shadow-sm transition-colors hover:bg-black/[0.025] disabled:opacity-50"
-                >
-                  {loadingMore ? 'Loading…' : 'Load more drafts'}
-                </button>
-              </div>
-            )}
-          </motion.div>
-        </div>
+        {/* ── Body: always side-by-side from md+ ─────────────── */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* Conversation review panel */}
-        {selected && (
-          <div className="order-first flex min-h-0 min-w-0 w-full shrink-0 flex-col overflow-hidden rounded-[24px] border border-black/[0.06] bg-surface shadow-elevation-3 2xl:order-last 2xl:w-[48%] 2xl:max-w-[600px]">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
-              <div className="flex min-w-0 items-center gap-2.5">
-                {selected.platform.toLowerCase() === 'reddit' ? (
-                  <RedditIcon className="h-5 w-5 shrink-0 text-[#FF4500]" />
-                ) : (
-                  <BlueskyIcon className="h-5 w-5 shrink-0 text-[#1185FE]" />
-                )}
-                <div className="min-w-0">
-                  <h3 className="truncate text-[15px] font-semibold text-text-primary">Conversation</h3>
-                  <span className="block truncate text-[11px] font-medium text-text-tertiary">
-                    {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
-                  </span>
-                </div>
+          {/* LEFT: Compact Lead List */}
+          <div className="flex flex-col border-r border-[#E7E7E3] overflow-hidden" style={{ width: '380px', minWidth: '380px', flexShrink: 0 }}>
+
+            {/* List header bar */}
+            <div className="shrink-0 px-4 py-3 border-b border-[#EDEDEA] flex items-center justify-between gap-3">
+              <p className="text-[13px] font-medium text-[#6B6B66]">
+                <span className="tabular-nums font-bold text-[#1C1C1A]">{searchQuery.trim() ? filteredDrafts.length : totalCount}</span>
+                {' '}drafts awaiting review
+              </p>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8C8C85] pointer-events-none" strokeWidth={2} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className="h-8 w-36 rounded-[9px] border border-[#DEDEDA] bg-white pl-8 pr-3 text-[12px] text-[#1C1C1A] placeholder-[#8C8C85] focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15"
+                />
               </div>
-              {selected.url ? (
-                <a
-                  href={selected.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-accent transition-colors hover:bg-accent/5"
-                >
-                  Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
-                </a>
+            </div>
+
+            {/* Scrollable list */}
+            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-[84px] animate-pulse bg-[#F5F5F3] border-b border-[#F0F0ED] mx-3 my-2 rounded-lg" />
+                ))
+              ) : filteredDrafts.length === 0 ? (
+                <div className="flex items-center justify-center h-40 text-[13px] text-[#8C8C85]">
+                  No drafts found
+                </div>
               ) : (
-                <span className="flex items-center gap-1.5 text-[13px] font-medium text-text-tertiary">
-                  Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
-                </span>
+                filteredDrafts.map(d => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => handleSelect(d)}
+                    className={`w-full text-left px-4 py-3.5 border-b border-[#F0F0ED] transition-colors duration-100 group ${
+                      selected?.id === d.id
+                        ? 'bg-[#FFF8F5] border-l-2 border-l-[#FF5101]'
+                        : 'bg-white border-l-2 border-l-transparent hover:bg-[#FAFAF8]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h4 className={`text-[13.5px] font-semibold leading-snug line-clamp-1 transition-colors ${
+                        selected?.id === d.id ? 'text-[#1C1C1A]' : 'text-[#1C1C1A] group-hover:text-[#FF5101]'
+                      }`}>
+                        {d.title || d.matchedKeyword || 'Draft reply'}
+                      </h4>
+                      <IntentBadge score={d.score} label={d.label} className="shrink-0 text-[10.5px]" />
+                    </div>
+
+                    <p className="text-[12px] text-[#6B6B66] line-clamp-2 leading-relaxed mb-2">
+                      {d.content}
+                    </p>
+
+                    <div className="flex items-center gap-2 text-[11px] text-[#8C8C85]">
+                      <PlatformIcon platform={d.platform} />
+                      <span className="font-medium text-[#4A4A45] truncate max-w-[90px]">
+                        {d.platform === 'reddit' ? `r/${d.community}` : d.community}
+                      </span>
+                      <span className="opacity-40">·</span>
+                      <span>{d.timeAgo}</span>
+                      {d.draft && (
+                        <>
+                          <span className="opacity-40">·</span>
+                          <span className="text-emerald-600 font-semibold">Draft ready</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                ))
               )}
-            </div>
 
-            <div className="flex-1 space-y-5 bg-surface p-4 sm:p-6 2xl:overflow-y-auto">
-              <div className="flex justify-start">
-                <div className="w-fit max-w-[88%] rounded-[18px] rounded-bl-md border border-black/[0.04] bg-[#F1F1EF] px-4 py-3.5">
-                  <div className="mb-2 flex items-center gap-2 text-[10.5px] font-medium text-text-tertiary">
-                    {selected.platform.toLowerCase() === 'reddit' ? (
-                      <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
-                    ) : (
-                      <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />
-                    )}
-                    <span>{selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}</span>
-                  </div>
-                  {selected.title && (
-                    <h4 className="mb-1 line-clamp-2 text-[13px] font-semibold leading-snug text-text-primary">
-                      {selected.title}
-                    </h4>
-                  )}
-                  <p className="line-clamp-3 text-[12.5px] leading-relaxed text-text-secondary">{selected.content}</p>
-                  <p className="mt-1.5 text-right text-[10px] font-medium text-text-tertiary">{selected.timeAgo}</p>
-                </div>
-              </div>
-
-              {isEditingReply ? (
-                <div className="ml-auto w-full max-w-[92%]">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <span className="text-[11px] font-semibold text-text-secondary">Your reply</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingReply(false)}
-                      className="rounded-lg px-2 py-1 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/5"
-                    >
-                      Done
-                    </button>
-                  </div>
-                  <div className="rounded-[20px] rounded-br-md bg-accent p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
-                    <textarea
-                      value={draftContent}
-                      onChange={event => setDraftContent(event.target.value)}
-                      className="min-h-[240px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary focus:ring-2 focus:ring-white/60"
-                      placeholder="Write your reply..."
-                      autoFocus
-                      spellCheck
-                    />
-                  </div>
-                  <p className="mt-1.5 px-1 text-right text-[10.5px] tabular-nums text-text-tertiary">{draftContent.length} characters</p>
-                </div>
-              ) : (
-                <div className="flex justify-end">
+              {/* Load more */}
+              {!loading && hasMore && (
+                <div className="flex justify-center py-4">
                   <button
                     type="button"
-                    onClick={() => draftContent ? setIsEditingReply(true) : void handleRegenerate()}
-                    disabled={isRegenerating || isSending}
-                    className="group w-fit max-w-[82%] rounded-[20px] rounded-br-md bg-accent px-4 py-3 text-left text-white shadow-[0_4px_18px_rgba(10,132,255,0.16)] transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-70"
+                    onClick={loadMoreDrafts}
+                    disabled={loadingMore}
+                    className="rounded-full border border-black/[0.08] bg-white px-5 py-2 text-[12px] font-semibold text-[#1C1C1A] shadow-xs hover:bg-black/[0.025] disabled:opacity-50"
                   >
-                    {draftContent ? (
-                      <p className="line-clamp-4 whitespace-pre-line text-[13px] leading-relaxed text-white">{draftContent}</p>
-                    ) : (
-                      <p className="text-[13px] font-semibold text-white">{isRegenerating ? 'Preparing reply...' : 'Generate reply'}</p>
-                    )}
-                    <div className="mt-2 flex items-center justify-end gap-2 text-[10px] font-medium text-white/65">
-                      <span>{draftContent ? 'Draft' : 'Not generated'}</span>
-                      <span aria-hidden="true">&middot;</span>
-                      <span className="group-hover:text-white/90">{draftContent ? 'Open full reply' : 'Create preview'}</span>
-                    </div>
+                    {loadingMore ? 'Loading…' : 'Load more'}
                   </button>
                 </div>
               )}
-
-              {draftContent && currentQuality?.blocksAutomation && (
-                <div className="space-y-2">
-                  {currentQuality.issues.map(issue => (
-                    <div key={issue.code} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12px] font-medium text-amber-800">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                      <span>{issue.message}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="shrink-0 border-t border-black/[0.06] bg-surface p-4 sm:p-5">
-              <button
-                type="button"
-                onClick={handleApproveAndSend}
-                disabled={!draftContent || isSending || currentQuality?.blocksAutomation}
-                className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 !rounded-[14px] disabled:opacity-40"
-              >
-                {isSending ? (
-                  <><RefreshCcw className="h-4 w-4 animate-spin" /> {selected?.platform === 'reddit' ? 'Preparing...' : 'Posting...'}</>
-                ) : (
-                  <><CheckCircle className="h-4 w-4" strokeWidth={2.5} /> {
-                    manualPostReadyId === selected?.id
-                      ? 'Mark as Posted'
-                      : selected?.platform === 'reddit'
-                        ? (extensionInstalled ? 'Prefill in Reddit' : 'Copy & Open Reddit')
-                        : 'Post through Bluesky'
-                  }</>
-                )}
-              </button>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5">
-                  <button onClick={handleDismiss} className="btn-icon min-h-10 min-w-10 bg-background border border-black/[0.04]" title="Dismiss" aria-label="Dismiss draft">
-                    <X className="h-4 w-4" strokeWidth={2} />
-                  </button>
-                  <button
-                    onClick={handleRegenerate}
-                    disabled={isRegenerating || isSending}
-                    className="btn-icon min-h-10 min-w-10 bg-background border border-black/[0.04] disabled:opacity-40"
-                    title="Regenerate draft"
-                    aria-label="Regenerate draft"
-                  >
-                    <RefreshCcw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} strokeWidth={2} />
-                  </button>
-                </div>
-                <button
-                  onClick={handleCopy}
-                  disabled={!draftContent}
-                  className="btn-secondary flex min-h-10 items-center gap-2 !rounded-[12px] px-4 disabled:opacity-40"
-                >
-                  {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* RIGHT: Draft Review Panel */}
+          {selected ? (
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white">
+
+              {/* Panel Header */}
+              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#EDEDEA] px-6 py-4">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <PlatformIcon platform={selected.platform} size="md" />
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[15px] font-semibold text-[#1C1C1A]">Conversation</h3>
+                    <span className="block truncate text-[11px] font-medium text-[#8C8C85]">
+                      {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
+                    </span>
+                  </div>
+                </div>
+                {selected.url ? (
+                  <a
+                    href={selected.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-[#0A84FF] hover:bg-[#F0F7FF] transition-colors shrink-0"
+                  >
+                    Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  </a>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#8C8C85] shrink-0">
+                    Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  </span>
+                )}
+              </div>
+
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+                {/* Original post bubble */}
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original post</p>
+                  <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
+                    <div className="flex items-center gap-2 mb-2 text-[11px] font-medium text-[#8C8C85]">
+                      <PlatformIcon platform={selected.platform} />
+                      <span>{selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}</span>
+                      <span className="opacity-40">·</span>
+                      <span>{selected.timeAgo}</span>
+                    </div>
+                    {selected.title && (
+                      <h4 className="text-[14px] font-semibold text-[#1C1C1A] leading-snug mb-1.5">
+                        {selected.title}
+                      </h4>
+                    )}
+                    <p className="text-[13px] leading-relaxed text-[#4A4A45]">{selected.content}</p>
+                  </div>
+                </div>
+
+                {/* Draft reply — always fully visible inline editor */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply draft</p>
+                    <button
+                      type="button"
+                      onClick={handleRegenerate}
+                      disabled={isRegenerating || isSending}
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold text-[#4A4A45] hover:bg-[#F0F0ED] transition-colors disabled:opacity-40"
+                    >
+                      <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
+                      {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+                    </button>
+                  </div>
+
+                  {draftContent ? (
+                    <textarea
+                      value={draftContent}
+                      onChange={e => setDraftContent(e.target.value)}
+                      className="w-full rounded-[16px] border border-[#DEDEDA] bg-white px-4 py-3.5 text-[13.5px] leading-relaxed text-[#1C1C1A] resize-none focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15 transition-colors"
+                      rows={8}
+                      spellCheck
+                      placeholder="Your draft will appear here…"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRegenerate}
+                      disabled={isRegenerating}
+                      className="w-full rounded-[16px] border-2 border-dashed border-[#DEDEDA] px-4 py-8 text-[13px] font-semibold text-[#8C8C85] hover:border-[#0A84FF] hover:text-[#0A84FF] transition-colors disabled:opacity-50"
+                    >
+                      {isRegenerating ? 'Generating reply…' : '+ Generate reply'}
+                    </button>
+                  )}
+
+                  {draftContent && (
+                    <p className="mt-1.5 text-right text-[10.5px] tabular-nums text-[#8C8C85]">{draftContent.length} characters</p>
+                  )}
+                </div>
+
+                {/* Quality Issues */}
+                {draftContent && currentQuality?.blocksAutomation && (
+                  <div className="space-y-2">
+                    {currentQuality.issues.map(issue => (
+                      <div key={issue.code} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12px] font-medium text-amber-800">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <span>{issue.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Sticky Footer Actions */}
+              <div className="shrink-0 border-t border-[#EDEDEA] bg-white px-6 py-4">
+                <button
+                  type="button"
+                  onClick={handleApproveAndSend}
+                  disabled={!draftContent || isSending || currentQuality?.blocksAutomation}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#1C1C1A] text-[14px] font-semibold text-white hover:bg-black transition-colors disabled:opacity-40 shadow-sm"
+                >
+                  {isSending ? (
+                    <><RefreshCcw className="h-4 w-4 animate-spin" /> {selected?.platform === 'reddit' ? 'Preparing...' : 'Posting...'}</>
+                  ) : (
+                    <><CheckCircle className="h-4 w-4" strokeWidth={2.5} /> {
+                      manualPostReadyId === selected?.id
+                        ? 'Mark as Posted'
+                        : selected?.platform === 'reddit'
+                          ? (extensionInstalled ? 'Prefill in Reddit' : 'Copy & Open Reddit')
+                          : 'Post through Bluesky'
+                    }</>
+                  )}
+                </button>
+
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handleDismiss}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DEDEDA] bg-white text-[#6B6B66] hover:bg-[#F5F5F3] hover:text-[#1C1C1A] transition-colors"
+                      title="Dismiss"
+                    >
+                      <X className="h-4 w-4" strokeWidth={2} />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={handleCopy}
+                    disabled={!draftContent}
+                    className="flex h-9 items-center gap-2 rounded-[10px] border border-[#DEDEDA] bg-white px-3.5 text-[12.5px] font-semibold text-[#4A4A45] hover:bg-[#F7F7F4] transition-colors disabled:opacity-40"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F2F2EF]">
+                <CheckCircle className="h-7 w-7 text-[#8C8C85]" strokeWidth={1.75} />
+              </div>
+              <p className="text-[14px] font-semibold text-[#4A4A45] mb-1">
+                {loading ? 'Loading drafts…' : 'No drafts yet'}
+              </p>
+              <p className="text-[13px] text-[#8C8C85] max-w-[240px] leading-relaxed">
+                {loading ? '' : 'Qualified leads with generated replies will appear here for review.'}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </AppPage>
   )
