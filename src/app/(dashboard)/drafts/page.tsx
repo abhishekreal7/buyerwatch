@@ -533,8 +533,10 @@ export default function DraftsPage() {
                           {selected.title && (
                             <h3 className="text-[15px] font-semibold text-[#222222] mb-1.5 leading-snug">{selected.title}</h3>
                           )}
-                          {/* Clamped to 4 lines — click Open thread to read full */}
-                          <p className="text-[13px] text-[#4A4A4A] leading-relaxed line-clamp-4">{selected.content}</p>
+                          {/* Clamped strictly to 4 lines with max-height fallback */}
+                          <div className="max-h-36 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                            <p className="text-[13px] text-[#4A4A4A] leading-relaxed" style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selected.content}</p>
+                          </div>
                           <div className="flex items-center gap-3 mt-3 text-[11.5px] font-bold text-[#878A8C]">
                             <button className="flex items-center gap-1 hover:bg-[#F6F7F8] px-2 py-1 rounded transition-colors">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -633,7 +635,9 @@ export default function DraftsPage() {
                           {selected.title && (
                             <p className="text-[14.5px] font-semibold text-[#0F1419] mb-1">{selected.title}</p>
                           )}
-                          <p className="text-[14px] text-[#0F1419] leading-relaxed line-clamp-4">{selected.content}</p>
+                          <div className="max-h-36 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                            <p className="text-[14px] text-[#0F1419] leading-relaxed" style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selected.content}</p>
+                          </div>
                           {/* Bluesky engagement row */}
                           <div className="flex items-center gap-6 mt-3 text-[#536471]">
                             <button className="flex items-center gap-1.5 hover:text-[#0085FF] transition-colors text-[12.5px]">
