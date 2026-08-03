@@ -1,6 +1,6 @@
-﻿'use client'
+'use client'
 
-import { useState, useEffect } from 'react'
+import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react'
 import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, ArrowUp } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -78,6 +78,7 @@ export default function DashboardPage() {
   const [regenerating, setRegenerating] = useState(false)
   const [filterTab, setFilterTab] = useState<'all' | 'high-intent' | 'dismissed'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [communityHealth, setCommunityHealth] = useState<Record<string, { rejection_rate: number; total_engagements: number }>>({}) // Feature 3
   const [editingDraft, setEditingDraft] = useState<string | null>(null) // Feature 4: inline draft edit
   const [stats, setStats] = useState({
@@ -98,7 +99,7 @@ export default function DashboardPage() {
   const { userId } = useDashboardSession()
   const { isInstalled: extensionInstalled } = useExtensionStatus()
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const todayIso = today.toISOString()
@@ -151,7 +152,7 @@ export default function DashboardPage() {
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .eq('status', 'drafted'),
+        .in('status', ['drafted', 'needs_manual_reply']),
       supabase
         .from('reply_analytics')
         .select('id', { count: 'exact', head: true })
@@ -258,12 +259,53 @@ export default function DashboardPage() {
     })
 
     setLoading(false)
-  }
+  }, [supabase, userId])
 
   useEffect(() => {
+    void loadData()
+  }, [loadData])
 
-    loadData()
-  }, [])
+  useEffect(() => {
+    let refreshTimer: number | undefined
+    const scheduleRefresh = () => {
+      if (document.visibilityState !== 'visible') return
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        void loadData()
+      }, 250)
+    }
+
+    const interval = window.setInterval(scheduleRefresh, 30_000)
+    const channel = supabase
+      .channel(`dashboard-live-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'monitored_threads', filter: `user_id=eq.${userId}` },
+        scheduleRefresh,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reply_analytics', filter: `user_id=eq.${userId}` },
+        scheduleRefresh,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+        scheduleRefresh,
+      )
+      .subscribe()
+
+    window.addEventListener('focus', scheduleRefresh)
+    document.addEventListener('visibilitychange', scheduleRefresh)
+
+    return () => {
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+      window.clearInterval(interval)
+      window.removeEventListener('focus', scheduleRefresh)
+      document.removeEventListener('visibilitychange', scheduleRefresh)
+      void supabase.removeChannel(channel)
+    }
+  }, [loadData, supabase, userId])
 
   useEffect(() => {
     const handleAutoSendChanged = (event: Event) => {
@@ -275,7 +317,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const handleConversationSearch = (event: Event) => {
-      setSearchQuery((event as CustomEvent<string>).detail || '')
+      startTransition(() => {
+        setSearchQuery((event as CustomEvent<string>).detail || '')
+      })
     }
     window.addEventListener('buyerwatch:conversation-search', handleConversationSearch)
     return () => window.removeEventListener('buyerwatch:conversation-search', handleConversationSearch)
@@ -388,6 +432,7 @@ export default function DashboardPage() {
       setEditingDraft(null)
       setTotalSent(prev => prev + 1)
       setStats(prev => ({ ...prev, postedToday: prev.postedToday + 1 }))
+      void loadData()
       toast.success(totalSent === 0 ? 'First reply posted successfully.' : 'Reply posted successfully.')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to send reply')
@@ -450,6 +495,7 @@ export default function DashboardPage() {
       await loadData()
       return
     }
+    void loadData()
     toast.success('Moved to Dismissed')
   }
 
@@ -471,6 +517,7 @@ export default function DashboardPage() {
     setEditingDraft(null)
     setStats(prev => ({ ...prev, postedToday: prev.postedToday + 1 }))
     setTotalSent(prev => prev + 1)
+    void loadData()
     toast.success('Marked as posted')
   }
 
@@ -507,9 +554,13 @@ export default function DashboardPage() {
         }).catch(console.error)
       }
 
-      setThreads(prev => prev.map(t => t.id === threadToDraft.id ? { ...t, draft, originalDraft: draft } : t))
-      setSelectedThread(prev => prev?.id === threadToDraft.id ? { ...prev, draft, originalDraft: draft } : prev)
+      setThreads(prev => prev.map(t => t.id === threadToDraft.id ? { ...t, draft, originalDraft: draft, status: 'drafted' } : t))
+      setSelectedThread(prev => prev?.id === threadToDraft.id ? { ...prev, draft, originalDraft: draft, status: 'drafted' } : prev)
+      if (isFirstDraft && threadToDraft.status !== 'drafted' && threadToDraft.status !== 'needs_manual_reply') {
+        setStats(prev => ({ ...prev, draftsReady: prev.draftsReady + 1 }))
+      }
       window.dispatchEvent(new Event('buyerwatch:credits-changed'))
+      void loadData()
       toast.success(isFirstDraft ? 'Reply ready.' : 'Reply rewritten.')
     } catch {
       toast.error('Failed to request regeneration')
@@ -532,7 +583,7 @@ export default function DashboardPage() {
     void generateReplyForThread(thread)
   }
 
-  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const normalizedSearch = deferredSearchQuery.trim().toLowerCase()
   const searchableThreads = normalizedSearch
     ? threads.filter(thread => [
       thread.title,
@@ -553,10 +604,10 @@ export default function DashboardPage() {
     if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
       setSelectedThread(null)
     }
-  }, [filterTab, searchQuery, threads])
+  }, [filterTab, deferredSearchQuery, threads])
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-6">
 
       {/* Post-upgrade modal — shown once per plan tier per browser, via localStorage */}
       {!loading && userId && (
@@ -591,37 +642,37 @@ export default function DashboardPage() {
         )}
       />
 
-      {/* Compact overview metrics with one restrained visual language. */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ElevenLabs Style 4 Metric Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Conversations Found */}
-        <div className="relative rounded-[18px] border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.045em] text-[#69717D]">Conversations Found</span>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-[#0A84FF]">
+        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">Conversations Found</span>
+            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
               <MessageCircle className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-[26px] font-bold leading-none tracking-tight text-gray-900">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.threadsFound}
             </span>
-            <span className="text-[11px] font-medium text-[#77808C]">Pending review</span>
+            <span className="text-[11.5px] font-medium text-[#667085]">Pending review</span>
           </div>
         </div>
 
         {/* Metric 2: High Intent */}
-        <div className="rounded-[18px] border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.045em] text-[#69717D]">High Intent</span>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-600">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
+            <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
               <Sparkles className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-[26px] font-bold leading-none tracking-tight text-gray-900">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.highIntent}
             </span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold ${
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
               stats.highIntentToday > 0
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-[#F1F2F3] text-[#667085]'
@@ -633,28 +684,28 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 3: Drafts Ready */}
-        <div className="rounded-[18px] border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.045em] text-[#69717D]">Drafts Ready</span>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-[#0A84FF]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">Drafts Ready</span>
+            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-[26px] font-bold leading-none tracking-tight text-gray-900">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.draftsReady}
             </span>
-            <span className="text-[11px] font-medium text-[#77808C]">
+            <span className="text-[11.5px] font-medium text-[#667085]">
               {stats.draftsReady > 0 ? 'Review Now →' : 'Up to date'}
             </span>
           </div>
         </div>
 
         {/* Metric 4: Posted Today */}
-        <div className="rounded-[18px] border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.045em] text-[#69717D]">Posted Today</span>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-orange-100/80 bg-orange-50 text-[#FF5101]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">Posted Today</span>
+            <div className="w-8 h-8 rounded-xl text-[#FF5101] flex items-center justify-center shrink-0">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 <path d="M8.5 12L11 14.5L15.5 9.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -662,10 +713,10 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-[26px] font-bold leading-none tracking-tight text-gray-900">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.postedToday}
             </span>
-            <span className="text-[11px] font-medium text-[#77808C]">Automated & manual</span>
+            <span className="text-[11.5px] font-medium text-[#667085]">Automated & manual</span>
           </div>
         </div>
       </div>
@@ -742,7 +793,7 @@ export default function DashboardPage() {
 
             {/* Main opportunity feed */}
             <div>
-              <div className="w-full space-y-3">
+              <div className="w-full space-y-4">
               {loading && (
                 <div className="flex min-h-56 items-center justify-center py-12 text-xs font-medium text-[#667085]">
                   Loading opportunities...
@@ -812,12 +863,12 @@ export default function DashboardPage() {
                   const isReddit = thread.platform === 'reddit'
 
                   return (
-                    <div key={thread.id} className="space-y-2 pb-1">
+                    <div key={thread.id} className="space-y-2.5 pb-1">
                     <article
                       id={`conversation-${thread.id}`}
                       tabIndex={-1}
                       aria-label={`Review opportunity${thread.title ? `: ${thread.title}` : ''}`}
-                      className="rounded-[18px] border border-black/[0.06] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.025)] transition-colors hover:border-black/15 focus:outline-none focus-visible:border-[#0A84FF]/45 focus-visible:ring-2 focus-visible:ring-[#0A84FF]/15 sm:p-5"
+                      className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.025)] transition-colors hover:border-black/15 focus:outline-none focus-visible:border-[#0A84FF]/45 focus-visible:ring-2 focus-visible:ring-[#0A84FF]/15"
                     >
                       <div>
                       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">

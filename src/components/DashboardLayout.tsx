@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -94,30 +94,30 @@ function DashboardShell({
   const [openingCheckout, setOpeningCheckout] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [conversationSearch, setConversationSearch] = useState('')
+  const deferredConversationSearch = useDeferredValue(conversationSearch)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { status: extensionStatus } = useExtensionStatus()
   const extensionMissing = extensionStatus === 'missing'
 
   useEffect(() => {
     const focusSearch = () => searchInputRef.current?.focus()
-    const handleShortcut = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        focusSearch()
-      }
-    }
-
     window.addEventListener('buyerwatch:focus-conversation-search', focusSearch)
-    document.addEventListener('keydown', handleShortcut)
     return () => {
       window.removeEventListener('buyerwatch:focus-conversation-search', focusSearch)
-      document.removeEventListener('keydown', handleShortcut)
     }
   }, [])
 
   useEffect(() => {
     if (pathname !== '/dashboard') setConversationSearch('')
   }, [pathname])
+
+  useEffect(() => {
+    if (pathname === '/dashboard') {
+      window.dispatchEvent(new CustomEvent('buyerwatch:conversation-search', {
+        detail: deferredConversationSearch,
+      }))
+    }
+  }, [deferredConversationSearch, pathname])
 
   useEffect(() => {
     async function loadSidebarData() {
@@ -241,7 +241,7 @@ function DashboardShell({
         <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F4F4F2] px-2 py-2.5 h-full lg:flex select-none">
           <div className="flex flex-col h-full">
             {/* Logo Header */}
-            <div className="mb-2 flex h-9 shrink-0 items-center px-3">
+            <div className="mb-2 flex h-9 shrink-0 items-center px-3.5">
               <Link
                 href="/dashboard"
                 className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
@@ -425,9 +425,7 @@ function DashboardShell({
                       ref={searchInputRef}
                       value={conversationSearch}
                       onChange={(event) => {
-                        const value = event.target.value
-                        setConversationSearch(value)
-                        window.dispatchEvent(new CustomEvent('buyerwatch:conversation-search', { detail: value }))
+                        setConversationSearch(event.target.value)
                       }}
                       className="h-full min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[12.5px] text-[#343431] outline-none placeholder:text-[#777772] focus:border-0 focus:outline-none focus:ring-0"
                       placeholder="Search conversations..."
@@ -435,9 +433,6 @@ function DashboardShell({
                       style={{ outline: 'none', outlineOffset: 0, boxShadow: 'none' }}
                       aria-label="Search dashboard conversations"
                     />
-                    <span className="ml-auto rounded-[6px] border border-[#D8D8D4] bg-white px-1.5 text-[9.5px] font-semibold leading-[18px] text-[#73736E] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
-                      Ctrl K
-                    </span>
                   </div>
 
                   <button
