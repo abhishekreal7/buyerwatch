@@ -476,22 +476,26 @@ export default function OpportunitiesPage() {
         <div className="mb-0 flex flex-col gap-3 border-y border-[#E7E7E3] py-3 sm:flex-row sm:items-center sm:justify-between px-0 shrink-0">
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {FILTERS.map(filter => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setActiveFilter(filter)}
-                className={`min-h-9 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] transition-colors duration-150 ${
-                  activeFilter === filter
-                    ? 'bg-[#EFEFEC] font-semibold text-text-primary'
-                    : 'font-medium text-text-secondary hover:bg-[#F6F6F3] hover:text-text-primary'
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  {filter === 'Reddit' && <RedditIcon className="w-3.5 h-3.5 text-[#FF4500]" />}
-                  {filter === 'Bluesky' && <BlueskyIcon className="w-3.5 h-3.5 text-[#0085FF]" />}
-                  {filter}
-                </span>
-              </button>
+              <span key={filter} className="flex items-center">
+                {filter === 'Reddit' && (
+                  <span className="mx-2 h-5 w-px bg-[#E0E0DC] shrink-0" aria-hidden="true" />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter(filter)}
+                  className={`min-h-9 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] transition-colors duration-150 ${
+                    activeFilter === filter
+                      ? 'bg-[#EFEFEC] font-semibold text-text-primary'
+                      : 'font-medium text-text-secondary hover:bg-[#F6F6F3] hover:text-text-primary'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {filter === 'Reddit' && <RedditIcon className="w-3.5 h-3.5 text-[#FF4500]" />}
+                    {filter === 'Bluesky' && <BlueskyIcon className="w-3.5 h-3.5 text-[#0085FF]" />}
+                    {filter}
+                  </span>
+                </button>
+              </span>
             ))}
           </div>
 
