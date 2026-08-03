@@ -572,24 +572,38 @@ export default function DraftsPage() {
 
               {/* Sticky Footer Actions */}
               <div className="shrink-0 border-t border-[#EDEDEA] bg-white px-6 py-4">
-                <button
-                  type="button"
-                  onClick={handleApproveAndSend}
-                  disabled={!draftContent || isSending || currentQuality?.blocksAutomation}
-                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#1C1C1A] text-[14px] font-semibold text-white hover:bg-black transition-colors disabled:opacity-40 shadow-sm"
-                >
-                  {isSending ? (
-                    <><RefreshCcw className="h-4 w-4 animate-spin" /> {selected?.platform === 'reddit' ? 'Preparing...' : 'Posting...'}</>
-                  ) : (
-                    <><CheckCircle className="h-4 w-4" strokeWidth={2.5} /> {
-                      manualPostReadyId === selected?.id
-                        ? 'Mark as Posted'
-                        : selected?.platform === 'reddit'
-                          ? (extensionInstalled ? 'Prefill in Reddit' : 'Copy & Open Reddit')
-                          : 'Post through Bluesky'
-                    }</>
-                  )}
-                </button>
+                {(() => {
+                  const isReddit = selected?.platform === 'reddit';
+                  const isMarkAsPosted = manualPostReadyId === selected?.id;
+                  const isDisabled = !draftContent || isSending || currentQuality?.blocksAutomation;
+                  const btnClass = isDisabled
+                    ? 'flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-[14px] border border-[#E0E0DC] bg-[#F2F2EF] text-[14px] font-semibold text-[#AEAEAD] transition-colors'
+                    : isMarkAsPosted
+                      ? 'flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-600 text-[14px] font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99] transition-all'
+                      : isReddit
+                        ? 'flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#FF4500] text-[14px] font-semibold text-white shadow-sm hover:bg-[#E03D00] active:scale-[0.99] transition-all'
+                        : 'flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0085FF] text-[14px] font-semibold text-white shadow-sm hover:bg-[#006FD6] active:scale-[0.99] transition-all';
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleApproveAndSend}
+                      disabled={isDisabled}
+                      className={btnClass}
+                    >
+                      {isSending ? (
+                        <><RefreshCcw className="h-4 w-4 animate-spin" /> {isReddit ? 'Preparing...' : 'Posting...'}</>
+                      ) : (
+                        <><CheckCircle className="h-4 w-4" strokeWidth={2.5} /> {
+                          isMarkAsPosted
+                            ? 'Mark as Posted'
+                            : isReddit
+                              ? (extensionInstalled ? 'Prefill in Reddit' : 'Copy & Open Reddit')
+                              : 'Post through Bluesky'
+                        }</>
+                      )}
+                    </button>
+                  );
+                })()}
 
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5">
