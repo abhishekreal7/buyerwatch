@@ -273,11 +273,11 @@ function DashboardShell({
                         }`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
-                        <span className="grid h-5 w-5 shrink-0 place-items-center">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                           <SidebarIcon
                             aria-hidden
                             strokeWidth={1.75}
-                            className={`h-[17px] w-[17px] transition-colors ${
+                            className={`h-[17px] w-[17px] shrink-0 transition-colors ${
                               isFilledSidebarIcon
                                 ? isActive
                                   ? 'text-[#5D5D58]'
@@ -288,7 +288,7 @@ function DashboardShell({
                             }`}
                           />
                         </span>
-                        <span className="truncate">{item.name}</span>
+                        <span className="truncate leading-none">{item.name}</span>
                         {showOpportunityIndicator && (
                           <span
                             className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#1687E8] ${isActive ? 'ring-2 ring-white' : 'ring-2 ring-[#F4F4F2]'
