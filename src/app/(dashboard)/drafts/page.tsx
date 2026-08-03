@@ -466,106 +466,256 @@ export default function DraftsPage() {
 
           {/* RIGHT: Draft Review Panel */}
           {selected ? (
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ background: selected.platform === 'reddit' ? '#DAE0E6' : '#F1F3F5' }}>
 
-              {/* Panel Header */}
-              <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#EDEDEA] px-6 py-4">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <PlatformIcon platform={selected.platform} size="md" />
-                  <div className="min-w-0">
-                    <h3 className="truncate text-[15px] font-semibold text-[#1C1C1A]">Conversation</h3>
-                    <span className="block truncate text-[11px] font-medium text-[#8C8C85]">
-                      {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
-                    </span>
+              {/* Platform chrome top bar */}
+              {selected.platform === 'reddit' ? (
+                // ── Reddit chrome bar ──────────────────────────────────
+                <div className="shrink-0 flex items-center justify-between px-4 py-2.5 bg-white border-b border-[#EDEFF1]" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                  <div className="flex items-center gap-2">
+                    <RedditIcon className="h-6 w-6 text-[#FF4500]" />
+                    <span className="text-[13px] font-bold text-[#1C1C1B]">reddit</span>
+                    <span className="text-[12px] text-[#878A8C] ml-1">· {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}</span>
                   </div>
+                  {selected.url ? (
+                    <a href={selected.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[12px] font-semibold text-[#0079D3] hover:underline">
+                      Open thread <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : null}
                 </div>
-                {selected.url ? (
-                  <a
-                    href={selected.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-[#0A84FF] hover:bg-[#F0F7FF] transition-colors shrink-0"
-                  >
-                    Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
-                  </a>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#8C8C85] shrink-0">
-                    Open post <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
-                  </span>
-                )}
-              </div>
-
-              {/* Scrollable body */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
-                {/* Original post bubble */}
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original post</p>
-                  <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
-                    <div className="flex items-center gap-2 mb-2 text-[11px] font-medium text-[#8C8C85]">
-                      <PlatformIcon platform={selected.platform} />
-                      <span>{selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}</span>
-                      <span className="opacity-40">·</span>
-                      <span>{selected.timeAgo}</span>
-                    </div>
-                    {selected.title && (
-                      <h4 className="text-[14px] font-semibold text-[#1C1C1A] leading-snug mb-1.5">
-                        {selected.title}
-                      </h4>
-                    )}
-                    <p className="text-[13px] leading-relaxed text-[#4A4A45]">{selected.content}</p>
+              ) : (
+                // ── Bluesky chrome bar ─────────────────────────────────
+                <div className="shrink-0 flex items-center justify-between px-4 py-2.5 bg-white border-b border-[#E3E8EF]" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                  <div className="flex items-center gap-2">
+                    <BlueskyIcon className="h-5 w-5 text-[#0085FF]" />
+                    <span className="text-[13.5px] font-bold text-[#0F1419]">Bluesky</span>
+                    <span className="text-[12px] text-[#536471] ml-1">· {selected.community}</span>
                   </div>
+                  {selected.url ? (
+                    <a href={selected.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[12px] font-semibold text-[#0085FF] hover:underline">
+                      Open post <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : null}
                 </div>
+              )}
 
-                {/* Draft reply — always fully visible inline editor */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply draft</p>
-                    <button
-                      type="button"
-                      onClick={handleRegenerate}
-                      disabled={isRegenerating || isSending}
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold text-[#4A4A45] hover:bg-[#F0F0ED] transition-colors disabled:opacity-40"
-                    >
-                      <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
-                      {isRegenerating ? 'Regenerating…' : 'Regenerate'}
-                    </button>
-                  </div>
+              {/* Scrollable platform body */}
+              <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
 
-                  {draftContent ? (
-                    <textarea
-                      value={draftContent}
-                      onChange={e => setDraftContent(e.target.value)}
-                      className="w-full rounded-[16px] border border-[#DEDEDA] bg-white px-4 py-3.5 text-[13.5px] leading-relaxed text-[#1C1C1A] resize-none focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15 transition-colors"
-                      rows={8}
-                      spellCheck
-                      placeholder="Your draft will appear here…"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleRegenerate}
-                      disabled={isRegenerating}
-                      className="w-full rounded-[16px] border-2 border-dashed border-[#DEDEDA] px-4 py-8 text-[13px] font-semibold text-[#8C8C85] hover:border-[#0A84FF] hover:text-[#0A84FF] transition-colors disabled:opacity-50"
-                    >
-                      {isRegenerating ? 'Generating reply…' : '+ Generate reply'}
-                    </button>
-                  )}
+                {selected.platform === 'reddit' ? (
+                  // ══════════════════════════════════════════════════════
+                  // REDDIT THREAD VIEW
+                  // ══════════════════════════════════════════════════════
+                  <div className="max-w-3xl mx-auto px-3 py-3 space-y-1" style={{ fontFamily: 'IBM Plex Sans, system-ui, sans-serif' }}>
 
-                  {draftContent && (
-                    <p className="mt-1.5 text-right text-[10.5px] tabular-nums text-[#8C8C85]">{draftContent.length} characters</p>
-                  )}
-                </div>
-
-                {/* Quality Issues */}
-                {draftContent && currentQuality?.blocksAutomation && (
-                  <div className="space-y-2">
-                    {currentQuality.issues.map(issue => (
-                      <div key={issue.code} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12px] font-medium text-amber-800">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                        <span>{issue.message}</span>
+                    {/* Post card */}
+                    <div className="rounded-md bg-white border border-[#EDEFF1] overflow-hidden">
+                      {/* Vote + meta row */}
+                      <div className="flex">
+                        <div className="w-10 bg-[#F8F9FA] flex flex-col items-center pt-2 gap-0.5">
+                          <button className="text-[#878A8C] hover:text-[#FF4500] transition-colors" aria-label="upvote">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l8 8H4z"/></svg>
+                          </button>
+                          <span className="text-[11px] font-bold text-[#1C1C1B]">•</span>
+                          <button className="text-[#878A8C] hover:text-[#7193FF] transition-colors" aria-label="downvote">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20l-8-8h16z"/></svg>
+                          </button>
+                        </div>
+                        <div className="flex-1 p-3">
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#878A8C] mb-2">
+                            <span className="font-semibold text-[#0079D3]">r/{selected.community}</span>
+                            <span>·</span>
+                            <span>Posted by u/{selected.target}</span>
+                            <span>·</span>
+                            <span>{selected.timeAgo}</span>
+                          </div>
+                          {selected.title && (
+                            <h3 className="text-[16px] font-semibold text-[#222222] mb-2 leading-snug">{selected.title}</h3>
+                          )}
+                          <p className="text-[13.5px] text-[#3C3C3C] leading-relaxed">{selected.content}</p>
+                          {/* Reddit action bar */}
+                          <div className="flex items-center gap-3 mt-3 text-[11.5px] font-bold text-[#878A8C]">
+                            <button className="flex items-center gap-1 hover:bg-[#F6F7F8] px-2 py-1 rounded transition-colors">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                              Comments
+                            </button>
+                            <button className="flex items-center gap-1 hover:bg-[#F6F7F8] px-2 py-1 rounded transition-colors">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                              Share
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Comment thread container */}
+                    <div className="rounded-md bg-white border border-[#EDEFF1] px-3 py-3">
+                      <p className="text-[11px] font-bold text-[#878A8C] uppercase tracking-wide mb-3">Comment as BuyerWatch</p>
+
+                      {/* Reply draft textarea styled as Reddit comment box */}
+                      <div className="rounded border border-[#EDEFF1] overflow-hidden bg-white">
+                        <div className="flex border-b border-[#EDEFF1] bg-[#F6F7F8] px-2 py-1 gap-2">
+                          <button className="text-[11px] font-bold text-[#0079D3] hover:underline">Bold</button>
+                          <button className="text-[11px] font-bold text-[#878A8C] italic hover:underline">Italic</button>
+                          <button className="text-[11px] text-[#878A8C] hover:underline">Link</button>
+                        </div>
+                        {draftContent ? (
+                          <textarea
+                            value={draftContent}
+                            onChange={e => setDraftContent(e.target.value)}
+                            className="w-full px-3 py-2.5 text-[13.5px] leading-relaxed text-[#1C1C1B] resize-none focus:outline-none bg-white"
+                            rows={7}
+                            spellCheck
+                            placeholder="What are your thoughts?"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleRegenerate}
+                            disabled={isRegenerating}
+                            className="w-full px-3 py-8 text-[13px] text-[#878A8C] hover:text-[#0079D3] transition-colors text-center"
+                          >
+                            {isRegenerating ? 'Generating…' : '+ Generate reply'}
+                          </button>
+                        )}
+                      </div>
+
+                      {draftContent && (
+                        <div className="flex items-center justify-between mt-2">
+                          <button
+                            type="button"
+                            onClick={handleRegenerate}
+                            disabled={isRegenerating || isSending}
+                            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[#878A8C] hover:text-[#1C1C1B] transition-colors disabled:opacity-40"
+                          >
+                            <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
+                            {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+                          </button>
+                          <span className="text-[10.5px] tabular-nums text-[#878A8C]">{draftContent.length} chars</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quality issues */}
+                    {draftContent && currentQuality?.blocksAutomation && (
+                      <div className="space-y-1.5">
+                        {currentQuality.issues.map(issue => (
+                          <div key={issue.code} className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] font-medium text-amber-800">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                            <span>{issue.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                ) : (
+                  // ══════════════════════════════════════════════════════
+                  // BLUESKY POST VIEW
+                  // ══════════════════════════════════════════════════════
+                  <div className="max-w-xl mx-auto px-3 py-3 space-y-px" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+
+                    {/* Original post card */}
+                    <div className="bg-white border border-[#E3E8EF] rounded-2xl px-4 py-4">
+                      <div className="flex gap-3">
+                        {/* Avatar */}
+                        <div className="shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-[#0085FF] to-[#00B4D8] flex items-center justify-center">
+                          <BlueskyIcon className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 text-[13.5px] mb-1">
+                            <span className="font-bold text-[#0F1419]">{selected.target}</span>
+                            <span className="text-[#536471]">{selected.community}</span>
+                            <span className="text-[#536471]">·</span>
+                            <span className="text-[#536471] text-[12.5px]">{selected.timeAgo}</span>
+                          </div>
+                          {selected.title && (
+                            <p className="text-[14.5px] font-semibold text-[#0F1419] mb-1">{selected.title}</p>
+                          )}
+                          <p className="text-[14.5px] text-[#0F1419] leading-relaxed">{selected.content}</p>
+                          {/* Bluesky engagement row */}
+                          <div className="flex items-center gap-6 mt-3 text-[#536471]">
+                            <button className="flex items-center gap-1.5 hover:text-[#0085FF] transition-colors text-[12.5px]">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </button>
+                            <button className="flex items-center gap-1.5 hover:text-[#00BA7C] transition-colors text-[12.5px]">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                            </button>
+                            <button className="flex items-center gap-1.5 hover:text-[#FF3D64] transition-colors text-[12.5px]">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Thread connector line */}
+                    <div className="flex pl-7">
+                      <div className="w-0.5 bg-[#CFD9DE] mx-auto" style={{ height: '20px' }} />
+                    </div>
+
+                    {/* Your reply card */}
+                    <div className="bg-white border border-[#E3E8EF] rounded-2xl px-4 py-4">
+                      <div className="flex gap-3">
+                        {/* BuyerWatch avatar */}
+                        <div className="shrink-0 h-10 w-10 rounded-full bg-[#1C1C1A] flex items-center justify-center">
+                          <span className="text-white text-[11px] font-bold">BW</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 text-[13.5px] mb-2">
+                            <span className="font-bold text-[#0F1419]">Your Business</span>
+                            <span className="text-[#536471] text-[12.5px]">· replying now</span>
+                          </div>
+                          {draftContent ? (
+                            <textarea
+                              value={draftContent}
+                              onChange={e => setDraftContent(e.target.value)}
+                              className="w-full text-[14.5px] leading-relaxed text-[#0F1419] resize-none focus:outline-none bg-transparent placeholder:text-[#536471]"
+                              rows={6}
+                              spellCheck
+                              placeholder="Write your reply…"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleRegenerate}
+                              disabled={isRegenerating}
+                              className="text-[14px] text-[#536471] hover:text-[#0085FF] transition-colors w-full text-left"
+                            >
+                              {isRegenerating ? 'Generating reply…' : '+ Generate reply'}
+                            </button>
+                          )}
+                          {draftContent && (
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#EFF3F4]">
+                              <button
+                                type="button"
+                                onClick={handleRegenerate}
+                                disabled={isRegenerating || isSending}
+                                className="flex items-center gap-1.5 text-[12px] font-semibold text-[#536471] hover:text-[#0085FF] transition-colors disabled:opacity-40"
+                              >
+                                <RefreshCcw className={`h-3.5 w-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+                                {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+                              </button>
+                              <span className="text-[11px] tabular-nums text-[#536471]">{draftContent.length} chars</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quality issues */}
+                    {draftContent && currentQuality?.blocksAutomation && (
+                      <div className="space-y-1.5 pt-1">
+                        {currentQuality.issues.map(issue => (
+                          <div key={issue.code} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] font-medium text-amber-800">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                            <span>{issue.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
