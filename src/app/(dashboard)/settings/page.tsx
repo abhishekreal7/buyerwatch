@@ -451,8 +451,8 @@ export default function SettingsPage() {
   return (
     <AppPage>
       <div className="w-full max-w-[960px]">
-        {/* Page title — sticky so it stays visible while content scrolls */}
-        <div className="sticky top-0 z-20 -mx-4 mb-6 bg-[#FAFAFA]/90 px-4 pb-3 pt-4 backdrop-blur-sm border-b border-[#EDEDEA]">
+        {/* Page title */}
+        <div className="mb-6">
           <h1 className="page-title">Settings</h1>
         </div>
 
