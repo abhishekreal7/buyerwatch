@@ -59,7 +59,7 @@ export function LeadPipelineBoard({
   onDraftReply: (id: string) => void
   draftingId: string | null
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(opportunities[0]?.id ?? null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
 
   // Pipeline columns definition
@@ -100,7 +100,7 @@ export function LeadPipelineBoard({
 
           return (
             <div key={col.id} className="flex flex-col rounded-2xl bg-[#F6F6F4]/70 p-3 border border-[#ECECE9]">
-              {/* Column Header matching screenshot */}
+              {/* Column Header */}
               <div className="flex items-center justify-between px-1 mb-3">
                 <h3 className="text-[15px] font-bold text-[#1C1C1A] tracking-tight">{col.title}</h3>
                 <div className="flex items-center gap-1">
@@ -128,89 +128,19 @@ export function LeadPipelineBoard({
                   colItems.map((item) => {
                     const isSelected = selectedId === item.id
 
-                    if (isSelected) {
-                      {/* Selected Dark Card matching reference image */}
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => setSelectedId(item.id)}
-                          className="group relative cursor-pointer rounded-2xl bg-[#18181B] p-4 text-white shadow-xl ring-1 ring-black/20 transition-all duration-200"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-2">
-                              <PlatformIcon platform={item.platform} />
-                              <span className="text-[11px] font-medium text-gray-300 capitalize">{item.target}</span>
-                            </div>
-                            <IntentBadge score={item.score} label={item.label} className="shrink-0" />
-                          </div>
-
-                          <h4 className="text-[14.5px] font-semibold text-white leading-snug line-clamp-2 mb-1.5">
-                            {item.title || 'Conversation Lead'}
-                          </h4>
-
-                          <p className="text-[12px] text-gray-300 line-clamp-3 leading-relaxed mb-3">
-                            {item.content}
-                          </p>
-
-                          <div className="space-y-1.5 border-t border-white/10 pt-2.5 text-[11.5px] text-gray-300">
-                            <div className="flex items-center gap-2 text-gray-300">
-                              <span className="truncate font-medium text-gray-200">r/{item.target} • {item.author}</span>
-                            </div>
-                            {item.url && (
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1 text-[11px] text-blue-400 hover:underline truncate"
-                              >
-                                <ExternalLink className="h-3 w-3 shrink-0" />
-                                View thread source
-                              </a>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-3">
-                            <div className="flex items-center gap-1 text-[11px] text-gray-400">
-                              <Calendar className="h-3.5 w-3.5" />
-                              <span>{formatShortDate(item.createdAt)}</span>
-                            </div>
-
-                            {item.status === 'pending' && item.score !== null && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onDraftReply(item.id)
-                                }}
-                                disabled={draftingId === item.id}
-                                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1 text-[11.5px] font-semibold text-white hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-50"
-                              >
-                                <Sparkles className="h-3 w-3" />
-                                {draftingId === item.id ? 'Drafting…' : 'Generate reply'}
-                              </button>
-                            )}
-
-                            {item.status === 'drafted' && (
-                              <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                                <CheckCircle2 className="h-3 w-3" /> Ready
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    }
-
-                    {/* Standard White Card matching reference image */}
                     return (
                       <div
                         key={item.id}
                         onClick={() => setSelectedId(item.id)}
-                        className="group relative cursor-pointer rounded-2xl bg-white p-4 border border-[#E4E4E1] shadow-2xs hover:shadow-md hover:border-[#D4D4D0] transition-all duration-150"
+                        className={`group relative cursor-pointer rounded-2xl bg-white p-4 border transition-all duration-150 shadow-2xs hover:shadow-md ${
+                          isSelected
+                            ? 'border-[#FF5101] ring-2 ring-[#FF5101]/15 bg-orange-50/10'
+                            : 'border-[#E4E4E1] hover:border-[#D4D4D0]'
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <h4 className="text-[14px] font-bold text-[#1C1C1A] leading-snug line-clamp-1 group-hover:text-blue-600 transition-colors">
-                            {item.title || item.keyword}
+                          <h4 className="text-[14px] font-bold text-[#1C1C1A] leading-snug line-clamp-1 group-hover:text-[#FF5101] transition-colors">
+                            {item.title || item.keyword || 'Conversation Lead'}
                           </h4>
                           <IntentBadge score={item.score} label={item.label} className="shrink-0" />
                         </div>
@@ -227,9 +157,45 @@ export function LeadPipelineBoard({
 
                           <div className="flex items-center gap-2">
                             <PlatformIcon platform={item.platform} />
-                            <span className="font-medium text-[#4A4A45]">{item.author}</span>
+                            <span className="font-medium text-[#4A4A45]">{item.author || item.target}</span>
                           </div>
                         </div>
+
+                        {item.url && isSelected && (
+                          <div className="mt-2.5 pt-2 border-t border-black/[0.05] flex items-center justify-between">
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1 text-[11px] font-medium text-[#FF5101] hover:underline truncate"
+                            >
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                              View thread source
+                            </a>
+
+                            {item.status === 'pending' && item.score !== null && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDraftReply(item.id)
+                                }}
+                                disabled={draftingId === item.id}
+                                className="flex items-center gap-1.5 rounded-lg bg-[#FF5101] px-2.5 py-1 text-[11.5px] font-semibold text-white hover:bg-[#E04700] transition-colors shadow-xs disabled:opacity-50"
+                              >
+                                <Sparkles className="h-3 w-3" />
+                                {draftingId === item.id ? 'Drafting…' : 'Generate reply'}
+                              </button>
+                            )}
+
+                            {item.status === 'drafted' && (
+                              <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                <CheckCircle2 className="h-3 w-3" /> Ready
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })
