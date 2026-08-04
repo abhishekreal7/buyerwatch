@@ -4,12 +4,14 @@ import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from 'r
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  SquaresFour,
-  FileText,
-  PresentationChart,
   PuzzlePiece,
   Cube,
 } from '@phosphor-icons/react'
+import {
+  Squares2X2Icon,
+  DocumentTextIcon,
+  PresentationChartLineIcon,
+} from '@heroicons/react/24/solid'
 import {
   Bell,
   HelpCircle,
@@ -45,25 +47,25 @@ export type DashboardBootstrap = {
   }
 }
 
-/** 5 Solid Phosphor Icons for specified items, Outline Lucide for the rest */
+/** Specific icons for specified items, Outline Lucide for the rest */
 const MAIN_NAV_ITEMS = [
   {
     name: 'Dashboard',
     href: '/dashboard',
-    icon: SquaresFour,
-    isPhosphor: true,
+    icon: Squares2X2Icon,
+    isHeroicon: true,
   },
   {
     name: 'Drafts Ready',
     href: '/drafts',
-    icon: FileText,
-    isPhosphor: true,
+    icon: DocumentTextIcon,
+    isHeroicon: true,
   },
   {
     name: 'Analytics',
     href: '/analytics',
-    icon: PresentationChart,
-    isPhosphor: true,
+    icon: PresentationChartLineIcon,
+    isHeroicon: true,
   },
   {
     name: 'Keywords',
@@ -287,7 +289,7 @@ function DashboardShell({
             <nav className="space-y-1" aria-label="Primary navigation">
               {MAIN_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
-                const IconComp = item.icon
+                const IconComp = item.icon as any
                 const showExtensionAlert = extensionMissing && ['Keywords', 'Opportunities'].includes(item.name)
                 
                 // Get count badge data if available
@@ -315,7 +317,9 @@ function DashboardShell({
                         : 'flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
                     }
                   >
-                    {item.isPhosphor ? (
+                    {item.isHeroicon ? (
+                      <IconComp className="h-5 w-5 shrink-0 text-current" />
+                    ) : item.isPhosphor ? (
                       <IconComp weight="fill" size={20} className="shrink-0 text-current" />
                     ) : (
                       <IconComp size={20} className="shrink-0 text-current" strokeWidth={1.75} />
@@ -499,7 +503,7 @@ function DashboardShell({
             <div className="flex items-center justify-around px-2 h-[64px] pt-1">
               {MOBILE_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                const IconComp = item.icon
+                const IconComp = item.icon as any
                 return (
                   <Link
                     key={item.name}
@@ -514,7 +518,9 @@ function DashboardShell({
                     }`}
                   >
                     <div className="relative grid h-5 w-5 place-items-center">
-                      {item.isPhosphor ? (
+                      {item.isHeroicon ? (
+                        <IconComp className="h-4.5 w-4.5 text-current" />
+                      ) : item.isPhosphor ? (
                         <IconComp weight="fill" size={18} className="text-current" />
                       ) : (
                         <IconComp size={18} className="text-current" strokeWidth={1.75} />
@@ -554,12 +560,12 @@ function DashboardShell({
                 className="fixed inset-x-3 bottom-[76px] z-50 overflow-hidden rounded-2xl border border-black/10 bg-white p-2 shadow-[0_20px_60px_rgba(0,0,0,0.16)] lg:hidden"
               >
                 {[
-                  { name: 'Dashboard', href: '/dashboard', icon: SquaresFour, isPhosphor: true },
+                  { name: 'Dashboard', href: '/dashboard', icon: Squares2X2Icon, isHeroicon: true },
                   { name: 'Posted replies', href: '/posted', icon: Send, isPhosphor: false },
                   { name: 'Settings', href: '/settings', icon: Settings, isPhosphor: false },
                 ].map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-                  const IconComp = item.icon
+                  const IconComp = item.icon as any
                   return (
                     <Link
                       key={item.href}
@@ -573,7 +579,9 @@ function DashboardShell({
                         isActive ? 'bg-blue-50 text-[#0A84FF]' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
-                      {item.isPhosphor ? (
+                      {item.isHeroicon ? (
+                        <IconComp className="h-4.5 w-4.5" />
+                      ) : item.isPhosphor ? (
                         <IconComp weight="fill" size={18} />
                       ) : (
                         <IconComp size={18} strokeWidth={2} />
