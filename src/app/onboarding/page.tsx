@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { BrandLogo } from '@/components/BrandLogo'
 import { skipOnboardingAction } from '@/app/actions/onboarding'
+import { signOutAction } from '@/app/actions/auth'
 
 export default async function OnboardingPage() {
   const supabase = await createClient()
@@ -38,7 +39,7 @@ export default async function OnboardingPage() {
             </button>
           </form>
           <span className="text-gray-300 text-xs">|</span>
-          <form action="/api/auth/signout" method="POST">
+          <form action={signOutAction}>
             <button
               type="submit"
               className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-xs font-semibold text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"

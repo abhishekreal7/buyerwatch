@@ -189,27 +189,51 @@ export async function skipOnboardingAction() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const admin = getServiceRoleClient()
-  const { data: profile } = await admin
+  const { data: profile } = await supabase
     .from('profiles')
     .select('id, business_name')
     .eq('id', user.id)
     .maybeSingle()
 
   if (!profile?.business_name) {
-    const { error: upsertError } = await admin.from('profiles').upsert({
+    const profileData = {
       id: user.id,
       business_name: 'My Workspace',
       business_description: 'General brand monitoring workspace',
       business_type: 'saas',
       writing_style: 'Helpful, concise, direct',
-    }, { onConflict: 'id' })
+    }
+
+    const { error: upsertError } = await supabase
+      .from('profiles')
+      .upsert(profileData, { onConflict: 'id' })
 
     if (upsertError) {
-      logger.error({ err: upsertError, userId: user.id }, 'Unable to set placeholder profile during skip onboarding')
+      logger.warn({ err: upsertError, userId: user.id }, 'User upsert failed during skip onboarding, attempting update fallback')
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          business_name: 'My Workspace',
+          business_description: 'General brand monitoring workspace',
+          business_type: 'saas',
+          writing_style: 'Helpful, concise, direct',
+        })
+        .eq('id', user.id)
+
+      if (updateError) {
+        logger.error({ err: updateError, userId: user.id }, 'User update failed during skip onboarding, attempting admin fallback')
+        try {
+          const admin = getServiceRoleClient()
+          await admin.from('profiles').upsert(profileData, { onConflict: 'id' })
+        } catch (adminErr) {
+          logger.error({ err: adminErr, userId: user.id }, 'Admin fallback failed during skip onboarding')
+        }
+      }
     }
   }
 
   redirect('/dashboard')
 }
+
 
