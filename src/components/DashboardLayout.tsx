@@ -270,10 +270,10 @@ function DashboardShell({
 
   return (
     <DashboardSessionProvider userId={userId}>
-      <div className="h-screen w-screen overflow-hidden bg-[#F4F4F2] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
+      <div className="h-screen w-screen overflow-hidden bg-[#F7F7F7] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
-        {/* Desktop Sidebar sitting directly on warm stone background */}
-        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F4F4F2] px-2 py-2.5 h-full lg:flex select-none">
+        {/* Desktop Sidebar sitting directly on background */}
+        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F7F7F7] px-2 py-2.5 h-full lg:flex select-none">
           <div className="flex flex-col h-full">
             {/* Logo Header */}
             <div className="mb-2 flex h-9 shrink-0 items-center px-3.5">
