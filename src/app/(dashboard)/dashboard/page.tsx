@@ -822,7 +822,7 @@ export default function DashboardPage() {
                     </div>
                     <a
                       href="/keywords"
-                      className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800"
+                      className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-2"
                     >
                       <Target className="w-3.5 h-3.5" strokeWidth={2} />
                       Add first keyword
