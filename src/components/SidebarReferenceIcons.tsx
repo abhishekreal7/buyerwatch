@@ -20,41 +20,32 @@ function IconFrame({ title, children, ...props }: SidebarReferenceIconProps) {
   )
 }
 
-/** 1. Dashboard: Bento grid layout (Top-Left wide, Top-Right square, Bottom-Left square, Bottom-Right wide) */
+/** 1. Dashboard: Bento grid layout matching Dashboard.png (3 rounded squares + top-right circle) */
 export function ReferenceDashboardIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="2.5" y="2.5" width="7" height="7" rx="2" fill="currentColor" />
-      <rect x="10.5" y="2.5" width="7" height="7" rx="2" fill="currentColor" opacity="0.6" />
-      <rect x="2.5" y="10.5" width="7" height="7" rx="2" fill="currentColor" opacity="0.6" />
-      <rect x="10.5" y="10.5" width="7" height="7" rx="2" fill="currentColor" />
+      <rect x="2.5" y="2.5" width="6.8" height="6.8" rx="2" fill="currentColor" />
+      <circle cx="14.1" cy="5.9" r="3.4" fill="currentColor" />
+      <rect x="2.5" y="10.7" width="6.8" height="6.8" rx="2" fill="currentColor" />
+      <rect x="10.7" y="10.7" width="6.8" height="6.8" rx="2" fill="currentColor" />
     </IconFrame>
   )
 }
 
-/** 2. Folder (Drafts Ready / Projects): Solid folder with crisp 100% white pill bar cutout */
+/** 2. Drafts Ready: Solid folder matching Projects.png */
 export function ReferenceFolderIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
       <path
-        d="M2.5 5C2.5 3.89543 3.39543 3 4.5 3H8.25C8.85 3 9.4 3.25 9.8 3.7L11.1 5.3H15.5C16.6046 5.3 17.5 6.19543 17.5 7.3V14.7C17.5 15.8046 16.6046 16.7 15.5 16.7H4.5C3.39543 16.7 2.5 15.8046 2.5 14.7V5Z"
+        d="M2.5 5.5C2.5 4.39543 3.39543 3.5 4.5 3.5H8.25C8.85 3.5 9.4 3.75 9.8 4.2L11.1 5.8H15.5C16.6046 5.8 17.5 6.69543 17.5 7.8V14.5C17.5 15.6046 16.6046 16.5 15.5 16.5H4.5C3.39543 16.5 2.5 15.6046 2.5 14.5V5.5Z"
         fill="currentColor"
       />
-      <rect x="4.5" y="7.5" width="11" height="2.2" rx="1.1" fill="#FFFFFF" />
     </IconFrame>
   )
 }
 
 export function ReferenceBreadcrumbFolderIcon(props: SidebarReferenceIconProps) {
-  return (
-    <IconFrame {...props}>
-      <path
-        d="M2.5 5C2.5 3.89543 3.39543 3 4.5 3H8.25C8.85 3 9.4 3.25 9.8 3.7L11.1 5.3H15.5C16.6046 5.3 17.5 6.19543 17.5 7.3V14.7C17.5 15.8046 16.6046 16.7 15.5 16.7H4.5C3.39543 16.7 2.5 15.8046 2.5 14.7V5Z"
-        fill="currentColor"
-      />
-      <rect x="4.5" y="7.5" width="11" height="2.2" rx="1.1" fill="#FFFFFF" />
-    </IconFrame>
-  )
+  return <ReferenceFolderIcon {...props} />
 }
 
 export function ReferenceBreadcrumbCurrentIcon(props: SidebarReferenceIconProps) {
@@ -66,13 +57,17 @@ export function ReferenceBreadcrumbCurrentIcon(props: SidebarReferenceIconProps)
   )
 }
 
-/** 3. Analytics: Easel Stand presentation board with crisp white trendline */
+/** 3. Analytics: Presentation easel board with trendline matching Analytics.png */
 export function ReferenceAnalyticsIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <rect x="2.5" y="2.5" width="15" height="10.5" rx="2" fill="currentColor" />
-      <path d="M5 9.5L8 6.5L11 8.5L15 4.5" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M6.5 13L5 17.5M13.5 13L15 17.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <rect x="2.5" y="2.5" width="15" height="9.5" rx="1.8" fill="currentColor" />
+      <path d="M5.5 8.5L8.5 5.5L11.5 7.5L14.5 4.5" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="5.5" cy="8.5" r="1.1" fill="#FFFFFF" />
+      <circle cx="8.5" cy="5.5" r="1.1" fill="#FFFFFF" />
+      <circle cx="11.5" cy="7.5" r="1.1" fill="#FFFFFF" />
+      <circle cx="14.5" cy="4.5" r="1.1" fill="#FFFFFF" />
+      <path d="M6.5 12.2L4.5 17.2M13.5 12.2L15.5 17.2M10 12.2V16.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </IconFrame>
   )
 }
@@ -88,7 +83,7 @@ export function ReferenceReportIcon(props: SidebarReferenceIconProps) {
   )
 }
 
-/** 4. Keywords (Extensions / Puzzle piece) */
+/** 4. Keywords: Puzzle piece matching Extensions.png */
 export function ReferencePuzzleIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
@@ -100,32 +95,26 @@ export function ReferencePuzzleIcon(props: SidebarReferenceIconProps) {
   )
 }
 
-/** 5. Opportunities (Companies / 3D Isometric Cube with CAD Precision Seams) */
+/** 5. Opportunities: 3D Isometric Cube matching Companies.png */
 export function ReferenceCubeIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      {/* Top Face */}
-      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8L10 2.2Z" fill="currentColor" opacity="0.45" />
-      {/* Left Face */}
-      <path d="M3.2 5.8L10 9.4V17.2L3.2 13.6V5.8Z" fill="currentColor" opacity="0.75" />
-      {/* Right Face */}
+      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8L10 2.2Z" fill="currentColor" opacity="0.6" />
+      <path d="M3.2 5.8L10 9.4V17.2L3.2 13.6V5.8Z" fill="currentColor" opacity="0.85" />
       <path d="M10 9.4L16.8 5.8V13.6L10 17.2V9.4Z" fill="currentColor" />
-      {/* Crisp Seam Lines */}
-      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8Z" stroke="#FFFFFF" strokeWidth="0.7" opacity="0.7" />
-      <path d="M10 9.4V17.2" stroke="#FFFFFF" strokeWidth="0.7" opacity="0.7" />
+      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8Z" stroke="#FFFFFF" strokeWidth="0.6" opacity="0.8" />
+      <path d="M10 9.4V17.2" stroke="#FFFFFF" strokeWidth="0.6" opacity="0.8" />
     </IconFrame>
   )
 }
 
-/** 6. People: Contact ID badge card with avatar circle & text bars */
+/** 6. People: Contact ID badge matching People.png */
 export function ReferencePeopleIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
       <rect x="2.5" y="3" width="15" height="14" rx="2.5" fill="currentColor" />
-      {/* Profile Avatar */}
       <circle cx="7" cy="8.25" r="2.2" fill="#FFFFFF" />
       <path d="M4.5 14.5C5.1 12.8 6.2 12 7.5 12C8.8 12 9.9 12.8 10.5 14.5H4.5Z" fill="#FFFFFF" />
-      {/* Text Lines */}
       <rect x="11.5" y="7" width="4" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.85" />
       <rect x="11.5" y="10" width="4" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.6" />
       <rect x="11.5" y="13" width="2.5" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.4" />

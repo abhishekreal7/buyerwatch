@@ -25,7 +25,10 @@ import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
 import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
 import {
+  ReferenceAnalyticsIcon,
   ReferenceCubeIcon,
+  ReferenceDashboardIcon,
+  ReferenceFolderIcon,
   ReferencePuzzleIcon,
 } from '@/components/SidebarReferenceIcons'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -48,9 +51,9 @@ export type DashboardBootstrap = {
 }
 
 const NAV_ITEMS = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, sidebarIcon: LayoutDashboard },
-  { name: 'Drafts Ready', href: '/drafts', icon: FolderClosed, sidebarIcon: FolderClosed },
-  { name: 'Analytics', href: '/analytics', icon: ChartNoAxesCombined, sidebarIcon: ChartNoAxesCombined },
+  { name: 'Dashboard', href: '/dashboard', icon: ReferenceDashboardIcon, sidebarIcon: ReferenceDashboardIcon },
+  { name: 'Drafts Ready', href: '/drafts', icon: ReferenceFolderIcon, sidebarIcon: ReferenceFolderIcon },
+  { name: 'Analytics', href: '/analytics', icon: ReferenceAnalyticsIcon, sidebarIcon: ReferenceAnalyticsIcon },
   { name: 'Keywords', href: '/keywords', icon: ReferencePuzzleIcon, sidebarIcon: ReferencePuzzleIcon },
   { name: 'Opportunities', href: '/opportunities', icon: ReferenceCubeIcon, sidebarIcon: ReferenceCubeIcon },
   { name: 'Posted', href: '/posted', icon: Send, sidebarIcon: Send },
@@ -255,7 +258,7 @@ function DashboardShell({
               {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 const SidebarIcon = item.sidebarIcon
-                const isFilledSidebarIcon = item.name === 'Keywords' || item.name === 'Opportunities'
+                const isFilledSidebarIcon = ['Dashboard', 'Drafts Ready', 'Analytics', 'Keywords', 'Opportunities'].includes(item.name)
                 const showExtensionAlert = extensionMissing && ['Keywords', 'Opportunities', 'Settings'].includes(item.name)
                 const showOpportunityIndicator = item.name === 'Opportunities' && hasUnreviewedOpportunities
                 return (
@@ -493,7 +496,7 @@ function DashboardShell({
             <div className="flex items-center justify-around px-2 h-[64px] pt-1">
               {MOBILE_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                const isFilledMobileIcon = item.name === 'Keywords' || item.name === 'Opportunities'
+                const isFilledMobileIcon = ['Dashboard', 'Drafts Ready', 'Analytics', 'Keywords', 'Opportunities'].includes(item.name)
                 const showExtensionAlert = extensionMissing && ['Keywords', 'Opportunities'].includes(item.name)
                 const showOpportunityIndicator = item.name === 'Opportunities' && hasUnreviewedOpportunities
                 return (
