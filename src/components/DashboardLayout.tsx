@@ -313,11 +313,11 @@ function DashboardShell({
                     aria-current={isActive ? 'page' : undefined}
                     className={
                       isActive
-                        ? 'flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
-                        : 'flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
+                        ? 'group flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
+                        : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
                     }
                   >
-                    <IconComp className="h-5 w-5 shrink-0 text-current" />
+                    <IconComp className={`h-5 w-5 shrink-0 transition-colors ${isActive ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
                     <span>{item.name}</span>
 
                     {/* Metadata Badge */}
@@ -341,11 +341,11 @@ function DashboardShell({
                   aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
                   className={
                     pathname.startsWith('/settings')
-                      ? 'flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
-                      : 'flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
+                      ? 'group flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
+                      : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
                   }
                 >
-                  <Settings size={20} className="shrink-0 text-current" strokeWidth={1.75} />
+                  <Settings size={20} className={`shrink-0 transition-colors ${pathname.startsWith('/settings') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} strokeWidth={1.75} />
                   <span>Settings</span>
                 </Link>
               </div>
@@ -356,9 +356,9 @@ function DashboardShell({
               {/* Help center — separated with mt-6 / space above profile card */}
               <Link
                 href="/contact"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+                className="group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
               >
-                <HelpCircle size={20} className="shrink-0 text-current" strokeWidth={1.75} />
+                <HelpCircle size={20} className="shrink-0 text-[#9E9E9E] group-hover:text-[#3A3A3A] transition-colors" strokeWidth={1.75} />
                 <span>Help center</span>
               </Link>
 
