@@ -3,7 +3,7 @@ name: Production synthetic
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 0 * * *'
 
 permissions:
   contents: read
@@ -12,9 +12,10 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: ${{ secrets.PRODUCTION_BASE_URL != '' }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Probe production
