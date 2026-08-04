@@ -8,8 +8,6 @@ import {
   DocumentTextIcon,
   PresentationChartLineIcon,
   PuzzlePieceIcon,
-  CubeIcon,
-  PaperAirplaneIcon,
 } from '@heroicons/react/24/solid'
 import {
   Bell,
@@ -20,6 +18,10 @@ import {
   Settings,
   X,
 } from 'lucide-react'
+import {
+  ReferenceCubeIcon,
+  ReferencePostedIcon,
+} from '@/components/SidebarReferenceIcons'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
@@ -45,7 +47,7 @@ export type DashboardBootstrap = {
   }
 }
 
-/** Heroicons Solid icons for all main navigation items */
+/** Specific icons for specified items */
 const MAIN_NAV_ITEMS = [
   {
     name: 'Dashboard',
@@ -74,14 +76,14 @@ const MAIN_NAV_ITEMS = [
   {
     name: 'Opportunities',
     href: '/opportunities',
-    icon: CubeIcon,
-    isHeroicon: true,
+    icon: ReferenceCubeIcon,
+    isCustomSvg: true,
   },
   {
     name: 'Posted',
     href: '/posted',
-    icon: PaperAirplaneIcon,
-    isHeroicon: true,
+    icon: ReferencePostedIcon,
+    isCustomSvg: true,
   },
 ]
 
@@ -547,7 +549,7 @@ function DashboardShell({
               >
                 {[
                   { name: 'Dashboard', href: '/dashboard', icon: Squares2X2Icon, isHeroicon: true },
-                  { name: 'Posted replies', href: '/posted', icon: PaperAirplaneIcon, isHeroicon: true },
+                  { name: 'Posted replies', href: '/posted', icon: ReferencePostedIcon, isCustomSvg: true },
                   { name: 'Settings', href: '/settings', icon: Settings, isPhosphor: false },
                 ].map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
