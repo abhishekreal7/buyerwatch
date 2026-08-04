@@ -451,14 +451,26 @@ export default function SettingsPage() {
   return (
     <AppPage>
       <div className="w-full max-w-[960px]">
-        {/* Page title */}
-        <div className="mb-6">
-          <h1 className="page-title">Settings</h1>
+        {/* Sticky Professional Page Header */}
+        <div className="sticky -top-5 sm:-top-6 z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-5 sm:-mt-6 pt-5 sm:pt-6 pb-4 bg-white/90 backdrop-blur-md border-b border-gray-100 mb-6 flex items-center justify-between transition-all">
+          <div>
+            <h1 className="page-title">Settings</h1>
+            <p className="hidden sm:block text-xs text-gray-500 mt-0.5">Manage your account, platform connections, and AI writing preferences.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex h-9 items-center gap-2 rounded-xl bg-gray-900 px-4 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-black disabled:opacity-50 cursor-pointer"
+          >
+            {saving ? <Activity className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            <span>{saving ? 'Saving...' : 'Save changes'}</span>
+          </button>
         </div>
 
         <div className="flex flex-col items-start gap-5 md:flex-row md:gap-8">
           {/* ── Sidebar ───────────────────────────────────────────── */}
-          <nav className="sticky top-[60px] z-10 -mx-1 w-[calc(100%+8px)] shrink-0 overflow-x-auto bg-[#FAFAFA]/95 px-1 py-1 backdrop-blur-sm no-scrollbar md:top-24 md:mx-0 md:w-52 md:overflow-visible md:bg-transparent md:p-0" aria-label="Settings sections">
+          <nav className="sticky top-[72px] md:top-[84px] z-10 -mx-1 w-[calc(100%+8px)] shrink-0 overflow-x-auto bg-[#FAFAFA]/95 px-1 py-1 backdrop-blur-sm no-scrollbar md:mx-0 md:w-52 md:overflow-visible md:bg-transparent md:p-0" aria-label="Settings sections">
             <ul className="flex min-w-max gap-1 md:min-w-0 md:flex-col md:space-y-0.5">
               {SECTIONS.map(s => (
                 <li key={s.id}>
