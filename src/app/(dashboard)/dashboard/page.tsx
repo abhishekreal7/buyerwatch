@@ -597,8 +597,8 @@ export default function DashboardPage() {
   const filtered = filterTab === 'dismissed'
     ? searchableThreads.filter(t => t.status === 'dismissed')
     : filterTab === 'high-intent'
-    ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score >= 80)
-    : searchableThreads.filter(t => t.status !== 'dismissed')
+      ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score >= 80)
+      : searchableThreads.filter(t => t.status !== 'dismissed')
 
   useEffect(() => {
     if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
@@ -674,11 +674,10 @@ export default function DashboardPage() {
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.highIntent}
             </span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
-              stats.highIntentToday > 0
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${stats.highIntentToday > 0
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-[#F1F2F3] text-[#667085]'
-            }`}>
+              }`}>
               {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-3 w-3" strokeWidth={2.25} />}
               {stats.highIntentToday > 0 ? `${stats.highIntentToday} new today` : 'No new today'}
             </span>
@@ -803,69 +802,69 @@ export default function DashboardPage() {
             {/* Main opportunity feed */}
             <div>
               <div className="w-full space-y-4">
-              {loading && (
-                <div className="flex min-h-56 items-center justify-center py-12 text-xs font-medium text-[#667085]">
-                  Loading opportunities...
-                </div>
-              )}
+                {loading && (
+                  <div className="flex min-h-56 items-center justify-center py-12 text-xs font-medium text-[#667085]">
+                    Loading opportunities...
+                  </div>
+                )}
 
-              {!loading && filtered.length === 0 && keywordsCount === 0 && (
-                /* ── No keywords yet — onboarding CTA ── */
-                <div className="flex min-h-64 flex-col items-center justify-center gap-4 px-6 py-14 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[#0A84FF]">
-                    <Target className="w-6 h-6" strokeWidth={2} />
+                {!loading && filtered.length === 0 && keywordsCount === 0 && (
+                  /* ── No keywords yet — onboarding CTA ── */
+                  <div className="flex min-h-64 flex-col items-center justify-center gap-4 px-6 py-14 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
+                      <Search className="w-5 h-5" strokeWidth={1.8} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900 tracking-tight">Your signal radar is idle</h3>
+                      <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                        Add your first keyword to start scanning Reddit &amp; social communities for prospective buyers.
+                      </p>
+                    </div>
+                    <a
+                      href="/keywords"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800"
+                    >
+                      <Target className="w-3.5 h-3.5" strokeWidth={2} />
+                      Add first keyword
+                    </a>
                   </div>
-                  <div>
-                    <h3 className="text-base font-bold text-gray-900 tracking-tight">Your signal radar is idle</h3>
-                    <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                      Add your first keyword to start scanning Reddit &amp; social communities for prospective buyers.
-                    </p>
-                  </div>
-                  <a
-                    href="/keywords"
-                    className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800"
-                  >
-                    <Target className="w-3.5 h-3.5" strokeWidth={2} />
-                    Add first keyword
-                  </a>
-                </div>
-              )}
+                )}
 
-              {!loading && filtered.length === 0 && keywordsCount > 0 && (
-                /* Borderless empty state keeps the feed visually quiet. */
-                <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
-                    <Search className="w-5 h-5" strokeWidth={1.8} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900">No conversations yet</h3>
-                    <p className="text-xs text-[#667085] mt-1">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      toast.info('Checking for new posts...')
-                      try {
-                        const { data: kws } = await supabase.from('keywords').select('id').eq('user_id', userId).limit(1)
-                        if (kws && kws.length > 0) {
-                          await fetch('/api/keywords/fetch-now', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ keywordId: kws[0].id }),
-                          })
-                          toast.success('Check requested. Refreshing...')
-                          setTimeout(() => loadData(), 3000)
+                {!loading && filtered.length === 0 && keywordsCount > 0 && (
+                  /* Borderless empty state keeps the feed visually quiet. */
+                  <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
+                      <Search className="w-5 h-5" strokeWidth={1.8} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">No conversations yet</h3>
+                      <p className="text-xs text-[#667085] mt-1">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        toast.info('Checking for new posts...')
+                        try {
+                          const { data: kws } = await supabase.from('keywords').select('id').eq('user_id', userId).limit(1)
+                          if (kws && kws.length > 0) {
+                            await fetch('/api/keywords/fetch-now', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ keywordId: kws[0].id }),
+                            })
+                            toast.success('Check requested. Refreshing...')
+                            setTimeout(() => loadData(), 3000)
+                          }
+                        } catch {
+                          toast.error('Scan check failed')
                         }
-                      } catch {
-                        toast.error('Scan check failed')
-                      }
-                    }}
-                    className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#F1F2F3] px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-[#E8EAEC]"
-                  >
-                    <RefreshCcw className="w-3.5 h-3.5 text-gray-400" />
-                    Check now
-                  </button>
-                </div>
-              )}
+                      }}
+                      className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#F1F2F3] px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-[#E8EAEC]"
+                    >
+                      <RefreshCcw className="w-3.5 h-3.5 text-gray-400" />
+                      Check now
+                    </button>
+                  </div>
+                )}
 
 
                 {filtered.map((thread) => {
@@ -873,239 +872,239 @@ export default function DashboardPage() {
 
                   return (
                     <div key={thread.id} className="space-y-2.5 pb-1">
-                    <article
-                      id={`conversation-${thread.id}`}
-                      tabIndex={-1}
-                      aria-label={`Review opportunity${thread.title ? `: ${thread.title}` : ''}`}
-                      className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.025)] transition-colors hover:border-black/15 focus:outline-none focus-visible:border-[#0A84FF]/45 focus-visible:ring-2 focus-visible:ring-[#0A84FF]/15"
-                    >
-                      <div>
-                      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text-secondary">
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F4F5F7]">
-                            {thread.platform === 'reddit' ? (
-                              <>
-                                <RedditIcon className="h-[18px] w-[18px] text-[#FF4500]" />
-                                <span className="font-medium text-text-secondary text-[13px] tracking-tight">Reddit</span>
-                              </>
-                            ) : thread.platform === 'x' ? (
-                              <>
-                                <XIcon className="h-[18px] w-[18px] text-[#0F1419]" />
-                                <span className="font-medium text-text-secondary text-[13px] tracking-tight">X</span>
-                              </>
-                            ) : (
-                              <>
-                                <BlueskyIcon className="h-[18px] w-[18px] text-[#1185FE]" />
-                                <span className="font-medium text-text-secondary text-[13px] tracking-tight">Bluesky</span>
-                              </>
-                            )}
+                      <article
+                        id={`conversation-${thread.id}`}
+                        tabIndex={-1}
+                        aria-label={`Review opportunity${thread.title ? `: ${thread.title}` : ''}`}
+                        className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.025)] transition-colors hover:border-black/15 focus:outline-none focus-visible:border-[#0A84FF]/45 focus-visible:ring-2 focus-visible:ring-[#0A84FF]/15"
+                      >
+                        <div>
+                          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text-secondary">
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F4F5F7]">
+                                {thread.platform === 'reddit' ? (
+                                  <>
+                                    <RedditIcon className="h-[18px] w-[18px] text-[#FF4500]" />
+                                    <span className="font-medium text-text-secondary text-[13px] tracking-tight">Reddit</span>
+                                  </>
+                                ) : thread.platform === 'x' ? (
+                                  <>
+                                    <XIcon className="h-[18px] w-[18px] text-[#0F1419]" />
+                                    <span className="font-medium text-text-secondary text-[13px] tracking-tight">X</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <BlueskyIcon className="h-[18px] w-[18px] text-[#1185FE]" />
+                                    <span className="font-medium text-text-secondary text-[13px] tracking-tight">Bluesky</span>
+                                  </>
+                                )}
+                              </div>
+                              <span>·</span>
+                              <span className="font-medium text-text-primary">{isReddit ? `r/${thread.target}` : `"${thread.target}"`}</span>
+                              {/* Feature 3: Community Health Badge — Fix 6.2: Sample size gate */}
+                              {communityHealth[thread.target] && (() => {
+                                const h = communityHealth[thread.target]
+                                if (h.total_engagements < 3) {
+                                  return (
+                                    <span title="Gathering data (under 3 posts)" className="relative group cursor-help">
+                                      <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />
+                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-44 text-center text-[11px] bg-gray-900 text-white px-2 py-1 rounded-md shadow-lg z-50 leading-snug">Gathering community health data</span>
+                                    </span>
+                                  )
+                                }
+                                const isSafe = h.rejection_rate < 0.05
+                                const isModerate = h.rejection_rate >= 0.05 && h.rejection_rate < 0.2
+                                const color = isSafe ? 'bg-emerald-400' : isModerate ? 'bg-amber-400' : 'bg-red-400'
+                                const label = isSafe ? 'Safe community' : isModerate ? 'Moderate — post carefully' : 'High rejection rate'
+                                return (
+                                  <span title={label} className="relative group cursor-help">
+                                    <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
+                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-40 text-center text-[11px] bg-gray-900 text-white px-2 py-1 rounded-md shadow-lg z-50 leading-snug">{label}</span>
+                                  </span>
+                                )
+                              })()}
+                              <span className="ml-1 text-xs">{thread.timeAgo}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {getSafeThreadUrl(thread) && (
+                                <a
+                                  href={getSafeThreadUrl(thread) ?? undefined}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-semibold text-[#4F5865] transition-colors hover:bg-[#F1F2F3] hover:text-[#0A84FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
+                                  aria-label={`Open ${thread.platform === 'reddit' ? 'Reddit' : 'Bluesky'} post in a new tab`}
+                                  title={`Open on ${thread.platform === 'reddit' ? 'Reddit' : 'Bluesky'}`}
+                                >
+                                  Open post
+                                  <ExternalLink className="h-3 w-3" strokeWidth={1.9} />
+                                </a>
+                              )}
+                              {/* Feature 5: Google Ranked badge */}
+                              {thread.googleRanked && (
+                                <span className="flex items-center gap-1 rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                                  <Globe className="w-3 h-3" />
+                                  Google Ranked
+                                </span>
+                              )}
+                              {thread.status !== 'dismissed' && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDismiss(thread)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
+                                  aria-label={`Dismiss ${thread.title || 'conversation'}`}
+                                  title="Move to Dismissed"
+                                >
+                                  <X className="h-3.5 w-3.5" strokeWidth={1.8} />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <span>·</span>
-                          <span className="font-medium text-text-primary">{isReddit ? `r/${thread.target}` : `"${thread.target}"`}</span>
-                          {/* Feature 3: Community Health Badge — Fix 6.2: Sample size gate */}
-                          {communityHealth[thread.target] && (() => {
-                            const h = communityHealth[thread.target]
-                            if (h.total_engagements < 3) {
-                              return (
-                                <span title="Gathering data (under 3 posts)" className="relative group cursor-help">
-                                  <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />
-                                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-44 text-center text-[11px] bg-gray-900 text-white px-2 py-1 rounded-md shadow-lg z-50 leading-snug">Gathering community health data</span>
+
+                          {thread.title && (
+                            <h3 className="mb-2 text-[15px] font-bold leading-snug text-text-primary">
+                              {thread.title}
+                            </h3>
+                          )}
+                          <p className="text-text-secondary text-[14px] line-clamp-2 mb-4 leading-relaxed">{thread.content}</p>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-3">
+                              {thread.flag === 'COMPETITOR_RISK' ? (
+                                <span className="px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1.5 bg-red-100 text-red-700 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                  Competitor Risk
                                 </span>
-                              )
-                            }
-                            const isSafe = h.rejection_rate < 0.05
-                            const isModerate = h.rejection_rate >= 0.05 && h.rejection_rate < 0.2
-                            const color = isSafe ? 'bg-emerald-400' : isModerate ? 'bg-amber-400' : 'bg-red-400'
-                            const label = isSafe ? 'Safe community' : isModerate ? 'Moderate — post carefully' : 'High rejection rate'
-                            return (
-                              <span title={label} className="relative group cursor-help">
-                                <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
-                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-40 text-center text-[11px] bg-gray-900 text-white px-2 py-1 rounded-md shadow-lg z-50 leading-snug">{label}</span>
-                              </span>
-                            )
-                          })()}
-                          <span className="ml-1 text-xs">{thread.timeAgo}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {getSafeThreadUrl(thread) && (
-                            <a
-                              href={getSafeThreadUrl(thread) ?? undefined}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(event) => event.stopPropagation()}
-                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-semibold text-[#4F5865] transition-colors hover:bg-[#F1F2F3] hover:text-[#0A84FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
-                              aria-label={`Open ${thread.platform === 'reddit' ? 'Reddit' : 'Bluesky'} post in a new tab`}
-                              title={`Open on ${thread.platform === 'reddit' ? 'Reddit' : 'Bluesky'}`}
-                            >
-                              Open post
-                              <ExternalLink className="h-3 w-3" strokeWidth={1.9} />
-                            </a>
-                          )}
-                          {/* Feature 5: Google Ranked badge */}
-                          {thread.googleRanked && (
-                            <span className="flex items-center gap-1 rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
-                              <Globe className="w-3 h-3" />
-                              Google Ranked
-                            </span>
-                          )}
-                          {thread.status !== 'dismissed' && (
-                            <button
-                              type="button"
-                              onClick={() => void handleDismiss(thread)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
-                              aria-label={`Dismiss ${thread.title || 'conversation'}`}
-                              title="Move to Dismissed"
-                            >
-                              <X className="h-3.5 w-3.5" strokeWidth={1.8} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                              ) : (
+                                <IntentBadge score={thread.score} label={thread.label} />
+                              )}
+                              {thread.matchedKeyword && (
+                                <span className="text-xs text-text-tertiary font-medium tracking-wide">Matched: &quot;{thread.matchedKeyword}&quot;</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {/* Feature 4: Closing Soon badge */}
+                              {(() => {
+                                const hoursLeft = getWindowHoursLeft(thread.createdAt)
+                                if (hoursLeft !== null && hoursLeft <= 6) {
+                                  return (
+                                    <span className="text-xs bg-amber-50 text-amber-600 font-semibold px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                      Closes in {hoursLeft}h
+                                    </span>
+                                  )
+                                }
+                                return null
+                              })()}
+                            </div>
+                          </div>
 
-                      {thread.title && (
-                        <h3 className="mb-2 text-[15px] font-bold leading-snug text-text-primary">
-                          {thread.title}
-                        </h3>
-                      )}
-                      <p className="text-text-secondary text-[14px] line-clamp-2 mb-4 leading-relaxed">{thread.content}</p>
-
-                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-3">
-                          {thread.flag === 'COMPETITOR_RISK' ? (
-                            <span className="px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1.5 bg-red-100 text-red-700 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]">
-                              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                              Competitor Risk
-                            </span>
-                          ) : (
-                            <IntentBadge score={thread.score} label={thread.label} />
-                          )}
-                          {thread.matchedKeyword && (
-                            <span className="text-xs text-text-tertiary font-medium tracking-wide">Matched: &quot;{thread.matchedKeyword}&quot;</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {/* Feature 4: Closing Soon badge */}
-                          {(() => {
-                            const hoursLeft = getWindowHoursLeft(thread.createdAt)
-                            if (hoursLeft !== null && hoursLeft <= 6) {
-                              return (
-                                <span className="text-xs bg-amber-50 text-amber-600 font-semibold px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                  Closes in {hoursLeft}h
-                                </span>
-                              )
-                            }
-                            return null
-                          })()}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex justify-end border-t border-black/[0.05] pt-4 sm:pl-8">
-                        {editingDraft === thread.id ? (
-                          <div className="w-full max-w-[92%] sm:max-w-[68%]">
-                            <div className="mb-2 flex items-center justify-between px-1">
-                              <span className="text-[11px] font-semibold text-gray-500">Your reply</span>
+                          <div className="mt-4 flex justify-end border-t border-black/[0.05] pt-4 sm:pl-8">
+                            {editingDraft === thread.id ? (
+                              <div className="w-full max-w-[92%] sm:max-w-[68%]">
+                                <div className="mb-2 flex items-center justify-between px-1">
+                                  <span className="text-[11px] font-semibold text-gray-500">Your reply</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingDraft(null)}
+                                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
+                                  >
+                                    Done
+                                  </button>
+                                </div>
+                                <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                                  <textarea
+                                    className="min-h-[190px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                                    value={thread.draft || ''}
+                                    placeholder="Write your reply..."
+                                    onChange={(event) => {
+                                      const updated = event.target.value
+                                      setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, draft: updated } : item))
+                                      setSelectedThread(prev => prev?.id === thread.id ? { ...prev, draft: updated } : prev)
+                                    }}
+                                    autoFocus
+                                    spellCheck
+                                  />
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1">
+                                  <span className="text-[10.5px] tabular-nums text-gray-400">
+                                    {(thread.draft || '').length} characters
+                                  </span>
+                                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleDismiss()}
+                                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                      title="Dismiss thread"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleRegenerate}
+                                      disabled={regenerating}
+                                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
+                                      title="Rewrite reply"
+                                    >
+                                      <RefreshCcw className={`h-3.5 w-3.5 ${regenerating ? 'animate-spin' : ''}`} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCopyDraft}
+                                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+                                    >
+                                      <Copy className="h-3.5 w-3.5" />
+                                      Copy
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleMarkAsPosted}
+                                      className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+                                    >
+                                      Mark posted
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleApproveAndSend}
+                                      disabled={sendingThreadId === thread.id}
+                                      className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-black"
+                                    >
+                                      <CheckCircle className="h-3.5 w-3.5" />
+                                      {sendingThreadId === thread.id
+                                        ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                                        : getDeliveryActionLabel(thread.platform, extensionInstalled)}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
                               <button
                                 type="button"
-                                onClick={() => setEditingDraft(null)}
-                                className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
+                                onClick={() => handleReplyBubbleClick(thread)}
+                                disabled={regenerating}
+                                className="group w-fit max-w-[82%] rounded-[17px] rounded-br-[5px] bg-[#0A84FF] px-4 py-3 text-left text-white shadow-[0_3px_12px_rgba(10,132,255,0.12)] transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_5px_16px_rgba(10,132,255,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-75 sm:max-w-[46%]"
+                                aria-label={thread.draft ? 'Open full drafted reply' : 'Generate a drafted reply'}
                               >
-                                Done
+                                {thread.draft ? (
+                                  <p className="line-clamp-2 whitespace-pre-line text-[12.5px] leading-relaxed text-white">
+                                    {thread.draft}
+                                  </p>
+                                ) : (
+                                  <span className="flex items-center gap-2 text-[12.5px] font-semibold leading-relaxed text-white">
+                                    <MessageCircle className="h-3.5 w-3.5 text-white/75" strokeWidth={2} />
+                                    {regenerating && selectedThread?.id === thread.id ? 'Preparing reply...' : 'Generate reply'}
+                                  </span>
+                                )}
+                                {thread.draft && (
+                                  <span className="mt-1.5 block text-right text-[9.5px] font-medium text-white/65 group-hover:text-white/90">
+                                    Open full reply
+                                  </span>
+                                )}
                               </button>
-                            </div>
-                            <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
-                              <textarea
-                                className="min-h-[190px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
-                                value={thread.draft || ''}
-                                placeholder="Write your reply..."
-                                onChange={(event) => {
-                                  const updated = event.target.value
-                                  setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, draft: updated } : item))
-                                  setSelectedThread(prev => prev?.id === thread.id ? { ...prev, draft: updated } : prev)
-                                }}
-                                autoFocus
-                                spellCheck
-                              />
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1">
-                              <span className="text-[10.5px] tabular-nums text-gray-400">
-                                {(thread.draft || '').length} characters
-                              </span>
-                              <div className="flex flex-wrap items-center justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDismiss()}
-                                  className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                                  title="Dismiss thread"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleRegenerate}
-                                  disabled={regenerating}
-                                  className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
-                                  title="Rewrite reply"
-                                >
-                                  <RefreshCcw className={`h-3.5 w-3.5 ${regenerating ? 'animate-spin' : ''}`} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleCopyDraft}
-                                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
-                                >
-                                  <Copy className="h-3.5 w-3.5" />
-                                  Copy
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleMarkAsPosted}
-                                  className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
-                                >
-                                  Mark posted
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleApproveAndSend}
-                                  disabled={sendingThreadId === thread.id}
-                                  className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-black"
-                                >
-                                  <CheckCircle className="h-3.5 w-3.5" />
-                                  {sendingThreadId === thread.id
-                                    ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                                    : getDeliveryActionLabel(thread.platform, extensionInstalled)}
-                                </button>
-                              </div>
-                            </div>
+                            )}
                           </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleReplyBubbleClick(thread)}
-                            disabled={regenerating}
-                            className="group w-fit max-w-[82%] rounded-[17px] rounded-br-[5px] bg-[#0A84FF] px-4 py-3 text-left text-white shadow-[0_3px_12px_rgba(10,132,255,0.12)] transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_5px_16px_rgba(10,132,255,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-75 sm:max-w-[46%]"
-                            aria-label={thread.draft ? 'Open full drafted reply' : 'Generate a drafted reply'}
-                          >
-                            {thread.draft ? (
-                              <p className="line-clamp-2 whitespace-pre-line text-[12.5px] leading-relaxed text-white">
-                                {thread.draft}
-                              </p>
-                            ) : (
-                              <span className="flex items-center gap-2 text-[12.5px] font-semibold leading-relaxed text-white">
-                                <MessageCircle className="h-3.5 w-3.5 text-white/75" strokeWidth={2} />
-                                {regenerating && selectedThread?.id === thread.id ? 'Preparing reply...' : 'Generate reply'}
-                              </span>
-                            )}
-                            {thread.draft && (
-                              <span className="mt-1.5 block text-right text-[9.5px] font-medium text-white/65 group-hover:text-white/90">
-                                Open full reply
-                              </span>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                      </div>
-                    </article>
+                        </div>
+                      </article>
 
                       {showLegacyReview && (
                         <div
@@ -1317,195 +1316,195 @@ export default function DashboardPage() {
               {/* Retained temporarily for checkpoint compatibility; the inline conversation is the active review surface. */}
               {selectedThread && (
                 <div className="hidden" aria-hidden="true">
-                <button
-                  type="button"
-                  className="fixed inset-0 z-30 bg-black/20 backdrop-blur-[1px] xl:hidden"
-                  onClick={() => setSelectedThread(null)}
-                  aria-label="Close review panel"
-                />
-                <div className="fixed inset-x-3 bottom-[76px] top-[72px] z-40 flex w-auto shrink-0 flex-col overflow-hidden rounded-3xl border border-black/[0.08] bg-white shadow-xl transition-all xl:sticky xl:inset-auto xl:top-[80px] xl:z-auto xl:max-h-[calc(100vh-96px)] xl:w-[46%] xl:max-w-[520px] xl:shadow-lg">
-                  {/* Panel Header */}
-                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-white px-4 py-4 sm:px-6">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      {selectedThread.platform === 'reddit' ? (
-                        <RedditIcon className="h-5 w-5 shrink-0 text-[#FF4500]" />
-                      ) : selectedThread.platform === 'x' ? (
-                        <XIcon className="h-5 w-5 shrink-0 text-[#0F1419]" />
-                      ) : (
-                        <BlueskyIcon className="h-5 w-5 shrink-0 text-[#1185FE]" />
-                      )}
-                      <div className="min-w-0">
-                        <h2 className="truncate text-sm font-semibold tracking-tight text-gray-900">Conversation</h2>
-                        <span className="block truncate text-[11px] font-medium text-gray-400">
-                          {selectedThread.platform === 'reddit' ? `r/${selectedThread.target}` : selectedThread.target}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                    {getSafeThreadUrl(selectedThread) ? (
-                      <a
-                        href={getSafeThreadUrl(selectedThread) ?? undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50 hover:text-blue-700"
-                      >
-                        Open post <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
-                        Open post <ExternalLink className="h-3 w-3" />
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedThread(null)}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 xl:hidden"
-                      aria-label="Close review panel"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                    </div>
-                  </div>
-
-                  {/* Staggered conversation body */}
-                  <div className="flex-1 space-y-5 overflow-y-visible px-4 py-5 sm:px-6 xl:overflow-y-auto">
-                    <div className="flex justify-start">
-                      <div className="w-fit max-w-[82%] rounded-[18px] rounded-bl-md border border-black/[0.04] bg-[#F1F1EF] px-3.5 py-3">
-                        <div className="mb-2 flex items-center gap-2 text-[10.5px] font-medium text-gray-400">
-                          {selectedThread.platform === 'reddit' ? (
-                            <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
-                          ) : selectedThread.platform === 'x' ? (
-                            <XIcon className="h-3.5 w-3.5 text-[#0F1419]" />
-                          ) : (
-                            <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />
-                          )}
-                          <span>{selectedThread.platform === 'reddit' ? `r/${selectedThread.target}` : selectedThread.target}</span>
-                        </div>
-                        {selectedThread.title && (
-                            <h3 className="mb-1 line-clamp-1 text-[13px] font-semibold leading-snug text-gray-900">
-                            {selectedThread.title}
-                          </h3>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-30 bg-black/20 backdrop-blur-[1px] xl:hidden"
+                    onClick={() => setSelectedThread(null)}
+                    aria-label="Close review panel"
+                  />
+                  <div className="fixed inset-x-3 bottom-[76px] top-[72px] z-40 flex w-auto shrink-0 flex-col overflow-hidden rounded-3xl border border-black/[0.08] bg-white shadow-xl transition-all xl:sticky xl:inset-auto xl:top-[80px] xl:z-auto xl:max-h-[calc(100vh-96px)] xl:w-[46%] xl:max-w-[520px] xl:shadow-lg">
+                    {/* Panel Header */}
+                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-white px-4 py-4 sm:px-6">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        {selectedThread.platform === 'reddit' ? (
+                          <RedditIcon className="h-5 w-5 shrink-0 text-[#FF4500]" />
+                        ) : selectedThread.platform === 'x' ? (
+                          <XIcon className="h-5 w-5 shrink-0 text-[#0F1419]" />
+                        ) : (
+                          <BlueskyIcon className="h-5 w-5 shrink-0 text-[#1185FE]" />
                         )}
-                        <p className="line-clamp-2 text-[12.5px] font-normal leading-relaxed text-gray-600">
-                          {selectedThread.content}
-                        </p>
-                        <p className="mt-1.5 text-right text-[10px] font-medium text-gray-400">
-                          {selectedThread.timeAgo}
-                        </p>
-                      </div>
-                    </div>
-
-                    {editingDraft === selectedThread.id ? (
-                      <div className="ml-auto w-full max-w-[92%]">
-                        <div className="mb-2 flex items-center justify-between px-1">
-                          <span className="text-[11px] font-semibold text-gray-500">Your reply</span>
-                          <button
-                            type="button"
-                            onClick={() => setEditingDraft(null)}
-                            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
-                          >
-                            Done
-                          </button>
+                        <div className="min-w-0">
+                          <h2 className="truncate text-sm font-semibold tracking-tight text-gray-900">Conversation</h2>
+                          <span className="block truncate text-[11px] font-medium text-gray-400">
+                            {selectedThread.platform === 'reddit' ? `r/${selectedThread.target}` : selectedThread.target}
+                          </span>
                         </div>
-                        <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
-                          <textarea
-                            className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
-                            value={selectedThread.draft || ''}
-                            placeholder="Write your reply..."
-                            onChange={(e) => {
-                              const updated = e.target.value
-                              setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, draft: updated } : t))
-                              setSelectedThread(prev => prev ? { ...prev, draft: updated } : null)
-                            }}
-                            autoFocus
-                            spellCheck
-                          />
-                        </div>
-                        <p className="mt-1.5 px-1 text-right text-[10.5px] tabular-nums text-gray-400">
-                          {(selectedThread.draft || '').length} characters
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => selectedThread.draft ? setEditingDraft(selectedThread.id) : void handleRegenerate()}
-                          disabled={regenerating}
-                          className="group w-fit max-w-[84%] rounded-[20px] rounded-br-md bg-[#0A84FF] px-4 py-3 text-left text-white shadow-[0_4px_18px_rgba(10,132,255,0.16)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-75"
-                          aria-label={selectedThread.draft ? 'Open full drafted reply' : 'Generate a drafted reply'}
-                        >
-                          {selectedThread.draft ? (
-                            <p className="line-clamp-4 whitespace-pre-line text-[13px] leading-relaxed text-white">
-                              {selectedThread.draft}
-                            </p>
-                          ) : (
-                            <p className="text-[13px] font-semibold leading-relaxed text-white">
-                              {regenerating ? 'Preparing reply...' : 'Generate reply'}
-                            </p>
-                          )}
-                          <div className="mt-2 flex items-center justify-end gap-2 text-[10px] font-medium text-white/65">
-                            <span>{selectedThread.draft ? 'Draft' : 'Not generated'}</span>
-                            <span aria-hidden="true">&middot;</span>
-                            <span className="group-hover:text-white/90">
-                              {selectedThread.draft ? 'Open full reply' : 'Create preview'}
-                            </span>
-                          </div>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Panel Footer & Action Bar */}
-                  <div className="p-5 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
-                    <button
-                      onClick={handleApproveAndSend}
-                      disabled={!selectedThread.draft || sendingThreadId === selectedThread.id}
-                      className="w-full py-3 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold text-xs disabled:bg-gray-100 disabled:text-gray-400 disabled:border disabled:border-gray-200/60 shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      <CheckCircle className="w-4 h-4 text-white" />
-                      {sendingThreadId === selectedThread.id
-                        ? (selectedThread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                        : getDeliveryActionLabel(selectedThread.platform, extensionInstalled)}
-                    </button>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => void handleDismiss()}
-                          className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all cursor-pointer"
-                          title="Dismiss thread"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={handleRegenerate}
-                          disabled={regenerating}
-                          className="p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all disabled:opacity-40 cursor-pointer"
-                          title={selectedThread.draft ? 'Rewrite reply' : 'Generate reply'}
-                        >
-                          <RefreshCcw className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
-                        </button>
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {getSafeThreadUrl(selectedThread) ? (
+                          <a
+                            href={getSafeThreadUrl(selectedThread) ?? undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50 hover:text-blue-700"
+                          >
+                            Open post <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
+                            Open post <ExternalLink className="h-3 w-3" />
+                          </span>
+                        )}
                         <button
-                          onClick={handleCopyDraft}
-                          className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          type="button"
+                          onClick={() => setSelectedThread(null)}
+                          className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 xl:hidden"
+                          aria-label="Close review panel"
                         >
-                          <Copy className="w-3.5 h-3.5 text-gray-400" />
-                          Copy
-                        </button>
-                        <button
-                          onClick={handleMarkAsPosted}
-                          className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all cursor-pointer shadow-2xs"
-                        >
-                          Mark as Posted
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
+
+                    {/* Staggered conversation body */}
+                    <div className="flex-1 space-y-5 overflow-y-visible px-4 py-5 sm:px-6 xl:overflow-y-auto">
+                      <div className="flex justify-start">
+                        <div className="w-fit max-w-[82%] rounded-[18px] rounded-bl-md border border-black/[0.04] bg-[#F1F1EF] px-3.5 py-3">
+                          <div className="mb-2 flex items-center gap-2 text-[10.5px] font-medium text-gray-400">
+                            {selectedThread.platform === 'reddit' ? (
+                              <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
+                            ) : selectedThread.platform === 'x' ? (
+                              <XIcon className="h-3.5 w-3.5 text-[#0F1419]" />
+                            ) : (
+                              <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />
+                            )}
+                            <span>{selectedThread.platform === 'reddit' ? `r/${selectedThread.target}` : selectedThread.target}</span>
+                          </div>
+                          {selectedThread.title && (
+                            <h3 className="mb-1 line-clamp-1 text-[13px] font-semibold leading-snug text-gray-900">
+                              {selectedThread.title}
+                            </h3>
+                          )}
+                          <p className="line-clamp-2 text-[12.5px] font-normal leading-relaxed text-gray-600">
+                            {selectedThread.content}
+                          </p>
+                          <p className="mt-1.5 text-right text-[10px] font-medium text-gray-400">
+                            {selectedThread.timeAgo}
+                          </p>
+                        </div>
+                      </div>
+
+                      {editingDraft === selectedThread.id ? (
+                        <div className="ml-auto w-full max-w-[92%]">
+                          <div className="mb-2 flex items-center justify-between px-1">
+                            <span className="text-[11px] font-semibold text-gray-500">Your reply</span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingDraft(null)}
+                              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
+                            >
+                              Done
+                            </button>
+                          </div>
+                          <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                            <textarea
+                              className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                              value={selectedThread.draft || ''}
+                              placeholder="Write your reply..."
+                              onChange={(e) => {
+                                const updated = e.target.value
+                                setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, draft: updated } : t))
+                                setSelectedThread(prev => prev ? { ...prev, draft: updated } : null)
+                              }}
+                              autoFocus
+                              spellCheck
+                            />
+                          </div>
+                          <p className="mt-1.5 px-1 text-right text-[10.5px] tabular-nums text-gray-400">
+                            {(selectedThread.draft || '').length} characters
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => selectedThread.draft ? setEditingDraft(selectedThread.id) : void handleRegenerate()}
+                            disabled={regenerating}
+                            className="group w-fit max-w-[84%] rounded-[20px] rounded-br-md bg-[#0A84FF] px-4 py-3 text-left text-white shadow-[0_4px_18px_rgba(10,132,255,0.16)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-75"
+                            aria-label={selectedThread.draft ? 'Open full drafted reply' : 'Generate a drafted reply'}
+                          >
+                            {selectedThread.draft ? (
+                              <p className="line-clamp-4 whitespace-pre-line text-[13px] leading-relaxed text-white">
+                                {selectedThread.draft}
+                              </p>
+                            ) : (
+                              <p className="text-[13px] font-semibold leading-relaxed text-white">
+                                {regenerating ? 'Preparing reply...' : 'Generate reply'}
+                              </p>
+                            )}
+                            <div className="mt-2 flex items-center justify-end gap-2 text-[10px] font-medium text-white/65">
+                              <span>{selectedThread.draft ? 'Draft' : 'Not generated'}</span>
+                              <span aria-hidden="true">&middot;</span>
+                              <span className="group-hover:text-white/90">
+                                {selectedThread.draft ? 'Open full reply' : 'Create preview'}
+                              </span>
+                            </div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Panel Footer & Action Bar */}
+                    <div className="p-5 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
+                      <button
+                        onClick={handleApproveAndSend}
+                        disabled={!selectedThread.draft || sendingThreadId === selectedThread.id}
+                        className="w-full py-3 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold text-xs disabled:bg-gray-100 disabled:text-gray-400 disabled:border disabled:border-gray-200/60 shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <CheckCircle className="w-4 h-4 text-white" />
+                        {sendingThreadId === selectedThread.id
+                          ? (selectedThread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                          : getDeliveryActionLabel(selectedThread.platform, extensionInstalled)}
+                      </button>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => void handleDismiss()}
+                            className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all cursor-pointer"
+                            title="Dismiss thread"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={handleRegenerate}
+                            disabled={regenerating}
+                            className="p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all disabled:opacity-40 cursor-pointer"
+                            title={selectedThread.draft ? 'Rewrite reply' : 'Generate reply'}
+                          >
+                            <RefreshCcw className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleCopyDraft}
+                            className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-gray-400" />
+                            Copy
+                          </button>
+                          <button
+                            onClick={handleMarkAsPosted}
+                            className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all cursor-pointer shadow-2xs"
+                          >
+                            Mark as Posted
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
                 </div>
               )}
             </div>
