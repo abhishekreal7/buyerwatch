@@ -11,6 +11,7 @@ import {
   CubeIcon,
   FolderIcon,
   IdentificationIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/solid'
 import {
   Bell,
@@ -345,9 +346,12 @@ function DashboardShell({
                   </Link>
                 )
               })}
+            </nav>
 
-              {/* Settings Nav Item — separated with mt-6 */}
-              <div className="pt-5">
+            {/* Bottom Group (Settings + Help Center + Profile Card) */}
+            <div className="mt-auto flex flex-col gap-3 pt-4">
+              <div className="space-y-1">
+                {/* Settings Nav Item */}
                 <Link
                   href="/settings"
                   prefetch
@@ -362,19 +366,21 @@ function DashboardShell({
                   <IdentificationIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.startsWith('/settings') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
                   <span>Settings</span>
                 </Link>
-              </div>
-            </nav>
 
-            {/* Bottom Group (Help Center + Profile Card) */}
-            <div className="mt-auto flex flex-col gap-4 pt-4">
-              {/* Help center — separated with mt-6 / space above profile card */}
-              <Link
-                href="/contact"
-                className="group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                <HelpCircle size={20} className="shrink-0 text-[#9E9E9E] group-hover:text-[#3A3A3A] transition-colors" strokeWidth={1.75} />
-                <span>Help center</span>
-              </Link>
+                {/* Help center */}
+                <Link
+                  href="/contact"
+                  aria-current={pathname.startsWith('/contact') ? 'page' : undefined}
+                  className={
+                    pathname.startsWith('/contact')
+                      ? 'group flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
+                      : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
+                  }
+                >
+                  <QuestionMarkCircleIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.startsWith('/contact') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
+                  <span>Help center</span>
+                </Link>
+              </div>
 
               {/* Restyled Profile Card */}
               <div className="rounded-xl border border-zinc-200 p-3 space-y-2">
