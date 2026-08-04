@@ -4,13 +4,12 @@ import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from 'r
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  PuzzlePiece,
-  Cube,
-} from '@phosphor-icons/react'
-import {
   Squares2X2Icon,
   DocumentTextIcon,
   PresentationChartLineIcon,
+  PuzzlePieceIcon,
+  CubeIcon,
+  PaperAirplaneIcon,
 } from '@heroicons/react/24/solid'
 import {
   Bell,
@@ -18,7 +17,6 @@ import {
   LogOut,
   Menu,
   Search,
-  Send,
   Settings,
   X,
 } from 'lucide-react'
@@ -47,7 +45,7 @@ export type DashboardBootstrap = {
   }
 }
 
-/** Specific icons for specified items, Outline Lucide for the rest */
+/** Heroicons Solid icons for all main navigation items */
 const MAIN_NAV_ITEMS = [
   {
     name: 'Dashboard',
@@ -70,20 +68,20 @@ const MAIN_NAV_ITEMS = [
   {
     name: 'Keywords',
     href: '/keywords',
-    icon: PuzzlePiece,
-    isPhosphor: true,
+    icon: PuzzlePieceIcon,
+    isHeroicon: true,
   },
   {
     name: 'Opportunities',
     href: '/opportunities',
-    icon: Cube,
-    isPhosphor: true,
+    icon: CubeIcon,
+    isHeroicon: true,
   },
   {
     name: 'Posted',
     href: '/posted',
-    icon: Send,
-    isPhosphor: false,
+    icon: PaperAirplaneIcon,
+    isHeroicon: true,
   },
 ]
 
@@ -317,13 +315,7 @@ function DashboardShell({
                         : 'flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
                     }
                   >
-                    {item.isHeroicon ? (
-                      <IconComp className="h-5 w-5 shrink-0 text-current" />
-                    ) : item.isPhosphor ? (
-                      <IconComp weight="fill" size={20} className="shrink-0 text-current" />
-                    ) : (
-                      <IconComp size={20} className="shrink-0 text-current" strokeWidth={1.75} />
-                    )}
+                    <IconComp className="h-5 w-5 shrink-0 text-current" />
                     <span>{item.name}</span>
 
                     {/* Metadata Badge */}
@@ -518,13 +510,7 @@ function DashboardShell({
                     }`}
                   >
                     <div className="relative grid h-5 w-5 place-items-center">
-                      {item.isHeroicon ? (
-                        <IconComp className="h-4.5 w-4.5 text-current" />
-                      ) : item.isPhosphor ? (
-                        <IconComp weight="fill" size={18} className="text-current" />
-                      ) : (
-                        <IconComp size={18} className="text-current" strokeWidth={1.75} />
-                      )}
+                      <IconComp className="h-4.5 w-4.5 text-current" />
                     </div>
                     <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name.split(' ')[0]}</span>
                   </Link>
@@ -561,7 +547,7 @@ function DashboardShell({
               >
                 {[
                   { name: 'Dashboard', href: '/dashboard', icon: Squares2X2Icon, isHeroicon: true },
-                  { name: 'Posted replies', href: '/posted', icon: Send, isPhosphor: false },
+                  { name: 'Posted replies', href: '/posted', icon: PaperAirplaneIcon, isHeroicon: true },
                   { name: 'Settings', href: '/settings', icon: Settings, isPhosphor: false },
                 ].map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -581,8 +567,6 @@ function DashboardShell({
                     >
                       {item.isHeroicon ? (
                         <IconComp className="h-4.5 w-4.5" />
-                      ) : item.isPhosphor ? (
-                        <IconComp weight="fill" size={18} />
                       ) : (
                         <IconComp size={18} strokeWidth={2} />
                       )}
