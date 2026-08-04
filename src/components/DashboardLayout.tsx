@@ -4,10 +4,15 @@ import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from 'r
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  SquaresFour,
+  FileText,
+  PresentationChart,
+  PuzzlePiece,
+  Cube,
+} from '@phosphor-icons/react'
+import {
   Bell,
-  ChartNoAxesCombined,
-  FolderClosed,
-  LayoutDashboard,
+  HelpCircle,
   LogOut,
   Menu,
   Search,
@@ -15,28 +20,17 @@ import {
   Settings,
   X,
 } from 'lucide-react'
-import {
-  PiArrowLeftBold,
-  PiQuestionFill,
-} from 'react-icons/pi'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
-import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
-import {
-  ReferenceAnalyticsIcon,
-  ReferenceCubeIcon,
-  ReferenceDashboardIcon,
-  ReferenceFolderIcon,
-  ReferencePuzzleIcon,
-} from '@/components/SidebarReferenceIcons'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import {
   ExtensionPriorityNotice,
   ExtensionProvider,
   useExtensionStatus,
 } from '@/components/ExtensionInstall'
+import { signOutAction } from '@/app/actions/auth'
 
 export type DashboardBootstrap = {
   autoSend: boolean
@@ -50,17 +44,47 @@ export type DashboardBootstrap = {
   }
 }
 
-const NAV_ITEMS = [
-  { name: 'Dashboard', href: '/dashboard', icon: ReferenceDashboardIcon, sidebarIcon: ReferenceDashboardIcon },
-  { name: 'Drafts Ready', href: '/drafts', icon: ReferenceFolderIcon, sidebarIcon: ReferenceFolderIcon },
-  { name: 'Analytics', href: '/analytics', icon: ReferenceAnalyticsIcon, sidebarIcon: ReferenceAnalyticsIcon },
-  { name: 'Keywords', href: '/keywords', icon: ReferencePuzzleIcon, sidebarIcon: ReferencePuzzleIcon },
-  { name: 'Opportunities', href: '/opportunities', icon: ReferenceCubeIcon, sidebarIcon: ReferenceCubeIcon },
-  { name: 'Posted', href: '/posted', icon: Send, sidebarIcon: Send },
-  { name: 'Settings', href: '/settings', icon: Settings, sidebarIcon: Settings },
+/** 5 Solid Phosphor Icons for specified items, Outline Lucide for the rest */
+const MAIN_NAV_ITEMS = [
+  {
+    name: 'Dashboard',
+    href: '/dashboard',
+    icon: SquaresFour,
+    isPhosphor: true,
+  },
+  {
+    name: 'Drafts Ready',
+    href: '/drafts',
+    icon: FileText,
+    isPhosphor: true,
+  },
+  {
+    name: 'Analytics',
+    href: '/analytics',
+    icon: PresentationChart,
+    isPhosphor: true,
+  },
+  {
+    name: 'Keywords',
+    href: '/keywords',
+    icon: PuzzlePiece,
+    isPhosphor: true,
+  },
+  {
+    name: 'Opportunities',
+    href: '/opportunities',
+    icon: Cube,
+    isPhosphor: true,
+  },
+  {
+    name: 'Posted',
+    href: '/posted',
+    icon: Send,
+    isPhosphor: false,
+  },
 ]
 
-const MOBILE_NAV_ITEMS = NAV_ITEMS.filter((item) =>
+const MOBILE_NAV_ITEMS = MAIN_NAV_ITEMS.filter((item) =>
   ['Drafts Ready', 'Analytics', 'Keywords', 'Opportunities'].includes(item.name)
 )
 
@@ -94,6 +118,8 @@ function DashboardShell({
   )
   const [plan, setPlan] = useState<PlanTier>(initialData.plan)
   const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
+  const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
+  const [keywordCount, setKeywordCount] = useState<number | null>(null)
   const [openingCheckout, setOpeningCheckout] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [conversationSearch, setConversationSearch] = useState('')
@@ -124,8 +150,7 @@ function DashboardShell({
 
   useEffect(() => {
     async function loadSidebarData() {
-      // Profile — auto-send state
-      const [profileResult, unreviewedResult] = await Promise.all([
+      const [profileResult, unreviewedResult, keywordCountResult] = await Promise.all([
         supabase
           .from('profiles')
           .select('auto_send_enabled, plan, draft_count, draft_month')
@@ -133,12 +158,17 @@ function DashboardShell({
           .single(),
         supabase
           .from('monitored_threads')
-          .select('id')
+          .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
           .in('status', ['pending', 'drafted', 'needs_manual_reply'])
-          .is('reviewed_at', null)
-          .limit(1),
+          .is('reviewed_at', null),
+        supabase
+          .from('keywords')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('is_active', true),
       ])
+
       const profile = profileResult.data
       if (profile) {
         const normalizedPlan = normalizePlan(profile.plan)
@@ -151,8 +181,13 @@ function DashboardShell({
         setPlan(normalizedPlan)
         setCredits({ used, limit })
       }
-      setHasUnreviewedOpportunities((unreviewedResult.data?.length ?? 0) > 0)
+
+      const oppsCount = unreviewedResult.count ?? 0
+      setOpportunityCount(oppsCount)
+      setHasUnreviewedOpportunities(oppsCount > 0)
+      setKeywordCount(keywordCountResult.count ?? null)
     }
+
     const refreshCredits = () => void loadSidebarData()
     const refreshInterval = window.setInterval(loadSidebarData, 60_000)
     window.addEventListener('buyerwatch:credits-changed', refreshCredits)
@@ -174,8 +209,6 @@ function DashboardShell({
     if (autoSend === null || togglingAutoSend) return
     const next = !autoSend
 
-    // Pausing must stay instant. Initial activation is deliberately completed
-    // in Settings where the trust evidence, scope, and limits are visible.
     if (next) {
       router.push('/settings?section=connections')
       toast.info('Review the earned automation controls before activating it.')
@@ -183,7 +216,7 @@ function DashboardShell({
     }
 
     setTogglingAutoSend(true)
-    setAutoSend(next) // optimistic
+    setAutoSend(next)
 
     const res = await fetch('/api/settings/autosend', {
       method: 'PATCH',
@@ -192,7 +225,7 @@ function DashboardShell({
     })
 
     if (!res.ok) {
-      setAutoSend(!next) // revert
+      setAutoSend(!next)
       toast.error('Failed to update auto-send setting')
     } else {
       clearSupabaseReadCache()
@@ -231,223 +264,202 @@ function DashboardShell({
   const creditsPercent = credits && credits.limit > 0
     ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
     : 0
-  function focusConversationSearch() {
-    window.dispatchEvent(new Event('buyerwatch:focus-conversation-search'))
-  }
 
   return (
     <DashboardSessionProvider userId={userId}>
-      {/* Outer App Canvas — Fits 100% viewport screen */}
       <div className="h-screen w-screen overflow-hidden bg-[#F4F4F2] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
-        {/* Desktop Sidebar sitting directly on warm stone background */}
-        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F4F4F2] px-2 py-2.5 h-full lg:flex select-none">
+        {/* Desktop Sidebar Restyled — Redesigned according to Prody-style SaaS reference */}
+        <aside className="hidden w-[220px] shrink-0 flex-col bg-white border-r border-zinc-200 px-3 py-4 h-full lg:flex select-none rounded-2xl shadow-xs">
           <div className="flex flex-col h-full">
             {/* Logo Header */}
-            <div className="mb-2 flex h-9 shrink-0 items-center px-3.5">
+            <div className="mb-4 flex h-9 shrink-0 items-center px-3">
               <Link
                 href="/dashboard"
-                className="flex items-center text-[18px] font-bold tracking-[-0.03em] text-[#1C1C1A] transition-opacity hover:opacity-75"
+                className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
               >
-                <BrandLogo size="sm" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 text-white font-semibold text-sm shadow-xs">
+                  B
+                </div>
+                <span className="font-semibold text-base text-zinc-900 tracking-tight">
+                  BuyerWatch
+                </span>
               </Link>
             </div>
 
-            {/* Navigation Items */}
-            <nav className="space-y-0.5" aria-label="Primary navigation">
-              {NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                const SidebarIcon = item.sidebarIcon
-                const isFilledSidebarIcon = ['Dashboard', 'Drafts Ready', 'Analytics', 'Keywords', 'Opportunities'].includes(item.name)
-                const showExtensionAlert = extensionMissing && ['Keywords', 'Opportunities', 'Settings'].includes(item.name)
-                const showOpportunityIndicator = item.name === 'Opportunities' && hasUnreviewedOpportunities
+            {/* Main Navigation Items */}
+            <nav className="space-y-1" aria-label="Primary navigation">
+              {MAIN_NAV_ITEMS.map((item) => {
+                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
+                const IconComp = item.icon
+                const showExtensionAlert = extensionMissing && ['Keywords', 'Opportunities'].includes(item.name)
+                
+                // Get count badge data if available
+                let badgeCount: number | undefined = undefined
+                if (item.name === 'Drafts Ready' && credits) {
+                  badgeCount = credits.used
+                } else if (item.name === 'Opportunities' && opportunityCount !== null) {
+                  badgeCount = opportunityCount
+                } else if (item.name === 'Keywords' && keywordCount !== null) {
+                  badgeCount = keywordCount
+                }
+
                 return (
-                  <div key={item.name}>
-                    <Link
-                      href={item.href}
-                      prefetch
-                      onMouseEnter={() => prepareRoute(item.href)}
-                      onFocus={() => prepareRoute(item.href)}
-                      onTouchStart={() => prepareRoute(item.href)}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={`group flex h-9 items-center justify-between rounded-[10px] px-3 text-[13.5px] transition-all duration-150 ${isActive
-                        ? 'border border-[#E2E2DE] bg-white font-semibold text-[#111110] shadow-[0_1px_2.5px_rgba(0,0,0,0.035)]'
-                        : 'border border-transparent font-medium text-[#5D5D57] hover:bg-[#EBEBE8] hover:text-[#1C1C1A]'
-                        }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                          <SidebarIcon
-                            aria-hidden
-                            strokeWidth={1.75}
-                            className={`h-[17px] w-[17px] shrink-0 transition-colors ${
-                              isActive
-                                ? 'text-[#2D2D2A]'
-                                : 'text-[#5D5D58] group-hover:text-[#30302D]'
-                            }`}
-                          />
-                        </span>
-                        <span className="truncate leading-none">{item.name}</span>
-                        {showOpportunityIndicator && (
-                          <span
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#1687E8] ${isActive ? 'ring-2 ring-white' : 'ring-2 ring-[#F4F4F2]'
-                              }`}
-                            aria-label="Unreviewed opportunities available"
-                          />
-                        )}
-                      </span>
-                      {showExtensionAlert && !showOpportunityIndicator && (
-                        <span className="ml-2 h-2 w-2 shrink-0 rounded-full bg-amber-500 ring-2 ring-amber-100" title="Browser extension setup required" aria-label="Browser extension setup required" />
-                      )}
-                    </Link>
-                  </div>
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    prefetch
+                    onMouseEnter={() => prepareRoute(item.href)}
+                    onFocus={() => prepareRoute(item.href)}
+                    onTouchStart={() => prepareRoute(item.href)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={
+                      isActive
+                        ? 'flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
+                        : 'flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
+                    }
+                  >
+                    {item.isPhosphor ? (
+                      <IconComp weight="fill" size={20} className="shrink-0 text-current" />
+                    ) : (
+                      <IconComp size={20} className="shrink-0 text-current" strokeWidth={1.75} />
+                    )}
+                    <span>{item.name}</span>
+
+                    {/* Metadata Badge */}
+                    {badgeCount !== undefined && (
+                      <span className="ml-auto text-xs text-zinc-400">{badgeCount}</span>
+                    )}
+
+                    {showExtensionAlert && badgeCount === undefined && (
+                      <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-amber-500" title="Extension setup required" />
+                    )}
+                  </Link>
                 )
               })}
+
+              {/* Settings Nav Item — separated with mt-6 */}
+              <div className="pt-5">
+                <Link
+                  href="/settings"
+                  prefetch
+                  onMouseEnter={() => prepareRoute('/settings')}
+                  aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
+                  className={
+                    pathname.startsWith('/settings')
+                      ? 'flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
+                      : 'flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
+                  }
+                >
+                  <Settings size={20} className="shrink-0 text-current" strokeWidth={1.75} />
+                  <span>Settings</span>
+                </Link>
+              </div>
             </nav>
 
-            {/* Bottom Navigation & Unified User Widget grouped with mt-auto */}
-            <div className="mt-auto shrink-0 flex flex-col gap-2 pt-3">
+            {/* Bottom Group (Help Center + Profile Card) */}
+            <div className="mt-auto flex flex-col gap-4 pt-4">
+              {/* Help center — separated with mt-6 / space above profile card */}
               <Link
                 href="/contact"
-                className="group flex h-8 items-center gap-2 rounded-xl px-2.5 text-[13px] font-medium text-[#5D5D57] transition-colors hover:bg-[#EAEAE7] hover:text-[#1C1C1A]"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-600 font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
               >
-                <PiQuestionFill className="h-[16px] w-[16px] text-[#7D7D77] group-hover:text-[#2C2C28]" aria-hidden />
-                Help center
+                <HelpCircle size={20} className="shrink-0 text-current" strokeWidth={1.75} />
+                <span>Help center</span>
               </Link>
 
-              {/* Unified Professional Profile & Usage Card */}
-              <div className="rounded-[16px] border border-[#E2E2DE] bg-white p-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col gap-2">
-                {/* User Info Row */}
+              {/* Restyled Profile Card */}
+              <div className="rounded-xl border border-zinc-200 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <Link
-                    href="/settings"
-                    className="group flex min-w-0 flex-1 items-center gap-2 rounded-lg transition-opacity hover:opacity-80"
-                    title="Account Settings"
-                  >
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <img
                       src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
                       alt={initialData.user?.name || 'User'}
-                      className="h-7.5 w-7.5 shrink-0 rounded-full object-cover border border-black/5 shadow-xs"
+                      className="h-8 w-8 shrink-0 rounded-full object-cover border border-zinc-200"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12.5px] font-semibold text-[#1C1C1A] leading-tight">
+                      <p className="truncate text-xs font-medium text-zinc-900 leading-tight">
                         {initialData.user?.name || 'User'}
                       </p>
-                      <p className="truncate text-[10px] font-medium text-[#82827D] capitalize">
+                      <p className="truncate text-[11px] text-zinc-500 capitalize">
                         {plan} Plan
                       </p>
                     </div>
-                  </Link>
-
-                  <form action="/api/auth/signout" method="POST" className="shrink-0">
+                  </div>
+                  <form action={signOutAction} className="shrink-0">
                     <button
                       type="submit"
-                      className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-[#7C7C76] transition-colors hover:bg-black/5 hover:text-[#1C1C1A]"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
                       title="Sign out"
                       aria-label="Sign out"
                     >
-                      <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      <LogOut className="h-4 w-4" />
                     </button>
                   </form>
                 </div>
 
-                {/* Muted Divider */}
-                <div className="h-px w-full bg-[#EAEAE7]" />
-
-                {/* Usage & Upgrade Section */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-[10.5px] font-medium text-[#686863]">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
                     <span>Usage</span>
-                    <span className="font-semibold text-[#1C1C1A]">
-                      {credits ? `${creditsRemaining} drafts left` : 'Checking'}
+                    <span className="font-medium text-zinc-700">
+                      {credits ? `${creditsRemaining} left` : ''}
                     </span>
                   </div>
-
                   <div
-                    className="h-1.5 overflow-hidden rounded-full bg-[#EFEFEA]"
+                    className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100"
                     role="progressbar"
                     aria-label="Monthly drafts remaining"
                     aria-valuemin={0}
-                    aria-valuemax={credits?.limit ?? 0}
-                    aria-valuenow={creditsRemaining ?? 0}
+                    aria-valuemax={credits?.limit || 100}
+                    aria-valuenow={creditsRemaining || 0}
                   >
                     <div
-                      className="h-full rounded-full bg-[#1687E8] transition-[width] duration-300"
+                      className="h-full rounded-full bg-zinc-900 transition-all duration-300"
                       style={{ width: `${creditsPercent}%` }}
                     />
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddCredits}
-                    disabled={openingCheckout}
-                    className={`mt-0.5 flex h-7 w-full items-center justify-center rounded-lg px-2 text-[11px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${plan === 'free'
-                        ? 'bg-[#1C1C1A] text-white shadow-xs hover:bg-black'
-                        : 'border border-[#DEDED9] bg-[#F7F7F5] text-[#555550] hover:bg-[#EFEFEB] hover:text-[#1C1C1A]'
-                      }`}
-                  >
-                    {openingCheckout
-                      ? 'Opening checkout…'
-                      : plan === 'growth'
-                        ? 'Manage Subscription'
-                        : plan === 'free'
-                          ? 'Upgrade Plan'
-                          : 'Add Credits'}
-                  </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddCredits}
+                  disabled={openingCheckout}
+                  className="w-full rounded-lg bg-zinc-900 text-white text-sm font-medium py-2 hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-60"
+                >
+                  {openingCheckout ? 'Opening checkout…' : 'Upgrade Plan'}
+                </button>
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Main Workspace Window Panel — Floating rounded white card (Image 1 design) */}
-        <main className="flex-1 h-full bg-white rounded-none sm:rounded-[20px] lg:rounded-[24px] border border-[#E5E5E2] shadow-[0_4px_24px_rgba(0,0,0,0.035),0_1px_4px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
-          <header className="sticky top-0 z-20 flex h-[56px] shrink-0 items-center justify-between bg-white px-4 sm:px-6">
-            <div className="flex min-w-0 items-center text-[12.5px] font-medium tracking-normal text-[#50504C]">
+        {/* Main Content App Panel (Untouched) */}
+        <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-white rounded-2xl border border-[#E2E2DE] shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+          {/* Header Bar */}
+          <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] bg-white px-4 lg:px-6">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => router.back()}
-                className="mr-2.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[#343431] transition-colors hover:bg-black/[0.045]"
-                aria-label="Go back"
-                title="Go back"
+                onClick={() => setMobileMenuOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 lg:hidden"
+                aria-label="Open sidebar"
               >
-                <PiArrowLeftBold className="h-3.5 w-3.5" aria-hidden />
+                <Menu className="h-5 w-5" />
               </button>
+              <div className="relative hidden w-64 sm:block">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={conversationSearch}
+                  onChange={(e) => setConversationSearch(e.target.value)}
+                  placeholder="Search conversations…"
+                  className="h-9 w-full rounded-xl bg-[#F4F4F2] pl-9 pr-3 text-xs text-gray-900 placeholder-gray-400 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/25"
+                />
+              </div>
             </div>
 
-            <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:gap-2">
-              {pathname === '/dashboard' && (
-                <>
-                  <div className="group relative hidden h-9 w-[238px] items-center rounded-[10px] border border-[#DCDCD8] bg-white pl-9 pr-3 text-left text-[12.5px] font-medium text-[#62625E] shadow-[0_1px_2px_rgba(0,0,0,0.045)] transition-colors focus-within:border-[#0A84FF]/45 focus-within:ring-2 focus-within:ring-[#0A84FF]/15 xl:flex">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#7D7D78] transition-colors group-hover:text-[#555551]" strokeWidth={1.9} />
-                    <input
-                      ref={searchInputRef}
-                      value={conversationSearch}
-                      onChange={(event) => {
-                        setConversationSearch(event.target.value)
-                      }}
-                      className="h-full min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[12.5px] text-[#343431] outline-none placeholder:text-[#777772] focus:border-0 focus:outline-none focus:ring-0"
-                      placeholder="Search conversations..."
-                      spellCheck={false}
-                      style={{ outline: 'none', outlineOffset: 0, boxShadow: 'none' }}
-                      aria-label="Search dashboard conversations"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={focusConversationSearch}
-                    className="flex h-11 w-11 items-center justify-center rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] text-[#666662] transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8 sm:w-8 lg:hidden"
-                    aria-label="Search dashboard conversations"
-                  >
-                    <Search className="h-3.5 w-3.5" strokeWidth={1.9} />
-                  </button>
-
-                  <div className="hidden h-4 w-px bg-[#E3E3E0] sm:block lg:hidden" />
-                </>
-              )}
-
-              {/* Clean Auto-send toggle */}
+            <div className="flex items-center gap-2">
               {autoSend !== null && (
                 <button
                   type="button"
@@ -466,7 +478,6 @@ function DashboardShell({
                 </button>
               )}
 
-              {/* Bell Icon */}
               <button
                 type="button"
                 onClick={() => toast.success("You're all caught up", { description: 'No new notifications right now.' })}
@@ -479,7 +490,7 @@ function DashboardShell({
             </div>
           </header>
 
-          {/* Content Container — Smooth independent vertical scroll */}
+          {/* Content Container */}
           <div className="relative z-10 w-full flex-1 min-h-0 overflow-y-auto px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
             {extensionMissing && ['/dashboard', '/keywords', '/opportunities'].some((href) => pathname === href || pathname.startsWith(`${href}/`)) && (
               <ExtensionPriorityNotice />
@@ -487,14 +498,12 @@ function DashboardShell({
             {children}
           </div>
 
-          {/* Mobile Nav */}
+          {/* Mobile Nav Drawer */}
           <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-black/[0.06] bg-white/95 pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-xl lg:hidden" aria-label="Mobile navigation">
             <div className="flex items-center justify-around px-2 h-[64px] pt-1">
               {MOBILE_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                const isFilledMobileIcon = ['Dashboard', 'Drafts Ready', 'Analytics', 'Keywords', 'Opportunities'].includes(item.name)
-                const showExtensionAlert = extensionMissing && ['Keywords', 'Opportunities'].includes(item.name)
-                const showOpportunityIndicator = item.name === 'Opportunities' && hasUnreviewedOpportunities
+                const IconComp = item.icon
                 return (
                   <Link
                     key={item.name}
@@ -504,22 +513,15 @@ function DashboardShell({
                     onFocus={() => prepareRoute(item.href)}
                     onTouchStart={() => prepareRoute(item.href)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 ${isActive ? 'text-[#0A84FF]' : 'text-gray-400 hover:text-gray-700'
-                      }`}
+                    className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 ${
+                      isActive ? 'text-[#0A84FF]' : 'text-gray-400 hover:text-gray-700'
+                    }`}
                   >
                     <div className="relative grid h-5 w-5 place-items-center">
-                      <item.icon
-                        className={isFilledMobileIcon ? 'h-4 w-4' : 'h-[17px] w-[17px]'}
-                        strokeWidth={isActive ? 2 : 1.75}
-                      />
-                      {showOpportunityIndicator && (
-                        <span
-                          className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#1687E8] ring-2 ring-white"
-                          aria-label="Unreviewed opportunities available"
-                        />
-                      )}
-                      {showExtensionAlert && !showOpportunityIndicator && (
-                        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white" aria-label="Browser extension setup required" />
+                      {item.isPhosphor ? (
+                        <IconComp weight="fill" size={18} className="text-current" />
+                      ) : (
+                        <IconComp size={18} className="text-current" strokeWidth={1.75} />
                       )}
                     </div>
                     <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name.split(' ')[0]}</span>
@@ -531,10 +533,11 @@ function DashboardShell({
                 onClick={() => setMobileMenuOpen((open) => !open)}
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-more-menu"
-                className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 ${mobileMenuOpen || ['/dashboard', '/posted', '/settings'].some((href) => pathname.startsWith(href))
-                  ? 'text-[#0A84FF]'
-                  : 'text-gray-400 hover:text-gray-700'
-                  }`}
+                className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 ${
+                  mobileMenuOpen || ['/dashboard', '/posted', '/settings'].some((href) => pathname.startsWith(href))
+                    ? 'text-[#0A84FF]'
+                    : 'text-gray-400 hover:text-gray-700'
+                }`}
               >
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                 <span className="text-[10px] font-medium">More</span>
@@ -555,11 +558,12 @@ function DashboardShell({
                 className="fixed inset-x-3 bottom-[76px] z-50 overflow-hidden rounded-2xl border border-black/10 bg-white p-2 shadow-[0_20px_60px_rgba(0,0,0,0.16)] lg:hidden"
               >
                 {[
-                  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-                  { name: 'Posted replies', href: '/posted', icon: Send },
-                  { name: 'Settings', href: '/settings', icon: Settings },
+                  { name: 'Dashboard', href: '/dashboard', icon: SquaresFour, isPhosphor: true },
+                  { name: 'Posted replies', href: '/posted', icon: Send, isPhosphor: false },
+                  { name: 'Settings', href: '/settings', icon: Settings, isPhosphor: false },
                 ].map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  const IconComp = item.icon
                   return (
                     <Link
                       key={item.href}
@@ -569,27 +573,32 @@ function DashboardShell({
                       onFocus={() => prepareRoute(item.href)}
                       onTouchStart={() => prepareRoute(item.href)}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${isActive ? 'bg-blue-50 text-[#0A84FF]' : 'text-gray-700 hover:bg-gray-50'
-                        }`}
+                      className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${
+                        isActive ? 'bg-blue-50 text-[#0A84FF]' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
                     >
-                      <item.icon className="h-4.5 w-4.5" strokeWidth={2} />
+                      {item.isPhosphor ? (
+                        <IconComp weight="fill" size={18} />
+                      ) : (
+                        <IconComp size={18} strokeWidth={2} />
+                      )}
                       {item.name}
                     </Link>
                   )
                 })}
-                <form action="/api/auth/signout" method="POST" className="border-t border-gray-100 pt-2">
+                <form action={signOutAction} className="border-t border-gray-100 pt-2">
                   <button
                     type="submit"
-                    className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-gray-600 hover:bg-red-50 hover:text-red-600"
+                    className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-red-600 hover:bg-red-50"
                   >
-                    <LogOut className="h-4.5 w-4.5" />
+                    <LogOut className="h-4.5 w-4.5" strokeWidth={2} />
                     Sign out
                   </button>
                 </form>
               </div>
             </>
           )}
-        </main>
+        </div>
       </div>
     </DashboardSessionProvider>
   )
