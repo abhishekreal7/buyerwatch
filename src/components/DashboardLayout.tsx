@@ -45,12 +45,28 @@ export type DashboardBootstrap = {
   }
 }
 
+function CustomDashboardIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 18 18"
+      fill="none"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect x="2" y="2" width="6" height="6" rx="2" fill="currentColor" />
+      <circle cx="13" cy="5" r="3" fill="currentColor" />
+      <rect x="2" y="10" width="6" height="6" rx="2" fill="currentColor" />
+      <rect x="10" y="10" width="6" height="6" rx="2" fill="currentColor" />
+    </svg>
+  )
+}
+
 /** Specific icons for specified items */
 const MAIN_NAV_ITEMS = [
   {
     name: 'Dashboard',
     href: '/dashboard',
-    icon: Squares2X2Icon,
+    icon: CustomDashboardIcon,
   },
   {
     name: 'Drafts Ready',
@@ -540,7 +556,7 @@ function DashboardShell({
                 className="fixed inset-x-3 bottom-[76px] z-50 overflow-hidden rounded-2xl border border-black/10 bg-white p-2 shadow-[0_20px_60px_rgba(0,0,0,0.16)] lg:hidden"
               >
                 {[
-                  { name: 'Dashboard', href: '/dashboard', icon: Squares2X2Icon, isHeroicon: true },
+                  { name: 'Dashboard', href: '/dashboard', icon: CustomDashboardIcon, isHeroicon: true },
                   { name: 'Posted replies', href: '/posted', icon: FolderIcon, isHeroicon: true },
                   { name: 'Settings', href: '/settings', icon: IdentificationIcon, isHeroicon: true },
                 ].map((item) => {
