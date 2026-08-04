@@ -8,6 +8,9 @@ import {
   DocumentTextIcon,
   PresentationChartLineIcon,
   PuzzlePieceIcon,
+  CubeIcon,
+  FolderIcon,
+  IdentificationIcon,
 } from '@heroicons/react/24/solid'
 import {
   Bell,
@@ -15,13 +18,8 @@ import {
   LogOut,
   Menu,
   Search,
-  Settings,
   X,
 } from 'lucide-react'
-import {
-  ReferenceCubeIcon,
-  ReferencePostedIcon,
-} from '@/components/SidebarReferenceIcons'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
@@ -53,37 +51,31 @@ const MAIN_NAV_ITEMS = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: Squares2X2Icon,
-    isHeroicon: true,
   },
   {
     name: 'Drafts Ready',
     href: '/drafts',
     icon: DocumentTextIcon,
-    isHeroicon: true,
   },
   {
     name: 'Analytics',
     href: '/analytics',
     icon: PresentationChartLineIcon,
-    isHeroicon: true,
   },
   {
     name: 'Keywords',
     href: '/keywords',
     icon: PuzzlePieceIcon,
-    isHeroicon: true,
   },
   {
     name: 'Opportunities',
     href: '/opportunities',
-    icon: ReferenceCubeIcon,
-    isCustomSvg: true,
+    icon: CubeIcon,
   },
   {
     name: 'Posted',
     href: '/posted',
-    icon: ReferencePostedIcon,
-    isCustomSvg: true,
+    icon: FolderIcon,
   },
 ]
 
@@ -345,7 +337,7 @@ function DashboardShell({
                       : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
                   }
                 >
-                  <Settings size={20} className={`shrink-0 transition-colors ${pathname.startsWith('/settings') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} strokeWidth={1.75} />
+                  <IdentificationIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.startsWith('/settings') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
                   <span>Settings</span>
                 </Link>
               </div>
@@ -549,8 +541,8 @@ function DashboardShell({
               >
                 {[
                   { name: 'Dashboard', href: '/dashboard', icon: Squares2X2Icon, isHeroicon: true },
-                  { name: 'Posted replies', href: '/posted', icon: ReferencePostedIcon, isCustomSvg: true },
-                  { name: 'Settings', href: '/settings', icon: Settings, isPhosphor: false },
+                  { name: 'Posted replies', href: '/posted', icon: FolderIcon, isHeroicon: true },
+                  { name: 'Settings', href: '/settings', icon: IdentificationIcon, isHeroicon: true },
                 ].map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
                   const IconComp = item.icon as any
