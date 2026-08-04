@@ -28,9 +28,15 @@ const BlueskySVG = () => (
     <path d="M135.72 44.03C202.216 93.848 273.74 195.17 300 249.49c26.262-54.316 97.782-155.638 164.28-205.46C512.26 8.009 590-19.862 590 68.825c0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.707-7.896-.017-2.936-1.193.516-3.707 7.896-13.714 40.255-67.233 197.356-189.63 71.766-64.444-66.128-34.605-132.256 82.697-152.22-67.108 11.421-142.549-7.449-163.25-81.433C20.156 217.613 10 86.535 10 68.825c0-88.687 77.742-60.816 125.72-24.795z" fill="#0085FF" />
   </svg>
 )
+const XSVG = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-[#0F1419]">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+)
 export const sourcePlatforms = [
   { name: 'Reddit', sub: 'r/startups + 12,400 more', color: '#FF4500', bg: '#FFF0EB', Icon: RedditSVG, count: '847', textColor: undefined },
   { name: 'Bluesky', sub: '#saas, #buildinpublic', color: '#0085FF', bg: '#EBF4FF', Icon: BlueskySVG, count: '312', textColor: undefined },
+  { name: 'X', sub: 'Keywords & posts', color: '#0F1419', bg: '#F4F4F4', Icon: XSVG, count: '520', textColor: undefined },
 ]
 
 export const PlatformSourcesWidget = () => {
@@ -41,7 +47,7 @@ export const PlatformSourcesWidget = () => {
         Monitors intent signals on
       </div>
 
-      <div className="flex items-center justify-center gap-8 md:gap-12 px-4">
+      <div className="flex items-center justify-center gap-6 md:gap-10 px-4">
         {/* Reddit */}
         <div className="flex items-center gap-2.5 opacity-75 hover:opacity-100 transition-opacity duration-200">
           <div className="w-6 h-6 flex-shrink-0">
@@ -58,6 +64,16 @@ export const PlatformSourcesWidget = () => {
             <BlueskySVG />
           </div>
           <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>Bluesky</span>
+        </div>
+
+        <span style={{ color: '#D1D1D1', fontSize: '18px' }}>•</span>
+
+        {/* X */}
+        <div className="flex items-center gap-2.5 opacity-75 hover:opacity-100 transition-opacity duration-200">
+          <div className="w-5 h-5 flex-shrink-0">
+            <XSVG />
+          </div>
+          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a1a', fontFamily: 'var(--font-inter)', letterSpacing: '-0.01em' }}>X</span>
         </div>
 
       </div>

@@ -492,8 +492,7 @@ export default function OpportunitiesPage() {
                   <span className="flex items-center gap-1.5">
                     {filter === 'Reddit' && <RedditIcon className="w-3.5 h-3.5 text-[#FF4500]" />}
                     {filter === 'Bluesky' && <BlueskyIcon className="w-3.5 h-3.5 text-[#0085FF]" />}
-                    {filter === 'X' && <XIcon className="w-3.5 h-3.5 text-[#0F1419]" />}
-                    {filter}
+                    {filter === 'X' ? <XIcon className="w-3.5 h-3.5 text-[#0F1419]" /> : filter}
                   </span>
                 </button>
               </span>
