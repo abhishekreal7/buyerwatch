@@ -59,7 +59,7 @@ function StatusPill({ active, onClick }: { active: boolean; onClick: () => void 
 }
 
 // Real metric calculations based strictly on monitored threads
-const getSuccessRate = (kwId: string, threadCount: number, repliedCount: number) => {
+const getSuccessRate = (threadCount: number, repliedCount: number) => {
   if (threadCount > 0) {
     return Math.round((repliedCount / threadCount) * 100)
   }
@@ -426,12 +426,12 @@ export default function KeywordsPage() {
                 aria-label="Select all rules"
               />
             </div>
-            <span>ID</span>
-            <span>Deals</span>
-            <span>Contact</span>
-            <span>Email</span>
-            <span>Value</span>
-            <span>Source</span>
+            <span>#</span>
+            <span>Keyword</span>
+            <span>Community</span>
+            <span>Leads found</span>
+            <span>Reply rate</span>
+            <span>Status</span>
             <span />
           </div>
 
@@ -473,7 +473,7 @@ export default function KeywordsPage() {
 
             {filtered.map((kw, index) => {
               const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
-              const successRate = getSuccessRate(kw.id, threadStats.total, threadStats.replied)
+              const successRate = getSuccessRate(threadStats.total, threadStats.replied)
 
               return (
                 <div

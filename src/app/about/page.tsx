@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -21,7 +21,7 @@ export default function AboutPage() {
       {/* Main Content */}
       <main className="mx-auto max-w-3xl px-4 pt-12 sm:px-6 sm:pt-16">
         <motion.div
-          initial={{ opacity: 1, y: 8 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.22 }}
         >

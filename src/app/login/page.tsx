@@ -1,18 +1,28 @@
-﻿'use client'
+'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useEffect } from 'react'
 import { signInAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useSearchParams } from 'next/navigation'
+import { friendlyAuthError } from '@/lib/auth-errors'
 
 function LoginContent() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const searchParams = useSearchParams()
-  const urlError = searchParams.get('error')
+  const rawUrlError = searchParams.get('error')
+  // Defense-in-depth: sanitize whatever is in the URL before rendering it
+  const urlError = rawUrlError ? friendlyAuthError(rawUrlError) : null
+
+  // Clean the error from the URL bar so it doesn't persist on refresh or get shared
+  useEffect(() => {
+    if (rawUrlError) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [rawUrlError])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -50,7 +60,7 @@ function LoginContent() {
 
       {/* Main Authentication Card */}
       <motion.div
-        initial={{ opacity: 1, y: 8, scale: 1 }}
+        initial={{ opacity: 0, y: 8, scale: 1 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-[400px] z-10 my-auto"

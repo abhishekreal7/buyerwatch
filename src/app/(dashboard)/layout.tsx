@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     : 0
   const userMetadata = (claims.user_metadata ?? {}) as Record<string, string | undefined>
   const email = typeof claims.email === 'string' ? claims.email : undefined
-  const userName = userMetadata.full_name || userMetadata.name || profile?.business_name || (email ? email.split('@')[0] : 'Iona Rollins')
+  const userName = userMetadata.full_name || userMetadata.name || profile?.business_name || (email ? email.split('@')[0] : 'Account')
   const bootstrap: DashboardBootstrap = {
     autoSend: profile?.auto_send_enabled ?? false,
     plan,

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -131,7 +131,7 @@ export function GettingStartedChecklist({
                     <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
                       Step Accomplished!
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-gray-100 text-gray-700">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
                       {completedCount}/{steps.length}
                     </span>
                   </div>

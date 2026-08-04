@@ -695,9 +695,16 @@ export default function DashboardPage() {
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {loading ? '—' : stats.draftsReady}
             </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">
-              {stats.draftsReady > 0 ? 'Review Now →' : 'Up to date'}
-            </span>
+            {stats.draftsReady > 0 ? (
+              <a
+                href="/drafts"
+                className="text-[11.5px] font-semibold text-[#0A84FF] hover:underline underline-offset-2 transition-colors"
+              >
+                Review Now →
+              </a>
+            ) : (
+              <span className="text-[11.5px] font-medium text-[#667085]">Up to date</span>
+            )}
           </div>
         </div>
 
@@ -779,7 +786,7 @@ export default function DashboardPage() {
                 >
                   <span>Dismissed</span>
                   {dismissedCount > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-gray-200 text-gray-700">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-700">
                       {dismissedCount}
                     </span>
                   )}

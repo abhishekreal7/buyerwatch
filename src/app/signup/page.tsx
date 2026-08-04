@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { signUpAction } from '@/app/actions/auth'
@@ -51,7 +51,7 @@ export default function SignupPage() {
 
       {/* Main Authentication Card */}
       <motion.div
-        initial={{ opacity: 1, y: 8, scale: 1 }}
+        initial={{ opacity: 0, y: 8, scale: 1 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-[400px] z-10 my-auto"

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -556,7 +556,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
           <button
             type="button"
             onClick={handlePrev}
-            className="min-h-11 cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-gray-100 hover:text-text-primary sm:px-6"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-gray-100 hover:text-text-primary sm:px-6"
           >
             Back
           </button>
@@ -567,7 +567,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
             type="button"
             onClick={handleNext}
             disabled={step === 1 && (!businessName.trim() || businessDescription.trim().length < 12)}
-            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-gray-800 disabled:opacity-50 sm:px-8"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-gray-800 disabled:opacity-50 sm:px-8"
           >
             Continue <ArrowRight className="w-4 h-4" />
           </button>
@@ -577,7 +577,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:cursor-wait disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:cursor-wait disabled:opacity-60"
             >
               {loading ? 'Launching...' : 'Launch monitoring'}
             </button>

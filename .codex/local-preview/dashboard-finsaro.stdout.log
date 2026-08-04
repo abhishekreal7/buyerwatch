@@ -19,3 +19,6 @@
  GET /api/auth/google?next=login 307 in 38ms (next.js: 7ms, proxy.ts: 7ms, application-code: 24ms)
  GET /login 200 in 299ms (next.js: 16ms, proxy.ts: 31ms, application-code: 252ms)
  GET /api/auth/google?next=login 307 in 53ms (next.js: 19ms, proxy.ts: 18ms, application-code: 16ms)
+ GET / 200 in 2.7s (next.js: 461ms, proxy.ts: 139ms, application-code: 2.1s)
+ GET / 200 in 515ms (next.js: 11ms, proxy.ts: 15ms, application-code: 488ms)
+[?25h

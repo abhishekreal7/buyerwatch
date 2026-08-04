@@ -183,3 +183,33 @@ export async function completeOnboardingAction(data: OnboardingData) {
 
   redirect('/dashboard')
 }
+
+export async function skipOnboardingAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const admin = getServiceRoleClient()
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id, business_name')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!profile?.business_name) {
+    const { error: upsertError } = await admin.from('profiles').upsert({
+      id: user.id,
+      business_name: 'My Workspace',
+      business_description: 'General brand monitoring workspace',
+      business_type: 'saas',
+      writing_style: 'Helpful, concise, direct',
+    }, { onConflict: 'id' })
+
+    if (upsertError) {
+      logger.error({ err: upsertError, userId: user.id }, 'Unable to set placeholder profile during skip onboarding')
+    }
+  }
+
+  redirect('/dashboard')
+}
+

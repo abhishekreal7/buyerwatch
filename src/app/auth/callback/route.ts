@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { friendlyAuthError } from '@/lib/auth-errors'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
   if (oauthError) {
     console.error('OAuth callback error parameter:', oauthError)
     return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(oauthError)}`, request.url)
+      new URL(`/login?error=${encodeURIComponent(friendlyAuthError(oauthError))}`, request.url)
     )
   }
 
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
       if (error) {
         console.error('exchangeCodeForSession error:', error.message)
         return NextResponse.redirect(
-          new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url)
+          new URL(`/login?error=${encodeURIComponent(friendlyAuthError(error.message))}`, request.url)
         )
       }
 
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
     } catch (err: any) {
       console.error('Callback handler exception:', err)
       return NextResponse.redirect(
-        new URL(`/login?error=${encodeURIComponent(err.message || 'Authentication error')}`, request.url)
+        new URL(`/login?error=${encodeURIComponent(friendlyAuthError(err.message))}`, request.url)
       )
     }
   }
