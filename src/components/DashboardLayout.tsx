@@ -48,15 +48,21 @@ export type DashboardBootstrap = {
 function CustomDashboardIcon({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 18 18"
-      fill="none"
+      viewBox="280 180 452 448"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect x="2" y="2" width="6" height="6" rx="2" fill="currentColor" />
-      <circle cx="13" cy="5" r="3" fill="currentColor" />
-      <rect x="2" y="10" width="6" height="6" rx="2" fill="currentColor" />
-      <rect x="10" y="10" width="6" height="6" rx="2" fill="currentColor" />
+      {/* Top-left: rounded square */}
+      <rect x="300" y="200" width="190" height="190" rx="38" ry="38" fill="currentColor" />
+
+      {/* Top-right: circle */}
+      <circle cx="617" cy="295" r="95" fill="currentColor" />
+
+      {/* Bottom-left: rounded square */}
+      <rect x="300" y="418" width="190" height="190" rx="38" ry="38" fill="currentColor" />
+
+      {/* Bottom-right: rounded square */}
+      <rect x="522" y="418" width="190" height="190" rx="38" ry="38" fill="currentColor" />
     </svg>
   )
 }
