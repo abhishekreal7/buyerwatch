@@ -813,7 +813,7 @@ export default function DashboardPage() {
                 /* ── No keywords yet — onboarding CTA ── */
                 <div className="flex min-h-64 flex-col items-center justify-center gap-4 px-6 py-14 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[#0A84FF]">
-                    <Search className="w-6 h-6" strokeWidth={2} />
+                    <Target className="w-6 h-6" strokeWidth={2} />
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-gray-900 tracking-tight">Your signal radar is idle</h3>
