@@ -23,6 +23,7 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
+import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import {
@@ -269,21 +270,16 @@ function DashboardShell({
     <DashboardSessionProvider userId={userId}>
       <div className="h-screen w-screen overflow-hidden bg-[#F4F4F2] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
-        {/* Desktop Sidebar Restyled — Redesigned according to Prody-style SaaS reference */}
-        <aside className="hidden w-[220px] shrink-0 flex-col bg-white border-r border-zinc-200 px-3 py-4 h-full lg:flex select-none rounded-2xl shadow-xs">
+        {/* Desktop Sidebar sitting directly on warm stone background */}
+        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F4F4F2] px-2 py-2.5 h-full lg:flex select-none">
           <div className="flex flex-col h-full">
             {/* Logo Header */}
-            <div className="mb-4 flex h-9 shrink-0 items-center px-3">
+            <div className="mb-2 flex h-9 shrink-0 items-center px-3.5">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
+                className="flex items-center transition-opacity hover:opacity-80"
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 text-white font-semibold text-sm shadow-xs">
-                  B
-                </div>
-                <span className="font-semibold text-base text-zinc-900 tracking-tight">
-                  BuyerWatch
-                </span>
+                <BrandLogo size="sm" />
               </Link>
             </div>
 
