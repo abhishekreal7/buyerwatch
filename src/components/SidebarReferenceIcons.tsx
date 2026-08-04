@@ -20,7 +20,7 @@ function IconFrame({ title, children, ...props }: SidebarReferenceIconProps) {
   )
 }
 
-/** 1. Dashboard: Bento grid layout matching Dashboard.png (3 rounded squares + top-right circle) */
+/** 1. Dashboard: Bento grid matching Dashboard.png (3 rounded squares + top-right circle) */
 export function ReferenceDashboardIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
@@ -76,7 +76,7 @@ export function ReferenceReportIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
       <path d="M4 3C4 2.44772 4.44772 2 5 2H11.5L16 6.5V17C16 17.5523 15.5523 18 15 18H5C4.44772 18 4 17.5523 4 17V3Z" fill="currentColor" />
-      <path d="M11 2V6.5H16" fill="#FFFFFF" opacity="0.4" />
+      <path d="M11 2V6.5H16" fill="#FFFFFF" />
       <rect x="6.5" y="9.5" width="7" height="1.8" rx="0.9" fill="#FFFFFF" />
       <rect x="6.5" y="13" width="4.5" height="1.8" rx="0.9" fill="#FFFFFF" />
     </IconFrame>
@@ -95,15 +95,14 @@ export function ReferencePuzzleIcon(props: SidebarReferenceIconProps) {
   )
 }
 
-/** 5. Opportunities: 3D Isometric Cube matching Companies.png */
+/** 5. Opportunities: Crisp 3D Isometric Cube matching Companies.png */
 export function ReferenceCubeIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8L10 2.2Z" fill="currentColor" opacity="0.6" />
-      <path d="M3.2 5.8L10 9.4V17.2L3.2 13.6V5.8Z" fill="currentColor" opacity="0.85" />
-      <path d="M10 9.4L16.8 5.8V13.6L10 17.2V9.4Z" fill="currentColor" />
-      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8Z" stroke="#FFFFFF" strokeWidth="0.6" opacity="0.8" />
-      <path d="M10 9.4V17.2" stroke="#FFFFFF" strokeWidth="0.6" opacity="0.8" />
+      {/* 3D Cube faces with white inner seam cutouts */}
+      <path d="M10 2.2L16.8 5.8L10 9.4L3.2 5.8L10 2.2Z" fill="currentColor" />
+      <path d="M3.2 6.4L9.4 9.7V17L3.2 13.5V6.4Z" fill="currentColor" />
+      <path d="M10.6 9.7L16.8 6.4V13.5L10.6 17V9.7Z" fill="currentColor" />
     </IconFrame>
   )
 }
@@ -115,9 +114,9 @@ export function ReferencePeopleIcon(props: SidebarReferenceIconProps) {
       <rect x="2.5" y="3" width="15" height="14" rx="2.5" fill="currentColor" />
       <circle cx="7" cy="8.25" r="2.2" fill="#FFFFFF" />
       <path d="M4.5 14.5C5.1 12.8 6.2 12 7.5 12C8.8 12 9.9 12.8 10.5 14.5H4.5Z" fill="#FFFFFF" />
-      <rect x="11.5" y="7" width="4" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.85" />
-      <rect x="11.5" y="10" width="4" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.6" />
-      <rect x="11.5" y="13" width="2.5" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.4" />
+      <rect x="11.5" y="7" width="4" height="1.8" rx="0.9" fill="#FFFFFF" />
+      <rect x="11.5" y="10" width="4" height="1.8" rx="0.9" fill="#FFFFFF" />
+      <rect x="11.5" y="13" width="2.5" height="1.8" rx="0.9" fill="#FFFFFF" />
     </IconFrame>
   )
 }
@@ -135,8 +134,7 @@ export function ReferencePostedIcon(props: SidebarReferenceIconProps) {
 export function ReferenceCheckIcon(props: SidebarReferenceIconProps) {
   return (
     <IconFrame {...props}>
-      <circle cx="10" cy="10" r="8" fill="currentColor" opacity="0.15" />
-      <circle cx="10" cy="10" r="6.5" fill="currentColor" />
+      <circle cx="10" cy="10" r="8" fill="currentColor" />
       <path d="M7 10L9 12L13 7.5" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </IconFrame>
   )

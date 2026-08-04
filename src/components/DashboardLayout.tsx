@@ -281,13 +281,9 @@ function DashboardShell({
                             aria-hidden
                             strokeWidth={1.75}
                             className={`h-[17px] w-[17px] shrink-0 transition-colors ${
-                              isFilledSidebarIcon
-                                ? isActive
-                                  ? 'text-[#5D5D58]'
-                                  : 'text-[#777771] group-hover:text-[#5D5D58]'
-                                : isActive
-                                  ? 'text-[#2D2D2A]'
-                                  : 'text-[#5D5D58] group-hover:text-[#30302D]'
+                              isActive
+                                ? 'text-[#2D2D2A]'
+                                : 'text-[#5D5D58] group-hover:text-[#30302D]'
                             }`}
                           />
                         </span>
