@@ -81,7 +81,7 @@ function FilterPill({ label, active, onClick, icon }: { label: string; active: b
       }`}
     >
       {icon}
-      {label}
+      {label && (label.toUpperCase() !== 'X' || !icon) && <span>{label}</span>}
     </button>
   )
 }
@@ -511,9 +511,11 @@ export default function KeywordsPage() {
                       ) : (
                         <BlueskyIcon className="h-4.5 w-4.5 shrink-0 text-[#1185FE]" />
                       )}
-                      <span className="text-[13.5px] font-medium text-[#33332E] truncate">
-                        {kw.platform === 'reddit' ? `r/${kw.target}` : kw.target}
-                      </span>
+                      {kw.target.toLowerCase() !== 'x' && kw.target.toLowerCase() !== 'twitter' && (
+                        <span className="text-[13.5px] font-medium text-[#33332E] truncate">
+                          {kw.platform === 'reddit' ? `r/${kw.target}` : kw.target}
+                        </span>
+                      )}
                     </div>
                   </div>
 
