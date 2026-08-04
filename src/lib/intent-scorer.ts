@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { analyzeBuyingSignals } from './buying-signal-filter'
 import {
   AiUsageError,
   calculateAnthropicUsage,
@@ -9,6 +8,7 @@ import {
 } from './ai-usage'
 import { getConfiguredSecret, isDevelopmentMockEnabled } from './env'
 import { IntentResult, parseIntentResult } from './intent'
+import { evaluateIntentPreflight } from './intent-preflight'
 import { logger } from './logger'
 import { NormalizedPost } from './types'
 
@@ -55,35 +55,19 @@ function labelForScore(score: number): IntentResult['label'] {
   return 'other'
 }
 
-function scoreWithoutProvider(
+export function scoreWithoutProvider(
   post: NormalizedPost,
   userProfile: IntentScoringProfile,
 ): IntentScoringResult {
-  const text = `${post.title ?? ''} ${post.text ?? ''}`.trim()
-  const analysis = analyzeBuyingSignals(text)
-  const weights = analysis.categories.map((category) => {
-    if (category === 'purchase') return 88
-    if (category === 'seeking') return 78
-    if (category === 'research') return 68
-    return 55
-  })
-  const score = weights.length === 0
-    ? 35
-    : Math.min(95, Math.max(...weights) + Math.max(0, weights.length - 1) * 4)
-  const normalizedText = text.toLocaleLowerCase()
-  const competitorRisk = (userProfile.competitors ?? []).some((competitor) => {
-    const normalized = competitor.trim().toLocaleLowerCase()
-    return normalized.length > 1 && normalizedText.includes(normalized)
-  })
-  const evidence = analysis.matchedSignals.slice(0, 3)
+  const preflight = evaluateIntentPreflight(post, userProfile)
 
   return {
-    score,
-    label: labelForScore(score),
-    reasoning: evidence.length > 0
-      ? `Deterministic fallback matched: ${evidence.join(', ')}.`
+    score: preflight.score,
+    label: labelForScore(preflight.score),
+    reasoning: preflight.evidenceSignals.length > 0
+      ? `Deterministic fallback matched: ${preflight.evidenceSignals.slice(0, 3).join(', ')}.`
       : 'Deterministic fallback found only weak commercial intent.',
-    flag: competitorRisk ? 'COMPETITOR_RISK' : undefined,
+    flag: preflight.flag,
     usage: emptyAiUsage(),
   }
 }

@@ -8,9 +8,9 @@ import * as dotenv from 'dotenv'
 import path from 'path'
 import { randomBytes } from 'crypto'
 import { buildAttributionShortUrl } from '../../src/lib/attribution'
-import { matchedSignals } from '../../src/lib/buying-signal-filter'
 import { getAppUrl } from '../../src/lib/app-url'
 import { IntentLabel } from '../../src/lib/intent'
+import { evaluateIntentPreflight } from '../../src/lib/intent-preflight'
 import { getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
 import { getConfiguredSecret } from '../../src/lib/env'
 import {
@@ -109,12 +109,20 @@ export async function processScorePost(
     }
 
     if (!profile) throw new Error('Profile not found for scoring job')
+    const { data: keyword, error: keywordError } = await supabase
+      .from('keywords')
+      .select('term')
+      .eq('id', keywordId)
+      .maybeSingle()
+    if (keywordError) throw keywordError
+
     const plan = normalizePlan(profile.plan)
     const planLimits = getPlanLimits(plan)
     const hasAnthropic = Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY))
 
     let scoreResult: Awaited<ReturnType<typeof scoreIntent>>
     let evidenceSignals: string[]
+    let paidIntentGatePassed = true
     if (hasScoringCheckpoint && existing) {
       scoreResult = {
         score: Number(existing.intent_score ?? 0),
@@ -136,7 +144,13 @@ export async function processScorePost(
       }
       signalReserved = true
 
-      if (hasAnthropic) {
+      const preflight = evaluateIntentPreflight(post, profile, {
+        keywordTerm: keyword?.term,
+      })
+      evidenceSignals = preflight.evidenceSignals
+      paidIntentGatePassed = !hasAnthropic || preflight.shouldUseAi
+
+      if (hasAnthropic && preflight.shouldUseAi) {
         // Reserve provider spend and the daily intent allowance atomically.
         const intentSpend = await reserveAiSpend(supabase, {
           userId,
@@ -182,11 +196,23 @@ export async function processScorePost(
           throw error
         }
       } else {
-        scoreResult = await scoreIntent(post, profile, {
-          maxRetries: providerRetries,
-        })
+        scoreResult = {
+          score: preflight.score,
+          label: preflight.label,
+          flag: preflight.flag,
+          reasoning: preflight.reasoning,
+          usage: emptyAiUsage(),
+        }
+        logger.info({
+          userId,
+          platform: post.platform,
+          externalId: post.externalId,
+          score: scoreResult.score,
+          label: scoreResult.label,
+          shouldUseAi: preflight.shouldUseAi,
+          evidenceSignals: evidenceSignals.slice(0, 6),
+        }, hasAnthropic ? 'Intent preflight skipped paid AI scoring' : 'Intent preflight used deterministic scoring')
       }
-      evidenceSignals = matchedSignals(`${post.title ?? ''} ${post.text ?? ''}`)
     }
     
     // Save thread early if score is low
@@ -202,6 +228,23 @@ export async function processScorePost(
         reasoning: scoreResult.reasoning,
         evidenceSignals,
         automationReason: 'low_intent',
+      })
+      signalReserved = false
+      return
+    }
+
+    if (!paidIntentGatePassed) {
+      await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'needs_manual_reply',
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        evidenceSignals,
+        automationReason: 'preflight_ai_bypassed',
       })
       signalReserved = false
       return

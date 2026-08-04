@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { AlertTriangle, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search, AtSign, MessageCircle } from 'lucide-react'
-import { RedditIcon, BlueskyIcon } from '@/components/Icons'
+import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { PageHeader } from '@/components/PageHeader'
 import { createClient } from '@/utils/supabase/client'
@@ -23,7 +23,7 @@ function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm'
   const norm = platform.toLowerCase()
   if (norm === 'reddit') return <RedditIcon className={`${cls} text-[#FF4500]`} />
   if (norm === 'bluesky') return <BlueskyIcon className={`${cls} text-[#1185FE]`} />
-  if (norm === 'x') return <AtSign className={`${cls} text-[#0F1419]`} />
+  if (norm === 'x') return <XIcon className={`${cls} text-[#0F1419]`} />
   return <MessageCircle className={`${cls} text-gray-500`} />
 }
 

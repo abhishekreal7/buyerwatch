@@ -3,6 +3,10 @@ import { Job } from 'bullmq'
 import { fetchXPosts } from '../../src/lib/x'
 import { scorePostQueue } from '../../src/lib/queues'
 import { X_DAILY_SPEND_LIMIT_CENTS } from '../../src/lib/plan-limits'
+import {
+  buildSocialScoreCandidates,
+  type SocialKeywordMapping,
+} from '../../src/lib/reddit-candidates'
 import * as dotenv from 'dotenv'
 import path from 'path'
 
@@ -11,7 +15,10 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 import { supabaseWorker as supabase } from '../lib/supabase'
 
 export async function xFetchHandler(job: Job) {
-  const { target, keywordMappings: preloadedMappings } = job.data
+  const { target, keywordMappings: preloadedMappings } = job.data as {
+    target: string
+    keywordMappings?: SocialKeywordMapping[]
+  }
 
   try {
     // Find all users watching this specific X target
@@ -63,22 +70,21 @@ export async function xFetchHandler(job: Job) {
     const posts = await fetchXPosts(target)
     if (!posts || posts.length === 0) return
 
-    for (const post of posts) {
-      const postText = `${post.text || ''}`.toLowerCase()
-
-      for (const mapping of keywordMappings) {
-        if (postText.includes(mapping.term.toLowerCase())) {
-          // Push to score queue
-          await scorePostQueue.add('score', {
-            userId: mapping.user_id,
-            keywordId: mapping.id,
-            post,
-          }, {
-            jobId: `score-${mapping.user_id}-${post.externalId}`
-          })
-        }
-      }
+    const discovery = buildSocialScoreCandidates(posts, keywordMappings)
+    for (const candidate of discovery.candidates) {
+      const safeJobId = candidate.post.externalId.replace(/:/g, '_')
+      await scorePostQueue.add('score', candidate, {
+        jobId: `score-${candidate.userId}-${safeJobId}`,
+      })
     }
+
+    logger.info({
+      target,
+      posts: posts.length,
+      enqueued: discovery.candidates.length,
+      skipped: discovery.skipped,
+      users: discovery.users,
+    }, `X target ${target}: ${discovery.candidates.length} enqueued`)
   } catch (error) {
     logger.error({ error }, `Failed to fetch X target ${target}:`)
     throw error

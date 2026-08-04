@@ -10,7 +10,7 @@ import {
   MessageCircle,
   Sparkles,
 } from 'lucide-react'
-import { BlueskyIcon, RedditIcon } from '@/components/Icons'
+import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { type IntentLabel } from '@/lib/intent'
 import { IntentBadge } from '@/components/IntentBadge'
 
@@ -46,7 +46,7 @@ function PlatformIcon({ platform }: { platform: string }) {
   const norm = platform.toLowerCase()
   if (norm === 'reddit') return <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
   if (norm === 'bluesky') return <BlueskyIcon className="h-3.5 w-3.5 text-[#0284C7]" />
-  if (norm === 'x') return <AtSign className="h-3.5 w-3.5 text-[#0F1419]" />
+  if (norm === 'x') return <XIcon className="h-3.5 w-3.5 text-[#0F1419]" />
   return <MessageCircle className="h-3.5 w-3.5 text-gray-500" />
 }
 

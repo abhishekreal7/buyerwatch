@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -6,7 +6,7 @@ import {
   Plus, Search, MoreHorizontal, Check, X, Pause, Play,
   Trash2, Target, Rss, Sparkles, ArrowRight
 } from 'lucide-react'
-import { RedditIcon, BlueskyIcon } from '@/components/Icons'
+import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
@@ -394,6 +394,7 @@ export default function KeywordsPage() {
             <FilterPill label="All Platforms" active={filterPlatform === 'all'} onClick={() => setFilterPlatform('all')} />
             <FilterPill label="Reddit" icon={<RedditIcon className="w-3.5 h-3.5 shrink-0" />} active={filterPlatform === 'reddit'} onClick={() => setFilterPlatform('reddit')} />
             <FilterPill label="Bluesky" icon={<BlueskyIcon className="w-3.5 h-3.5 shrink-0" />} active={filterPlatform === 'bluesky'} onClick={() => setFilterPlatform('bluesky')} />
+            <FilterPill label="X" icon={<XIcon className="w-3.5 h-3.5 shrink-0" />} active={filterPlatform === 'x'} onClick={() => setFilterPlatform('x')} />
           </div>
 
           <div className="hidden h-5 w-px bg-black/[0.07] sm:block" />
@@ -505,6 +506,8 @@ export default function KeywordsPage() {
                     <div className="inline-flex items-center gap-2.5 rounded-full border border-[#E2E2DF] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] truncate max-w-full">
                       {kw.platform === 'reddit' ? (
                         <RedditIcon className="h-4.5 w-4.5 shrink-0 text-[#FF4500]" />
+                      ) : kw.platform === 'x' ? (
+                        <XIcon className="h-4.5 w-4.5 shrink-0 text-[#0F1419]" />
                       ) : (
                         <BlueskyIcon className="h-4.5 w-4.5 shrink-0 text-[#1185FE]" />
                       )}

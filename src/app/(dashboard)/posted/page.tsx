@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { AppPage } from '@/components/AppPage'
 import { useDashboardSession } from '@/components/DashboardContext'
-import { BlueskyIcon, RedditIcon } from '@/components/Icons'
+import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
 import { createClient } from '@/utils/supabase/client'
 import { IntentBadge } from '@/components/IntentBadge'
@@ -43,7 +43,7 @@ function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm'
   const norm = platform.toLowerCase()
   if (norm === 'reddit') return <RedditIcon className={`${cls} text-[#FF4500]`} />
   if (norm === 'bluesky') return <BlueskyIcon className={`${cls} text-[#1185FE]`} />
-  if (norm === 'x') return <AtSign className={`${cls} text-[#0F1419]`} />
+  if (norm === 'x') return <XIcon className={`${cls} text-[#0F1419]`} />
   return <MessageCircle className={`${cls} text-gray-500`} />
 }
 

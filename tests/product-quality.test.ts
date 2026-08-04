@@ -15,6 +15,7 @@ import {
   getIntentDisplayLabel,
   parseIntentResult,
 } from '../src/lib/intent'
+import { evaluateIntentPreflight } from '../src/lib/intent-preflight'
 import { buildIntentScoringPrompt } from '../src/lib/intent-scorer'
 import {
   buildFallbackSuggestions,
@@ -107,6 +108,69 @@ describe('intent result validation', () => {
   it('keeps display labels faithful to the model category', () => {
     expect(getIntentDisplayLabel('complaining', 72)).toBe('Pain signal')
     expect(getIntentDisplayLabel('other', 20)).toBe('Low relevance')
+  })
+})
+
+describe('intent preflight cost gate', () => {
+  const profile = {
+    business_name: 'BuyerWatch',
+    business_description: 'Monitor Reddit and Bluesky for high-intent lead generation conversations.',
+    competitors: ['SignalCo'],
+  }
+
+  it('keeps self-promotional keyword matches out of paid AI scoring', () => {
+    const result = evaluateIntentPreflight({
+      platform: 'reddit',
+      externalId: 'promo-1',
+      author: 'maker',
+      title: 'I built a lead generation dashboard',
+      text: 'I launched it this week and would love feedback on my landing page.',
+      url: 'https://reddit.example/promo-1',
+      createdAt: '2026-08-04T00:00:00.000Z',
+      sourceTarget: 'SaaS',
+    }, profile, { keywordTerm: 'lead generation' })
+
+    expect(result.shouldUseAi).toBe(false)
+    expect(result.score).toBeLessThan(60)
+    expect(result.noiseSignals).toEqual(expect.arrayContaining(['self_promotion', 'showcase']))
+  })
+
+  it('passes explicit buying research to the paid scorer', () => {
+    const result = evaluateIntentPreflight({
+      platform: 'reddit',
+      externalId: 'buyer-1',
+      author: 'operator',
+      title: 'Looking for lead generation software',
+      text: 'What are people using for Reddit monitoring? I need pricing before choosing a tool.',
+      url: 'https://reddit.example/buyer-1',
+      createdAt: '2026-08-04T00:00:00.000Z',
+      sourceTarget: 'SaaS',
+    }, profile, { keywordTerm: 'lead generation' })
+
+    expect(result.shouldUseAi).toBe(true)
+    expect(result.score).toBeGreaterThanOrEqual(80)
+    expect(result.evidenceSignals).toEqual(expect.arrayContaining([
+      'looking for',
+      'pricing',
+      'keyword:lead generation',
+    ]))
+  })
+
+  it('keeps competitor replacement requests eligible even without a literal keyword hit', () => {
+    const result = evaluateIntentPreflight({
+      platform: 'reddit',
+      externalId: 'competitor-1',
+      author: 'buyer',
+      title: 'Alternative to SignalCo?',
+      text: 'The pricing is too expensive and I am looking for something better.',
+      url: 'https://reddit.example/competitor-1',
+      createdAt: '2026-08-04T00:00:00.000Z',
+      sourceTarget: 'SaaS',
+    }, profile, { keywordTerm: 'lead generation' })
+
+    expect(result.shouldUseAi).toBe(true)
+    expect(result.flag).toBe('COMPETITOR_RISK')
+    expect(result.score).toBeGreaterThanOrEqual(80)
   })
 })
 

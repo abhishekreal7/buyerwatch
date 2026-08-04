@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppPage } from '@/components/AppPage'
-import { BlueskyIcon, RedditIcon } from '@/components/Icons'
+import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { createClient } from '@/utils/supabase/client'
@@ -71,7 +71,7 @@ function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm'
   const norm = platform.toLowerCase()
   if (norm === 'reddit') return <RedditIcon className={`${cls} text-[#FF4500]`} />
   if (norm === 'bluesky') return <BlueskyIcon className={`${cls} text-[#0284C7]`} />
-  if (norm === 'x') return <AtSign className={`${cls} text-[#0F1419]`} />
+  if (norm === 'x') return <XIcon className={`${cls} text-[#0F1419]`} />
   return <MessageCircle className={`${cls} text-gray-500`} />
 }
 
@@ -492,6 +492,7 @@ export default function OpportunitiesPage() {
                   <span className="flex items-center gap-1.5">
                     {filter === 'Reddit' && <RedditIcon className="w-3.5 h-3.5 text-[#FF4500]" />}
                     {filter === 'Bluesky' && <BlueskyIcon className="w-3.5 h-3.5 text-[#0085FF]" />}
+                    {filter === 'X' && <XIcon className="w-3.5 h-3.5 text-[#0F1419]" />}
                     {filter}
                   </span>
                 </button>

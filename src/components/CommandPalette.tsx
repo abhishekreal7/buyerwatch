@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
 import { usePathname, useRouter } from 'next/navigation'
 import { MessageCircle, Search } from 'lucide-react'
-import { BlueskyIcon, RedditIcon } from '@/components/Icons'
+import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -200,6 +200,8 @@ export function CommandPalette() {
                         <RedditIcon className="h-4 w-4 text-[#FF4500]" />
                       ) : conversation.platform === 'bluesky' ? (
                         <BlueskyIcon className="h-4 w-4 text-[#1185FE]" />
+                      ) : conversation.platform === 'x' ? (
+                        <XIcon className="h-4 w-4 text-[#0F1419]" />
                       ) : (
                         <MessageCircle className="h-4 w-4" strokeWidth={1.9} />
                       )}

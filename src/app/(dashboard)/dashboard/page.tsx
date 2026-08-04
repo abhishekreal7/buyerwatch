@@ -7,7 +7,7 @@ import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { toast } from 'sonner'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { GettingStartedChecklist } from '@/components/GettingStartedChecklist'
-import { BlueskyIcon, RedditIcon } from '@/components/Icons'
+import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
 import { getPlanLimits } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
@@ -874,10 +874,15 @@ export default function DashboardPage() {
                       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text-secondary">
                           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F4F5F7]">
-                            {isReddit ? (
+                            {thread.platform === 'reddit' ? (
                               <>
                                 <RedditIcon className="h-[18px] w-[18px] text-[#FF4500]" />
                                 <span className="font-medium text-text-secondary text-[13px] tracking-tight">Reddit</span>
+                              </>
+                            ) : thread.platform === 'x' ? (
+                              <>
+                                <XIcon className="h-[18px] w-[18px] text-[#0F1419]" />
+                                <span className="font-medium text-text-secondary text-[13px] tracking-tight">X</span>
                               </>
                             ) : (
                               <>
@@ -1100,8 +1105,10 @@ export default function DashboardPage() {
                         >
                           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-2 text-[12px] font-medium text-gray-400">
-                              {isReddit ? (
+                              {thread.platform === 'reddit' ? (
                                 <RedditIcon className="h-[18px] w-[18px] shrink-0 text-[#FF4500]" />
+                              ) : thread.platform === 'x' ? (
+                                <XIcon className="h-[18px] w-[18px] shrink-0 text-[#0F1419]" />
                               ) : (
                                 <BlueskyIcon className="h-[18px] w-[18px] shrink-0 text-[#1185FE]" />
                               )}
@@ -1313,6 +1320,8 @@ export default function DashboardPage() {
                     <div className="flex min-w-0 items-center gap-2.5">
                       {selectedThread.platform === 'reddit' ? (
                         <RedditIcon className="h-5 w-5 shrink-0 text-[#FF4500]" />
+                      ) : selectedThread.platform === 'x' ? (
+                        <XIcon className="h-5 w-5 shrink-0 text-[#0F1419]" />
                       ) : (
                         <BlueskyIcon className="h-5 w-5 shrink-0 text-[#1185FE]" />
                       )}
@@ -1357,6 +1366,8 @@ export default function DashboardPage() {
                         <div className="mb-2 flex items-center gap-2 text-[10.5px] font-medium text-gray-400">
                           {selectedThread.platform === 'reddit' ? (
                             <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
+                          ) : selectedThread.platform === 'x' ? (
+                            <XIcon className="h-3.5 w-3.5 text-[#0F1419]" />
                           ) : (
                             <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />
                           )}
