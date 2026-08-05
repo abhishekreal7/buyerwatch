@@ -10,6 +10,7 @@ import {
 import { springs } from '@/lib/motion'
 import EyebrowBadge from '@/components/EyebrowBadge'
 import { BrandLogo } from '@/components/BrandLogo'
+import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { StickyFeatureScroll } from '@/components/StickyFeatureScroll'
 import {
   CustomKeywordRulesIcon,
@@ -693,31 +694,76 @@ export default function LandingPage() {
         </>
         )}
 
-        <Section id="workflow" className="bg-[#F8F8F6] py-[100px]">
-          <div className="mx-auto max-w-[1120px] px-6">
-            <motion.div variants={fadeUp} className="mb-14 max-w-[650px]">
-              <SectionBadge color="#0A84FF" text="Verified workflow" />
-              <h2 className="mb-4 text-[clamp(34px,4vw,52px)] font-extrabold leading-[1.05] tracking-[-0.04em] text-[#0A0A0A]" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif' }}>
-                Evidence stays attached from signal to outcome.
+        <Section id="platforms" className="bg-[#DCEBFA] py-[100px] md:py-[116px]">
+          <div className="mx-auto max-w-[1180px] px-5 sm:px-6">
+            <motion.div variants={fadeUp} className="mx-auto mb-12 max-w-[680px] text-center md:mb-14">
+              <span className="mb-5 inline-block text-[12px] font-bold uppercase tracking-[0.12em] text-[#65564E]">
+                Platform coverage
+              </span>
+              <h2
+                className="mb-4 text-[clamp(38px,5vw,58px)] font-extrabold leading-[1.02] tracking-[-0.045em] text-[#11110F]"
+                style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif' }}
+              >
+                Stay close to buyer conversations.
               </h2>
-              <p className="max-w-[580px] text-[16px] leading-7 text-[#6B6B6B]" style={{ fontFamily: 'var(--font-inter)' }}>
-                Every opportunity keeps its source, review history, and delivery state together, so your team can inspect what happened without relying on decorative claims.
+              <p className="mx-auto max-w-[590px] text-[16px] leading-7 text-[#5D6570]" style={{ fontFamily: 'var(--font-inter)' }}>
+                Bring high-intent discussions from the communities your buyers already use into one focused review queue.
               </p>
             </motion.div>
 
-            <motion.div variants={staggerContainer} className="grid gap-3 md:grid-cols-3">
+            <motion.div variants={staggerContainer} className="grid gap-4 md:grid-cols-3">
               {[
-                { icon: Radar, step: '01', title: 'Source captured', body: 'The original thread, platform, matching rule, and intent reasoning remain attached to each opportunity.' },
-                { icon: BadgeCheck, step: '02', title: 'Draft reviewed', body: 'Product context, policy checks, edits, and manual approval are recorded before a reply is sent.' },
-                { icon: History, step: '03', title: 'Outcome recorded', body: 'Permalink, send state, failures, and optional click or conversion events remain available for review.' },
-              ].map(({ icon: Icon, step, title, body }) => (
-                <motion.article key={step} variants={fadeUp} className="rounded-[20px] border border-[#E4E4E1] bg-white p-7 shadow-[0_1px_2px_rgba(10,10,10,0.03)]">
-                  <div className="mb-10 flex items-center justify-between">
-                    <span className="text-[12px] font-semibold tabular-nums text-[#9A9A94]">{step}</span>
-                    <Icon className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.7} />
+                {
+                  icon: XIcon,
+                  name: 'X / Twitter',
+                  status: 'Controlled rollout',
+                  iconClass: 'bg-[#0A0A0A] text-white',
+                  body: 'Track fast-moving buyer conversations on X when discovery access is enabled for your workspace.',
+                  action: 'Ask about X access',
+                  href: '/contact',
+                },
+                {
+                  icon: BlueskyIcon,
+                  name: 'Bluesky',
+                  status: 'Public discovery',
+                  iconClass: 'bg-white text-[#1185FE]',
+                  body: 'Discover relevant public posts early and move the strongest opportunities into your reply workflow.',
+                  action: 'Monitor Bluesky',
+                  href: '/signup',
+                },
+                {
+                  icon: RedditIcon,
+                  name: 'Reddit',
+                  status: 'Community discovery',
+                  iconClass: 'bg-white text-[#FF4500]',
+                  body: 'Find problem-aware threads and buying questions across the communities that matter to your product.',
+                  action: 'Monitor Reddit',
+                  href: '/signup',
+                },
+              ].map(({ icon: Icon, name, status, iconClass, body, action, href }) => (
+                <motion.article
+                  key={name}
+                  variants={fadeUp}
+                  whileHover={{ y: -4 }}
+                  transition={springs.snappy}
+                  className="flex min-h-[330px] flex-col rounded-[24px] border border-white/75 bg-white/75 p-7 shadow-[0_16px_45px_rgba(62,91,122,0.08)] backdrop-blur-sm sm:p-8"
+                >
+                  <div className="mb-8 flex items-start justify-between gap-4">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-[17px] shadow-[0_3px_12px_rgba(36,50,65,0.08)] ${iconClass}`}>
+                      <Icon className="h-7 w-7" />
+                    </div>
+                    <span className="pt-2 text-right text-[10px] font-bold uppercase tracking-[0.09em] text-[#7A7E82]">
+                      {status}
+                    </span>
                   </div>
-                  <h3 className="mb-2 text-[18px] font-bold tracking-[-0.02em] text-[#151513]">{title}</h3>
-                  <p className="text-[14px] leading-6 text-[#6B6B66]">{body}</p>
+                  <h3 className="mb-2.5 text-[24px] font-extrabold tracking-[-0.035em] text-[#141412]">{name}</h3>
+                  <p className="mb-7 text-[14px] leading-6 text-[#62676E]">{body}</p>
+                  <Link
+                    href={href}
+                    className="mt-auto inline-flex min-h-11 w-fit items-center rounded-full border border-[#D4DBE3] bg-white/60 px-5 text-[13px] font-bold text-[#171715] transition-colors hover:border-[#AEB8C3] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A73E8] focus-visible:ring-offset-2"
+                  >
+                    {action}
+                  </Link>
                 </motion.article>
               ))}
             </motion.div>
