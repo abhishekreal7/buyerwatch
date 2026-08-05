@@ -92,9 +92,14 @@ export function getProviderCapabilities(): ProviderCapabilities {
     aiDrafting: Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY)),
     billing: Boolean(
       process.env.DODO_PAYMENTS_API_KEY
+      && process.env.DODO_PAYMENTS_STARTER_PRODUCT_ID
       && process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
       && process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
       && process.env.DODO_PAYMENTS_WEBHOOK_SECRET
+      && (
+        process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
+        || process.env.DODO_PAYMENTS_ENVIRONMENT === 'live_mode'
+      )
     ),
     redditDiscovery: hasRedditDiscoveryProvider(),
     redditPosting: Boolean(
@@ -118,10 +123,23 @@ export function getProviderCapabilities(): ProviderCapabilities {
 function validateOptionalProviders(): void {
   assertCompleteOptionalGroup([
     'DODO_PAYMENTS_API_KEY',
+    'DODO_PAYMENTS_STARTER_PRODUCT_ID',
     'DODO_PAYMENTS_PRO_PRODUCT_ID',
     'DODO_PAYMENTS_GROWTH_PRODUCT_ID',
     'DODO_PAYMENTS_WEBHOOK_SECRET',
+    'DODO_PAYMENTS_ENVIRONMENT',
   ], 'Dodo billing')
+  if (
+    process.env.DODO_PAYMENTS_API_KEY
+    && process.env.DODO_PAYMENTS_ENVIRONMENT !== 'test_mode'
+    && process.env.DODO_PAYMENTS_ENVIRONMENT !== 'live_mode'
+  ) {
+    throw new Error('DODO_PAYMENTS_ENVIRONMENT must be test_mode or live_mode')
+  }
+  assertCompleteOptionalGroup([
+    'DODO_PAYMENTS_SIGNAL_PACK_PRODUCT_ID',
+    'DODO_PAYMENTS_DRAFT_PACK_PRODUCT_ID',
+  ], 'Dodo add-on billing')
   assertCompleteOptionalGroup([
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',

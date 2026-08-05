@@ -3,6 +3,7 @@ import DodoPayments from 'dodopayments'
 import { createClient } from '@/utils/supabase/server'
 import { getAppUrl } from '@/lib/app-url'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
+import { getDodoEnvironment } from '@/lib/dodo'
 
 export async function POST() {
   try {
@@ -15,6 +16,13 @@ export async function POST() {
 
     const apiKey = process.env.DODO_PAYMENTS_API_KEY
     if (!apiKey) return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
+    let environment: ReturnType<typeof getDodoEnvironment>
+    try {
+      environment = getDodoEnvironment()
+    } catch {
+      console.error('[billing/portal] DODO_PAYMENTS_ENVIRONMENT is invalid')
+      return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
+    }
     const { data: profile } = await supabase
       .from('profiles')
       .select('billing_customer_id')
@@ -26,9 +34,7 @@ export async function POST() {
 
     const dodo = new DodoPayments({
       bearerToken: apiKey,
-      environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
-        ? 'test_mode'
-        : 'live_mode',
+      environment,
       timeout: 15_000,
       maxRetries: 1,
     })

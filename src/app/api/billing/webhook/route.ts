@@ -7,6 +7,7 @@ import {
   getAddonTypeFromProductId,
   normalizeAddonType,
 } from '@/lib/billing-addons-server'
+import { getDodoEnvironment, getDodoProductId } from '@/lib/dodo'
 
 type BillingPlan = 'starter' | 'pro' | 'growth'
 type BillingStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired'
@@ -66,22 +67,30 @@ export async function POST(req: Request) {
     console.error('[billing/webhook] Required Dodo configuration is missing')
     return NextResponse.json({ error: 'webhook_not_configured' }, { status: 503 })
   }
+  let environment: ReturnType<typeof getDodoEnvironment>
+  try {
+    environment = getDodoEnvironment()
+  } catch {
+    console.error('[billing/webhook] DODO_PAYMENTS_ENVIRONMENT is invalid')
+    return NextResponse.json({ error: 'webhook_not_configured' }, { status: 503 })
+  }
 
   let rawBody: string
   try {
     rawBody = await readTextBody(req)
   } catch (error) {
     if (error instanceof RequestInputError) {
-      return NextResponse.json({ error: error.message }, { status: 413 })
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.message === 'request_too_large' ? 413 : 400 },
+      )
     }
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
   }
   const client = new DodoPayments({
     bearerToken: apiKey,
     webhookKey: webhookSecret,
-    environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
-      ? 'test_mode'
-      : 'live_mode',
+    environment,
   })
 
   let event: Record<string, any>
@@ -104,12 +113,7 @@ export async function POST(req: Request) {
   let userId = typeof metadata.user_id === 'string' ? metadata.user_id : null
   const subscriptionId =
     typeof data.subscription_id === 'string' ? data.subscription_id : null
-  let productId =
-    typeof data.product_id === 'string'
-      ? data.product_id
-      : typeof data.product?.product_id === 'string'
-        ? data.product.product_id
-        : null
+  let productId = getDodoProductId(data)
   let plan = getPlan(productId)
   const providerStatus = getStatus(eventType, data.status)
   const customerId =
@@ -155,10 +159,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'invalid_addon_event' }, { status: 500 })
     }
 
-    const metadataCredits = Number(metadata.credits)
-    const credits = Number.isFinite(metadataCredits) && metadataCredits > 0
-      ? Math.floor(metadataCredits)
-      : getAddonCredits(addonType)
+    // Credits are a server-owned entitlement. Never trust webhook metadata for
+    // the quantity even though the event signature itself is authentic.
+    const credits = getAddonCredits(addonType)
     const { data: result, error } = await getSupabase().rpc('apply_billing_addon_event', {
       p_event_id: eventId,
       p_event_type: eventType,

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import DodoPayments from 'dodopayments'
+import { getDodoEnvironment } from '@/lib/dodo'
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { authRateLimit, getIp } from '@/lib/ratelimit'
@@ -38,11 +39,18 @@ export async function DELETE(request: Request) {
           { status: 409 },
         )
       }
+      let environment: ReturnType<typeof getDodoEnvironment>
+      try {
+        environment = getDodoEnvironment()
+      } catch {
+        return NextResponse.json(
+          { error: 'billing_cancellation_not_configured' },
+          { status: 409 },
+        )
+      }
       const dodo = new DodoPayments({
         bearerToken: apiKey,
-        environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
-          ? 'test_mode'
-          : 'live_mode',
+        environment,
         timeout: 15_000,
         maxRetries: 2,
       })

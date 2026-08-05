@@ -25,9 +25,13 @@ function stubProductionCore() {
   }
   for (const name of [
     'DODO_PAYMENTS_API_KEY',
+    'DODO_PAYMENTS_STARTER_PRODUCT_ID',
     'DODO_PAYMENTS_PRO_PRODUCT_ID',
     'DODO_PAYMENTS_GROWTH_PRODUCT_ID',
     'DODO_PAYMENTS_WEBHOOK_SECRET',
+    'DODO_PAYMENTS_ENVIRONMENT',
+    'DODO_PAYMENTS_SIGNAL_PACK_PRODUCT_ID',
+    'DODO_PAYMENTS_DRAFT_PACK_PRODUCT_ID',
     'ANTHROPIC_MODEL',
     'ANTHROPIC_INTENT_MODEL',
     'REDDIT_OAUTH_CLIENT_ID',
@@ -97,6 +101,39 @@ describe('production capability configuration', () => {
     stubProductionCore()
     vi.stubEnv('DODO_PAYMENTS_API_KEY', 'configured')
     expect(() => validateAppEnvironment()).toThrow(/Dodo billing is partially configured/)
+  })
+
+  it('enables billing only with every subscription product and an explicit environment', () => {
+    stubProductionCore()
+    vi.stubEnv('DODO_PAYMENTS_API_KEY', 'configured')
+    vi.stubEnv('DODO_PAYMENTS_STARTER_PRODUCT_ID', 'starter')
+    vi.stubEnv('DODO_PAYMENTS_PRO_PRODUCT_ID', 'pro')
+    vi.stubEnv('DODO_PAYMENTS_GROWTH_PRODUCT_ID', 'growth')
+    vi.stubEnv('DODO_PAYMENTS_WEBHOOK_SECRET', 'webhook')
+    vi.stubEnv('DODO_PAYMENTS_ENVIRONMENT', 'test_mode')
+
+    expect(() => validateAppEnvironment()).not.toThrow()
+    expect(getProviderCapabilities().billing).toBe(true)
+  })
+
+  it('rejects an invalid Dodo environment instead of falling through to live mode', () => {
+    stubProductionCore()
+    vi.stubEnv('DODO_PAYMENTS_API_KEY', 'configured')
+    vi.stubEnv('DODO_PAYMENTS_STARTER_PRODUCT_ID', 'starter')
+    vi.stubEnv('DODO_PAYMENTS_PRO_PRODUCT_ID', 'pro')
+    vi.stubEnv('DODO_PAYMENTS_GROWTH_PRODUCT_ID', 'growth')
+    vi.stubEnv('DODO_PAYMENTS_WEBHOOK_SECRET', 'webhook')
+    vi.stubEnv('DODO_PAYMENTS_ENVIRONMENT', 'production')
+
+    expect(() => validateAppEnvironment()).toThrow(/test_mode or live_mode/)
+    expect(getProviderCapabilities().billing).toBe(false)
+  })
+
+  it('requires add-on product IDs as a pair', () => {
+    stubProductionCore()
+    vi.stubEnv('DODO_PAYMENTS_SIGNAL_PACK_PRODUCT_ID', 'signals')
+
+    expect(() => validateAppEnvironment()).toThrow(/Dodo add-on billing is partially configured/)
   })
 
   it('does not claim unapproved Reddit OAuth can power discovery', () => {

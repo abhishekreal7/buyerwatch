@@ -3,6 +3,7 @@ import DodoPayments from 'dodopayments'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { logger } from './logger'
 import { publishQStashJson } from './qstash'
+import { getDodoEnvironment } from './dodo'
 
 type OutboxPayload = {
   userId: string
@@ -21,7 +22,8 @@ function getSupabaseAdmin(): SupabaseClient {
   )
 }
 
-function planForProduct(productId: string): 'pro' | 'growth' | null {
+function planForProduct(productId: string): 'starter' | 'pro' | 'growth' | null {
+  if (productId === process.env.DODO_PAYMENTS_STARTER_PRODUCT_ID) return 'starter'
   if (productId === process.env.DODO_PAYMENTS_PRO_PRODUCT_ID) return 'pro'
   if (productId === process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID) return 'growth'
   return null
@@ -115,9 +117,7 @@ export async function reconcileBillingSubscriptions(limit = 100): Promise<number
 
   const dodo = new DodoPayments({
     bearerToken: apiKey,
-    environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
-      ? 'test_mode'
-      : 'live_mode',
+    environment: getDodoEnvironment(),
     timeout: 15_000,
     maxRetries: 2,
   })

@@ -6,7 +6,8 @@ import { getAppUrl } from '@/lib/app-url'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
 import { BILLING_ADDONS, type BillingAddonType } from '@/lib/billing-addons'
-import { getAddonProductId, normalizeAddonType } from '@/lib/billing-addons-server'
+import { getAddonProductId } from '@/lib/billing-addons-server'
+import { getDodoEnvironment, parseBillingCheckoutIntent } from '@/lib/dodo'
 
 /**
  * POST /api/billing/checkout
@@ -44,13 +45,27 @@ export async function POST(req: Request) {
     if (!apiKey) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
+    if (!user.email) {
+      return NextResponse.json({ error: 'billing_customer_email_missing' }, { status: 409 })
+    }
 
     // Parse requested checkout intent. Add-ons are one-time purchases and do
     // not mutate the user's subscription plan.
-    const body = await readJsonBody<{ plan?: string; addon?: BillingAddonType }>(req, 1_024)
-    const requestedAddon = normalizeAddonType(body.addon)
+    const body = await readJsonBody<Record<string, unknown>>(req, 1_024)
+    const intent = parseBillingCheckoutIntent(body)
+    if (!intent) {
+      return NextResponse.json({ error: 'invalid_checkout_request' }, { status: 400 })
+    }
+    let environment: ReturnType<typeof getDodoEnvironment>
+    try {
+      environment = getDodoEnvironment()
+    } catch {
+      console.error('[billing/checkout] DODO_PAYMENTS_ENVIRONMENT is invalid')
+      return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
+    }
 
-    if (requestedAddon) {
+    if (intent.kind === 'addon') {
+      const requestedAddon: BillingAddonType = intent.addon
       const productId = getAddonProductId(requestedAddon)
       if (!productId) {
         return NextResponse.json({ error: 'addon_billing_not_configured' }, { status: 503 })
@@ -58,9 +73,7 @@ export async function POST(req: Request) {
 
       const dodo = new DodoPayments({
         bearerToken: apiKey,
-        environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
-          ? 'test_mode'
-          : 'live_mode',
+        environment,
         timeout: 15_000,
         maxRetries: 1,
       })
@@ -74,7 +87,7 @@ export async function POST(req: Request) {
       const session = await dodo.checkoutSessions.create({
         product_cart: [{ product_id: productId, quantity: 1 }],
         customer: {
-          email: user.email ?? '',
+          email: user.email,
         },
         metadata: {
           user_id: user.id,
@@ -98,7 +111,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ url: checkoutUrl })
     }
 
-    const requestedPlan = body.plan === 'growth' ? 'growth' : body.plan === 'starter' ? 'starter' : 'pro'
+    const requestedPlan = intent.plan
     const productId = requestedPlan === 'growth'
       ? growthProductId
       : requestedPlan === 'starter'
@@ -110,9 +123,7 @@ export async function POST(req: Request) {
 
     const dodo = new DodoPayments({
       bearerToken: apiKey,
-      environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
-        ? 'test_mode'
-        : 'live_mode',
+      environment,
       timeout: 15_000,
       maxRetries: 1,
     })
@@ -123,7 +134,7 @@ export async function POST(req: Request) {
     const session = await dodo.checkoutSessions.create({
       product_cart: [{ product_id: productId, quantity: 1 }],
       customer: {
-        email: user.email ?? '',
+        email: user.email,
       },
       // metadata is returned verbatim in every webhook event —
       // the webhook handler reads metadata.user_id and metadata.plan
@@ -159,4 +170,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'checkout_failed' }, { status: 500 })
   }
 }
-
