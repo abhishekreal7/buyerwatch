@@ -24,6 +24,10 @@ import { getSafeThreadUrl } from '@/lib/thread-url'
 import { IntentBadge } from '@/components/IntentBadge'
 import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
 import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
+import {
+  DEFAULT_HIGH_INTENT_THRESHOLD,
+  normalizeHighIntentThreshold,
+} from '@/lib/high-intent-threshold'
 
 interface Thread {
   id: string
@@ -101,6 +105,7 @@ export default function DashboardPage() {
   const [hasInspectedLead, setHasInspectedLead] = useState(false)
   const [hasCopiedOrApproved, setHasCopiedOrApproved] = useState(false)
   const [autoSendEnabled, setAutoSendEnabled] = useState(false)
+  const [highIntentThreshold, setHighIntentThreshold] = useState(DEFAULT_HIGH_INTENT_THRESHOLD)
   const [sendingThreadId, setSendingThreadId] = useState<string | null>(null)
   const [signalUsage, setSignalUsage] = useState({ used: 0, limit: 250 })
   const [draftUsage, setDraftUsage] = useState({ used: 0, limit: 40 })
@@ -114,24 +119,12 @@ export default function DashboardPage() {
     const todayIso = today.toISOString()
     const activeStatuses = ['pending', 'drafted', 'needs_manual_reply']
     const usageMonth = getCurrentUsageMonth()
-    const [
-      profileResult,
-      addonCreditsResult,
-      keywordsCountResult,
-      feedbackCountResult,
-      threadsResult,
-      activeThreadsCountResult,
-      highIntentCountResult,
-      draftsCountResult,
-      postedTodayCountResult,
-      totalPostedCountResult,
-      highIntentTodayCountResult,
-    ] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('plan, auto_send_enabled, signal_count, signal_month, draft_count, draft_month')
-        .eq('id', userId)
-        .single(),
+    const profileResultPromise = supabase
+      .from('profiles')
+      .select('plan, auto_send_enabled, signal_count, signal_month, draft_count, draft_month, high_intent_threshold')
+      .eq('id', userId)
+      .single()
+    const independentResultsPromise = Promise.all([
       supabase
         .from('billing_addon_credits')
         .select('addon_type, credits')
@@ -162,12 +155,6 @@ export default function DashboardPage() {
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .in('status', activeStatuses)
-        .gte('intent_score', 80),
-      supabase
-        .from('monitored_threads')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
         .in('status', ['drafted', 'needs_manual_reply']),
       supabase
         .from('reply_analytics')
@@ -180,16 +167,43 @@ export default function DashboardPage() {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .eq('was_sent', true),
+    ])
+
+    const profileResult = await profileResultPromise
+    const profile = profileResult.data
+    const effectiveHighIntentThreshold = normalizeHighIntentThreshold(
+      profile?.high_intent_threshold,
+    )
+    const [
+      [
+        addonCreditsResult,
+        keywordsCountResult,
+        feedbackCountResult,
+        threadsResult,
+        activeThreadsCountResult,
+        draftsCountResult,
+        postedTodayCountResult,
+        totalPostedCountResult,
+      ],
+      highIntentCountResult,
+      highIntentTodayCountResult,
+    ] = await Promise.all([
+      independentResultsPromise,
       supabase
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .in('status', activeStatuses)
-        .gte('intent_score', 80)
+        .gte('intent_score', effectiveHighIntentThreshold),
+      supabase
+        .from('monitored_threads')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .in('status', activeStatuses)
+        .gte('intent_score', effectiveHighIntentThreshold)
         .gte('created_at', todayIso),
     ])
 
-    const profile = profileResult.data
     const normalizedPlan = normalizePlan(profile?.plan)
     const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
     const effectiveLimits = getPlanLimitsWithAddons(normalizedPlan, addonCredits)
@@ -204,6 +218,7 @@ export default function DashboardPage() {
       limit: effectiveLimits.aiDraftsPerMonth,
     })
     setAutoSendEnabled(profile?.auto_send_enabled ?? false)
+    setHighIntentThreshold(effectiveHighIntentThreshold)
 
     // Load persisted setup progress rather than resetting the checklist per session.
     setKeywordsCount(keywordsCountResult.count ?? 0)
@@ -508,7 +523,7 @@ export default function DashboardPage() {
     setStats(prev => ({
       ...prev,
       threadsFound: Math.max(0, prev.threadsFound - 1),
-      highIntent: dismissed.score >= 80 ? Math.max(0, prev.highIntent - 1) : prev.highIntent,
+      highIntent: dismissed.score >= highIntentThreshold ? Math.max(0, prev.highIntent - 1) : prev.highIntent,
       draftsReady: dismissed.status === 'drafted'
         ? Math.max(0, prev.draftsReady - 1)
         : prev.draftsReady,
@@ -657,7 +672,7 @@ export default function DashboardPage() {
   const filtered = filterTab === 'dismissed'
     ? searchableThreads.filter(t => t.status === 'dismissed')
     : filterTab === 'high-intent'
-      ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score >= 80)
+      ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score >= highIntentThreshold)
       : searchableThreads.filter(t => t.status !== 'dismissed')
   const signalLimitReached = plan === 'free' && signalUsage.used >= signalUsage.limit
   const draftLimitReached = plan === 'free' && draftUsage.used >= draftUsage.limit
@@ -666,7 +681,7 @@ export default function DashboardPage() {
     if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
       setSelectedThread(null)
     }
-  }, [filterTab, deferredSearchQuery, threads])
+  }, [filterTab, deferredSearchQuery, highIntentThreshold, threads])
 
   return (
     <div className="w-full space-y-6">
@@ -727,7 +742,7 @@ export default function DashboardPage() {
         {/* Metric 2: High Intent */}
         <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent (≥{highIntentThreshold}%)</span>
             <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
               <Sparkles className="w-4 h-4" strokeWidth={2} />
             </div>
@@ -868,7 +883,7 @@ export default function DashboardPage() {
       {/* Filtered threads calculation */}
       {(() => {
         const filtered = threads.filter(t => {
-          if (filterTab === 'high-intent') return t.score >= 80 && t.status !== 'dismissed'
+          if (filterTab === 'high-intent') return t.score >= highIntentThreshold && t.status !== 'dismissed'
           if (filterTab === 'dismissed') return t.status === 'dismissed'
           return t.status !== 'dismissed'
         })
@@ -889,7 +904,7 @@ export default function DashboardPage() {
                   onClick={() => setFilterTab('high-intent')}
                   className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
-                  High Intent (≥80%)
+                  High Intent (≥{highIntentThreshold}%)
                 </button>
                 <button
                   onClick={() => setFilterTab('dismissed')}

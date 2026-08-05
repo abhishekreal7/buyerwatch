@@ -39,6 +39,8 @@ create table profiles (
   signal_month date,
   signal_count integer not null default 0,
   notification_preferences jsonb default '{"emailDigest": true, "highIntentAlerts": true, "weeklyReport": false}'::jsonb,
+  high_intent_threshold smallint not null default 80
+    check (high_intent_threshold between 60 and 95),
   last_polled_at timestamptz,
   created_at timestamptz default now()
 );

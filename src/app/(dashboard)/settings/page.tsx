@@ -23,6 +23,12 @@ import {
   type ToneArchetype,
 } from '@/lib/writing-style'
 import { ExtensionSettingsPanel, useExtensionStatus } from '@/components/ExtensionInstall'
+import {
+  DEFAULT_HIGH_INTENT_THRESHOLD,
+  HIGH_INTENT_THRESHOLD_MAX,
+  HIGH_INTENT_THRESHOLD_MIN,
+  normalizeHighIntentThreshold,
+} from '@/lib/high-intent-threshold'
 
 /* ─── Nav sections ────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -173,6 +179,7 @@ export default function SettingsPage() {
     highIntentAlerts: true,
     weeklyReport: false,
   })
+  const [highIntentThreshold, setHighIntentThreshold] = useState(DEFAULT_HIGH_INTENT_THRESHOLD)
 
   const [planState, setPlanState] = useState<{ plan: string, keywordsMax: number, threadsMax: number, draftsMax: number }>({
     plan: 'free',
@@ -202,7 +209,7 @@ export default function SettingsPage() {
       ] = await Promise.all([
         supabase
           .from('profiles')
-          .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
+          .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, high_intent_threshold, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
           .eq('id', userId)
           .single(),
         supabase.from('platform_connections').select('platform, external_username').eq('user_id', userId),
@@ -222,7 +229,7 @@ export default function SettingsPage() {
       if (!p) {
         const { data: legacyProfile } = await supabase
           .from('profiles')
-          .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
+          .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, high_intent_threshold, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
           .eq('id', userId)
           .single()
         p = legacyProfile
@@ -256,6 +263,7 @@ export default function SettingsPage() {
           referralTrackingEnabled: p.referral_tracking_enabled !== false, // default true
         })
         if (p.notification_preferences) setNotifications(p.notification_preferences)
+        setHighIntentThreshold(normalizeHighIntentThreshold(p.high_intent_threshold))
         setSlack({ webhookUrl: p.slack_webhook_url || '', threshold: p.slack_notify_threshold ?? 70 })
         setWebhookSecret(p.webhook_secret || '')
       }
@@ -341,6 +349,7 @@ export default function SettingsPage() {
       reddit_username: profile.redditUsername,
       referral_tracking_enabled: profile.referralTrackingEnabled,
       notification_preferences: notifications,
+      high_intent_threshold: normalizeHighIntentThreshold(highIntentThreshold),
     }
     const saveProfile = async () => {
       const extendedResult = await supabase.from('profiles').update({
@@ -974,11 +983,47 @@ export default function SettingsPage() {
                 {/* ── NOTIFICATIONS ────────────────────────────────── */}
                 {activeSection === 'notifications' && (
                   <>
+                    <SectionCard
+                      title="High-intent threshold"
+                      description="Choose which scored opportunities count as high intent across your dashboard and analytics."
+                    >
+                      <div>
+                        <div className="mb-3 flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-[14px] font-semibold text-gray-900">Minimum dashboard intent score</p>
+                            <p className="mt-1 text-[12px] leading-5 text-gray-500">
+                              This changes counts and filters only. It does not rescore opportunities or change their buying/researching classification.
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-[14px] font-bold tabular-nums text-white">
+                            {highIntentThreshold}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={HIGH_INTENT_THRESHOLD_MIN}
+                          max={HIGH_INTENT_THRESHOLD_MAX}
+                          step="1"
+                          value={highIntentThreshold}
+                          aria-label="Minimum high-intent dashboard score"
+                          onChange={event => setHighIntentThreshold(normalizeHighIntentThreshold(event.target.value))}
+                          className="w-full cursor-pointer accent-gray-900"
+                        />
+                        <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
+                          <span>{HIGH_INTENT_THRESHOLD_MIN} — Catch more</span>
+                          <span>{HIGH_INTENT_THRESHOLD_MAX} — Only the strongest</span>
+                        </div>
+                        <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11.5px] leading-5 text-blue-800">
+                          Slack keeps its own notification threshold below, so changing this slider will not alter Slack delivery.
+                        </p>
+                      </div>
+                    </SectionCard>
+
                     <SectionCard title="Email Notifications" description="Choose which updates you receive by email.">
                       <div className="space-y-0 divide-y divide-gray-50">
                         {[
                           { key: 'emailDigest', icon: Mail, label: 'Daily digest', description: 'A morning summary of new opportunities and activity.' },
-                          { key: 'highIntentAlerts', icon: Activity, label: 'High-intent alerts', description: 'Instant notification when a thread scores 85+.' },
+                          { key: 'highIntentAlerts', icon: Activity, label: 'High-intent alerts', description: `Instant notification when a thread meets your ${highIntentThreshold}+ dashboard threshold.` },
                           { key: 'weeklyReport', icon: BarChart2, label: 'Weekly report', description: 'Your posting stats, top threads, and trends each week.' },
                         ].map(item => (
                           <div key={item.key} className="flex items-center justify-between gap-6 py-4 first:pt-0 last:pb-0">

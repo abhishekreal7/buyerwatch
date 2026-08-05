@@ -16,6 +16,7 @@ import { formatDistanceToNow, subDays, startOfDay, isAfter, format } from 'date-
 import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { useExtensionStatus } from '@/components/ExtensionInstall'
+import { normalizeHighIntentThreshold } from '@/lib/high-intent-threshold'
 
 // Custom Label for Horizontal Bar Chart
 const CustomBarLabel = (props: any) => {
@@ -59,8 +60,6 @@ const CustomBarLabel = (props: any) => {
   )
 }
 
-// HIGH_INTENT_THRESHOLD must match the dashboard stat card (intent_score >= 80)
-const HIGH_INTENT_THRESHOLD = 80
 const PLATFORM_COLORS: Record<string, string> = {
   reddit: '#FF5101',
   bluesky: '#0A84FF',
@@ -125,6 +124,7 @@ export default function AnalyticsPage() {
     needsAttention: any[]
     replyRate: number
     platformData: any[]
+    highIntentThreshold: number
     attributionStats: { clicks: number; conversions: number; totalRevenue: number }
   } | null>(null)
   const [leadDiscoveryRange, setLeadDiscoveryRange] = useState<LeadDiscoveryRange>(14)
@@ -152,7 +152,7 @@ export default function AnalyticsPage() {
         conversionsRes,
         revenueRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('auto_send_enabled').eq('id', userId).single(),
+        supabase.from('profiles').select('auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
         fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).range(from, to)),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).not('sent_at', 'is', null),
@@ -168,6 +168,7 @@ export default function AnalyticsPage() {
       const feedback = feedbackRes.data || []
       const conns = connsRes.data || []
       const profile = profileRes.data
+      const highIntentThreshold = normalizeHighIntentThreshold(profile?.high_intent_threshold)
 
       // --- STATS ---
       const found = threads.length
@@ -194,7 +195,7 @@ export default function AnalyticsPage() {
           const dateStr = format(d, 'MMM d')
           if (discoveredMap[dateStr] !== undefined) {
             discoveredMap[dateStr]++
-            if (Number(t.intent_score) >= HIGH_INTENT_THRESHOLD) {
+            if (Number(t.intent_score) >= highIntentThreshold) {
               qualifiedMap[dateStr]++
             }
           }
@@ -296,6 +297,7 @@ export default function AnalyticsPage() {
         needsAttention: alerts,
         replyRate,
         platformData,
+        highIntentThreshold,
         attributionStats: { clicks, conversions, totalRevenue }
       })
       setLoading(false)
@@ -436,7 +438,7 @@ export default function AnalyticsPage() {
                   <span className="text-text-tertiary hidden sm:inline">|</span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-                    High-intent: <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
+                    High-intent (≥{data.highIntentThreshold}%): <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
                   </span>
                 </div>
               </div>
