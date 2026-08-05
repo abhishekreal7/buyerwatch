@@ -10,7 +10,7 @@ import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
-import { normalizePlan } from '@/lib/plan-limits'
+import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -239,6 +239,7 @@ export default function KeywordsPage() {
 
   const activeCount = keywords.filter(k => k.is_active).length
   const pausedCount = keywords.filter(k => !k.is_active).length
+  const keywordLimit = Number(getPlanLimits(userPlan).keywords)
 
   return (
     <AppPage>
@@ -280,7 +281,7 @@ export default function KeywordsPage() {
             </div>
             <p className="flex-1 text-[13.5px] text-orange-900 leading-relaxed">
               <span className="font-semibold">{pausedCount} rule{pausedCount !== 1 ? 's are' : ' is'} paused</span>{' '}
-              because your current plan includes 1 active keyword.
+              because your current plan includes {keywordLimit} active keyword{keywordLimit !== 1 ? 's' : ''}.
               Upgrade to reactivate all {pausedCount}.
             </p>
             <a
@@ -581,14 +582,13 @@ export default function KeywordsPage() {
         {/* ── Upgrade prompt (Placement A) ─────────────────────────
             Shown only when:
             1. plan === 'free'
-            2. user is at the 1-keyword limit (keywords.length >= 1)
+            2. user is at the current keyword limit
             3. that keyword has >= 1 real discovered thread (real data only)
         ─────────────────────────────────────────────────────────── */}
-        {!loading && userPlan === 'free' && keywords.length >= 1 && (() => {
-          const firstKw = keywords[0]
-          const kwStats = metrics[firstKw?.id] || { total: 0, replied: 0 }
-          if (kwStats.total === 0) return null
-          const avgPerKeyword = kwStats.total
+        {!loading && userPlan === 'free' && keywords.length >= keywordLimit && (() => {
+          const totalConversations = keywords.reduce((sum, keyword) => sum + (metrics[keyword.id]?.total ?? 0), 0)
+          if (totalConversations === 0) return null
+          const avgPerKeyword = Math.max(1, Math.round(totalConversations / Math.max(keywords.length, 1)))
           return (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -601,12 +601,12 @@ export default function KeywordsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-semibold text-text-primary mb-1">
-                  Your 1 keyword has found{' '}
-                  <span className="text-black">{kwStats.total}</span>{' '}
-                  conversation{kwStats.total !== 1 ? 's' : ''} this month.
+                  Your {keywordLimit} Starter keyword{keywordLimit !== 1 ? 's have' : ' has'} found{' '}
+                  <span className="text-black">{totalConversations}</span>{' '}
+                  conversation{totalConversations !== 1 ? 's' : ''} this month.
                 </p>
                 <p className="text-[13px] text-text-secondary leading-relaxed">
-                  Teams on Professional track up to 10 topics simultaneously — each additional
+                  Professional tracks up to 10 topics simultaneously — each additional
                   keyword typically surfaces ~{avgPerKeyword} new conversation{avgPerKeyword !== 1 ? 's' : ''} per month.
                 </p>
               </div>

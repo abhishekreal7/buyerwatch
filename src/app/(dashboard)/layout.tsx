@@ -1,5 +1,10 @@
 import DashboardLayout, { type DashboardBootstrap } from '@/components/DashboardLayout'
-import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { normalizePlan } from '@/lib/plan-limits'
+import {
+  getCurrentUsageMonth,
+  getPlanLimitsWithAddons,
+  sumMonthlyAddonCredits,
+} from '@/lib/billing-addons'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -13,7 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/login')
   }
 
-  const [profileResult, unreviewedResult] = await Promise.all([
+  const usageMonth = getCurrentUsageMonth()
+  const [profileResult, unreviewedResult, addonCreditsResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('auto_send_enabled, plan, draft_count, draft_month, business_name')
@@ -26,14 +32,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .in('status', ['pending', 'drafted', 'needs_manual_reply'])
       .is('reviewed_at', null)
       .limit(1),
+    supabase
+      .from('billing_addon_credits')
+      .select('addon_type, credits')
+      .eq('user_id', userId)
+      .eq('usage_month', usageMonth),
   ])
 
   const profile = profileResult.data
   const plan = normalizePlan(profile?.plan)
-  const limit = getPlanLimits(plan).aiDraftsPerMonth
-  const currentMonth = `${new Date().toISOString().slice(0, 7)}-01`
+  const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
+  const limit = getPlanLimitsWithAddons(plan, addonCredits).aiDraftsPerMonth
+  const currentMonth = usageMonth
   const used = profile?.draft_month === currentMonth
-    ? Math.min(Math.max(profile.draft_count ?? 0, 0), limit)
+    ? Math.max(profile.draft_count ?? 0, 0)
     : 0
   const userMetadata = (claims.user_metadata ?? {}) as Record<string, string | undefined>
   const email = typeof claims.email === 'string' ? claims.email : undefined

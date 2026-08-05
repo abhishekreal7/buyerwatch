@@ -5,7 +5,7 @@ import { PricingClient } from './PricingClient'
 
 export const metadata = {
   title: 'Pricing — BuyerWatch',
-  description: 'Simple, transparent pricing. Start free, upgrade when you need more signal coverage.',
+  description: 'Simple, transparent pricing. Start with 5 keyword rules and upgrade when you need more signal coverage.',
 }
 
 export const dynamic = 'force-dynamic'
@@ -31,7 +31,7 @@ export default function PricingPage() {
             href="/signup"
             className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white bg-[#0A0A0A] hover:bg-[#1C1C1E] px-4 py-2 rounded-xl transition-colors"
           >
-            Get started free
+            Start for $19
           </Link>
         </div>
       </nav>
@@ -45,7 +45,7 @@ export default function PricingPage() {
           Simple plans that<br className="hidden sm:block" /> scale with you
         </h1>
         <p className="text-[17px] text-[#666666] max-w-[440px] mx-auto leading-relaxed">
-          Start free with your first keyword rule. Upgrade when you need more coverage.
+          Start with 5 keyword rules. Upgrade when you need more coverage.
         </p>
       </div>
 

@@ -15,7 +15,7 @@ const faqs = [
   { q: 'Does it work for non-SaaS businesses?', a: 'Yes. You can monitor configured Reddit communities and Bluesky searches for conversations relevant to any product or service.' },
   { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. BuyerWatch finds active buying intent from people who don\'t know you yet.' },
   { q: 'How does intent scoring work?', a: 'We classify posts into Buying, Researching, Complaining, and Other, then attach a 0–100 confidence score for review.' },
-  { q: 'Can I try it for free?', a: 'Yes. Start with 1 keyword and up to 50 conversations per month. No card required.' },
+  { q: 'What does the Starter plan include?', a: 'Starter is $19/month and includes 5 keyword rules, up to 250 conversations per month, and manual review before anything is posted.' },
   { q: 'Does this violate platform terms of service?', a: 'BuyerWatch uses public-feed access and authenticated connections where configured. Manual review is the default, and you remain responsible for each platform\'s rules.' },
   { q: 'How does BuyerWatch reduce promotional replies?', a: 'Drafts include an affiliation disclosure, are checked for promotional phrasing, and stay in manual review until the confidence engine has enough trust evidence.' }
 ]
@@ -102,11 +102,11 @@ export function LandingFooter() {
               See the right conversation.<br />Decide what happens next.
             </motion.h2>
             <motion.p variants={fadeUp} className="mb-10" style={{ fontFamily: 'var(--font-inter)', fontSize: '17px', color: '#6B6B6B', lineHeight: 1.65 }}>
-              Start monitoring Reddit and Bluesky with one free keyword rule.
+              Start monitoring Reddit and Bluesky with 5 keyword rules on Starter.
             </motion.p>
             <motion.div variants={fadeUp} className="flex items-center justify-center">
               <PremiumCtaButton href="/signup" className="w-full sm:w-auto">
-                Start for free
+                Get started
               </PremiumCtaButton>
             </motion.div>
           </div>

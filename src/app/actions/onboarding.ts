@@ -44,7 +44,7 @@ async function completeWithoutRpc(
   }
 
   const plan = normalizePlan(existingProfile?.plan)
-  const limit = getPlanLimits(plan).keywords
+  const limit = Number(getPlanLimits(plan).keywords)
   const { count, error: countError } = await admin
     .from('keywords')
     .select('id', { count: 'exact', head: true })
@@ -235,5 +235,4 @@ export async function skipOnboardingAction() {
 
   redirect('/dashboard')
 }
-
 

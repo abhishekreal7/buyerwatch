@@ -52,7 +52,7 @@ export function evaluateAutoSendContentPolicy(
   draftResult: DraftSafetyResult,
   profile: { auto_send_enabled: boolean; plan: string },
 ): AutoSendEvaluation | null {
-  if (profile.plan === 'free') {
+  if (profile.plan === 'free' || profile.plan === 'starter') {
     return blockedDecision('auto_send_requires_paid_plan')
   }
   if (!profile.auto_send_enabled) {

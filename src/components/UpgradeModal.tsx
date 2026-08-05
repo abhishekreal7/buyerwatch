@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -94,7 +94,8 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
     }
   }, [visible])
 
-  const tierLabel = normalizePlan(plan) === 'growth' ? 'Growth' : 'Professional'
+  const tier = normalizePlan(plan)
+  const tierLabel = tier === 'growth' ? 'Growth' : tier === 'starter' ? 'Starter' : 'Professional'
 
   return (
     <AnimatePresence>

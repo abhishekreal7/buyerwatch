@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { normalizePlan } from '@/lib/plan-limits'
+import { getPlanLimits } from '@/lib/plan-limits'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
 
@@ -81,7 +81,7 @@ export async function PATCH(req: Request) {
     if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
 
     const isActivating = enabled && profile.auto_send_enabled !== true
-    if (enabled && normalizePlan(profile.plan) === 'free') {
+    if (enabled && !getPlanLimits(profile.plan).autoSend) {
       return NextResponse.json({ error: 'auto_send_requires_paid_plan' }, { status: 403 })
     }
     if (isActivating) {

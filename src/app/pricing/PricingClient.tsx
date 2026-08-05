@@ -65,9 +65,10 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
       {/* Plans grid */}
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 px-4 pb-20 sm:px-6 md:grid-cols-2 md:pb-24 lg:grid-cols-3">
         {PRICING_PLANS.map((plan) => {
-          const paidPlan = plan.name !== 'Free'
+          const price: string = plan.price
+          const paidPlan = price !== '$0' && price !== 'Custom'
           const checkoutAvailable = !paidPlan || billingEnabled
-          const displayPrice = formatPrice(plan.price, annual)
+          const displayPrice = formatPrice(price, annual)
           const isHighlighted = plan.highlight
 
           return (
@@ -93,8 +94,8 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                     isHighlighted ? 'text-white/50' : 'text-[#888]'
                   }`}
                 >
-                  {plan.id === 'free'
-                    ? 'For exploring the platform'
+                  {plan.id === 'starter'
+                    ? 'For getting signal live'
                     : plan.id === 'pro'
                     ? 'For active founders'
                     : 'For growing teams'}
@@ -106,7 +107,7 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                 <span className="text-[46px] font-bold tracking-tight leading-none">
                   {displayPrice}
                 </span>
-                {plan.price !== '$0' && (
+                {price !== '$0' && (
                   <span
                     className={`text-[14px] font-medium ${
                       isHighlighted ? 'text-white/50' : 'text-[#888]'
@@ -115,7 +116,7 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                     {annual ? '/mo, billed annually' : plan.period}
                   </span>
                 )}
-                {plan.price === '$0' && (
+                {price === '$0' && (
                   <span
                     className={`text-[14px] font-medium ${
                       isHighlighted ? 'text-white/50' : 'text-[#888]'

@@ -17,6 +17,7 @@ import {
 import { aiRateLimit, getIp } from '@/lib/ratelimit'
 import { isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 import { recordEngagementEvent } from '@/lib/automation-audit'
+import { BILLING_ADDONS } from '@/lib/billing-addons'
 
 export async function POST(req: Request) {
   try {
@@ -142,7 +143,11 @@ export async function POST(req: Request) {
     if (!reserved) {
       await releaseAiSpend(admin, aiSpend.id)
       return NextResponse.json(
-        { error: 'plan_limit_reached', limit: 'ai_drafts' },
+        {
+          error: 'plan_limit_reached',
+          limit: 'ai_drafts',
+          addon: BILLING_ADDONS.drafts,
+        },
         { status: 403 },
       )
     }

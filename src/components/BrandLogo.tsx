@@ -18,15 +18,13 @@ export function BrandLogo({ compact = false, size = 'md', tone = 'dark' }: Brand
   const imageStyle = tone === 'light' ? { filter: 'brightness(0) invert(1)' } : undefined
 
   if (compact) {
-    const markWidth = Math.round(dim.height * (122 / 175))
-
     return (
-      <span className="inline-flex shrink-0" style={{ width: markWidth, height: dim.height }}>
+      <span className="inline-flex shrink-0" style={{ width: dim.height, height: dim.height }}>
         <Image
-          src="/buyerwatch-mark.png"
+          src="/buyerwatch-icon.png"
           alt="BuyerWatch"
-          width={122}
-          height={175}
+          width={128}
+          height={128}
           loading="eager"
           unoptimized
           className="h-full w-full object-contain"

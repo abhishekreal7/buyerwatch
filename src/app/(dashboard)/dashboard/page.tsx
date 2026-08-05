@@ -9,7 +9,14 @@ import { UpgradeModal } from '@/components/UpgradeModal'
 import { GettingStartedChecklist } from '@/components/GettingStartedChecklist'
 import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
-import { getPlanLimits } from '@/lib/plan-limits'
+import { normalizePlan, type PlanTier } from '@/lib/plan-limits'
+import {
+  BILLING_ADDONS,
+  getCurrentUsageMonth,
+  getPlanLimitsWithAddons,
+  sumMonthlyAddonCredits,
+  type BillingAddonType,
+} from '@/lib/billing-addons'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { useExtensionStatus } from '@/components/ExtensionInstall'
@@ -74,7 +81,7 @@ export default function DashboardPage() {
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
   const [loading, setLoading] = useState(true)
   const [totalSent, setTotalSent] = useState(0)
-  const [plan, setPlan] = useState('free')
+  const [plan, setPlan] = useState<PlanTier>('free')
   const [regenerating, setRegenerating] = useState(false)
   const [filterTab, setFilterTab] = useState<'all' | 'high-intent' | 'dismissed'>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -95,17 +102,21 @@ export default function DashboardPage() {
   const [hasCopiedOrApproved, setHasCopiedOrApproved] = useState(false)
   const [autoSendEnabled, setAutoSendEnabled] = useState(false)
   const [sendingThreadId, setSendingThreadId] = useState<string | null>(null)
+  const [signalUsage, setSignalUsage] = useState({ used: 0, limit: 250 })
+  const [draftUsage, setDraftUsage] = useState({ used: 0, limit: 40 })
+  const [openingAddonCheckout, setOpeningAddonCheckout] = useState<BillingAddonType | null>(null)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
   const { isInstalled: extensionInstalled } = useExtensionStatus()
-
   const loadData = useCallback(async () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const todayIso = today.toISOString()
     const activeStatuses = ['pending', 'drafted', 'needs_manual_reply']
+    const usageMonth = getCurrentUsageMonth()
     const [
       profileResult,
+      addonCreditsResult,
       keywordsCountResult,
       feedbackCountResult,
       threadsResult,
@@ -118,9 +129,14 @@ export default function DashboardPage() {
     ] = await Promise.all([
       supabase
         .from('profiles')
-        .select('plan, auto_send_enabled')
+        .select('plan, auto_send_enabled, signal_count, signal_month, draft_count, draft_month')
         .eq('id', userId)
         .single(),
+      supabase
+        .from('billing_addon_credits')
+        .select('addon_type, credits')
+        .eq('user_id', userId)
+        .eq('usage_month', usageMonth),
       supabase
         .from('keywords')
         .select('*', { count: 'exact', head: true })
@@ -174,10 +190,19 @@ export default function DashboardPage() {
     ])
 
     const profile = profileResult.data
-    if (profile?.plan) {
-      setPlan(profile.plan)
-      setKeywordsMax(getPlanLimits(profile.plan).keywords)
-    }
+    const normalizedPlan = normalizePlan(profile?.plan)
+    const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
+    const effectiveLimits = getPlanLimitsWithAddons(normalizedPlan, addonCredits)
+    setPlan(normalizedPlan)
+    setKeywordsMax(effectiveLimits.keywords)
+    setSignalUsage({
+      used: profile?.signal_month === usageMonth ? Math.max(profile.signal_count ?? 0, 0) : 0,
+      limit: effectiveLimits.threadsPerMonth,
+    })
+    setDraftUsage({
+      used: profile?.draft_month === usageMonth ? Math.max(profile.draft_count ?? 0, 0) : 0,
+      limit: effectiveLimits.aiDraftsPerMonth,
+    })
     setAutoSendEnabled(profile?.auto_send_enabled ?? false)
 
     // Load persisted setup progress rather than resetting the checklist per session.
@@ -521,6 +546,34 @@ export default function DashboardPage() {
     toast.success('Marked as posted')
   }
 
+  const handleBuyAddon = async (type: BillingAddonType) => {
+    if (openingAddonCheckout) return
+    setOpeningAddonCheckout(type)
+    try {
+      const idempotencyKey = crypto.randomUUID()
+      const response = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({ addon: type }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.url) {
+        throw new Error(payload?.error || 'checkout_failed')
+      }
+      window.location.href = payload.url
+    } catch (error) {
+      setOpeningAddonCheckout(null)
+      if (error instanceof Error && error.message === 'addon_billing_not_configured') {
+        window.location.href = '/pricing'
+        return
+      }
+      toast.error('Could not open add-on checkout')
+    }
+  }
+
   const generateReplyForThread = async (threadToDraft: Thread) => {
     if (regenerating) return
     const isFirstDraft = !threadToDraft.draft
@@ -533,7 +586,14 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ threadId: threadToDraft.id })
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null)
+        if (res.status === 403 && payload?.error === 'plan_limit_reached' && payload?.limit === 'ai_drafts') {
+          toast.error('Draft limit reached. Add 20 more drafts for $5.')
+          return
+        }
+        throw new Error()
+      }
 
       const { draft } = await res.json()
       clearSupabaseReadCache()
@@ -599,6 +659,8 @@ export default function DashboardPage() {
     : filterTab === 'high-intent'
       ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score >= 80)
       : searchableThreads.filter(t => t.status !== 'dismissed')
+  const signalLimitReached = plan === 'free' && signalUsage.used >= signalUsage.limit
+  const draftLimitReached = plan === 'free' && draftUsage.used >= draftUsage.limit
 
   useEffect(() => {
     if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
@@ -730,12 +792,12 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Upgrade banner (Placement B) ────────────────────────────── */}
-      {!loading && plan === 'free' && keywordsCount >= 1 && stats.highIntent > 0 && !bannerDismissed && (
+      {!loading && plan === 'free' && keywordsCount >= keywordsMax && stats.highIntent > 0 && !bannerDismissed && (
         <div className="flex flex-col items-start gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/80 px-4 py-3.5 shadow-2xs sm:flex-row sm:items-center sm:px-5">
           <Sparkles className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={1.75} />
           <p className="flex-1 text-xs text-amber-900 leading-relaxed">
             <span className="font-semibold">{stats.highIntent} high-intent conversation{stats.highIntent !== 1 ? 's' : ''} found</span>{' '}
-            this month with your current keyword. Upgrade to Professional to add 9 more topics.
+            this month across your {keywordsMax} Starter keyword{keywordsMax !== 1 ? 's' : ''}. Upgrade to Professional for 10 total topics.
           </p>
           <div className="flex shrink-0 items-center gap-2">
             <a
@@ -752,6 +814,54 @@ export default function DashboardPage() {
               <X className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
           </div>
+        </div>
+      )}
+
+      {!loading && (signalLimitReached || draftLimitReached) && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {signalLimitReached && (
+            <div className="flex flex-col items-start gap-3 rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)] sm:flex-row sm:items-center sm:px-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFF0EA] text-[#FF5101]">
+                <Globe className="h-4 w-4" strokeWidth={2} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-950">Signal limit reached</p>
+                <p className="mt-0.5 text-xs text-[#667085]">
+                  {signalUsage.used}/{signalUsage.limit} Starter signals used this month.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleBuyAddon('signals')}
+                disabled={Boolean(openingAddonCheckout)}
+                className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-4 text-xs font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
+              >
+                {openingAddonCheckout === 'signals' ? 'Opening...' : BILLING_ADDONS.signals.ctaLabel}
+              </button>
+            </div>
+          )}
+
+          {draftLimitReached && (
+            <div className="flex flex-col items-start gap-3 rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)] sm:flex-row sm:items-center sm:px-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF4FF] text-[#0A84FF]">
+                <FileText className="h-4 w-4" strokeWidth={2} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-950">Draft limit reached</p>
+                <p className="mt-0.5 text-xs text-[#667085]">
+                  {draftUsage.used}/{draftUsage.limit} Starter drafts used this month.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleBuyAddon('drafts')}
+                disabled={Boolean(openingAddonCheckout)}
+                className="inline-flex min-h-10 items-center rounded-xl bg-[#0A84FF] px-4 text-xs font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-60"
+              >
+                {openingAddonCheckout === 'drafts' ? 'Opening...' : BILLING_ADDONS.drafts.ctaLabel}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1286,21 +1396,26 @@ export default function DashboardPage() {
                   )
                 })}
 
-                {plan === 'free' && stats.threadsFound > 10 && (
+                {signalLimitReached && (
                   <div className="rounded-2xl p-6 bg-surface border border-black/5 shadow-sm text-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-white/90 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
                       <div className="bg-black/5 p-3 rounded-full mb-3">
                         <Lock className="w-5 h-5 text-gray-700" />
                       </div>
                       <h3 className="font-semibold text-gray-900 mb-1">
-                        {stats.threadsFound - 10} more high-intent threads waiting
+                        Starter signal limit reached
                       </h3>
                       <p className="text-[13px] text-gray-500 mb-4 max-w-[260px]">
-                        You&apos;ve reached the free tier limit. Upgrade to unlock all conversations.
+                        Add 100 more monitored signals for this month without changing plans.
                       </p>
-                      <a href="/settings" className="px-5 py-2 rounded-lg bg-[#0A84FF] hover:bg-blue-600 text-white text-[13px] font-medium transition-colors shadow-[0_0_20px_rgba(10,132,255,0.2)]">
-                        Upgrade to Pro
-                      </a>
+                      <button
+                        type="button"
+                        onClick={() => void handleBuyAddon('signals')}
+                        disabled={Boolean(openingAddonCheckout)}
+                        className="px-5 py-2 rounded-lg bg-[#0A84FF] hover:bg-blue-600 text-white text-[13px] font-medium transition-colors shadow-[0_0_20px_rgba(10,132,255,0.2)] disabled:opacity-60"
+                      >
+                        {openingAddonCheckout === 'signals' ? 'Opening...' : BILLING_ADDONS.signals.ctaLabel}
+                      </button>
                     </div>
 
                     {/* Dummy blurred content behind */}

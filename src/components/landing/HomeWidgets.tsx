@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useInView } from 'framer-motion'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { sourcePlatforms } from './HomeVisuals'
 import { springs } from '@/lib/motion'
+import { BrandLogo } from '@/components/BrandLogo'
 
 export const ChatSimulation = () => {
   const [messages, setMessages] = useState<number[]>([0])
@@ -235,6 +236,110 @@ export const BentoPlatformSourcesWidget = () => {
         </motion.div>
       ))}
     </div>
+  )
+}
+
+const buyerWatchConversation = [
+  {
+    side: 'left',
+    name: 'Avery in r/SaaS',
+    time: '08:14',
+    tone: 'reddit',
+    text: 'How do you find buyers who are already asking for help? I keep seeing the right Reddit threads too late.',
+  },
+  {
+    side: 'right',
+    name: 'BuyerWatch',
+    time: '08:16',
+    tone: 'buyerwatch',
+    text: "I'd say BuyerWatch came from this exact problem, then share one useful search phrase they can try either way.",
+  },
+  {
+    side: 'left',
+    name: 'Avery',
+    time: '08:19',
+    tone: 'appreciation',
+    text: "That sounds way less spammy. I'd actually respond to that.",
+  },
+] as const
+
+export const BuyerWatchAgentPreview = () => {
+  const [visibleMessages, setVisibleMessages] = useState(1)
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInView(ref, { margin: '120px' })
+
+  useEffect(() => {
+    if (!inView) return
+    const timer = setInterval(() => {
+      setVisibleMessages((count) => (count >= buyerWatchConversation.length ? 1 : count + 1))
+    }, 1900)
+    return () => clearInterval(timer)
+  }, [inView])
+
+  return (
+    <motion.div
+      ref={ref}
+      className="flex h-[268px] w-full flex-col justify-end gap-2 overflow-hidden pb-2"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.45 }}
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.14, delayChildren: 0.04 } } }}
+    >
+      <AnimatePresence mode="popLayout">
+        {buyerWatchConversation.slice(0, visibleMessages).map((message, index) => {
+          const isReply = message.side === 'right'
+          const isAppreciation = message.tone === 'appreciation'
+
+          return (
+            <motion.div
+              key={message.time}
+              layout
+              initial={{ opacity: 0, y: 18, scale: 0.96, filter: 'blur(3px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -8, scale: 0.98, filter: 'blur(2px)' }}
+              transition={{ duration: 0.42, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
+              className={`${isReply ? 'ml-auto max-w-[84%] text-right' : 'max-w-[88%]'}`}
+            >
+              <div className={`mb-1.5 flex items-center gap-2 ${isReply ? 'justify-end' : 'justify-start'}`}>
+                {!isReply && (
+                  <img
+                    src="/landing-founder-avatar.png"
+                    alt=""
+                    className={`h-7 w-7 rounded-full object-cover ${isAppreciation ? 'opacity-95' : ''}`}
+                  />
+                )}
+                {isReply && (
+                  <motion.div
+                    className="flex h-[22px] w-[22px] items-center justify-center"
+                    animate={{ y: [0, -2, 0] }}
+                    transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    <BrandLogo compact size="sm" />
+                  </motion.div>
+                )}
+                <span style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontSize: '14px', fontWeight: 800, color: '#1C1C1A', letterSpacing: '-0.025em' }}>
+                  {message.name}
+                </span>
+              </div>
+              <motion.div
+                className={`inline-block max-w-[310px] rounded-[12px] px-3.5 py-2 text-left text-[12.75px] font-semibold leading-[1.3] tracking-[-0.018em] shadow-[0_1px_2px_rgba(0,0,0,0.03)] ${
+                  isReply
+                    ? 'rounded-tr-[4px] bg-[#0A84FF] text-white shadow-[0_10px_24px_rgba(10,132,255,0.18)]'
+                    : isAppreciation
+                      ? 'rounded-tl-[4px] border border-[#E7E7E3] bg-[#F7F7F5] text-[#3F3F3A]'
+                      : 'rounded-tl-[4px] bg-[#FFE3D7] text-[#1C1C1A]'
+                }`}
+                animate={isReply ? { boxShadow: ['0 10px 24px rgba(10,132,255,0.16)', '0 14px 30px rgba(10,132,255,0.24)', '0 10px 24px rgba(10,132,255,0.16)'] } : undefined}
+                transition={isReply ? { duration: 3.2, repeat: Infinity, ease: 'easeInOut' } : undefined}
+              >
+                {message.text}
+              </motion.div>
+              <div className="mt-1 text-[10.5px] font-semibold text-[#9B9B96]">{message.time}</div>
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
+    </motion.div>
   )
 }
 

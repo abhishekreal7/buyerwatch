@@ -1,26 +1,36 @@
 export const X_DAILY_SPEND_LIMIT_CENTS: Record<string, number> = {
   free: 0,
+  starter: 0,
   pro: 0,
   growth: 0,
 }
 
 export const PLAN_POLL_INTERVAL_MINUTES: Record<PlanTier, number> = {
   free: 60,
+  starter: 60,
   pro: 5,
   growth: 5,
 }
 
 export const PLAN_LIMITS = {
   free: {
-    keywords: 1,            // Primary felt constraint — 1 keyword rule
-    threadsPerMonth: 50,    // Up to 50 signals/mo discovered
-    aiDraftsPerMonth: 40,   // Generous cost backstop — should rarely bind on 1 keyword
+    keywords: 5,            // Unpaid default — same limits as Starter but no subscription.
+    threadsPerMonth: 250,
+    aiDraftsPerMonth: 40,
+    subredditTargeting: false,
+    workspaces: 1,
+    autoSend: false,
+  },
+  starter: {
+    keywords: 5,            // Starter paid plan ($19/mo).
+    threadsPerMonth: 250,   // Up to 250 signals/mo discovered.
+    aiDraftsPerMonth: 40,   // Cost backstop for the entry plan.
     subredditTargeting: false,
     workspaces: 1,
     autoSend: false,
   },
   pro: {
-    keywords: 10,           // Primary felt constraint — 10 keyword rules
+    keywords: 10,           // Professional plan includes 10 keyword rules.
     threadsPerMonth: 1000,  // Up to 1,000 signals/mo
     aiDraftsPerMonth: 400,  // Effectively invisible for normal usage
     subredditTargeting: true,
@@ -28,7 +38,7 @@ export const PLAN_LIMITS = {
     autoSend: true,
   },
   growth: {
-    keywords: 50,           // Primary felt constraint — 50 keyword rules
+    keywords: 50,           // Growth plan includes 50 keyword rules.
     threadsPerMonth: 5000,
     aiDraftsPerMonth: 2000,
     subredditTargeting: true,
@@ -39,8 +49,9 @@ export const PLAN_LIMITS = {
 
 export type PlanTier = keyof typeof PLAN_LIMITS
 
-/** Normalize any stored plan string to free | pro | growth. Unknown/legacy tiers → free. */
+/** Normalize any stored plan string to free | pro | growth. Unknown/legacy tiers fall back to free. */
 export function normalizePlan(plan: string | null | undefined): PlanTier {
+  if (plan === 'starter') return 'starter'
   if (plan === 'pro') return 'pro'
   if (plan === 'growth') return 'growth'
   return 'free'
@@ -52,7 +63,8 @@ export function getPlanLimits(plan: string | null | undefined) {
 
 /** Returns true if the plan is any paid tier (pro or growth). */
 export function isPaidPlan(plan: string | null | undefined): boolean {
-  return normalizePlan(plan) !== 'free'
+  const tier = normalizePlan(plan)
+  return tier === 'starter' || tier === 'pro' || tier === 'growth'
 }
 
 export function isPollingDue(

@@ -4,7 +4,6 @@ import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from 'r
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Squares2X2Icon,
   DocumentTextIcon,
   PresentationChartLineIcon,
   PuzzlePieceIcon,
@@ -15,7 +14,6 @@ import {
 } from '@heroicons/react/24/solid'
 import {
   Bell,
-  HelpCircle,
   LogOut,
   Menu,
   Search,
@@ -23,7 +21,14 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
-import { getPlanLimits, normalizePlan, type PlanTier } from '@/lib/plan-limits'
+import { normalizePlan, type PlanTier } from '@/lib/plan-limits'
+import {
+  BILLING_ADDONS,
+  getCurrentUsageMonth,
+  getPlanLimitsWithAddons,
+  sumMonthlyAddonCredits,
+  type BillingAddonType,
+} from '@/lib/billing-addons'
 import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -131,20 +136,18 @@ function DashboardShell({
 
   const [autoSend, setAutoSend] = useState<boolean | null>(initialData.autoSend)
   const [togglingAutoSend, setTogglingAutoSend] = useState(false)
-  const [hasUnreviewedOpportunities, setHasUnreviewedOpportunities] = useState(
-    initialData.hasUnreviewedOpportunities,
-  )
   const [plan, setPlan] = useState<PlanTier>(initialData.plan)
   const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
-  const [openingCheckout, setOpeningCheckout] = useState(false)
+  const [openingCheckout, setOpeningCheckout] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [conversationSearch, setConversationSearch] = useState('')
   const deferredConversationSearch = useDeferredValue(conversationSearch)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { status: extensionStatus } = useExtensionStatus()
   const extensionMissing = extensionStatus === 'missing'
+  const showConversationSearch = pathname === '/dashboard'
 
   useEffect(() => {
     const focusSearch = () => searchInputRef.current?.focus()
@@ -168,7 +171,8 @@ function DashboardShell({
 
   useEffect(() => {
     async function loadSidebarData() {
-      const [profileResult, unreviewedResult, keywordCountResult] = await Promise.all([
+      const usageMonth = getCurrentUsageMonth()
+      const [profileResult, unreviewedResult, keywordCountResult, addonCreditsResult] = await Promise.all([
         supabase
           .from('profiles')
           .select('auto_send_enabled, plan, draft_count, draft_month')
@@ -185,15 +189,21 @@ function DashboardShell({
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
           .eq('is_active', true),
+        supabase
+          .from('billing_addon_credits')
+          .select('addon_type, credits')
+          .eq('user_id', userId)
+          .eq('usage_month', usageMonth),
       ])
 
       const profile = profileResult.data
       if (profile) {
         const normalizedPlan = normalizePlan(profile.plan)
-        const limit = getPlanLimits(normalizedPlan).aiDraftsPerMonth
-        const currentMonth = `${new Date().toISOString().slice(0, 7)}-01`
+        const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
+        const limit = getPlanLimitsWithAddons(normalizedPlan, addonCredits).aiDraftsPerMonth
+        const currentMonth = usageMonth
         const used = profile.draft_month === currentMonth
-          ? Math.min(Math.max(profile.draft_count ?? 0, 0), limit)
+          ? Math.max(profile.draft_count ?? 0, 0)
           : 0
         setAutoSend(profile.auto_send_enabled ?? false)
         setPlan(normalizedPlan)
@@ -202,7 +212,6 @@ function DashboardShell({
 
       const oppsCount = unreviewedResult.count ?? 0
       setOpportunityCount(oppsCount)
-      setHasUnreviewedOpportunities(oppsCount > 0)
       setKeywordCount(keywordCountResult.count ?? null)
     }
 
@@ -253,35 +262,61 @@ function DashboardShell({
     setTogglingAutoSend(false)
   }
 
-  async function handleAddCredits() {
+  async function openCheckout(body: Record<string, string>, checkoutKey: string) {
     if (openingCheckout) return
-    if (plan === 'growth') {
-      window.location.href = '/pricing'
-      return
-    }
 
-    setOpeningCheckout(true)
+    setOpeningCheckout(checkoutKey)
     try {
+      // Unique per intentional click so repeat add-on buys are not collapsed
+      // by the server's short fallback bucket.
+      const idempotencyKey = crypto.randomUUID()
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: plan === 'free' ? 'pro' : 'growth' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(body),
       })
       const payload = await response.json().catch(() => null)
       if (!response.ok || !payload?.url) {
         throw new Error(payload?.error || 'checkout_failed')
       }
       window.location.href = payload.url
-    } catch {
-      toast.error('Billing checkout is not available yet')
-      setOpeningCheckout(false)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : ''
+      setOpeningCheckout(null)
+      if (msg === 'addon_billing_not_configured') {
+        // Fall back to plan upgrade checkout if standalone add-on pack products aren't configured in Dodo
+        await handleAddCredits()
+        return
+      } else if (msg === 'billing_provider_unauthorized') {
+        toast.error('Dodo Payments API key is invalid or unauthorized')
+      } else if (msg === 'billing_not_configured') {
+        toast.error('Billing setup incomplete (missing API key or product IDs)')
+      } else {
+        toast.error('Billing checkout is not available yet')
+      }
     }
+  }
+
+  async function handleBuyAddon(type: BillingAddonType) {
+    await openCheckout({ addon: type }, `addon:${type}`)
+  }
+
+  async function handleAddCredits() {
+    if (plan === 'growth') {
+      window.location.href = '/pricing'
+      return
+    }
+    await openCheckout({ plan: plan === 'free' ? 'starter' : plan === 'starter' ? 'pro' : 'growth' }, 'upgrade')
   }
 
   const creditsRemaining = credits ? Math.max(credits.limit - credits.used, 0) : null
   const creditsPercent = credits && credits.limit > 0
     ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
     : 0
+  const draftAddonAvailable = (plan === 'free' || plan === 'starter') && creditsRemaining === 0
 
   return (
     <DashboardSessionProvider userId={userId}>
@@ -436,11 +471,15 @@ function DashboardShell({
 
                 <button
                   type="button"
-                  onClick={handleAddCredits}
-                  disabled={openingCheckout}
+                  onClick={draftAddonAvailable ? () => void handleBuyAddon('drafts') : handleAddCredits}
+                  disabled={Boolean(openingCheckout)}
                   className="w-full rounded-lg bg-zinc-900 text-white text-sm font-medium py-2 hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-60"
                 >
-                  {openingCheckout ? 'Opening checkout…' : 'Upgrade Plan'}
+                  {openingCheckout
+                    ? 'Opening checkout...'
+                    : draftAddonAvailable
+                      ? BILLING_ADDONS.drafts.ctaLabel
+                      : 'Upgrade Plan'}
                 </button>
               </div>
             </div>
@@ -460,6 +499,7 @@ function DashboardShell({
               >
                 <Menu className="h-5 w-5" />
               </button>
+              {showConversationSearch && (
               <div className="relative hidden w-64 sm:block">
                 <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                 <input
@@ -471,6 +511,7 @@ function DashboardShell({
                   className="h-9 w-full rounded-xl bg-[#F4F4F2] pl-9 pr-3 text-xs text-gray-900 placeholder-gray-400 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/25"
                 />
               </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

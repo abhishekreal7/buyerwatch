@@ -36,12 +36,14 @@ const EMPTY_AI_USAGE: AiUsage = {
 
 const USER_MONTHLY_LIMIT_MICROUSD: Record<PlanTier, number> = {
   free: 1_000_000,
+  starter: 1_000_000,
   pro: 10_000_000,
   growth: 40_000_000,
 }
 
 const USER_LIMIT_ENV: Record<PlanTier, string> = {
   free: 'ANTHROPIC_FREE_MONTHLY_SPEND_LIMIT_USD',
+  starter: 'ANTHROPIC_FREE_MONTHLY_SPEND_LIMIT_USD',
   pro: 'ANTHROPIC_PRO_MONTHLY_SPEND_LIMIT_USD',
   growth: 'ANTHROPIC_GROWTH_MONTHLY_SPEND_LIMIT_USD',
 }

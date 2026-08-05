@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { AlertTriangle, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search, AtSign, MessageCircle } from 'lucide-react'
+import { AlertTriangle, Copy, Check, CheckCircle, X, RefreshCcw, ExternalLink, Search, MessageCircle } from 'lucide-react'
 import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { PageHeader } from '@/components/PageHeader'
@@ -15,6 +15,7 @@ import { IntentBadge } from '@/components/IntentBadge'
 import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
 import { useExtensionStatus } from '@/components/ExtensionInstall'
 import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
+import { BILLING_ADDONS } from '@/lib/billing-addons'
 
 const PAGE_SIZE = 40
 
@@ -76,6 +77,8 @@ export default function DraftsPage() {
   const [isSending, setIsSending] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [manualPostReadyId, setManualPostReadyId] = useState<string | null>(null)
+  const [draftLimitReached, setDraftLimitReached] = useState(false)
+  const [openingDraftAddon, setOpeningDraftAddon] = useState(false)
   const [connections, setConnections] = useState<string[]>([])
   const [businessName, setBusinessName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -322,8 +325,9 @@ export default function DraftsPage() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        if (res.status === 403) {
-          toast.error('Draft limit reached for your plan.')
+        if (res.status === 403 && err.error === 'plan_limit_reached' && err.limit === 'ai_drafts') {
+          setDraftLimitReached(true)
+          toast.error('Draft limit reached. Add 20 more drafts for $5.')
         } else {
           toast.error(err.error || 'Failed to regenerate draft')
         }
@@ -343,6 +347,32 @@ export default function DraftsPage() {
       toast.error('Failed to regenerate draft')
     } finally {
       setIsRegenerating(false)
+    }
+  }
+
+  const handleBuyDraftAddon = async () => {
+    if (openingDraftAddon) return
+    setOpeningDraftAddon(true)
+    try {
+      const idempotencyKey = crypto.randomUUID()
+      const response = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({ addon: 'drafts' }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.url) {
+        throw new Error(payload?.error || 'checkout_failed')
+      }
+      window.location.href = payload.url
+    } catch (error) {
+      toast.error(error instanceof Error && error.message === 'addon_billing_not_configured'
+        ? 'Draft add-on checkout is not configured yet'
+        : 'Could not open draft add-on checkout')
+      setOpeningDraftAddon(false)
     }
   }
 
@@ -370,6 +400,28 @@ export default function DraftsPage() {
 
         {/* ── Page Header ─────────────────────────────────────── */}
         <PageHeader title="Drafts Ready" />
+
+        {draftLimitReached && (
+          <div className="mx-6 mb-3 flex shrink-0 flex-col items-start gap-3 rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)] sm:flex-row sm:items-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF4FF] text-[#0A84FF]">
+              <RefreshCcw className="h-4 w-4" strokeWidth={2} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-[#1C1C1A]">Draft allowance used up</p>
+              <p className="mt-0.5 text-xs text-[#6B6B66]">
+                Keep Starter and add a small pack for this month.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleBuyDraftAddon}
+              disabled={openingDraftAddon}
+              className="inline-flex min-h-10 items-center rounded-xl bg-[#0A84FF] px-4 text-xs font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-60"
+            >
+              {openingDraftAddon ? 'Opening...' : BILLING_ADDONS.drafts.ctaLabel}
+            </button>
+          </div>
+        )}
 
         {/* ── Body: always side-by-side from md+ ─────────────── */}
         <div className="flex flex-1 min-h-0 overflow-hidden">

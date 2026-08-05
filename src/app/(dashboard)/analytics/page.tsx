@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   CheckCircle, FileText, Send, AlertTriangle, Activity
 } from 'lucide-react'
@@ -24,6 +24,7 @@ const CustomBarLabel = (props: any) => {
   if (x == null || y == null || width == null || height == null) return null
 
   const isPrimary = platformData[index]?.isPrimary
+  const color = platformData[index]?.color || '#111111'
   const labelWidth = 44
 
   const cx = x + width - (labelWidth / 2) - 8
@@ -32,21 +33,26 @@ const CustomBarLabel = (props: any) => {
   const isSmall = width < 60
   const finalCx = isSmall ? x + width + (labelWidth / 2) + 8 : cx
 
-  if (isPrimary) {
-    return (
-      <g>
-        <rect x={finalCx - 20} y={cy - 12} width="40" height="24" rx="12" fill="white" />
-        <text x={finalCx} y={cy} dy={4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#FF3B30">
-          {value}%
-        </text>
-      </g>
-    )
-  }
-
   return (
     <g>
-      {isSmall && <rect x={finalCx - 20} y={cy - 12} width="40" height="24" rx="12" fill="#F2F2F7" />}
-      <text x={finalCx} y={cy} dy={4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#8E8E93">
+      <rect
+        x={finalCx - 20}
+        y={cy - 12}
+        width="40"
+        height="24"
+        rx="12"
+        fill="white"
+        stroke={isPrimary ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.04)'}
+      />
+      <text
+        x={finalCx}
+        y={cy}
+        dy={4}
+        textAnchor="middle"
+        fontSize="11"
+        fontWeight={isPrimary ? '700' : '650'}
+        fill={isPrimary ? color : '#4B5563'}
+      >
         {value}%
       </text>
     </g>
@@ -55,6 +61,27 @@ const CustomBarLabel = (props: any) => {
 
 // HIGH_INTENT_THRESHOLD must match the dashboard stat card (intent_score >= 80)
 const HIGH_INTENT_THRESHOLD = 80
+const PLATFORM_COLORS: Record<string, string> = {
+  reddit: '#FF5101',
+  bluesky: '#0A84FF',
+  x: '#111111',
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  reddit: 'Reddit',
+  bluesky: 'Bluesky',
+  x: 'X',
+}
+const LEAD_DISCOVERY_RANGES = [7, 14, 30] as const
+type LeadDiscoveryRange = typeof LEAD_DISCOVERY_RANGES[number]
+
+function normalizePlatform(value: unknown) {
+  const platform = String(value || '').trim().toLowerCase()
+  if (platform === 'twitter' || platform === 'x.com') return 'x'
+  if (platform === 'reddit.com') return 'reddit'
+  if (platform === 'bsky' || platform === 'bsky.app') return 'bluesky'
+  return platform
+}
 
 // Custom Tooltip for Lead Discovery Chart
 const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
@@ -62,22 +89,22 @@ const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
     const discovered = payload.find((p: any) => p.dataKey === 'discovered')
     const qualified = payload.find((p: any) => p.dataKey === 'qualified')
     return (
-      <div className="bg-surface border border-black/[0.06] shadow-[0_4px_16px_rgba(0,0,0,0.08)] rounded-xl px-4 py-3 text-sm min-w-[160px] z-50 relative">
+      <div className="bg-white/95 border border-black/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.10)] rounded-xl px-3.5 py-3 text-[12.5px] min-w-[142px] z-50 relative backdrop-blur">
         <p className="font-semibold text-text-primary mb-2">{label}</p>
         {discovered && (
-          <p className="flex items-center justify-between gap-4 text-text-secondary mb-1">
+          <p className="flex items-center justify-between gap-3 text-text-secondary mb-1">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#0A0A0A]" />
+              <span className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
               <span className="font-medium">Discovered</span>
             </span>
             <span className="font-bold text-text-primary">{discovered.value}</span>
           </p>
         )}
         {qualified && (
-          <p className="flex items-center justify-between gap-4 text-text-secondary">
+          <p className="flex items-center justify-between gap-3 text-text-secondary">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#0A84FF]" />
-              <span className="font-medium">Qualified</span>
+              <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
+              <span className="font-medium">High-intent</span>
             </span>
             <span className="font-bold text-[#0A84FF]">{qualified.value}</span>
           </p>
@@ -100,13 +127,13 @@ export default function AnalyticsPage() {
     platformData: any[]
     attributionStats: { clicks: number; conversions: number; totalRevenue: number }
   } | null>(null)
+  const [leadDiscoveryRange, setLeadDiscoveryRange] = useState<LeadDiscoveryRange>(14)
 
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
   const { status: extensionStatus, openInstall } = useExtensionStatus()
 
-  useEffect(() => {
-    async function loadData() {
+  const loadData = useCallback(async () => {
       const now = new Date()
       const thirtyDaysAgo = subDays(now, 30)
       const sixtyDaysAgo = subDays(now, 60)
@@ -211,21 +238,26 @@ export default function AnalyticsPage() {
       const replyRate = totalDraftedEver > 0 ? (totalSent / totalDraftedEver) * 100 : 0
 
       // --- PLATFORM TRAFFIC ---
-      const platformCounts = { reddit: 0, bluesky: 0 }
+      const platformCounts: Record<string, number> = { reddit: 0, bluesky: 0, x: 0 }
       threads.forEach(t => {
-        if (t.status === 'replied') {
-          const p = t.platform.toLowerCase()
-          if (p === 'reddit') platformCounts.reddit++
-          if (p === 'bluesky') platformCounts.bluesky++
-        }
+        if (t.status === 'dismissed') return
+        const platform = normalizePlatform(t.platform)
+        if (platform in platformCounts) platformCounts[platform] += 1
       })
-      const totalPlatforms = platformCounts.reddit + platformCounts.bluesky
-      const rp = totalPlatforms > 0 ? Math.round((platformCounts.reddit / totalPlatforms) * 100) : 0
-      const bp = totalPlatforms > 0 ? Math.round((platformCounts.bluesky / totalPlatforms) * 100) : 0
-      const platformData = [
-        { platform: 'Reddit', replies: platformCounts.reddit, color: '#FF453A', percentage: rp, isPrimary: rp >= bp },
-        { platform: 'Bluesky', replies: platformCounts.bluesky, color: '#D1D1D6', percentage: bp, isPrimary: bp > rp }
-      ]
+      const totalPlatforms = Object.values(platformCounts).reduce((sum, count) => sum + count, 0)
+      const primaryPlatform = Object.entries(platformCounts)
+        .sort(([, left], [, right]) => right - left)[0]?.[0]
+      const platformData = (Object.keys(platformCounts) as Array<keyof typeof platformCounts>)
+        .filter(platform => platformCounts[platform] > 0 || platform !== 'x')
+        .map(platform => ({
+          platform: PLATFORM_LABELS[platform],
+          count: platformCounts[platform],
+          color: PLATFORM_COLORS[platform],
+          percentage: totalPlatforms > 0
+            ? Math.round((platformCounts[platform] / totalPlatforms) * 100)
+            : 0,
+          isPrimary: platform === primaryPlatform,
+        }))
 
       // --- NEEDS ATTENTION ---
       const alerts = []
@@ -267,10 +299,53 @@ export default function AnalyticsPage() {
         attributionStats: { clicks, conversions, totalRevenue }
       })
       setLoading(false)
+    }, [supabase, userId])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
+
+  useEffect(() => {
+    let refreshTimer: number | undefined
+    const scheduleRefresh = () => {
+      if (document.visibilityState !== 'visible') return
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        void loadData()
+      }, 250)
     }
 
-    loadData()
-  }, [supabase, userId])
+    const interval = window.setInterval(scheduleRefresh, 30_000)
+    const channel = supabase
+      .channel(`analytics-live-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'monitored_threads', filter: `user_id=eq.${userId}` },
+        scheduleRefresh,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reply_analytics', filter: `user_id=eq.${userId}` },
+        scheduleRefresh,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'draft_feedback', filter: `user_id=eq.${userId}` },
+        scheduleRefresh,
+      )
+      .subscribe()
+
+    window.addEventListener('focus', scheduleRefresh)
+    document.addEventListener('visibilitychange', scheduleRefresh)
+
+    return () => {
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+      window.clearInterval(interval)
+      window.removeEventListener('focus', scheduleRefresh)
+      document.removeEventListener('visibilitychange', scheduleRefresh)
+      void supabase.removeChannel(channel)
+    }
+  }, [loadData, supabase, userId])
 
   if (loading || !data) {
     return (
@@ -306,6 +381,14 @@ export default function AnalyticsPage() {
         ...data.needsAttention,
       ]
     : data.needsAttention
+  const leadDiscoveryData = data.trendData.slice(-leadDiscoveryRange)
+  const leadDiscoveryTotals = leadDiscoveryData.reduce(
+    (totals, point) => ({
+      discovered: totals.discovered + point.discovered,
+      qualified: totals.qualified + point.qualified,
+    }),
+    { discovered: 0, qualified: 0 },
+  )
 
   return (
     <AppPage>
@@ -322,16 +405,38 @@ export default function AnalyticsPage() {
             {/* Left Card: Lead Discovery */}
             <div className="relative flex flex-col overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:col-span-2 lg:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
+                <div>
+                  <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
+                </div>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-text-secondary">
+                  <div className="inline-flex rounded-full bg-black/[0.04] p-0.5" aria-label="Lead discovery date range">
+                    {LEAD_DISCOVERY_RANGES.map((range) => {
+                      const active = leadDiscoveryRange === range
+                      return (
+                        <button
+                          key={range}
+                          type="button"
+                          onClick={() => setLeadDiscoveryRange(range)}
+                          aria-pressed={active}
+                          className={
+                            active
+                              ? 'rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-colors'
+                              : 'rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-tertiary transition-colors hover:text-text-secondary'
+                          }
+                        >
+                          {range}D
+                        </button>
+                      )
+                    })}
+                  </div>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
-                    Discovered: <span className="font-bold text-text-primary">{data.stats.found}</span>
+                    <span className="w-2 h-2 rounded-full bg-[#171717]" />
+                    Discovered: <span className="font-bold text-text-primary">{leadDiscoveryTotals.discovered}</span>
                   </span>
                   <span className="text-text-tertiary hidden sm:inline">|</span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-                    Qualified: <span className="font-bold text-[#0A84FF]">{data.trendData.reduce((s, d) => s + d.qualified, 0)}</span>
+                    High-intent: <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
                   </span>
                 </div>
               </div>
@@ -346,40 +451,55 @@ export default function AnalyticsPage() {
                   </div>
                 )}
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.trendData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                  <AreaChart data={leadDiscoveryData} margin={{ top: 8, right: 4, left: -6, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0A0A0A" stopOpacity={0.05} />
-                        <stop offset="95%" stopColor="#0A0A0A" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#171717" stopOpacity={0.05} />
+                        <stop offset="95%" stopColor="#171717" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.12} />
                         <stop offset="95%" stopColor="#0A84FF" stopOpacity={0} />
                       </linearGradient>
                     </defs>
+                    <CartesianGrid vertical={false} stroke="rgba(20,18,16,0.045)" strokeDasharray="3 6" />
                     <XAxis
                       dataKey="date"
                       axisLine={false} tickLine={false}
                       tick={{ fill: 'rgba(20, 18, 16, 0.38)', fontSize: 11, fontWeight: 500 }}
                       minTickGap={30}
                     />
-                    <Tooltip content={<LeadDiscoveryTooltip />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
-                    <Area
-                      type="monotone"
-                      dataKey="discovered"
-                      stroke="#0A0A0A"
-                      strokeWidth={1.5}
-                      fillOpacity={1}
-                      fill="url(#colorDiscovered)"
-                      activeDot={{ r: 4, fill: '#0A0A0A', stroke: '#fff', strokeWidth: 2 }}
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      width={28}
+                      tick={{ fill: 'rgba(20, 18, 16, 0.28)', fontSize: 10, fontWeight: 600 }}
+                      tickCount={3}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={<LeadDiscoveryTooltip />}
+                      cursor={{ stroke: 'rgba(10,132,255,0.16)', strokeWidth: 1 }}
+                      wrapperStyle={{ outline: 'none' }}
                     />
                     <Area
-                      type="monotone"
+                      type="linear"
+                      dataKey="discovered"
+                      stroke="#171717"
+                      strokeWidth={1.75}
+                      fillOpacity={1}
+                      fill="url(#colorDiscovered)"
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                    <Area
+                      type="linear"
                       dataKey="qualified"
                       stroke="#0A84FF"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       fillOpacity={1}
                       fill="url(#colorQualified)"
+                      dot={false}
                       activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
                     />
                   </AreaChart>
@@ -426,34 +546,45 @@ export default function AnalyticsPage() {
             {/* Left Card: Traffic by Platform */}
             <div className="relative flex flex-col overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:p-8">
               <h2 className="text-[16px] font-semibold text-text-primary tracking-tight mb-8">Traffic by Platform</h2>
-              <div className="flex-1 min-h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={data.platformData || []}
-                    layout="vertical"
-                    margin={{ top: 0, right: 30, left: -20, bottom: 0 }}
-                    barSize={40}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="rgba(0,0,0,0.04)" />
-                    <XAxis type="number" hide domain={[0, 100]} />
-                    <YAxis type="category" dataKey="platform" hide />
-                    <Bar dataKey="percentage" radius={[8, 8, 8, 8]}>
-                      {(data.platformData || []).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                      <LabelList dataKey="percentage" content={(props: any) => <CustomBarLabel {...props} platformData={data.platformData || []} />} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-5 border-t border-black/[0.04] pt-6 sm:gap-8">
-                {(data.platformData || []).map((p, i) => (
-                  <span key={i} className="flex items-center gap-2 text-[15px] text-text-primary font-medium">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.isPrimary ? '#FF3B30' : '#E5E5EA' }} />
-                    {p.platform}
-                  </span>
-                ))}
-              </div>
+              {(data.platformData || []).some((p) => p.count > 0) ? (
+                <>
+                  <div className="flex-1 min-h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={data.platformData || []}
+                        layout="vertical"
+                        margin={{ top: 0, right: 30, left: -20, bottom: 0 }}
+                        barSize={40}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="rgba(0,0,0,0.04)" />
+                        <XAxis type="number" hide domain={[0, 100]} />
+                        <YAxis type="category" dataKey="platform" hide />
+                        <Bar dataKey="percentage" radius={[8, 8, 8, 8]} isAnimationActive={false}>
+                          {(data.platformData || []).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                          <LabelList dataKey="percentage" content={(props: any) => <CustomBarLabel {...props} platformData={data.platformData || []} />} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-5 border-t border-black/[0.04] pt-6 sm:gap-8">
+                    {(data.platformData || []).map((p, i) => (
+                      <span key={i} className="flex items-center gap-2 text-[15px] text-text-primary font-medium">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                        {p.platform}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex min-h-[260px] flex-1 items-center justify-center rounded-[22px] border border-black/[0.04] bg-white/60 text-center">
+                  <div>
+                    <p className="text-[14px] font-semibold text-text-primary">No platform traffic yet</p>
+                    <p className="mt-1 text-[12.5px] text-text-tertiary">New monitored conversations will appear here automatically.</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Middle Card: Reply Rate Gauge */}

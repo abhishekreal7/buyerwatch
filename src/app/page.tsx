@@ -26,8 +26,8 @@ import {
   WordFadeIn,
 } from '@/components/landing/HomeVisuals'
 import {
-  BentoPlatformSourcesWidget,
   BentoTrafficWidget,
+  BuyerWatchAgentPreview,
   ChatSimulation,
   LeadDiscoveryWidget,
 } from '@/components/landing/HomeWidgets'
@@ -109,7 +109,7 @@ export default function LandingPage() {
             href="/signup"
             className="rounded-full bg-[#0A0A0A] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_3px_10px_rgba(0,0,0,0.12)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-px hover:bg-[#222] hover:shadow-[0_5px_14px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#0A84FF]/20"
           >
-            Start for free
+            Get started
           </Link>
         </div>
       </motion.nav>
@@ -146,7 +146,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
             <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.975 }} transition={springs.snappy}>
               <PremiumCtaButton href="/signup">
-                Start for free
+                Get started
               </PremiumCtaButton>
             </motion.div>
             <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.975 }} transition={springs.snappy}>
@@ -157,7 +157,7 @@ export default function LandingPage() {
             </motion.div>
           </div>
 
-          <p className="text-[13px] text-[#9B9B9B] font-[450]">Free to start &middot; No credit card &middot; Cancel anytime</p>
+          <p className="text-[13px] text-[#9B9B9B] font-[450]">7-month free trial &middot; Then $19/month &middot; Cancel anytime</p>
         </motion.div>
 
         {/* Platform logos — clean, no box */}
@@ -487,16 +487,16 @@ export default function LandingPage() {
 
               <motion.div variants={staggerContainer} className="grid md:grid-cols-3 gap-[12px]">
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card p-[28px] flex flex-col">
-                  <div className="flex-1 flex flex-col justify-center w-full py-3">
-                    <BentoPlatformSourcesWidget />
+                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card flex h-[420px] flex-col overflow-hidden p-[28px]">
+                  <div className="flex-1 flex flex-col justify-center w-full">
+                    <BuyerWatchAgentPreview />
                   </div>
-                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '5px' }}>Multi-Platform Coverage</h4>
-                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>Signals from Reddit and Bluesky in one scheduled monitoring queue.</p>
+                  <h4 style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.02em', color: '#0A0A0A', marginBottom: '5px' }}>Painpoint to Reply</h4>
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: '14px', color: '#6B6B6B', lineHeight: 1.6 }}>BuyerWatch finds real Reddit painpoints, drafts a human reply, and keeps the exchange ready for review.</p>
                 </motion.div>
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card p-[28px] flex flex-col">
+                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card flex h-[420px] flex-col overflow-hidden p-[28px]">
                   <div className="flex-1 flex flex-col justify-center items-center h-full pt-4">
                     <ChatSimulation />
                   </div>
@@ -505,7 +505,7 @@ export default function LandingPage() {
                 </motion.div>
 
                 {/* ━ ━ ━ ━  section separator ━ ━ ━ ━  */}
-                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card p-[28px] flex flex-col">
+                <motion.div variants={fadeUp} whileHover={{ y: -3 }} transition={springs.snappy} className="buyerwatch-card flex h-[420px] flex-col overflow-hidden p-[28px]">
                   <div className="flex-1 flex flex-col justify-center gap-2.5 mb-6">
                     {[
                       { label: 'Buying', score: '94', dot: '#FF5101' },
@@ -752,8 +752,9 @@ export default function LandingPage() {
             <motion.div variants={staggerContainer} className="mx-auto grid max-w-5xl gap-5 px-4 sm:px-6 lg:grid-cols-3">
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
-                const rawPrice = parseInt(plan.price.replace('$', ''), 10)
-                const displayPrice = isNaN(rawPrice) ? plan.price : annualHome ? `$${Math.round(rawPrice * 0.8)}` : plan.price
+                const price: string = plan.price
+                const rawPrice = parseInt(price.replace('$', ''), 10)
+                const displayPrice = isNaN(rawPrice) ? price : annualHome ? `$${Math.round(rawPrice * 0.8)}` : price
                 return (
                   <motion.article
                     key={plan.id}
@@ -774,13 +775,13 @@ export default function LandingPage() {
                       {plan.name}
                     </p>
                     <p className={`text-[13px] mb-5 ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>
-                      {plan.id === 'free' ? 'For exploring the platform' : plan.id === 'pro' ? 'For active founders' : 'For growing teams'}
+                      {plan.id === 'starter' ? 'For getting signal live' : plan.id === 'pro' ? 'For active founders' : 'For growing teams'}
                     </p>
                     {/* Price */}
                     <div className="mb-4 flex items-baseline gap-1">
                       <span className={`text-[46px] font-bold leading-none tracking-tight ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>{displayPrice}</span>
                       <span className={`text-[14px] font-medium ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>
-                        {plan.price === '$0' ? 'forever' : annualHome ? '/mo, billed annually' : plan.period}
+                        {price === '$0' ? 'forever' : annualHome ? '/mo, billed annually' : plan.period}
                       </span>
                     </div>
                     <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>
@@ -817,7 +818,7 @@ export default function LandingPage() {
 
             {false && (
             <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-6 items-stretch">
-              {/* Free / Starter Card */}
+              {/* Starter Card */}
               <motion.div
                 variants={fadeUp}
                 whileHover={{ y: -3 }}
@@ -826,11 +827,11 @@ export default function LandingPage() {
               >
                 <div>
                   <h3 className="font-sans font-normal text-[20px] tracking-tight text-[#18181B] mb-4">
-                    Free
+                    Starter
                   </h3>
                   <div className="flex items-baseline mb-4">
                     <span className="font-sans font-bold text-[44px] tracking-[-0.03em] leading-none text-[#18181B]">
-                      $0
+                      $19
                     </span>
                     <span className="font-sans text-[14px] text-[#71717A] ml-1.5 font-normal">
                       /per month
@@ -848,8 +849,8 @@ export default function LandingPage() {
 
                   <div className="flex flex-col gap-3.5">
                     {[
-                      '1 Active Keyword Rule',
-                      'Up to 50 Buyer Intent Signals / mo',
+                      '5 Active Keyword Rules',
+                      'Up to 250 Buyer Intent Signals / mo',
                       'AI Intent Scoring (0–100)',
                       'Manual Review & Send Workflow',
                       'Reddit & Bluesky Monitoring'
@@ -906,7 +907,7 @@ export default function LandingPage() {
 
                   <div className="flex flex-col gap-3.5">
                     {[
-                      'Everything in Free',
+                      'Everything in Starter',
                       '10 Active Keyword Rules',
                       'Up to 1,000 Buyer Intent Signals / mo',
                       '400 AI Drafts / mo',

@@ -2,8 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import DodoPayments from 'dodopayments'
 import { readTextBody, RequestInputError } from '@/lib/request'
+import {
+  getAddonCredits,
+  getAddonTypeFromProductId,
+  normalizeAddonType,
+} from '@/lib/billing-addons-server'
 
-type BillingPlan = 'pro' | 'growth'
+type BillingPlan = 'starter' | 'pro' | 'growth'
 type BillingStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired'
 
 function getSupabase() {
@@ -14,6 +19,7 @@ function getSupabase() {
 }
 
 function getPlan(productId: string | null): BillingPlan | null {
+  if (productId === process.env.DODO_PAYMENTS_STARTER_PRODUCT_ID) return 'starter'
   if (productId === process.env.DODO_PAYMENTS_PRO_PRODUCT_ID) return 'pro'
   if (productId === process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID) return 'growth'
   return null
@@ -29,6 +35,28 @@ function getStatus(eventType: string, value: unknown): BillingStatus | null {
   if (eventType.includes('expire')) return 'expired'
   if (eventType.includes('hold') || eventType.includes('paused')) return 'on_hold'
   return null
+}
+
+function isSuccessfulOneTimePayment(eventType: string, value: unknown): boolean {
+  const status = String(value ?? '').toLowerCase()
+  return (
+    eventType.includes('succeeded')
+    || eventType.includes('success')
+    || eventType.includes('completed')
+    || ['succeeded', 'success', 'completed', 'paid'].includes(status)
+  )
+}
+
+function getPaymentId(data: Record<string, any>, eventId: string): string {
+  return (
+    typeof data.payment_id === 'string'
+      ? data.payment_id
+      : typeof data.payment?.payment_id === 'string'
+        ? data.payment.payment_id
+        : typeof data.id === 'string'
+          ? data.id
+          : eventId
+  )
 }
 
 export async function POST(req: Request) {
@@ -105,6 +133,54 @@ export async function POST(req: Request) {
 
   if (!eventId) {
     return NextResponse.json({ error: 'missing_webhook_id' }, { status: 400 })
+  }
+
+  const metadataAddon = normalizeAddonType(metadata.addon_type)
+  const productAddon = getAddonTypeFromProductId(productId)
+  const addonType = metadata.purchase_type === 'addon'
+    ? metadataAddon ?? productAddon
+    : productAddon
+
+  if (addonType && !eventType.startsWith('subscription.')) {
+    if (!isSuccessfulOneTimePayment(eventType, data.status)) {
+      return NextResponse.json({ received: true, result: 'ignored_addon_status' })
+    }
+    if (!userId || !eventAt) {
+      console.error('[billing/webhook] Add-on event has incomplete checkout metadata', {
+        eventId,
+        eventType,
+        hasUserId: Boolean(userId),
+        addonType,
+      })
+      return NextResponse.json({ error: 'invalid_addon_event' }, { status: 500 })
+    }
+
+    const metadataCredits = Number(metadata.credits)
+    const credits = Number.isFinite(metadataCredits) && metadataCredits > 0
+      ? Math.floor(metadataCredits)
+      : getAddonCredits(addonType)
+    const { data: result, error } = await getSupabase().rpc('apply_billing_addon_event', {
+      p_event_id: eventId,
+      p_event_type: eventType,
+      p_user_id: userId,
+      p_payment_id: getPaymentId(data, eventId),
+      p_product_id: productId,
+      p_addon_type: addonType,
+      p_quantity: 1,
+      p_credits: credits,
+      p_event_at: eventAt,
+    })
+
+    if (error) {
+      console.error('[billing/webhook] Add-on event application failed', {
+        eventId,
+        eventType,
+        code: error.code,
+      })
+      return NextResponse.json({ error: 'billing_addon_event_failed' }, { status: 500 })
+    }
+
+    return NextResponse.json({ received: true, result })
   }
 
   if (!eventType.startsWith('subscription.')) {

@@ -28,6 +28,14 @@ const backendHardeningMigration = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260729090000_backend_production_hardening.sql'),
   'utf8',
 )
+const starterLimitsFixMigration = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260805030000_fix_starter_limits_and_addon_payment_dedupe.sql'),
+  'utf8',
+)
+const starterAddonsMigration = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260805020000_starter_overage_addons.sql'),
+  'utf8',
+)
 
 describe('plan and scheduler contracts', () => {
   it('applies explicit polling intervals to every plan', () => {
@@ -137,8 +145,17 @@ describe('database security and billing migration contracts', () => {
 
   it('enforces canonical keyword limits inside a serialized transaction', () => {
     expect(migration).toContain('pg_advisory_xact_lock')
-    expect(migration).toContain("when 'growth' then 50 when 'pro' then 10 else 1")
     expect(migration).toContain('keyword plan limit reached')
+    // Historical migration introduced the trigger; current Starter limit is 5.
+    expect(starterLimitsFixMigration).toContain("when 'growth' then 50 when 'pro' then 10 else 5")
+    expect(starterLimitsFixMigration).toContain('keyword plan limit reached')
+  })
+
+  it('de-dupes add-on credits by provider payment and add-on type', () => {
+    expect(starterAddonsMigration).toContain('create or replace function public.apply_billing_addon_event')
+    expect(starterLimitsFixMigration).toContain('billing_addon_credits_payment_addon_uidx')
+    expect(starterLimitsFixMigration).toContain('on conflict (provider_payment_id, addon_type) do nothing')
+    expect(starterLimitsFixMigration).toContain('or p_payment_id is null or p_payment_id = \'\'')
   })
 
   it('makes billing events idempotent and subscription-order aware', () => {

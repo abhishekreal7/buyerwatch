@@ -1,19 +1,19 @@
-﻿export const PRICING_PLANS = [
+export const PRICING_PLANS = [
   {
-    id: 'free',
-    name: 'Free',
-    price: '$0',
-    period: 'forever',
-    description: 'Try BuyerWatch and get your first real buying signal.',
+    id: 'starter',
+    name: 'Starter',
+    price: '$19',
+    period: '/month',
+    description: 'Start monitoring real buying signals with enough coverage to prove the workflow.',
     features: [
-      '1 keyword monitoring rule',
-      'Up to 50 buyer-intent signals/month',
+      '5 keyword monitoring rules',
+      'Up to 250 buyer-intent signals/month',
       '40 AI-drafted replies/month',
       'Manual review and send workflow',
       'Reddit & Bluesky monitoring',
     ],
-    cta: 'Get started free',
-    href: '/signup',
+    cta: 'Start with Starter',
+    href: '/dashboard',
     highlight: false,
   },
   {
@@ -23,10 +23,11 @@
     period: '/month',
     description: 'For founders actively working a social selling motion.',
     features: [
-      'Everything in Free',
+      'Everything in Starter',
       '10 keyword monitoring rules',
       'Up to 1,000 buyer-intent signals/month',
       '400 AI-drafted replies/month',
+      'Reddit, Bluesky & X monitoring',
       'Guarded auto-send',
       'Subreddit targeting',
       'Slack notifications and reply attribution',

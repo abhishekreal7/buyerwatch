@@ -3,13 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  AtSign,
-  Calendar,
   ChevronDown,
   ChevronRight,
   ChevronUp,
   ExternalLink,
-  List,
   MessageCircle,
   Search,
   Sparkles,

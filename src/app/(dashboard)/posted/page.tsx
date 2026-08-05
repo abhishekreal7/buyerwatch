@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import {
-  AtSign,
   CheckCircle2,
   Clock,
   ExternalLink,

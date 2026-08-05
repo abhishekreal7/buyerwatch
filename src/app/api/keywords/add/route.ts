@@ -87,8 +87,14 @@ export async function POST(req: Request) {
       .single()
 
     if (error) {
-      // RLS plan limit rejection surfaces as a policy violation
-      if (error.code === '42501' || error.message?.toLowerCase().includes('policy')) {
+      // Trigger raises P0001 for plan limits; RLS may surface as 42501/policy.
+      const message = error.message?.toLowerCase() ?? ''
+      if (
+        error.code === 'P0001'
+        || error.code === '42501'
+        || message.includes('keyword plan limit')
+        || message.includes('policy')
+      ) {
         return NextResponse.json(
           { error: 'plan_limit_reached', limit: 'keywords' },
           { status: 403 }
