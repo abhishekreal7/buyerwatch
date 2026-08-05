@@ -104,7 +104,7 @@ export async function POST(req: Request) {
       : requestedPlan === 'starter'
         ? starterProductId
         : proProductId
-    if (!starterProductId || !proProductId || !growthProductId || !productId) {
+    if (!productId) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
 
