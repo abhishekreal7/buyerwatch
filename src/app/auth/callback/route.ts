@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { friendlyAuthError } from '@/lib/auth-errors'
+import { afterAuthenticationDestination } from '@/lib/billing-selection'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const oauthError = requestUrl.searchParams.get('error_description') || requestUrl.searchParams.get('error')
+  const selectedPlan = requestUrl.searchParams.get('plan')
 
   if (oauthError) {
     console.error('OAuth callback error parameter:', oauthError)
@@ -38,10 +40,10 @@ export async function GET(request: Request) {
           .maybeSingle()
 
         if (!profile || !profile.business_name) {
-          return NextResponse.redirect(new URL('/onboarding', request.url))
+          return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, false), request.url))
         }
 
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+        return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, true), request.url))
       }
     } catch (err: any) {
       console.error('Callback handler exception:', err)

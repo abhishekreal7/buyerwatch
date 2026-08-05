@@ -1,64 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
-
-const ANNUAL_DISCOUNT = 0.2 // 20% off
-
-function formatPrice(price: string, annual: boolean): string {
-  if (price === '$0' || price === 'Custom') return price
-  const num = parseInt(price.replace('$', ''), 10)
-  if (annual) return `$${Math.round(num * (1 - ANNUAL_DISCOUNT))}`
-  return price
-}
 
 interface PricingClientProps {
   billingEnabled: boolean
 }
 
 export function PricingClient({ billingEnabled }: PricingClientProps) {
-  const [annual, setAnnual] = useState(false)
-
   return (
     <>
-      {/* Annual/Monthly Toggle */}
-      <div className="flex items-center justify-center gap-3 pb-12">
-        <span
-          className={`text-[14px] font-medium transition-colors ${!annual ? 'text-[#0A0A0A]' : 'text-[#999]'}`}
-        >
-          Monthly
-        </span>
-
-        {/* Pill toggle */}
-        <button
-          id="billing-toggle"
-          onClick={() => setAnnual((a) => !a)}
-          aria-label="Toggle annual billing"
-          className="relative h-7 w-[52px] rounded-full bg-[#E5E5E5] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-2"
-        >
-          <span
-            className={`absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)] transition-[left] duration-200 ${
-              annual ? 'left-[27px]' : 'left-[3px]'
-            }`}
-          />
-
-        </button>
-
-        <span
-          className={`text-[14px] font-medium transition-colors ${annual ? 'text-[#0A0A0A]' : 'text-[#999]'}`}
-        >
-          Annual
-        </span>
-
-        {/* Save badge */}
-        <span
-          className={`inline-flex items-center rounded-full bg-[#0A0A0A] px-2.5 py-0.5 text-[11px] font-semibold text-white transition-all duration-200 ${
-            annual ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-          }`}
-        >
-          Save 20%
+      <div className="flex items-center justify-center pb-12">
+        <span className="rounded-full border border-[#D8D8D4] bg-white px-3 py-1 text-[13px] font-medium text-[#555]">
+          Monthly billing
         </span>
       </div>
 
@@ -68,7 +23,6 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
           const price: string = plan.price
           const paidPlan = price !== '$0' && price !== 'Custom'
           const checkoutAvailable = !paidPlan || billingEnabled
-          const displayPrice = formatPrice(price, annual)
           const isHighlighted = plan.highlight
 
           return (
@@ -105,7 +59,7 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
               {/* Price */}
               <div className="mb-4 flex items-baseline gap-1">
                 <span className="text-[46px] font-bold tracking-tight leading-none">
-                  {displayPrice}
+                  {price}
                 </span>
                 {price !== '$0' && (
                   <span
@@ -113,7 +67,7 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                       isHighlighted ? 'text-white/50' : 'text-[#888]'
                     }`}
                   >
-                    {annual ? '/mo, billed annually' : plan.period}
+                    {plan.period}
                   </span>
                 )}
                 {price === '$0' && (
@@ -204,6 +158,10 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
           )
         })}
       </div>
+      <p className="mx-auto -mt-12 max-w-2xl px-4 pb-16 text-center text-[12px] leading-relaxed text-[#777]">
+        Prices are in USD and exclude applicable taxes. Dodo Payments may convert
+        the charge to your local currency and add any disclosed currency-conversion fees at checkout.
+      </p>
     </>
   )
 }

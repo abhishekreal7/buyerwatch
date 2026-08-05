@@ -116,7 +116,7 @@ async function completeWithoutRpc(
   return { error: 'We could not save your monitoring rules. Please try again.' }
 }
 
-export async function completeOnboardingAction(data: OnboardingData) {
+export async function completeOnboardingAction(data: OnboardingData, selectedPlan?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -181,10 +181,13 @@ export async function completeOnboardingAction(data: OnboardingData) {
     }
   }
 
-  redirect('/dashboard')
+  const plan = selectedPlan === 'starter' || selectedPlan === 'pro' || selectedPlan === 'growth'
+    ? selectedPlan
+    : null
+  redirect(plan ? `/settings?section=plan&upgrade=${plan}` : '/dashboard')
 }
 
-export async function skipOnboardingAction() {
+export async function skipOnboardingAction(selectedPlan?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -233,6 +236,8 @@ export async function skipOnboardingAction() {
     }
   }
 
-  redirect('/dashboard')
+  const plan = selectedPlan === 'starter' || selectedPlan === 'pro' || selectedPlan === 'growth'
+    ? selectedPlan
+    : null
+  redirect(plan ? `/settings?section=plan&upgrade=${plan}` : '/dashboard')
 }
-

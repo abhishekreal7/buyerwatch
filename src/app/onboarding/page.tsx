@@ -4,8 +4,14 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { BrandLogo } from '@/components/BrandLogo'
 import { OnboardingHeaderActions } from '@/components/OnboardingHeaderActions'
+import { afterAuthenticationDestination, normalizeSelectedBillingPlan } from '@/lib/billing-selection'
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string }>
+}) {
+  const selectedPlan = normalizeSelectedBillingPlan((await searchParams).plan)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -21,17 +27,16 @@ export default async function OnboardingPage() {
     .single()
 
   if (profile?.business_name) {
-    redirect('/dashboard')
+    redirect(afterAuthenticationDestination(selectedPlan, true))
   }
 
   return (
     <div className="min-h-dvh overflow-y-auto bg-background px-4 pb-8 pt-5 md:pb-10 md:pt-6">
       <header className="mx-auto mb-5 flex w-full max-w-[600px] items-center justify-between">
         <BrandLogo size="sm" />
-        <OnboardingHeaderActions />
+        <OnboardingHeaderActions selectedPlan={selectedPlan} />
       </header>
-      <OnboardingWizard plan={normalizePlan(profile?.plan)} />
+      <OnboardingWizard plan={normalizePlan(profile?.plan)} selectedPlan={selectedPlan} />
     </div>
   )
 }
-

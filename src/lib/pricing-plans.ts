@@ -13,7 +13,7 @@ export const PRICING_PLANS = [
       'Reddit & Bluesky monitoring',
     ],
     cta: 'Start with Starter',
-    href: '/dashboard',
+    href: '/signup?plan=starter',
     highlight: false,
   },
   {
@@ -33,7 +33,7 @@ export const PRICING_PLANS = [
       'Slack notifications and reply attribution',
     ],
     cta: 'Upgrade to Professional',
-    href: '/dashboard',
+    href: '/signup?plan=pro',
     highlight: true,
   },
   {
@@ -52,7 +52,7 @@ export const PRICING_PLANS = [
       'Reply attribution and trust analytics',
     ],
     cta: 'Upgrade to Growth',
-    href: '/dashboard',
+    href: '/signup?plan=growth',
     highlight: false,
   },
 ] as const

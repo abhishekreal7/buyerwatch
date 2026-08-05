@@ -76,7 +76,6 @@ function Section({ children, className = '', delay = 0, id }: { children: React.
 
 export default function LandingPage() {
   const [activeAccordion, setActiveAccordion] = useState(0)
-  const [annualHome, setAnnualHome] = useState(false)
 
   // Navbar scroll animation
   const { scrollY } = useScroll()
@@ -157,7 +156,7 @@ export default function LandingPage() {
             </motion.div>
           </div>
 
-          <p className="text-[13px] text-[#9B9B9B] font-[450]">7-month free trial &middot; Then $19/month &middot; Cancel anytime</p>
+          <p className="text-[13px] text-[#9B9B9B] font-[450]">Free plan available &middot; Paid plans from $19/month &middot; Cancel anytime</p>
         </motion.div>
 
         {/* Platform logos — clean, no box */}
@@ -735,26 +734,14 @@ export default function LandingPage() {
               </h2>
             </motion.div>
 
-            {/* Annual/Monthly toggle */}
-            <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-12">
-              <span className={`text-[14px] font-medium transition-colors ${!annualHome ? 'text-[#0A0A0A]' : 'text-[#999]'}`}>Monthly</span>
-              <button
-                onClick={() => setAnnualHome(a => !a)}
-                aria-label="Toggle annual billing"
-                className="relative h-7 w-[52px] rounded-full bg-[#D4D4D4] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-2"
-              >
-                <span className={`absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)] transition-[left] duration-200 ${annualHome ? 'left-[27px]' : 'left-[3px]'}`} />
-              </button>
-              <span className={`text-[14px] font-medium transition-colors ${annualHome ? 'text-[#0A0A0A]' : 'text-[#999]'}`}>Annual</span>
-              <span className={`inline-flex items-center rounded-full bg-[#0A0A0A] px-2.5 py-0.5 text-[11px] font-semibold text-white transition-all duration-200 ${annualHome ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>Save 20%</span>
+            <motion.div variants={fadeUp} className="flex items-center justify-center mb-12">
+              <span className="rounded-full border border-[#D4D4D4] bg-white px-3 py-1 text-[13px] font-medium text-[#555]">Monthly billing</span>
             </motion.div>
 
             <motion.div variants={staggerContainer} className="mx-auto grid max-w-5xl gap-5 px-4 sm:px-6 lg:grid-cols-3">
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
                 const price: string = plan.price
-                const rawPrice = parseInt(price.replace('$', ''), 10)
-                const displayPrice = isNaN(rawPrice) ? price : annualHome ? `$${Math.round(rawPrice * 0.8)}` : price
                 return (
                   <motion.article
                     key={plan.id}
@@ -779,9 +766,9 @@ export default function LandingPage() {
                     </p>
                     {/* Price */}
                     <div className="mb-4 flex items-baseline gap-1">
-                      <span className={`text-[46px] font-bold leading-none tracking-tight ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>{displayPrice}</span>
+                      <span className={`text-[46px] font-bold leading-none tracking-tight ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>{price}</span>
                       <span className={`text-[14px] font-medium ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>
-                        {price === '$0' ? 'forever' : annualHome ? '/mo, billed annually' : plan.period}
+                        {price === '$0' ? 'forever' : plan.period}
                       </span>
                     </div>
                     <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>
@@ -815,6 +802,10 @@ export default function LandingPage() {
                 )
               })}
             </motion.div>
+
+            <motion.p variants={fadeUp} className="mx-auto mt-7 max-w-2xl text-center text-[12px] leading-relaxed text-[#777]">
+              Prices are in USD and exclude applicable taxes. Dodo Payments may convert the charge to your local currency and add any disclosed currency-conversion fees at checkout.
+            </motion.p>
 
             {false && (
             <motion.div variants={staggerContainer} className="grid lg:grid-cols-3 gap-6 items-stretch">
@@ -961,7 +952,7 @@ export default function LandingPage() {
                       '50 Active Keyword Rules',
                       'Up to 5,000 Buyer Intent Signals / mo',
                       '2,000 AI Drafts / mo',
-                      '15-Minute Polling Cadence',
+                      '5-Minute Polling Cadence',
                       'Guarded Auto-Send',
                       'Reply Attribution & Trust Analytics'
                     ].map((f) => (

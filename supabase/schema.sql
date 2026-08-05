@@ -31,7 +31,7 @@ create table profiles (
     ]::text[]
   ),
   reddit_username text,
-  plan text not null default 'free' check (plan in ('free', 'pro', 'growth')),
+  plan text not null default 'free' check (plan in ('free', 'starter', 'pro', 'growth')),
   auto_send_enabled boolean default false,
   auto_send_threshold integer default 85 check (auto_send_threshold between 70 and 100),
   draft_month date,

@@ -2,12 +2,53 @@ export type DodoEnvironment = 'test_mode' | 'live_mode'
 
 export type BillingPlan = 'starter' | 'pro' | 'growth'
 
+export type BillingPlanChangeStrategy = {
+  effectiveAt: 'immediately' | 'next_billing_date'
+  prorationBillingMode: 'prorated_immediately' | 'do_not_bill'
+  direction: 'upgrade' | 'downgrade'
+}
+
 export type BillingCheckoutIntent =
   | { kind: 'plan'; plan: BillingPlan }
   | { kind: 'addon'; addon: 'signals' | 'drafts' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+export function normalizeBillingPlan(value: unknown): BillingPlan | null {
+  return value === 'starter' || value === 'pro' || value === 'growth' ? value : null
+}
+
+export function getDodoProductIdForPlan(plan: BillingPlan): string | undefined {
+  if (plan === 'starter') return process.env.DODO_PAYMENTS_STARTER_PRODUCT_ID
+  if (plan === 'growth') return process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
+  return process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
+}
+
+export function getDodoPlanFromProductId(productId: string): BillingPlan | null {
+  const plans: BillingPlan[] = ['starter', 'pro', 'growth']
+  return plans.find((plan) => getDodoProductIdForPlan(plan) === productId) ?? null
+}
+
+export function getBillingPlanChangeStrategy(
+  currentPlan: BillingPlan,
+  requestedPlan: BillingPlan,
+): BillingPlanChangeStrategy | null {
+  if (currentPlan === requestedPlan) return null
+  const rank: Record<BillingPlan, number> = { starter: 0, pro: 1, growth: 2 }
+  const isUpgrade = rank[requestedPlan] > rank[currentPlan]
+  return isUpgrade
+    ? {
+        direction: 'upgrade',
+        effectiveAt: 'immediately',
+        prorationBillingMode: 'prorated_immediately',
+      }
+    : {
+        direction: 'downgrade',
+        effectiveAt: 'next_billing_date',
+        prorationBillingMode: 'do_not_bill',
+      }
 }
 
 /**
@@ -39,9 +80,8 @@ export function parseBillingCheckoutIntent(
   }
 
   if (!hasPlan) return { kind: 'plan', plan: 'pro' }
-  return body.plan === 'starter' || body.plan === 'pro' || body.plan === 'growth'
-    ? { kind: 'plan', plan: body.plan }
-    : null
+  const plan = normalizeBillingPlan(body.plan)
+  return plan ? { kind: 'plan', plan } : null
 }
 
 /**

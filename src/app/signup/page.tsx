@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { signUpAction } from '@/app/actions/auth'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import { BrandLogo } from '@/components/BrandLogo'
+import { useSearchParams } from 'next/navigation'
+import { normalizeSelectedBillingPlan, withSelectedPlan } from '@/lib/billing-selection'
 
-export default function SignupPage() {
+function SignupContent() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const selectedPlan = normalizeSelectedBillingPlan(useSearchParams().get('plan'))
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -95,7 +98,7 @@ export default function SignupPage() {
           {/* Social Authentication */}
           <div className="mb-5">
             <a
-              href="/api/auth/google?next=signup"
+              href={`/api/auth/google?next=signup${selectedPlan ? `&plan=${selectedPlan}` : ''}`}
               className="w-full h-11 flex items-center justify-center gap-2.5 bg-white border border-black/[0.12] hover:border-black/25 text-[#0A0A0A] rounded-xl font-medium text-[13.5px] transition-all duration-200 hover:bg-[#F9F9F9] active:scale-[0.985] shadow-[0_1px_2px_rgba(0,0,0,0.04)] cursor-pointer"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -120,6 +123,7 @@ export default function SignupPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {selectedPlan && <input type="hidden" name="plan" value={selectedPlan} />}
             <div>
               <label className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
                 Email address
@@ -169,7 +173,7 @@ export default function SignupPage() {
         {/* Footer Link */}
         <p className="text-center mt-6 text-[13px] text-[#666666]">
           Already have an account?{' '}
-          <Link href="/login" className="inline-flex min-h-11 items-center px-1 font-medium text-[#0A0A0A] hover:underline underline-offset-4">
+          <Link href={withSelectedPlan('/login', selectedPlan)} className="inline-flex min-h-11 items-center px-1 font-medium text-[#0A0A0A] hover:underline underline-offset-4">
             Log in
           </Link>
         </p>
@@ -180,6 +184,14 @@ export default function SignupPage() {
         <span>© BuyerWatch, Inc. All rights reserved.</span>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAFAFA]" />}>
+      <SignupContent />
+    </Suspense>
   )
 }
 

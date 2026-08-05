@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PRICING_PLANS } from '../src/lib/pricing-plans'
+import { PLAN_LIMITS } from '../src/lib/plan-limits'
+import { afterAuthenticationDestination } from '../src/lib/billing-selection'
 
 describe('pricing plan promises', () => {
   it('keeps Growth at $149 with the five-minute cadence', () => {
@@ -16,5 +18,31 @@ describe('pricing plan promises', () => {
 
     expect(professional?.features).toContain('Reddit & Bluesky monitoring')
     expect(professional?.features.some(feature => feature.includes('X monitoring'))).toBe(false)
+  })
+
+  it('gives Starter a meaningful entitlement increase over Free', () => {
+    expect(PLAN_LIMITS.free).toMatchObject({
+      keywords: 1,
+      threadsPerMonth: 50,
+      aiDraftsPerMonth: 10,
+      autoSend: false,
+    })
+    expect(PLAN_LIMITS.starter).toMatchObject({
+      keywords: 5,
+      threadsPerMonth: 250,
+      aiDraftsPerMonth: 40,
+      autoSend: false,
+    })
+  })
+
+  it('preserves a selected tier through authentication and onboarding', () => {
+    expect(afterAuthenticationDestination('growth', false)).toBe('/onboarding?plan=growth')
+    expect(afterAuthenticationDestination('growth', true)).toBe('/settings?section=plan&upgrade=growth')
+    expect(afterAuthenticationDestination('enterprise', true)).toBe('/dashboard')
+    expect(PRICING_PLANS.map(plan => plan.href)).toEqual([
+      '/signup?plan=starter',
+      '/signup?plan=pro',
+      '/signup?plan=growth',
+    ])
   })
 })

@@ -4,10 +4,12 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { authRateLimit, getIp } from '@/lib/ratelimit'
 import { getAppUrl } from '@/lib/app-url'
+import { afterAuthenticationDestination, normalizeSelectedBillingPlan, withSelectedPlan } from '@/lib/billing-selection'
 
 export async function signUpAction(formData: FormData) {
   const email = formData.get('email')?.toString()
   const password = formData.get('password')?.toString()
+  const selectedPlan = normalizeSelectedBillingPlan(formData.get('plan')?.toString())
   const supabase = await createClient()
   const origin = getAppUrl()
 
@@ -26,7 +28,7 @@ export async function signUpAction(formData: FormData) {
     password,
     options: {
       // Points to the email-confirmation handler, not the OAuth callback
-      emailRedirectTo: `${origin}/auth/confirm`,
+      emailRedirectTo: `${origin}${withSelectedPlan('/auth/confirm', selectedPlan)}`,
     },
   })
 
@@ -40,6 +42,7 @@ export async function signUpAction(formData: FormData) {
 export async function signInAction(formData: FormData) {
   const email = formData.get('email')?.toString()
   const password = formData.get('password')?.toString()
+  const selectedPlan = normalizeSelectedBillingPlan(formData.get('plan')?.toString())
   const supabase = await createClient()
 
   if (!email || !password) {
@@ -61,7 +64,11 @@ export async function signInAction(formData: FormData) {
     return { error: 'Invalid email or password.' }
   }
 
-  redirect('/dashboard')
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('business_name').eq('id', user.id).maybeSingle()
+    : { data: null }
+  redirect(afterAuthenticationDestination(selectedPlan, Boolean(profile?.business_name)))
 }
 
 export async function signInWithGoogleAction() {
@@ -142,4 +149,3 @@ export async function signOutAction() {
   await supabase.auth.signOut()
   redirect('/login')
 }
-

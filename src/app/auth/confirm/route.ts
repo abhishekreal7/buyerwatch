@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { afterAuthenticationDestination } from '@/lib/billing-selection'
 
 /**
  * GET /auth/confirm
@@ -17,6 +18,7 @@ import { createClient } from '@/utils/supabase/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const selectedPlan = requestUrl.searchParams.get('plan')
 
   if (!code) {
     return NextResponse.redirect(
@@ -42,8 +44,8 @@ export async function GET(request: Request) {
     .single()
 
   if (!profile || !profile.business_name) {
-    return NextResponse.redirect(new URL('/onboarding', request.url))
+    return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, false), request.url))
   }
 
-  return NextResponse.redirect(new URL('/dashboard', request.url))
+  return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, true), request.url))
 }

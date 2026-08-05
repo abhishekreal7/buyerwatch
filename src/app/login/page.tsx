@@ -8,12 +8,14 @@ import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useSearchParams } from 'next/navigation'
 import { friendlyAuthError } from '@/lib/auth-errors'
+import { normalizeSelectedBillingPlan, withSelectedPlan } from '@/lib/billing-selection'
 
 function LoginContent() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const searchParams = useSearchParams()
   const rawUrlError = searchParams.get('error')
+  const selectedPlan = normalizeSelectedBillingPlan(searchParams.get('plan'))
   // Defense-in-depth: sanitize whatever is in the URL before rendering it
   const urlError = rawUrlError ? friendlyAuthError(rawUrlError) : null
 
@@ -93,7 +95,7 @@ function LoginContent() {
           {/* Social Authentication */}
           <div className="mb-5">
             <a
-              href="/api/auth/google?next=login"
+              href={`/api/auth/google?next=login${selectedPlan ? `&plan=${selectedPlan}` : ''}`}
               className="w-full h-11 flex items-center justify-center gap-2.5 bg-white border border-black/[0.12] hover:border-black/25 text-[#0A0A0A] rounded-xl font-medium text-[13.5px] transition-all duration-200 hover:bg-[#F9F9F9] active:scale-[0.985] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -118,6 +120,7 @@ function LoginContent() {
 
           {/* Email / Password Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {selectedPlan && <input type="hidden" name="plan" value={selectedPlan} />}
             <div>
               <label className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
                 Email address
@@ -174,7 +177,7 @@ function LoginContent() {
         {/* Footer Link */}
         <p className="text-center mt-6 text-[13px] text-[#666666]">
           Don&apos;t have an account?{' '}
-          <Link href="/signup" className="inline-flex min-h-11 items-center px-1 font-medium text-[#0A0A0A] hover:underline underline-offset-4">
+          <Link href={withSelectedPlan('/signup', selectedPlan)} className="inline-flex min-h-11 items-center px-1 font-medium text-[#0A0A0A] hover:underline underline-offset-4">
             Sign up
           </Link>
         </p>

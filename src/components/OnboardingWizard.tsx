@@ -11,6 +11,7 @@ import {
 import { springs } from '@/lib/motion'
 import { getPlanLimits, type PlanTier } from '@/lib/plan-limits'
 import { normalizeWebsiteUrl, validateProductContext } from '@/lib/onboarding-validation'
+import type { SelectedBillingPlan } from '@/lib/billing-selection'
 
 const BUSINESS_TYPES = [
   { id: 'saas', label: 'SaaS', icon: Monitor },
@@ -23,7 +24,13 @@ const BUSINESS_TYPES = [
   { id: 'other', label: 'Other', icon: HelpCircle },
 ]
 
-export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
+export default function OnboardingWizard({
+  plan,
+  selectedPlan,
+}: {
+  plan: PlanTier
+  selectedPlan: SelectedBillingPlan | null
+}) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [analyzingUrl, setAnalyzingUrl] = useState(false)
@@ -187,7 +194,7 @@ export default function OnboardingWizard({ plan }: { plan: PlanTier }) {
         writing_style: writingStyle,
         reddit_username: redditUsername,
         keywords: dbKeywords
-      })
+      }, selectedPlan)
 
       if (res?.error) {
         setSubmitError(res.error)

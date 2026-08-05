@@ -36,6 +36,10 @@ const starterAddonsMigration = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260805020000_starter_overage_addons.sql'),
   'utf8',
 )
+const prePaymentIntegrityMigration = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260806010000_pre_payment_plan_integrity.sql'),
+  'utf8',
+)
 
 describe('plan and scheduler contracts', () => {
   it('applies explicit polling intervals to every plan', () => {
@@ -149,6 +153,13 @@ describe('database security and billing migration contracts', () => {
     // Historical migration introduced the trigger; current Starter limit is 5.
     expect(starterLimitsFixMigration).toContain("when 'growth' then 50 when 'pro' then 10 else 5")
     expect(starterLimitsFixMigration).toContain('keyword plan limit reached')
+  })
+
+  it('persists Starter safely and gives Free exactly one keyword', () => {
+    expect(prePaymentIntegrityMigration).toContain("plan in ('free', 'starter', 'pro', 'growth')")
+    expect(prePaymentIntegrityMigration).toContain("when 'starter' then 5")
+    expect(prePaymentIntegrityMigration).toMatch(/else 1\s+end/)
+    expect(prePaymentIntegrityMigration).toContain("item.platform not in ('reddit', 'bluesky')")
   })
 
   it('de-dupes add-on credits by provider payment and add-on type', () => {

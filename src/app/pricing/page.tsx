@@ -28,7 +28,7 @@ export default function PricingPage() {
             Log in
           </Link>
           <Link
-            href="/signup"
+            href="/signup?plan=starter"
             className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white bg-[#0A0A0A] hover:bg-[#1C1C1E] px-4 py-2 rounded-xl transition-colors"
           >
             Start for $19

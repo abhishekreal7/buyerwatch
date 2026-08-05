@@ -7,7 +7,13 @@ import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
 import { BILLING_ADDONS, type BillingAddonType } from '@/lib/billing-addons'
 import { getAddonProductId } from '@/lib/billing-addons-server'
-import { getDodoEnvironment, parseBillingCheckoutIntent } from '@/lib/dodo'
+import {
+  getBillingPlanChangeStrategy,
+  getDodoEnvironment,
+  getDodoPlanFromProductId,
+  getDodoProductIdForPlan,
+  parseBillingCheckoutIntent,
+} from '@/lib/dodo'
 
 /**
  * POST /api/billing/checkout
@@ -38,10 +44,6 @@ export async function POST(req: Request) {
     }
 
     const apiKey = process.env.DODO_PAYMENTS_API_KEY
-    const starterProductId = process.env.DODO_PAYMENTS_STARTER_PRODUCT_ID
-    const proProductId = process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
-    const growthProductId = process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
-
     if (!apiKey) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
@@ -64,6 +66,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
 
+    const dodo = new DodoPayments({
+      bearerToken: apiKey,
+      environment,
+      timeout: 15_000,
+      maxRetries: 1,
+    })
+
     if (intent.kind === 'addon') {
       const requestedAddon: BillingAddonType = intent.addon
       const productId = getAddonProductId(requestedAddon)
@@ -71,12 +80,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'addon_billing_not_configured' }, { status: 503 })
       }
 
-      const dodo = new DodoPayments({
-        bearerToken: apiKey,
-        environment,
-        timeout: 15_000,
-        maxRetries: 1,
-      })
       const addon = BILLING_ADDONS[requestedAddon]
       // Prefer a client-supplied key so intentional back-to-back pack purchases
       // each get a fresh checkout. Without one, use a short bucket so accidental
@@ -112,25 +115,80 @@ export async function POST(req: Request) {
     }
 
     const requestedPlan = intent.plan
-    const productId = requestedPlan === 'growth'
-      ? growthProductId
-      : requestedPlan === 'starter'
-        ? starterProductId
-        : proProductId
+    const productId = getDodoProductIdForPlan(requestedPlan)
     if (!productId) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
 
-    const dodo = new DodoPayments({
-      bearerToken: apiKey,
-      environment,
-      timeout: 15_000,
-      maxRetries: 1,
-    })
-
     const clientIdempotencyKey = req.headers.get('idempotency-key')?.trim().slice(0, 100)
     const planIdempotencySeed = clientIdempotencyKey
       || `bucket:${Math.floor(Date.now() / 600_000)}`
+    const idempotencyKey = createHash('sha256')
+      .update(`${user.id}:${requestedPlan}:${planIdempotencySeed}`)
+      .digest('hex')
+
+    const { data: billingProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('billing_subscription_id')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profileError) {
+      console.error('[billing/checkout] Could not load billing profile:', profileError)
+      return NextResponse.json({ error: 'billing_profile_unavailable' }, { status: 503 })
+    }
+
+    if (billingProfile?.billing_subscription_id) {
+      try {
+        const subscription = await dodo.subscriptions.retrieve(
+          billingProfile.billing_subscription_id,
+        )
+        if (subscription.status === 'active') {
+          const currentPlan = getDodoPlanFromProductId(subscription.product_id)
+          if (!currentPlan) {
+            return NextResponse.json(
+              { error: 'billing_subscription_product_unknown' },
+              { status: 409 },
+            )
+          }
+          const strategy = getBillingPlanChangeStrategy(currentPlan, requestedPlan)
+          if (!strategy) {
+            return NextResponse.json({ error: 'plan_already_active' }, { status: 409 })
+          }
+
+          await dodo.subscriptions.changePlan(
+            subscription.subscription_id,
+            {
+              product_id: productId,
+              quantity: 1,
+              effective_at: strategy.effectiveAt,
+              proration_billing_mode: strategy.prorationBillingMode,
+              on_payment_failure: 'prevent_change',
+              metadata: { user_id: user.id, plan: requestedPlan },
+            },
+            { idempotencyKey },
+          )
+
+          return NextResponse.json({
+            url: `${getAppUrl()}/settings?section=plan&billing=plan_change_pending`,
+            change: strategy.direction,
+          })
+        }
+
+        if (subscription.status === 'pending' || subscription.status === 'on_hold') {
+          return NextResponse.json(
+            { error: 'billing_subscription_requires_attention' },
+            { status: 409 },
+          )
+        }
+        // Cancelled, failed, and expired subscriptions cannot be changed. A new
+        // checkout is correct after those terminal states.
+      } catch (error) {
+        const providerError = error as { status?: number; statusCode?: number }
+        const status = providerError.status ?? providerError.statusCode
+        if (status !== 404) throw error
+      }
+    }
+
     const session = await dodo.checkoutSessions.create({
       product_cart: [{ product_id: productId, quantity: 1 }],
       customer: {
@@ -143,11 +201,7 @@ export async function POST(req: Request) {
         plan: requestedPlan,
       },
       return_url: `${getAppUrl()}/dashboard`,
-    }, {
-      idempotencyKey: createHash('sha256')
-        .update(`${user.id}:${requestedPlan}:${planIdempotencySeed}`)
-        .digest('hex'),
-    })
+    }, { idempotencyKey })
 
     const checkoutUrl = (session as any).checkout_url ?? (session as any).url
 

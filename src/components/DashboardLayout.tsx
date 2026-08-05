@@ -287,9 +287,7 @@ function DashboardShell({
       const msg = error instanceof Error ? error.message : ''
       setOpeningCheckout(null)
       if (msg === 'addon_billing_not_configured') {
-        // Fall back to plan upgrade checkout if standalone add-on pack products aren't configured in Dodo
-        await handleAddCredits()
-        return
+        toast.error('This add-on is temporarily unavailable. No charge was created.')
       } else if (msg === 'billing_provider_unauthorized') {
         toast.error('Dodo Payments API key is invalid or unauthorized')
       } else if (msg === 'billing_not_configured') {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Bell, CreditCard, Save, Check,
@@ -128,6 +128,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
+  const [openingPortal, setOpeningPortal] = useState(false)
+  const upgradeHandledRef = useRef(false)
   const { status: extensionStatus } = useExtensionStatus()
 
   useEffect(() => {
@@ -293,8 +295,16 @@ export default function SettingsPage() {
 
     // Handle OAuth Callback search parameters
     const params = new URLSearchParams(window.location.search)
+    const requestedSection = params.get('section')
+    if (SECTIONS.some(section => section.id === requestedSection)) {
+      setActiveSection(requestedSection!)
+    }
     const success = params.get('success')
     const error = params.get('error')
+    if (params.get('billing') === 'plan_change_pending') {
+      toast.success('Your plan change was submitted. Billing will update shortly.')
+      window.history.replaceState({}, '', '/settings?section=plan')
+    }
 
     if (success === 'reddit_connected') {
       toast.success('Successfully connected Reddit account!')
@@ -381,7 +391,7 @@ export default function SettingsPage() {
     setTimeout(() => setSaveSuccess(false), 2500)
   }
 
-  const handleUpgrade = async (plan: 'pro' | 'growth' = 'pro') => {
+  const handleUpgrade = async (plan: 'starter' | 'pro' | 'growth' = 'pro') => {
     setUpgrading(true)
     try {
       const res = await fetch('/api/billing/checkout', {
@@ -393,7 +403,13 @@ export default function SettingsPage() {
       if (res.ok && data.url) {
         window.location.href = data.url
       } else {
-        toast.error('Billing not yet configured')
+        const messages: Record<string, string> = {
+          plan_already_active: 'That plan is already active.',
+          billing_subscription_requires_attention: 'Resolve the existing subscription in billing settings before changing plans.',
+          billing_subscription_product_unknown: 'Your current subscription needs support review before it can be changed.',
+          billing_not_configured: 'Billing is not configured yet.',
+        }
+        toast.error(messages[data?.error] || 'Could not start the plan change.')
       }
     } catch (err) {
       console.error(err)
@@ -402,6 +418,29 @@ export default function SettingsPage() {
       setUpgrading(false)
     }
   }
+
+  const handleManageBilling = async () => {
+    setOpeningPortal(true)
+    try {
+      const response = await fetch('/api/billing/portal', { method: 'POST' })
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.url) throw new Error(data?.error || 'portal_failed')
+      window.location.href = data.url
+    } catch (error) {
+      console.error(error)
+      toast.error('Could not open billing management.')
+      setOpeningPortal(false)
+    }
+  }
+
+  useEffect(() => {
+    if (upgradeHandledRef.current) return
+    const requestedPlan = new URLSearchParams(window.location.search).get('upgrade')
+    if (requestedPlan !== 'starter' && requestedPlan !== 'pro' && requestedPlan !== 'growth') return
+    upgradeHandledRef.current = true
+    window.history.replaceState({}, '', '/settings?section=plan')
+    void handleUpgrade(requestedPlan)
+  }, [])
 
   const handleConnectReddit = () => { window.location.href = '/api/auth/reddit' }
 
@@ -446,7 +485,7 @@ export default function SettingsPage() {
     { value: 'creator', label: 'Creator / Content' },
     { value: 'other', label: 'Other' },
   ]
-  const canActivateAutomation = planState.plan !== 'free' && draftsReviewed >= 10
+  const canActivateAutomation = getPlanLimits(planState.plan).autoSend && draftsReviewed >= 10
 
   return (
     <AppPage>
@@ -739,7 +778,7 @@ export default function SettingsPage() {
                           <div className="flex-1">
                             <p className="text-[14px] font-semibold text-gray-900">Earned auto-send</p>
                             <p className="mt-1 text-[13px] text-gray-500">
-                              {planState.plan === 'free'
+                              {!getPlanLimits(planState.plan).autoSend
                                 ? `Professional plan required. ${draftsReviewed} of 10 trust reviews complete.`
                                 : draftsReviewed < 10
                                   ? `${draftsReviewed} of 10 personal reviews complete. Community history cannot bypass this gate.`
@@ -1124,8 +1163,8 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                           </div>
                           <p className="text-[13px] text-gray-500">
                             {planState.plan === 'free'
-                              ? '1 keyword rule. Upgrade for 10 rules, 1,000 signals, and auto-send.'
-                              : 'You have access to all premium features.'}
+                              ? '1 keyword, 50 signals, and 10 AI drafts per month.'
+                              : `${planState.keywordsMax} keywords, ${planState.threadsMax.toLocaleString()} signals, and ${planState.draftsMax.toLocaleString()} AI drafts per month.`}
                           </p>
                         </div>
                       </div>
@@ -1148,25 +1187,30 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
 
                       {planState.plan === 'free' && (
                         <div className="pt-5 border-t border-gray-100">
-                          <div className="flex items-start gap-4 p-4 bg-gray-950 rounded-xl">
+                          <div className="flex flex-col gap-4 p-4 bg-gray-950 rounded-xl sm:flex-row sm:items-start">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <Sparkles className="w-4 h-4 text-amber-400" />
-                                <span className="text-[14px] font-bold text-white">Upgrade to Professional</span>
-                                <span className="text-[12px] font-semibold text-white/60">$49/mo</span>
+                                <span className="text-[14px] font-bold text-white">Choose a paid plan</span>
                               </div>
                               <p className="text-[12px] text-white/50 leading-relaxed">
-                                10 keyword rules, 1,000 signals/month, auto-send, subreddit targeting.
+                                Starter begins at $19/month. Professional adds auto-send and subreddit targeting.
                               </p>
                             </div>
-                            <button
-                              className="shrink-0 text-[13px] font-semibold bg-white text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                              onClick={() => handleUpgrade('pro')}
-                              disabled={upgrading}
-                            >
-                              {upgrading ? 'Redirecting...' : 'Upgrade'}
-                            </button>
+                            <div className="flex gap-2">
+                              <button className="rounded-lg bg-white/10 px-3 py-2 text-[12px] font-semibold text-white hover:bg-white/15 disabled:opacity-50" onClick={() => handleUpgrade('starter')} disabled={upgrading}>Starter</button>
+                              <button className="rounded-lg bg-white px-3 py-2 text-[12px] font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-50" onClick={() => handleUpgrade('pro')} disabled={upgrading}>{upgrading ? 'Opening…' : 'Professional'}</button>
+                            </div>
                           </div>
+                        </div>
+                      )}
+                      {planState.plan !== 'free' && (
+                        <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-5">
+                          {planState.plan === 'starter' && <button onClick={() => handleUpgrade('pro')} disabled={upgrading} className="rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50">Upgrade to Professional</button>}
+                          {planState.plan !== 'growth' && <button onClick={() => handleUpgrade('growth')} disabled={upgrading} className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-800 disabled:opacity-50">Upgrade to Growth</button>}
+                          <button onClick={handleManageBilling} disabled={openingPortal} className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-800 disabled:opacity-50">
+                            {openingPortal ? 'Opening…' : 'Manage or cancel billing'}
+                          </button>
                         </div>
                       )}
                     </SectionCard>
@@ -1191,10 +1235,8 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                         </div>
                       ))}
 
-                      {/* Placement C — Draft limit warning
-                          Only fires for free users who have used >= 35 of 40 drafts.
-                          Should be a rare event for a 1-keyword user; shown honestly. */}
-                      {planState.plan === 'free' && usageStats.drafts >= 35 && (() => {
+                      {/* Warn free users shortly before their ten-draft monthly limit. */}
+                      {planState.plan === 'free' && usageStats.drafts >= 8 && (() => {
                         const now = new Date()
                         const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
                         const resetStr = resetDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
@@ -1203,7 +1245,7 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" strokeWidth={1.75} />
                             <div>
                               <p className="text-[13px] text-amber-900 leading-relaxed">
-                                You&apos;ve used <span className="font-semibold">{usageStats.drafts}</span> of 40 draft previews this month.
+                                You&apos;ve used <span className="font-semibold">{usageStats.drafts}</span> of {PLAN_LIMITS.free.aiDraftsPerMonth} draft previews this month.
                                 This resets on <span className="font-semibold">{resetStr}</span>.{' '}
                                 Professional members get 400 drafts/month — enough that this number becomes invisible.
                               </p>

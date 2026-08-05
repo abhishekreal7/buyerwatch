@@ -31,6 +31,7 @@ function getStatus(eventType: string, value: unknown): BillingStatus | null {
     return value as BillingStatus
   }
   if (eventType.includes('active') || eventType.includes('renewed')) return 'active'
+  if (eventType.includes('plan_changed')) return 'active'
   if (eventType.includes('cancel')) return 'cancelled'
   if (eventType.includes('fail')) return 'failed'
   if (eventType.includes('expire')) return 'expired'

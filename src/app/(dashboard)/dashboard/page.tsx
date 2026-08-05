@@ -567,7 +567,7 @@ export default function DashboardPage() {
     } catch (error) {
       setOpeningAddonCheckout(null)
       if (error instanceof Error && error.message === 'addon_billing_not_configured') {
-        window.location.href = '/pricing'
+        toast.error('This add-on is temporarily unavailable. No charge was created.')
         return
       }
       toast.error('Could not open add-on checkout')
