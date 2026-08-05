@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { normalizeSelectedBillingPlan, withSelectedPlan } from '@/lib/billing-selection'
+import {
+  normalizeSelectedBillingCadence,
+  normalizeSelectedBillingPlan,
+  withSelectedPlan,
+} from '@/lib/billing-selection'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,10 +18,14 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const destination = requestUrl.searchParams.get('next') === 'signup' ? 'signup' : 'login'
   const selectedPlan = normalizeSelectedBillingPlan(requestUrl.searchParams.get('plan'))
+  const selectedBilling = normalizeSelectedBillingCadence(requestUrl.searchParams.get('billing'))
 
   try {
     const supabase = await createClient()
-    const redirectTo = new URL(withSelectedPlan('/auth/callback', selectedPlan), requestUrl.origin).toString()
+    const redirectTo = new URL(
+      withSelectedPlan('/auth/callback', selectedPlan, selectedBilling),
+      requestUrl.origin,
+    ).toString()
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },

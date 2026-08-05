@@ -37,12 +37,22 @@ describe('pricing plan promises', () => {
 
   it('preserves a selected tier through authentication and onboarding', () => {
     expect(afterAuthenticationDestination('growth', false)).toBe('/onboarding?plan=growth')
-    expect(afterAuthenticationDestination('growth', true)).toBe('/settings?section=plan&upgrade=growth')
+    expect(afterAuthenticationDestination('growth', false, 'annual')).toBe('/onboarding?plan=growth&billing=annual')
+    expect(afterAuthenticationDestination('growth', true)).toBe('/settings?section=plan&upgrade=growth&billing=monthly')
+    expect(afterAuthenticationDestination('growth', true, 'annual')).toBe('/settings?section=plan&upgrade=growth&billing=annual')
     expect(afterAuthenticationDestination('enterprise', true)).toBe('/dashboard')
     expect(PRICING_PLANS.map(plan => plan.href)).toEqual([
-      '/signup?plan=starter',
-      '/signup?plan=pro',
-      '/signup?plan=growth',
+      '/signup?plan=starter&billing=monthly',
+      '/signup?plan=pro&billing=monthly',
+      '/signup?plan=growth&billing=monthly',
+    ])
+  })
+
+  it('publishes exact annual charges and monthly equivalents', () => {
+    expect(PRICING_PLANS.map(({ id, annualPrice, annualTotal }) => ({ id, annualPrice, annualTotal }))).toEqual([
+      { id: 'starter', annualPrice: '$15', annualTotal: '$180' },
+      { id: 'pro', annualPrice: '$39', annualTotal: '$468' },
+      { id: 'growth', annualPrice: '$119', annualTotal: '$1,428' },
     ])
   })
 })

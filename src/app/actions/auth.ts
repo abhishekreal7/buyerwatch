@@ -4,12 +4,18 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { authRateLimit, getIp } from '@/lib/ratelimit'
 import { getAppUrl } from '@/lib/app-url'
-import { afterAuthenticationDestination, normalizeSelectedBillingPlan, withSelectedPlan } from '@/lib/billing-selection'
+import {
+  afterAuthenticationDestination,
+  normalizeSelectedBillingCadence,
+  normalizeSelectedBillingPlan,
+  withSelectedPlan,
+} from '@/lib/billing-selection'
 
 export async function signUpAction(formData: FormData) {
   const email = formData.get('email')?.toString()
   const password = formData.get('password')?.toString()
   const selectedPlan = normalizeSelectedBillingPlan(formData.get('plan')?.toString())
+  const selectedBilling = normalizeSelectedBillingCadence(formData.get('billing')?.toString())
   const supabase = await createClient()
   const origin = getAppUrl()
 
@@ -28,7 +34,7 @@ export async function signUpAction(formData: FormData) {
     password,
     options: {
       // Points to the email-confirmation handler, not the OAuth callback
-      emailRedirectTo: `${origin}${withSelectedPlan('/auth/confirm', selectedPlan)}`,
+      emailRedirectTo: `${origin}${withSelectedPlan('/auth/confirm', selectedPlan, selectedBilling)}`,
     },
   })
 
@@ -43,6 +49,7 @@ export async function signInAction(formData: FormData) {
   const email = formData.get('email')?.toString()
   const password = formData.get('password')?.toString()
   const selectedPlan = normalizeSelectedBillingPlan(formData.get('plan')?.toString())
+  const selectedBilling = normalizeSelectedBillingCadence(formData.get('billing')?.toString())
   const supabase = await createClient()
 
   if (!email || !password) {
@@ -68,7 +75,7 @@ export async function signInAction(formData: FormData) {
   const { data: profile } = user
     ? await supabase.from('profiles').select('business_name').eq('id', user.id).maybeSingle()
     : { data: null }
-  redirect(afterAuthenticationDestination(selectedPlan, Boolean(profile?.business_name)))
+  redirect(afterAuthenticationDestination(selectedPlan, Boolean(profile?.business_name), selectedBilling))
 }
 
 export async function signInWithGoogleAction() {

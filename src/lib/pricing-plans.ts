@@ -3,6 +3,8 @@ export const PRICING_PLANS = [
     id: 'starter',
     name: 'Starter',
     price: '$19',
+    annualPrice: '$15',
+    annualTotal: '$180',
     period: '/month',
     description: 'Start monitoring real buying signals with enough coverage to prove the workflow.',
     features: [
@@ -13,13 +15,15 @@ export const PRICING_PLANS = [
       'Reddit & Bluesky monitoring',
     ],
     cta: 'Start with Starter',
-    href: '/signup?plan=starter',
+    href: '/signup?plan=starter&billing=monthly',
     highlight: false,
   },
   {
     id: 'pro',
     name: 'Professional',
     price: '$49',
+    annualPrice: '$39',
+    annualTotal: '$468',
     period: '/month',
     description: 'For founders actively working a social selling motion.',
     features: [
@@ -33,13 +37,15 @@ export const PRICING_PLANS = [
       'Slack notifications and reply attribution',
     ],
     cta: 'Upgrade to Professional',
-    href: '/signup?plan=pro',
+    href: '/signup?plan=pro&billing=monthly',
     highlight: true,
   },
   {
     id: 'growth',
     name: 'Growth',
     price: '$149',
+    annualPrice: '$119',
+    annualTotal: '$1,428',
     period: '/month',
     description: 'For teams that need higher limits and faster monitoring.',
     features: [
@@ -52,7 +58,7 @@ export const PRICING_PLANS = [
       'Reply attribution and trust analytics',
     ],
     cta: 'Upgrade to Growth',
-    href: '/signup?plan=growth',
+    href: '/signup?plan=growth&billing=monthly',
     highlight: false,
   },
 ] as const

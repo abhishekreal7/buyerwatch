@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getBillingPlanChangeStrategy,
+  getDodoBillingSelectionFromProductId,
   getDodoEnvironment,
   getDodoProductId,
   parseBillingCheckoutIntent,
@@ -12,18 +13,39 @@ afterEach(() => {
 
 describe('Dodo billing contracts', () => {
   it('accepts only explicit checkout intents', () => {
-    expect(parseBillingCheckoutIntent({})).toEqual({ kind: 'plan', plan: 'pro' })
+    expect(parseBillingCheckoutIntent({})).toEqual({ kind: 'plan', plan: 'pro', cadence: 'monthly' })
     expect(parseBillingCheckoutIntent({ plan: 'starter' })).toEqual({
       kind: 'plan',
       plan: 'starter',
+      cadence: 'monthly',
+    })
+    expect(parseBillingCheckoutIntent({ plan: 'growth', billing: 'annual' })).toEqual({
+      kind: 'plan',
+      plan: 'growth',
+      cadence: 'annual',
     })
     expect(parseBillingCheckoutIntent({ addon: 'signals' })).toEqual({
       kind: 'addon',
       addon: 'signals',
     })
     expect(parseBillingCheckoutIntent({ plan: 'enterprise' })).toBeNull()
+    expect(parseBillingCheckoutIntent({ plan: 'pro', billing: 'weekly' })).toBeNull()
     expect(parseBillingCheckoutIntent({ addon: 'unknown' })).toBeNull()
     expect(parseBillingCheckoutIntent({ plan: 'pro', addon: 'signals' })).toBeNull()
+  })
+
+  it('maps monthly and annual Dodo products to the same entitlement tier', () => {
+    vi.stubEnv('DODO_PAYMENTS_PRO_PRODUCT_ID', 'pro_monthly')
+    vi.stubEnv('DODO_PAYMENTS_PRO_ANNUAL_PRODUCT_ID', 'pro_annual')
+
+    expect(getDodoBillingSelectionFromProductId('pro_monthly')).toEqual({
+      plan: 'pro',
+      cadence: 'monthly',
+    })
+    expect(getDodoBillingSelectionFromProductId('pro_annual')).toEqual({
+      plan: 'pro',
+      cadence: 'annual',
+    })
   })
 
   it('extracts product IDs from subscription and one-time payment payloads', () => {
@@ -58,5 +80,10 @@ describe('Dodo billing contracts', () => {
       prorationBillingMode: 'do_not_bill',
     })
     expect(getBillingPlanChangeStrategy('pro', 'pro')).toBeNull()
+    expect(getBillingPlanChangeStrategy('pro', 'pro', 'monthly', 'annual')).toEqual({
+      direction: 'cadence_change',
+      effectiveAt: 'next_billing_date',
+      prorationBillingMode: 'do_not_bill',
+    })
   })
 })

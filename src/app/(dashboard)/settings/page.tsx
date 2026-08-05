@@ -391,13 +391,16 @@ export default function SettingsPage() {
     setTimeout(() => setSaveSuccess(false), 2500)
   }
 
-  const handleUpgrade = async (plan: 'starter' | 'pro' | 'growth' = 'pro') => {
+  const handleUpgrade = async (
+    plan: 'starter' | 'pro' | 'growth' = 'pro',
+    billing: 'monthly' | 'annual' = 'monthly',
+  ) => {
     setUpgrading(true)
     try {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, billing }),
       })
       const data = await res.json()
       if (res.ok && data.url) {
@@ -435,11 +438,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (upgradeHandledRef.current) return
-    const requestedPlan = new URLSearchParams(window.location.search).get('upgrade')
+    const query = new URLSearchParams(window.location.search)
+    const requestedPlan = query.get('upgrade')
+    const requestedBilling = query.get('billing') === 'annual' ? 'annual' : 'monthly'
     if (requestedPlan !== 'starter' && requestedPlan !== 'pro' && requestedPlan !== 'growth') return
     upgradeHandledRef.current = true
     window.history.replaceState({}, '', '/settings?section=plan')
-    void handleUpgrade(requestedPlan)
+    void handleUpgrade(requestedPlan, requestedBilling)
   }, [])
 
   const handleConnectReddit = () => { window.location.href = '/api/auth/reddit' }
@@ -1194,12 +1199,13 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                                 <span className="text-[14px] font-bold text-white">Choose a paid plan</span>
                               </div>
                               <p className="text-[12px] text-white/50 leading-relaxed">
-                                Starter begins at $19/month. Professional adds auto-send and subreddit targeting.
+                                Pay monthly, or save 20%+ with one annual payment. Professional adds auto-send and subreddit targeting.
                               </p>
                             </div>
                             <div className="flex gap-2">
                               <button className="rounded-lg bg-white/10 px-3 py-2 text-[12px] font-semibold text-white hover:bg-white/15 disabled:opacity-50" onClick={() => handleUpgrade('starter')} disabled={upgrading}>Starter</button>
                               <button className="rounded-lg bg-white px-3 py-2 text-[12px] font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-50" onClick={() => handleUpgrade('pro')} disabled={upgrading}>{upgrading ? 'Opening…' : 'Professional'}</button>
+                              <button className="rounded-lg border border-white/20 px-3 py-2 text-[12px] font-semibold text-white hover:bg-white/10 disabled:opacity-50" onClick={() => handleUpgrade('starter', 'annual')} disabled={upgrading}>Starter annual</button>
                             </div>
                           </div>
                         </div>
@@ -1208,6 +1214,20 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                         <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-5">
                           {planState.plan === 'starter' && <button onClick={() => handleUpgrade('pro')} disabled={upgrading} className="rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50">Upgrade to Professional</button>}
                           {planState.plan !== 'growth' && <button onClick={() => handleUpgrade('growth')} disabled={upgrading} className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-800 disabled:opacity-50">Upgrade to Growth</button>}
+                          <button
+                            onClick={() => handleUpgrade(
+                              planState.plan === 'starter'
+                                ? 'starter'
+                                : planState.plan === 'growth'
+                                  ? 'growth'
+                                  : 'pro',
+                              'annual',
+                            )}
+                            disabled={upgrading}
+                            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-800 disabled:opacity-50"
+                          >
+                            Switch current plan to annual
+                          </button>
                           <button onClick={handleManageBilling} disabled={openingPortal} className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-800 disabled:opacity-50">
                             {openingPortal ? 'Opening…' : 'Manage or cancel billing'}
                           </button>

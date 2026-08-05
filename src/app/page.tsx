@@ -76,6 +76,7 @@ function Section({ children, className = '', delay = 0, id }: { children: React.
 
 export default function LandingPage() {
   const [activeAccordion, setActiveAccordion] = useState(0)
+  const [annualHome, setAnnualHome] = useState(false)
 
   // Navbar scroll animation
   const { scrollY } = useScroll()
@@ -734,14 +735,26 @@ export default function LandingPage() {
               </h2>
             </motion.div>
 
-            <motion.div variants={fadeUp} className="flex items-center justify-center mb-12">
-              <span className="rounded-full border border-[#D4D4D4] bg-white px-3 py-1 text-[13px] font-medium text-[#555]">Monthly billing</span>
+            <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 mb-12">
+              <span className={`text-[14px] font-medium ${annualHome ? 'text-[#999]' : 'text-[#0A0A0A]'}`}>Monthly</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={annualHome}
+                aria-label="Use annual billing"
+                onClick={() => setAnnualHome(value => !value)}
+                className="relative h-7 w-[52px] rounded-full bg-[#D4D4D4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+              >
+                <span className={`absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-sm transition-[left] ${annualHome ? 'left-[27px]' : 'left-[3px]'}`} />
+              </button>
+              <span className={`text-[14px] font-medium ${annualHome ? 'text-[#0A0A0A]' : 'text-[#999]'}`}>Annual</span>
+              <span className="rounded-full bg-[#0A0A0A] px-2.5 py-1 text-[11px] font-semibold text-white">Save 20%+</span>
             </motion.div>
 
             <motion.div variants={staggerContainer} className="mx-auto grid max-w-5xl gap-5 px-4 sm:px-6 lg:grid-cols-3">
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
-                const price: string = plan.price
+                const price: string = annualHome ? plan.annualPrice : plan.price
                 return (
                   <motion.article
                     key={plan.id}
@@ -771,10 +784,13 @@ export default function LandingPage() {
                         {price === '$0' ? 'forever' : plan.period}
                       </span>
                     </div>
+                    <p className={`-mt-2 mb-4 min-h-5 text-[12px] ${isHighlighted ? 'text-white/50' : 'text-[#777]'}`}>
+                      {annualHome ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
+                    </p>
                     <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>
                     {/* CTA */}
                     <a
-                      href={plan.href}
+                      href={annualHome ? `/signup?plan=${plan.id}&billing=annual` : plan.href}
                       className={`mb-6 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-semibold transition-all duration-200 ${
                         isHighlighted ? 'bg-white text-[#0A0A0A] hover:bg-white/90' : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
                       }`}

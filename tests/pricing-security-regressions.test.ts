@@ -6,10 +6,13 @@ import { strictContentSecurityPolicy } from '../src/lib/session-csp'
 const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 
 describe('public pricing and session security regressions', () => {
-  it('does not advertise unsupported annual billing or a seven-month trial', () => {
+  it('advertises real annual billing without a seven-month trial', () => {
     const homepage = source('src/app/page.tsx')
     const pricing = source('src/app/pricing/PricingClient.tsx')
-    expect(`${homepage}\n${pricing}`).not.toMatch(/7-month|billed annually|Save 20%/i)
+    expect(`${homepage}\n${pricing}`).not.toMatch(/7-month/i)
+    expect(homepage).toMatch(/Save 20%\+/i)
+    expect(pricing).toMatch(/Billed.*once per year/i)
+    expect(`${homepage}\n${pricing}`).toContain('billing=annual')
   })
 
   it('keeps the how-it-works anchor valid', () => {

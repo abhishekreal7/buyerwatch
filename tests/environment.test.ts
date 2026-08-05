@@ -28,6 +28,9 @@ function stubProductionCore() {
     'DODO_PAYMENTS_STARTER_PRODUCT_ID',
     'DODO_PAYMENTS_PRO_PRODUCT_ID',
     'DODO_PAYMENTS_GROWTH_PRODUCT_ID',
+    'DODO_PAYMENTS_STARTER_ANNUAL_PRODUCT_ID',
+    'DODO_PAYMENTS_PRO_ANNUAL_PRODUCT_ID',
+    'DODO_PAYMENTS_GROWTH_ANNUAL_PRODUCT_ID',
     'DODO_PAYMENTS_WEBHOOK_SECRET',
     'DODO_PAYMENTS_ENVIRONMENT',
     'DODO_PAYMENTS_SIGNAL_PACK_PRODUCT_ID',
@@ -109,6 +112,9 @@ describe('production capability configuration', () => {
     vi.stubEnv('DODO_PAYMENTS_STARTER_PRODUCT_ID', 'starter')
     vi.stubEnv('DODO_PAYMENTS_PRO_PRODUCT_ID', 'pro')
     vi.stubEnv('DODO_PAYMENTS_GROWTH_PRODUCT_ID', 'growth')
+    vi.stubEnv('DODO_PAYMENTS_STARTER_ANNUAL_PRODUCT_ID', 'starter-annual')
+    vi.stubEnv('DODO_PAYMENTS_PRO_ANNUAL_PRODUCT_ID', 'pro-annual')
+    vi.stubEnv('DODO_PAYMENTS_GROWTH_ANNUAL_PRODUCT_ID', 'growth-annual')
     vi.stubEnv('DODO_PAYMENTS_WEBHOOK_SECRET', 'webhook')
     vi.stubEnv('DODO_PAYMENTS_ENVIRONMENT', 'test_mode')
 
@@ -122,6 +128,9 @@ describe('production capability configuration', () => {
     vi.stubEnv('DODO_PAYMENTS_STARTER_PRODUCT_ID', 'starter')
     vi.stubEnv('DODO_PAYMENTS_PRO_PRODUCT_ID', 'pro')
     vi.stubEnv('DODO_PAYMENTS_GROWTH_PRODUCT_ID', 'growth')
+    vi.stubEnv('DODO_PAYMENTS_STARTER_ANNUAL_PRODUCT_ID', 'starter-annual')
+    vi.stubEnv('DODO_PAYMENTS_PRO_ANNUAL_PRODUCT_ID', 'pro-annual')
+    vi.stubEnv('DODO_PAYMENTS_GROWTH_ANNUAL_PRODUCT_ID', 'growth-annual')
     vi.stubEnv('DODO_PAYMENTS_WEBHOOK_SECRET', 'webhook')
     vi.stubEnv('DODO_PAYMENTS_ENVIRONMENT', 'production')
 

@@ -5,9 +5,19 @@ import { createClient } from '@/utils/supabase/client'
 import { skipOnboardingAction } from '@/app/actions/onboarding'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { SelectedBillingPlan } from '@/lib/billing-selection'
+import {
+  afterAuthenticationDestination,
+  type SelectedBillingCadence,
+  type SelectedBillingPlan,
+} from '@/lib/billing-selection'
 
-export function OnboardingHeaderActions({ selectedPlan }: { selectedPlan: SelectedBillingPlan | null }) {
+export function OnboardingHeaderActions({
+  selectedPlan,
+  selectedBilling,
+}: {
+  selectedPlan: SelectedBillingPlan | null
+  selectedBilling: SelectedBillingCadence
+}) {
   const [skipping, setSkipping] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [supabase] = useState(createClient)
@@ -17,13 +27,13 @@ export function OnboardingHeaderActions({ selectedPlan }: { selectedPlan: Select
     setSkipping(true)
     toast.info('Finishing setup later...')
     try {
-      await skipOnboardingAction(selectedPlan)
+      await skipOnboardingAction(selectedPlan, selectedBilling)
     } catch {
       // Fallback hard redirect if server action redirect didn't trigger
-      window.location.href = selectedPlan ? `/settings?section=plan&upgrade=${selectedPlan}` : '/dashboard'
+      window.location.href = afterAuthenticationDestination(selectedPlan, true, selectedBilling)
       return
     }
-    window.location.href = selectedPlan ? `/settings?section=plan&upgrade=${selectedPlan}` : '/dashboard'
+    window.location.href = afterAuthenticationDestination(selectedPlan, true, selectedBilling)
   }
 
   const handleSignOut = async () => {

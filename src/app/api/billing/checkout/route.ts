@@ -9,8 +9,8 @@ import { BILLING_ADDONS, type BillingAddonType } from '@/lib/billing-addons'
 import { getAddonProductId } from '@/lib/billing-addons-server'
 import {
   getBillingPlanChangeStrategy,
+  getDodoBillingSelectionFromProductId,
   getDodoEnvironment,
-  getDodoPlanFromProductId,
   getDodoProductIdForPlan,
   parseBillingCheckoutIntent,
 } from '@/lib/dodo'
@@ -115,7 +115,8 @@ export async function POST(req: Request) {
     }
 
     const requestedPlan = intent.plan
-    const productId = getDodoProductIdForPlan(requestedPlan)
+    const requestedCadence = intent.cadence
+    const productId = getDodoProductIdForPlan(requestedPlan, requestedCadence)
     if (!productId) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
     const planIdempotencySeed = clientIdempotencyKey
       || `bucket:${Math.floor(Date.now() / 600_000)}`
     const idempotencyKey = createHash('sha256')
-      .update(`${user.id}:${requestedPlan}:${planIdempotencySeed}`)
+      .update(`${user.id}:${requestedPlan}:${requestedCadence}:${planIdempotencySeed}`)
       .digest('hex')
 
     const { data: billingProfile, error: profileError } = await supabase
@@ -143,14 +144,19 @@ export async function POST(req: Request) {
           billingProfile.billing_subscription_id,
         )
         if (subscription.status === 'active') {
-          const currentPlan = getDodoPlanFromProductId(subscription.product_id)
-          if (!currentPlan) {
+          const currentSelection = getDodoBillingSelectionFromProductId(subscription.product_id)
+          if (!currentSelection) {
             return NextResponse.json(
               { error: 'billing_subscription_product_unknown' },
               { status: 409 },
             )
           }
-          const strategy = getBillingPlanChangeStrategy(currentPlan, requestedPlan)
+          const strategy = getBillingPlanChangeStrategy(
+            currentSelection.plan,
+            requestedPlan,
+            currentSelection.cadence,
+            requestedCadence,
+          )
           if (!strategy) {
             return NextResponse.json({ error: 'plan_already_active' }, { status: 409 })
           }
@@ -163,7 +169,11 @@ export async function POST(req: Request) {
               effective_at: strategy.effectiveAt,
               proration_billing_mode: strategy.prorationBillingMode,
               on_payment_failure: 'prevent_change',
-              metadata: { user_id: user.id, plan: requestedPlan },
+              metadata: {
+                user_id: user.id,
+                plan: requestedPlan,
+                billing_cadence: requestedCadence,
+              },
             },
             { idempotencyKey },
           )
@@ -199,6 +209,7 @@ export async function POST(req: Request) {
       metadata: {
         user_id: user.id,
         plan: requestedPlan,
+        billing_cadence: requestedCadence,
       },
       return_url: `${getAppUrl()}/dashboard`,
     }, { idempotencyKey })

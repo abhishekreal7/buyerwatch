@@ -1,15 +1,16 @@
 export type DodoEnvironment = 'test_mode' | 'live_mode'
 
 export type BillingPlan = 'starter' | 'pro' | 'growth'
+export type BillingCadence = 'monthly' | 'annual'
 
 export type BillingPlanChangeStrategy = {
   effectiveAt: 'immediately' | 'next_billing_date'
   prorationBillingMode: 'prorated_immediately' | 'do_not_bill'
-  direction: 'upgrade' | 'downgrade'
+  direction: 'upgrade' | 'downgrade' | 'cadence_change'
 }
 
 export type BillingCheckoutIntent =
-  | { kind: 'plan'; plan: BillingPlan }
+  | { kind: 'plan'; plan: BillingPlan; cadence: BillingCadence }
   | { kind: 'addon'; addon: 'signals' | 'drafts' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -20,22 +21,55 @@ export function normalizeBillingPlan(value: unknown): BillingPlan | null {
   return value === 'starter' || value === 'pro' || value === 'growth' ? value : null
 }
 
-export function getDodoProductIdForPlan(plan: BillingPlan): string | undefined {
+export function normalizeBillingCadence(value: unknown): BillingCadence | null {
+  return value === 'monthly' || value === 'annual' ? value : null
+}
+
+export function getDodoProductIdForPlan(
+  plan: BillingPlan,
+  cadence: BillingCadence = 'monthly',
+): string | undefined {
+  if (cadence === 'annual') {
+    if (plan === 'starter') return process.env.DODO_PAYMENTS_STARTER_ANNUAL_PRODUCT_ID
+    if (plan === 'growth') return process.env.DODO_PAYMENTS_GROWTH_ANNUAL_PRODUCT_ID
+    return process.env.DODO_PAYMENTS_PRO_ANNUAL_PRODUCT_ID
+  }
   if (plan === 'starter') return process.env.DODO_PAYMENTS_STARTER_PRODUCT_ID
   if (plan === 'growth') return process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID
   return process.env.DODO_PAYMENTS_PRO_PRODUCT_ID
 }
 
-export function getDodoPlanFromProductId(productId: string): BillingPlan | null {
+export function getDodoBillingSelectionFromProductId(
+  productId: string,
+): { plan: BillingPlan; cadence: BillingCadence } | null {
   const plans: BillingPlan[] = ['starter', 'pro', 'growth']
-  return plans.find((plan) => getDodoProductIdForPlan(plan) === productId) ?? null
+  const cadences: BillingCadence[] = ['monthly', 'annual']
+  for (const plan of plans) {
+    for (const cadence of cadences) {
+      if (getDodoProductIdForPlan(plan, cadence) === productId) return { plan, cadence }
+    }
+  }
+  return null
+}
+
+export function getDodoPlanFromProductId(productId: string): BillingPlan | null {
+  return getDodoBillingSelectionFromProductId(productId)?.plan ?? null
 }
 
 export function getBillingPlanChangeStrategy(
   currentPlan: BillingPlan,
   requestedPlan: BillingPlan,
+  currentCadence: BillingCadence = 'monthly',
+  requestedCadence: BillingCadence = 'monthly',
 ): BillingPlanChangeStrategy | null {
-  if (currentPlan === requestedPlan) return null
+  if (currentPlan === requestedPlan && currentCadence === requestedCadence) return null
+  if (currentPlan === requestedPlan) {
+    return {
+      direction: 'cadence_change',
+      effectiveAt: 'next_billing_date',
+      prorationBillingMode: 'do_not_bill',
+    }
+  }
   const rank: Record<BillingPlan, number> = { starter: 0, pro: 1, growth: 2 }
   const isUpgrade = rank[requestedPlan] > rank[currentPlan]
   return isUpgrade
@@ -79,9 +113,12 @@ export function parseBillingCheckoutIntent(
       : null
   }
 
-  if (!hasPlan) return { kind: 'plan', plan: 'pro' }
+  if (!hasPlan) return { kind: 'plan', plan: 'pro', cadence: 'monthly' }
   const plan = normalizeBillingPlan(body.plan)
-  return plan ? { kind: 'plan', plan } : null
+  const cadence = body.billing === undefined
+    ? 'monthly'
+    : normalizeBillingCadence(body.billing)
+  return plan && cadence ? { kind: 'plan', plan, cadence } : null
 }
 
 /**

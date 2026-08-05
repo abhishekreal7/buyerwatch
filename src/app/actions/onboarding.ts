@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { publishMonitoringRun } from '@/lib/qstash'
+import { afterAuthenticationDestination } from '@/lib/billing-selection'
 import {
   normalizeWebsiteUrl,
   validateOnboardingData,
@@ -116,7 +117,11 @@ async function completeWithoutRpc(
   return { error: 'We could not save your monitoring rules. Please try again.' }
 }
 
-export async function completeOnboardingAction(data: OnboardingData, selectedPlan?: string | null) {
+export async function completeOnboardingAction(
+  data: OnboardingData,
+  selectedPlan?: string | null,
+  selectedBilling?: string | null,
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -184,10 +189,13 @@ export async function completeOnboardingAction(data: OnboardingData, selectedPla
   const plan = selectedPlan === 'starter' || selectedPlan === 'pro' || selectedPlan === 'growth'
     ? selectedPlan
     : null
-  redirect(plan ? `/settings?section=plan&upgrade=${plan}` : '/dashboard')
+  redirect(afterAuthenticationDestination(plan, true, selectedBilling))
 }
 
-export async function skipOnboardingAction(selectedPlan?: string | null) {
+export async function skipOnboardingAction(
+  selectedPlan?: string | null,
+  selectedBilling?: string | null,
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -239,5 +247,5 @@ export async function skipOnboardingAction(selectedPlan?: string | null) {
   const plan = selectedPlan === 'starter' || selectedPlan === 'pro' || selectedPlan === 'growth'
     ? selectedPlan
     : null
-  redirect(plan ? `/settings?section=plan&upgrade=${plan}` : '/dashboard')
+  redirect(afterAuthenticationDestination(plan, true, selectedBilling))
 }

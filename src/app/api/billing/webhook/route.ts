@@ -7,7 +7,7 @@ import {
   getAddonTypeFromProductId,
   normalizeAddonType,
 } from '@/lib/billing-addons-server'
-import { getDodoEnvironment, getDodoProductId } from '@/lib/dodo'
+import { getDodoEnvironment, getDodoPlanFromProductId, getDodoProductId } from '@/lib/dodo'
 
 type BillingPlan = 'starter' | 'pro' | 'growth'
 type BillingStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired'
@@ -20,10 +20,7 @@ function getSupabase() {
 }
 
 function getPlan(productId: string | null): BillingPlan | null {
-  if (productId === process.env.DODO_PAYMENTS_STARTER_PRODUCT_ID) return 'starter'
-  if (productId === process.env.DODO_PAYMENTS_PRO_PRODUCT_ID) return 'pro'
-  if (productId === process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID) return 'growth'
-  return null
+  return productId ? getDodoPlanFromProductId(productId) : null
 }
 
 function getStatus(eventType: string, value: unknown): BillingStatus | null {

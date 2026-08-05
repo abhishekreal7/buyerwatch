@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get('code')
   const oauthError = requestUrl.searchParams.get('error_description') || requestUrl.searchParams.get('error')
   const selectedPlan = requestUrl.searchParams.get('plan')
+  const selectedBilling = requestUrl.searchParams.get('billing')
 
   if (oauthError) {
     console.error('OAuth callback error parameter:', oauthError)
@@ -40,10 +41,10 @@ export async function GET(request: Request) {
           .maybeSingle()
 
         if (!profile || !profile.business_name) {
-          return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, false), request.url))
+          return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, false, selectedBilling), request.url))
         }
 
-        return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, true), request.url))
+        return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, true, selectedBilling), request.url))
       }
     } catch (err: any) {
       console.error('Callback handler exception:', err)

@@ -19,6 +19,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const selectedPlan = requestUrl.searchParams.get('plan')
+  const selectedBilling = requestUrl.searchParams.get('billing')
 
   if (!code) {
     return NextResponse.redirect(
@@ -44,8 +45,8 @@ export async function GET(request: Request) {
     .single()
 
   if (!profile || !profile.business_name) {
-    return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, false), request.url))
+    return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, false, selectedBilling), request.url))
   }
 
-  return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, true), request.url))
+  return NextResponse.redirect(new URL(afterAuthenticationDestination(selectedPlan, true, selectedBilling), request.url))
 }
