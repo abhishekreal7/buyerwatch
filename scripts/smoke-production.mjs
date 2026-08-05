@@ -37,13 +37,23 @@ await check('/api/health/ready', async (response) => {
 await check('/', async (response) => {
   if (response.status !== 200) throw new Error(`homepage returned ${response.status}`)
   const requiredHeaders = [
-    'content-security-policy',
     'strict-transport-security',
     'x-content-type-options',
     'x-frame-options',
   ]
   for (const header of requiredHeaders) {
     if (!response.headers.get(header)) throw new Error(`homepage is missing ${header}`)
+  }
+})
+
+await check('/login', async (response) => {
+  if (response.status !== 200) throw new Error(`login returned ${response.status}`)
+  const policy = response.headers.get('content-security-policy')
+  if (!policy?.includes("'strict-dynamic'")) {
+    throw new Error('login is missing its strict nonce-based CSP')
+  }
+  if (/script-src[^;]*'unsafe-inline'/.test(policy)) {
+    throw new Error('login CSP allows inline scripts')
   }
 })
 
