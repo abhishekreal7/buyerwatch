@@ -1228,6 +1228,20 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                           >
                             Switch current plan to annual
                           </button>
+                          <button
+                            onClick={() => handleUpgrade(
+                              planState.plan === 'starter'
+                                ? 'starter'
+                                : planState.plan === 'growth'
+                                  ? 'growth'
+                                  : 'pro',
+                              'monthly',
+                            )}
+                            disabled={upgrading}
+                            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-800 disabled:opacity-50"
+                          >
+                            Switch current plan to monthly
+                          </button>
                           <button onClick={handleManageBilling} disabled={openingPortal} className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-800 disabled:opacity-50">
                             {openingPortal ? 'Opening…' : 'Manage or cancel billing'}
                           </button>
