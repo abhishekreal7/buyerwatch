@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from 'next/headers'
 import { Inter, Geist_Mono, Plus_Jakarta_Sans, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import MotionProvider from "@/components/MotionProvider";
@@ -57,11 +58,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Strict CSP nonces are generated in proxy.ts. Reading the request headers
+  // forces dynamic rendering so Next.js can attach that nonce to its scripts.
+  await headers()
+
   return (
     <html
       lang="en"

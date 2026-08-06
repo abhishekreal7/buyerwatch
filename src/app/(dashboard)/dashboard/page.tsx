@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, ArrowUp } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -28,6 +28,7 @@ import {
   DEFAULT_HIGH_INTENT_THRESHOLD,
   normalizeHighIntentThreshold,
 } from '@/lib/high-intent-threshold'
+import { useConversationSearch } from '@/lib/conversation-search'
 
 interface Thread {
   id: string
@@ -79,6 +80,32 @@ function getDeliveryActionLabel(platform: string, extensionInstalled: boolean) {
   return 'Review delivery'
 }
 
+function mapThread(thread: any): Thread {
+  return {
+    id: thread.id,
+    platform: thread.platform,
+    target: (thread.keywords as { target?: string } | null)?.target || thread.platform,
+    timeAgo: formatTimeAgo(thread.created_at),
+    title: thread.title || '',
+    content: thread.text_content || '',
+    score: Number(thread.intent_score) || 0,
+    label: getIntentDisplayLabel(
+      thread.intent_label as IntentLabel | undefined,
+      Number(thread.intent_score) || 0,
+    ),
+    matchedKeyword: (thread.keywords as { term?: string } | null)?.term || '',
+    draft: (thread.reply_analytics as { draft_text?: string }[])?.[0]?.draft_text || '',
+    originalDraft: (thread.reply_analytics as { draft_text?: string }[])?.[0]?.draft_text || '',
+    url: thread.url || null,
+    flag: thread.flag || undefined,
+    reasoning: thread.score_reasoning || undefined,
+    googleRanked: thread.google_rank_position > 0,
+    createdAt: thread.created_at,
+    status: thread.status || 'pending',
+    reviewedAt: thread.reviewed_at || null,
+  }
+}
+
 export default function DashboardPage() {
   const showLegacyReview = process.env.NEXT_PUBLIC_BUYERWATCH_LEGACY_REVIEW === '1'
   const [threads, setThreads] = useState<Thread[]>([])
@@ -88,8 +115,10 @@ export default function DashboardPage() {
   const [plan, setPlan] = useState<PlanTier>('free')
   const [regenerating, setRegenerating] = useState(false)
   const [filterTab, setFilterTab] = useState<'all' | 'high-intent' | 'dismissed'>('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const { conversationSearch: searchQuery } = useConversationSearch()
   const deferredSearchQuery = useDeferredValue(searchQuery)
+  const searchQueryRef = useRef('')
+  const [searchLoading, setSearchLoading] = useState(false)
   const [communityHealth, setCommunityHealth] = useState<Record<string, { rejection_rate: number; total_engagements: number }>>({}) // Feature 3
   const [editingDraft, setEditingDraft] = useState<string | null>(null) // Feature 4: inline draft edit
   const [stats, setStats] = useState({
@@ -233,31 +262,9 @@ export default function DashboardPage() {
       return
     }
 
-    const parsed: Thread[] = (threadData || []).map(t => ({
-      id: t.id,
-      platform: t.platform,
-      target: (t.keywords as unknown as { target?: string })?.target || t.platform,
-      timeAgo: formatTimeAgo(t.created_at),
-      title: t.title || '',
-      content: t.text_content || '',
-      score: Number(t.intent_score) || 0,
-      label: getIntentDisplayLabel(
-        t.intent_label as IntentLabel | undefined,
-        Number(t.intent_score) || 0,
-      ),
-      matchedKeyword: (t.keywords as unknown as { term?: string })?.term || '',
-      draft: (t.reply_analytics as unknown as { draft_text?: string }[])?.[0]?.draft_text || '',
-      originalDraft: (t.reply_analytics as unknown as { draft_text?: string }[])?.[0]?.draft_text || '',
-      url: t.url || null,
-      flag: t.flag || undefined,
-      reasoning: (t as any).score_reasoning || undefined,        // Feature 1
-      googleRanked: (t as any).google_rank_position > 0,        // Feature 5
-      createdAt: t.created_at,                                   // Feature 4
-      status: t.status || 'pending',
-      reviewedAt: t.reviewed_at || null,
-    }))
+    const parsed = (threadData || []).map(mapThread)
 
-    setThreads(parsed)
+    if (!searchQueryRef.current) setThreads(parsed)
     setHasInspectedLead(parsed.some(thread => Boolean(thread.reviewedAt)))
     const activeParsed = parsed.filter(t => t.status !== 'dismissed')
     const requestedThreadId = new URLSearchParams(window.location.search).get('thread')
@@ -304,6 +311,50 @@ export default function DashboardPage() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => {
+    const normalizedQuery = deferredSearchQuery.trim()
+    const previousQuery = searchQueryRef.current
+    searchQueryRef.current = normalizedQuery
+
+    if (!normalizedQuery) {
+      setSearchLoading(false)
+      if (previousQuery) void loadData()
+      return
+    }
+
+    const controller = new AbortController()
+    setSearchLoading(true)
+    const timeout = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          q: normalizedQuery,
+          tab: filterTab,
+          threshold: String(highIntentThreshold),
+        })
+        const response = await fetch(`/api/conversations/search?${params}`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) throw new Error('search_failed')
+        const data = await response.json() as { threads?: unknown[] }
+        if (!controller.signal.aborted) {
+          setThreads((data.threads ?? []).map(mapThread))
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('[dashboard] Conversation search failed', error)
+          toast.error('Search failed. Please try again.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setSearchLoading(false)
+      }
+    }, 250)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timeout)
+    }
+  }, [deferredSearchQuery, filterTab, highIntentThreshold, loadData])
 
   useEffect(() => {
     let refreshTimer: number | undefined
@@ -353,16 +404,6 @@ export default function DashboardPage() {
     }
     window.addEventListener('buyerwatch:auto-send-changed', handleAutoSendChanged)
     return () => window.removeEventListener('buyerwatch:auto-send-changed', handleAutoSendChanged)
-  }, [])
-
-  useEffect(() => {
-    const handleConversationSearch = (event: Event) => {
-      startTransition(() => {
-        setSearchQuery((event as CustomEvent<string>).detail || '')
-      })
-    }
-    window.addEventListener('buyerwatch:conversation-search', handleConversationSearch)
-    return () => window.removeEventListener('buyerwatch:conversation-search', handleConversationSearch)
   }, [])
 
   useEffect(() => {
@@ -920,7 +961,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="flex items-center gap-2 text-xs font-semibold text-[#4F5865] pr-1">
-                <span>{filtered.length === 1 ? '1 opportunity' : `${filtered.length} opportunities`}</span>
+                <span>{searchLoading ? 'Searching all conversations...' : filtered.length === 1 ? '1 opportunity' : `${filtered.length} opportunities`}</span>
               </div>
             </div>
 
@@ -933,7 +974,19 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {!loading && filtered.length === 0 && keywordsCount === 0 && (
+                {!loading && !searchLoading && filtered.length === 0 && normalizedSearch && (
+                  <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
+                      <Search className="w-5 h-5" strokeWidth={1.8} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">No matching conversations</h3>
+                      <p className="text-xs text-[#667085] mt-1">Try a different word, community, platform, or matched keyword.</p>
+                    </div>
+                  </div>
+                )}
+
+                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount === 0 && (
                   /* ── No keywords yet — onboarding CTA ── */
                   <div className="flex min-h-64 flex-col items-center justify-center gap-4 px-6 py-14 text-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
@@ -955,7 +1008,7 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {!loading && filtered.length === 0 && keywordsCount > 0 && (
+                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount > 0 && (
                   /* Borderless empty state keeps the feed visually quiet. */
                   <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">

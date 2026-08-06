@@ -27,6 +27,8 @@ describe('public pricing and session security regressions', () => {
     expect(policy).toContain("script-src 'self' 'nonce-test-nonce' 'strict-dynamic'")
     expect(policy).not.toMatch(/script-src[^;]*'unsafe-inline'/)
     expect(source('next.config.ts')).not.toContain("{ key: 'Content-Security-Policy'")
+    expect(source('src/app/layout.tsx')).toContain("await headers()")
+    expect(source('src/proxy.ts')).toContain("response.headers.set('Content-Security-Policy', contentSecurityPolicy)")
     for (const route of ['login', 'signup', 'forgot-password', 'reset-password']) {
       expect(source(`src/app/${route}/layout.tsx`)).toContain('await headers()')
     }

@@ -42,10 +42,12 @@ describe('high-intent threshold preference', () => {
 
   it('persists a database-constrained preference independently of Slack', () => {
     const migration = source('supabase/migrations/20260806023000_add_high_intent_threshold.sql')
+    const permissionsMigration = source('supabase/migrations/20260806060000_grant_high_intent_threshold_update.sql')
     const settings = source('src/app/(dashboard)/settings/page.tsx')
 
     expect(migration).toContain('check (high_intent_threshold between 60 and 95)')
     expect(migration).toContain('alter column high_intent_threshold set default 80')
+    expect(permissionsMigration).toContain('grant update (high_intent_threshold) on public.profiles to authenticated')
     expect(settings).toContain('high_intent_threshold: normalizeHighIntentThreshold(highIntentThreshold)')
     expect(settings).toContain('threshold: slack.threshold')
   })

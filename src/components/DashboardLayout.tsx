@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -38,6 +38,7 @@ import {
   useExtensionStatus,
 } from '@/components/ExtensionInstall'
 import { signOutAction } from '@/app/actions/auth'
+import { ConversationSearchProvider, useConversationSearch } from '@/lib/conversation-search'
 
 export type DashboardBootstrap = {
   autoSend: boolean
@@ -120,7 +121,9 @@ type DashboardLayoutProps = {
 export default function DashboardLayout(props: DashboardLayoutProps) {
   return (
     <ExtensionProvider userId={props.userId}>
-      <DashboardShell {...props} />
+      <ConversationSearchProvider>
+        <DashboardShell {...props} />
+      </ConversationSearchProvider>
     </ExtensionProvider>
   )
 }
@@ -142,8 +145,7 @@ function DashboardShell({
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
   const [openingCheckout, setOpeningCheckout] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [conversationSearch, setConversationSearch] = useState('')
-  const deferredConversationSearch = useDeferredValue(conversationSearch)
+  const { conversationSearch, setConversationSearch } = useConversationSearch()
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { status: extensionStatus } = useExtensionStatus()
   const extensionMissing = extensionStatus === 'missing'
@@ -160,14 +162,6 @@ function DashboardShell({
   useEffect(() => {
     if (pathname !== '/dashboard') setConversationSearch('')
   }, [pathname])
-
-  useEffect(() => {
-    if (pathname === '/dashboard') {
-      window.dispatchEvent(new CustomEvent('buyerwatch:conversation-search', {
-        detail: deferredConversationSearch,
-      }))
-    }
-  }, [deferredConversationSearch, pathname])
 
   useEffect(() => {
     async function loadSidebarData() {
@@ -544,7 +538,7 @@ function DashboardShell({
           </header>
 
           {/* Content Container */}
-          <div className="relative z-10 w-full flex-1 min-h-0 overflow-y-auto px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
+          <div className="scrollbar-gutter-stable relative z-10 w-full flex-1 min-h-0 overflow-y-scroll px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
             {extensionMissing && ['/dashboard', '/keywords', '/opportunities'].some((href) => pathname === href || pathname.startsWith(`${href}/`)) && (
               <ExtensionPriorityNotice />
             )}

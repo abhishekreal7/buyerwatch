@@ -54,6 +54,7 @@ export const authRateLimit = createLimiter(5, '15 m', 15 * 60_000)
 export const actionRateLimit = createLimiter(10, '1 m', 60_000)
 export const aiRateLimit = createLimiter(8, '1 h', 60 * 60_000)
 export const fetchNowRateLimit = createLimiter(4, '1 h', 60 * 60_000)
+export const searchRateLimit = createLimiter(60, '1 m', 60 * 60_000)
 export const webhookRateLimit = createLimiter(30, '1 m', 60_000)
 export const settingsRateLimit = createLimiter(20, '1 h', 60 * 60_000)
 

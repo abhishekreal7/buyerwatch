@@ -197,6 +197,12 @@ export async function POST(req: Request) {
       p_draft_text: draftResult.text,
     })
     if (saveError) {
+      const { error: releaseError } = await admin.rpc('release_monthly_draft', {
+        p_user_id: user.id,
+      })
+      if (releaseError) {
+        console.error('Failed to release manual draft allowance after save failure:', releaseError)
+      }
       return NextResponse.json({ error: 'draft_save_failed' }, { status: 500 })
     }
 

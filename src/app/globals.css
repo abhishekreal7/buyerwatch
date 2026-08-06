@@ -421,6 +421,10 @@ p {
   scrollbar-width: none;
 }
 
+.scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}
+
 /* ─── Platform Badges ────────────────────────────────────── */
 .badge-platform {
   display: inline-flex;

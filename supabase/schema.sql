@@ -138,7 +138,8 @@ create policy "profiles update own" on profiles for update
 revoke update on profiles from authenticated;
 grant update (
   business_name, business_description, business_url, business_type,
-  writing_style, tone_archetype, style_guardrails, reddit_username, notification_preferences
+  writing_style, tone_archetype, style_guardrails, reddit_username, notification_preferences,
+  high_intent_threshold
 ) on profiles to authenticated;
 create policy "own keywords" on keywords for all using (auth.uid() = user_id);
 create policy "own threads" on monitored_threads for all using (auth.uid() = user_id);
