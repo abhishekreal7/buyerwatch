@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, ArrowUp } from 'lucide-react'
+import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, ArrowUp, ChevronDown } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { toast } from 'sonner'
@@ -18,7 +18,7 @@ import {
   type BillingAddonType,
 } from '@/lib/billing-addons'
 import { useDashboardSession } from '@/components/DashboardContext'
-import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
+import { getIntentDisplayLabel, isLowRelevanceScore, type IntentLabel } from '@/lib/intent'
 import { useExtensionStatus } from '@/components/ExtensionInstall'
 import { getSafeThreadUrl } from '@/lib/thread-url'
 import { IntentBadge } from '@/components/IntentBadge'
@@ -49,6 +49,14 @@ interface Thread {
   createdAt: string          // Feature 4: Approval-First window countdown
   status: string
   reviewedAt: string | null
+}
+
+type FilterTab = 'all' | 'high-intent' | 'dismissed'
+
+const DASHBOARD_FILTER_STORAGE_KEY = 'buyerwatch:dashboard-filter-tab'
+
+function isFilterTab(value: string | null): value is FilterTab {
+  return value === 'all' || value === 'high-intent' || value === 'dismissed'
 }
 
 function formatTimeAgo(dateString: string) {
@@ -120,7 +128,9 @@ export default function DashboardPage() {
   const [totalSent, setTotalSent] = useState(0)
   const [plan, setPlan] = useState<PlanTier>('free')
   const [regenerating, setRegenerating] = useState(false)
-  const [filterTab, setFilterTab] = useState<'all' | 'high-intent' | 'dismissed'>('all')
+  const [filterTab, setFilterTab] = useState<FilterTab>('high-intent')
+  const [filterPreferenceReady, setFilterPreferenceReady] = useState(false)
+  const [showLowRelevance, setShowLowRelevance] = useState(false)
   const { conversationSearch: searchQuery } = useConversationSearch()
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const searchQueryRef = useRef('')
@@ -148,6 +158,27 @@ export default function DashboardPage() {
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
   const { isInstalled: extensionInstalled } = useExtensionStatus()
+
+  useEffect(() => {
+    try {
+      const savedFilterTab = window.localStorage.getItem(DASHBOARD_FILTER_STORAGE_KEY)
+      if (isFilterTab(savedFilterTab)) setFilterTab(savedFilterTab)
+    } catch {
+      // A blocked storage API should never prevent the dashboard from loading.
+    } finally {
+      setFilterPreferenceReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!filterPreferenceReady) return
+
+    try {
+      window.localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, filterTab)
+    } catch {
+      // Keeping the active tab in memory is enough when storage is unavailable.
+    }
+  }, [filterPreferenceReady, filterTab])
   const loadData = useCallback(async () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -933,12 +964,30 @@ export default function DashboardPage() {
 
       {/* Filtered threads calculation */}
       {(() => {
-        const filtered = threads.filter(t => {
-          if (filterTab === 'high-intent') return t.score !== null && t.score >= highIntentThreshold && t.status !== 'dismissed'
-          if (filterTab === 'dismissed') return t.status === 'dismissed'
-          return t.status !== 'dismissed' && t.score !== null
-        })
         const dismissedCount = threads.filter(t => t.status === 'dismissed').length
+        const activeScoredCount = threads.filter(t => t.status !== 'dismissed' && t.score !== null).length
+        const highIntentCount = threads.filter(t => t.status !== 'dismissed' && t.score !== null && t.score >= highIntentThreshold).length
+        const lowRelevanceThreads = filterTab === 'all'
+          ? filtered.filter(thread => isLowRelevanceScore(thread.score))
+          : []
+        const primaryThreads = filterTab === 'all'
+          ? filtered.filter(thread => !isLowRelevanceScore(thread.score))
+          : filtered
+        const lowRelevanceExpanded = showLowRelevance || Boolean(normalizedSearch)
+        const feedItems = [
+          ...primaryThreads.map(thread => ({ kind: 'thread' as const, thread, isLowRelevance: false })),
+          ...(lowRelevanceThreads.length > 0 ? [{ kind: 'low-toggle' as const }] : []),
+          ...(lowRelevanceExpanded
+            ? lowRelevanceThreads.map(thread => ({ kind: 'thread' as const, thread, isLowRelevance: true }))
+            : []),
+        ]
+        const feedCountLabel = searchLoading
+          ? 'Searching all conversations...'
+          : filterTab === 'high-intent'
+            ? `${filtered.length} high-intent ${filtered.length === 1 ? 'opportunity' : 'opportunities'}`
+            : filterTab === 'all'
+              ? `${filtered.length} scored ${filtered.length === 1 ? 'conversation' : 'conversations'}`
+              : `${filtered.length} dismissed ${filtered.length === 1 ? 'conversation' : 'conversations'}`
 
         return (
           <>
@@ -946,19 +995,39 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] pb-4">
               <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-[#F1F2F3] p-1 no-scrollbar">
                 <button
-                  onClick={() => setFilterTab('all')}
+                  type="button"
+                  onClick={() => {
+                    setFilterTab('all')
+                    setShowLowRelevance(false)
+                  }}
+                  aria-pressed={filterTab === 'all'}
                   className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   All Conversations
                 </button>
                 <button
-                  onClick={() => setFilterTab('high-intent')}
+                  type="button"
+                  onClick={() => {
+                    setFilterTab('high-intent')
+                    setShowLowRelevance(false)
+                  }}
+                  aria-pressed={filterTab === 'high-intent'}
                   className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
-                  High Intent (≥{highIntentThreshold}%)
+                  <span>High Intent (≥{highIntentThreshold}%)</span>
+                  {highIntentCount > 0 && (
+                    <span className="ml-1.5 rounded-full bg-[#EAF4FF] px-1.5 py-0.5 text-[10px] font-bold text-[#0A84FF]">
+                      {highIntentCount}
+                    </span>
+                  )}
                 </button>
                 <button
-                  onClick={() => setFilterTab('dismissed')}
+                  type="button"
+                  onClick={() => {
+                    setFilterTab('dismissed')
+                    setShowLowRelevance(false)
+                  }}
+                  aria-pressed={filterTab === 'dismissed'}
                   className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   <span>Dismissed</span>
@@ -971,7 +1040,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="flex items-center gap-2 text-xs font-semibold text-[#4F5865] pr-1">
-                <span>{searchLoading ? 'Searching all conversations...' : filtered.length === 1 ? '1 opportunity' : `${filtered.length} opportunities`}</span>
+                <span>{feedCountLabel}</span>
               </div>
             </div>
 
@@ -1018,7 +1087,28 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount > 0 && (
+                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount > 0 && filterTab === 'high-intent' && activeScoredCount > 0 && (
+                  <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF4FF] text-[#0A84FF]">
+                      <Sparkles className="h-5 w-5" strokeWidth={1.8} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">No high-intent conversations yet</h3>
+                      <p className="mt-1 text-xs text-[#667085]">
+                        {activeScoredCount} scored {activeScoredCount === 1 ? 'conversation is' : 'conversations are'} available to review while BuyerWatch keeps monitoring.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFilterTab('all')}
+                      className="mt-1 inline-flex min-h-10 items-center rounded-xl border border-[#C7D7FE] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#0A84FF] transition-colors hover:bg-[#F5F9FF]"
+                    >
+                      View all scored conversations
+                    </button>
+                  </div>
+                )}
+
+                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount > 0 && !(filterTab === 'high-intent' && activeScoredCount > 0) && (
                   /* Borderless empty state keeps the feed visually quiet. */
                   <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
@@ -1053,21 +1143,55 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 )}
+                {feedItems.map((item) => {
+                  if (item.kind === 'low-toggle') {
+                    return (
+                      <section
+                        key="low-relevance-toggle"
+                        data-testid="low-relevance-toggle"
+                        aria-label="Low-relevance conversations"
+                        className="rounded-xl border border-dashed border-[#D8DDE5] bg-[#FAFBFC] px-3.5 py-2.5"
+                      >
+                        {normalizedSearch ? (
+                          <div className="flex items-center justify-between gap-3 text-xs">
+                            <span className="font-semibold text-[#667085]">Low-relevance matches</span>
+                            <span className="text-[#98A2B3]">Shown for your search</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowLowRelevance(current => !current)}
+                            aria-expanded={showLowRelevance}
+                            className="flex min-h-9 w-full items-center justify-between gap-3 rounded-lg text-left text-xs font-semibold text-[#667085] transition-colors hover:text-[#344054] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25"
+                          >
+                            <span>
+                              {showLowRelevance ? 'Hide' : 'Show'} {lowRelevanceThreads.length} low-relevance {lowRelevanceThreads.length === 1 ? 'result' : 'results'}
+                            </span>
+                            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${showLowRelevance ? 'rotate-180' : ''}`} aria-hidden="true" />
+                          </button>
+                        )}
+                      </section>
+                    )
+                  }
 
-
-                {filtered.map((thread) => {
+                  const { thread, isLowRelevance } = item
                   const isReddit = thread.platform === 'reddit'
 
                   return (
                     <div key={thread.id} className="space-y-2.5 pb-1">
                       <article
                         id={`conversation-${thread.id}`}
+                        data-testid={isLowRelevance ? 'low-relevance-thread' : undefined}
                         tabIndex={-1}
                         aria-label={`Review opportunity${thread.title ? `: ${thread.title}` : ''}`}
-                        className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.025)] transition-colors hover:border-black/15 focus:outline-none focus-visible:border-[#0A84FF]/45 focus-visible:ring-2 focus-visible:ring-[#0A84FF]/15"
+                        className={`rounded-2xl border transition-colors focus:outline-none focus-visible:border-[#0A84FF]/45 focus-visible:ring-2 focus-visible:ring-[#0A84FF]/15 ${
+                          isLowRelevance
+                            ? 'border-[#E5E7EB] bg-[#FCFCFD] p-4 shadow-none hover:border-[#D0D5DD]'
+                            : 'border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.025)] hover:border-black/15'
+                        }`}
                       >
                         <div>
-                          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                          <div className={`${isLowRelevance ? 'mb-2.5' : 'mb-3'} flex flex-wrap items-start justify-between gap-2`}>
                             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text-secondary">
                               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F4F5F7]">
                                 {thread.platform === 'reddit' ? (
@@ -1150,11 +1274,11 @@ export default function DashboardPage() {
                           </div>
 
                           {thread.title && (
-                            <h3 className="mb-2 text-[15px] font-bold leading-snug text-text-primary">
+                            <h3 className={`mb-2 leading-snug ${isLowRelevance ? 'text-[14px] font-semibold text-[#344054]' : 'text-[15px] font-bold text-text-primary'}`}>
                               {thread.title}
                             </h3>
                           )}
-                          <p className="text-text-secondary text-[14px] line-clamp-2 mb-4 leading-relaxed">{thread.content}</p>
+                          <p className={`line-clamp-2 leading-relaxed ${isLowRelevance ? 'mb-3 text-[13px] text-[#667085]' : 'mb-4 text-[14px] text-text-secondary'}`}>{thread.content}</p>
 
                           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                             <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -1167,7 +1291,7 @@ export default function DashboardPage() {
                                 <IntentBadge score={thread.score} label={thread.label} />
                               )}
                               {thread.matchedKeyword && (
-                                <span className="text-xs text-text-tertiary font-medium tracking-wide">Matched: &quot;{thread.matchedKeyword}&quot;</span>
+                                <span className={`text-xs font-medium tracking-wide ${isLowRelevance ? 'text-[#98A2B3]' : 'text-text-tertiary'}`}>Matched: &quot;{thread.matchedKeyword}&quot;</span>
                               )}
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -1187,7 +1311,7 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                          <div className="mt-4 flex justify-end border-t border-black/[0.05] pt-4 sm:pl-8">
+                          <div className={`${isLowRelevance ? 'mt-3 pt-3' : 'mt-4 pt-4'} flex justify-end border-t border-black/[0.05] sm:pl-8`}>
                             {editingDraft === thread.id ? (
                               <div className="w-full max-w-[92%] sm:max-w-[68%]">
                                 <div className="mb-2 flex items-center justify-between px-1">
@@ -1270,21 +1394,36 @@ export default function DashboardPage() {
                                 type="button"
                                 onClick={() => handleReplyBubbleClick(thread)}
                                 disabled={regenerating}
-                                className="group w-fit max-w-[82%] rounded-[17px] rounded-br-[5px] bg-[#0A84FF] px-4 py-3 text-left text-white shadow-[0_3px_12px_rgba(10,132,255,0.12)] transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_5px_16px_rgba(10,132,255,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-75 sm:max-w-[46%]"
-                                aria-label={thread.draft ? 'Open full drafted reply' : 'Generate a drafted reply'}
+                                data-testid={isLowRelevance ? 'low-relevance-reply' : undefined}
+                                className={`group w-fit max-w-[82%] text-left transition-[transform,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-75 sm:max-w-[46%] ${
+                                  isLowRelevance
+                                    ? thread.draft
+                                      ? 'rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-[#475467] shadow-none hover:border-[#98A2B3] hover:bg-[#F8FAFC]'
+                                      : 'inline-flex items-center gap-2 rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-[#475467] shadow-none hover:border-[#98A2B3] hover:bg-[#F8FAFC]'
+                                    : 'rounded-[17px] rounded-br-[5px] bg-[#0A84FF] px-4 py-3 text-white shadow-[0_3px_12px_rgba(10,132,255,0.12)] hover:-translate-y-px hover:shadow-[0_5px_16px_rgba(10,132,255,0.16)] disabled:hover:translate-y-0'
+                                }`}
+                                aria-label={thread.draft
+                                  ? 'Open full drafted reply'
+                                  : isLowRelevance
+                                    ? 'Generate a reply despite low relevance'
+                                    : 'Generate a drafted reply'}
                               >
                                 {thread.draft ? (
-                                  <p className="line-clamp-2 whitespace-pre-line text-[12.5px] leading-relaxed text-white">
+                                  <p className={`line-clamp-2 whitespace-pre-line text-[12.5px] leading-relaxed ${isLowRelevance ? 'text-[#344054]' : 'text-white'}`}>
                                     {thread.draft}
                                   </p>
                                 ) : (
-                                  <span className="flex items-center gap-2 text-[12.5px] font-semibold leading-relaxed text-white">
-                                    <MessageCircle className="h-3.5 w-3.5 text-white/75" strokeWidth={2} />
-                                    {regenerating && selectedThread?.id === thread.id ? 'Preparing reply...' : 'Generate reply'}
+                                  <span className={`flex items-center gap-2 text-[12.5px] font-semibold leading-relaxed ${isLowRelevance ? 'text-[#475467]' : 'text-white'}`}>
+                                    <MessageCircle className={`h-3.5 w-3.5 ${isLowRelevance ? 'text-[#667085]' : 'text-white/75'}`} strokeWidth={2} />
+                                    {regenerating && selectedThread?.id === thread.id
+                                      ? 'Preparing reply...'
+                                      : isLowRelevance
+                                        ? 'Generate reply anyway'
+                                        : 'Generate reply'}
                                   </span>
                                 )}
                                 {thread.draft && (
-                                  <span className="mt-1.5 block text-right text-[9.5px] font-medium text-white/65 group-hover:text-white/90">
+                                  <span className={`mt-1.5 block text-right text-[9.5px] font-medium ${isLowRelevance ? 'text-[#98A2B3] group-hover:text-[#667085]' : 'text-white/65 group-hover:text-white/90'}`}>
                                     Open full reply
                                   </span>
                                 )}

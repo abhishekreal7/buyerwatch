@@ -1,4 +1,5 @@
 export const INTENT_LABELS = ['buying', 'researching', 'complaining', 'other'] as const
+export const LOW_RELEVANCE_THRESHOLD = 40
 
 export type IntentLabel = (typeof INTENT_LABELS)[number]
 
@@ -63,4 +64,10 @@ export function getIntentDisplayLabel(label: IntentLabel | null | undefined, sco
   if (score >= 80) return 'Buying intent'
   if (score >= 60) return 'Researching'
   return 'Low relevance'
+}
+
+export function isLowRelevanceScore(score: number | null | undefined): boolean {
+  return typeof score === 'number'
+    && Number.isFinite(score)
+    && score < LOW_RELEVANCE_THRESHOLD
 }
