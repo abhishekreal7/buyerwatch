@@ -32,6 +32,11 @@ function isSendReplyData(value: unknown): value is SendReplyData {
     && typeof message.text === 'string'
     && message.text.trim().length > 0
     && message.text.length <= 10_000
+    && (message.sourceTarget === undefined || (
+      typeof message.sourceTarget === 'string'
+      && message.sourceTarget.trim().length > 0
+      && message.sourceTarget.length <= 200
+    ))
     && (message.platform === 'reddit' || message.platform === 'bluesky')
     && (message.triggerType === 'manual' || message.triggerType === 'auto')
   )

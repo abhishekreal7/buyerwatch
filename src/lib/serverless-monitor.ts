@@ -10,7 +10,11 @@ import {
 } from './reddit-candidates'
 import { searchBlueskyPosts } from './bluesky'
 import { fetchSubredditNew } from './reddit'
-import { dispatchPendingOutbox, withRedisLock } from './backend-maintenance'
+import { dispatchPendingOutbox, recoverStaleSends, withRedisLock } from './backend-maintenance'
+import {
+  MONITORING_RUN_LOCK_KEY,
+  MONITORING_RUN_LOCK_TTL_MS,
+} from './monitoring-lock'
 import { withScoreLock } from './score-lock'
 import { processScorePost } from '../../worker/handlers/score-post'
 import { isRedditDirectPostingConfigured } from './reddit-post'
@@ -269,6 +273,10 @@ async function runLockedMonitor(
   forcePlatform?: MonitorPlatform,
   forceTarget?: string,
 ): Promise<ServerlessMonitorResult> {
+  // Keep the serverless scheduler capable of recovering delivery work when
+  // the always-on worker is unavailable.
+  await recoverStaleSends(now)
+
   const maxScores = positiveInteger(
     process.env.SERVERLESS_MONITOR_MAX_SCORES,
     getConfiguredSecret(process.env.ANTHROPIC_API_KEY) ? 1 : 5,
@@ -390,8 +398,8 @@ export async function runServerlessMonitoring(
 ): Promise<ServerlessMonitorResult> {
   const result = await withRedisLock(
     redis,
-    'locks:serverless-social-monitor',
-    270_000,
+    MONITORING_RUN_LOCK_KEY,
+    MONITORING_RUN_LOCK_TTL_MS,
     () => runLockedMonitor(
       now,
       options.forceUserId,

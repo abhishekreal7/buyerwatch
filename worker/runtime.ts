@@ -10,6 +10,10 @@ import Redis from 'ioredis'
 import { fetchWithTimeout, withTimeout } from '../src/lib/http'
 import { logger } from '../src/lib/logger'
 import {
+  MONITORING_RUN_LOCK_KEY,
+  MONITORING_RUN_LOCK_TTL_MS,
+} from '../src/lib/monitoring-lock'
+import {
   blueskyFetchQueue,
   checkGoogleRankQueue,
   deadLetterQueue,
@@ -213,8 +217,8 @@ export async function startWorkerRuntime() {
     try {
       await withRedisLock(
         redis,
-        `scheduler:monitor:${minute}`,
-        55_000,
+        MONITORING_RUN_LOCK_KEY,
+        MONITORING_RUN_LOCK_TTL_MS,
         () => enqueueDueMonitoring(now),
       )
       await withRedisLock(

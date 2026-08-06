@@ -26,6 +26,7 @@ import { checkGoogleRankQueue, notifySlackQueue } from '../../src/lib/queues'
 import { recordAutomationDecision, recordEngagementEvent } from '../../src/lib/automation-audit'
 import { getPlatformCapabilities } from '../../src/lib/platform-capabilities'
 import { isRedditDirectPostingConfigured } from '../../src/lib/reddit-post'
+import { withScoreLock } from '../../src/lib/score-lock'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -46,7 +47,19 @@ type ScorePostOptions = {
 }
 
 export async function scorePostHandler(job: Job) {
-  return processScorePost(job.data as ScorePostPayload)
+  const payload = job.data as ScorePostPayload
+  const result = await withScoreLock(
+    payload.userId,
+    payload.post.externalId,
+    () => processScorePost(payload),
+  )
+  if (result === null) {
+    logger.info(
+      { jobId: job.id, userId: payload.userId, externalId: payload.post.externalId },
+      'Skipped duplicate score job while another worker owns the score lease',
+    )
+  }
+  return result
 }
 
 export async function processScorePost(
@@ -428,6 +441,7 @@ export async function processScorePost(
         text: draftText,
         platform: post.platform as 'reddit' | 'bluesky',
         triggerType: 'auto' as const,
+        sourceTarget: post.sourceTarget || undefined,
       }
       const thread = await saveThread({
         userId,

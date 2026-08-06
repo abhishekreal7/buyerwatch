@@ -75,12 +75,23 @@ export async function dispatchPendingOutbox(
 }
 
 export async function recoverStaleSends(now = new Date()): Promise<number> {
+  const supabase = getSupabaseAdmin()
   const staleBefore = new Date(now.getTime() - 15 * 60_000).toISOString()
-  const { data, error } = await getSupabaseAdmin().rpc('recover_stale_send_claims', {
+  const { data: recoveredClaims, error: claimsError } = await supabase.rpc('recover_stale_send_claims', {
     p_stale_before: staleBefore,
   })
-  if (error) throw error
-  return Number(data ?? 0)
+  if (claimsError) throw claimsError
+
+  const staleOutboxBefore = new Date(now.getTime() - 20 * 60_000).toISOString()
+  const { data: requeuedOutbox, error: outboxError } = await supabase.rpc(
+    'requeue_stale_auto_send_outbox',
+    {
+      p_stale_before: staleOutboxBefore,
+      p_max_dispatch_attempts: 3,
+    },
+  )
+  if (outboxError) throw outboxError
+  return Number(recoveredClaims ?? 0) + Number(requeuedOutbox ?? 0)
 }
 
 export async function cleanupOperationalData(): Promise<Record<string, number>> {

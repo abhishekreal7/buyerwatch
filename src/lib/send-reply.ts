@@ -9,6 +9,8 @@ import {
 } from './send-limiter'
 import { ensureAttributionMapping } from './attribution-store'
 import { recordEngagementEvent } from './automation-audit'
+import { queuedAutoSendBlockReason } from './auto-send-policy'
+import { isRedditDirectPostingConfigured } from './reddit-post'
 
 export type SendReplyData = {
   userId: string
@@ -17,6 +19,7 @@ export type SendReplyData = {
   text: string
   platform: 'reddit' | 'bluesky'
   triggerType: 'manual' | 'auto'
+  sourceTarget?: string
 }
 
 export type SendReplyContext = {
@@ -38,6 +41,26 @@ export function isRetryableSendError(error: unknown): boolean {
   return !(error instanceof PlatformPostError) || error.retryable
 }
 
+async function cancelQueuedAutoSend(
+  supabase: ReturnType<typeof getSupabase>,
+  threadId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('job_outbox')
+    .update({
+      status: 'cancelled',
+      dispatched_at: new Date().toISOString(),
+      last_error: `Automatic delivery cancelled: ${reason}`,
+    })
+    .eq('thread_id', threadId)
+    .eq('kind', 'auto_send')
+    .in('status', ['pending', 'dispatched'])
+  if (error) {
+    logger.warn({ error, threadId, reason }, 'Could not record automatic delivery cancellation')
+  }
+}
+
 export async function processSendReply(
   data: SendReplyData,
   context: SendReplyContext,
@@ -49,10 +72,41 @@ export async function processSendReply(
   if (triggerType === 'auto') {
     const { data: automationProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('auto_send_daily_limit')
+      .select('plan, auto_send_enabled, auto_send_daily_limit, auto_send_platforms, auto_send_communities')
       .eq('id', userId)
       .single()
-    if (profileError) throw new Error(`Unable to load automation limit: ${profileError.message}`)
+    if (profileError || !automationProfile) {
+      throw new Error(`Unable to load automation policy: ${profileError?.message ?? 'profile not found'}`)
+    }
+
+    const policyBlock = queuedAutoSendBlockReason(
+      automationProfile,
+      platform,
+      data.sourceTarget,
+      { redditDirectPostingEnabled: isRedditDirectPostingConfigured() },
+    )
+    if (policyBlock) {
+      await cancelQueuedAutoSend(supabase, threadId, policyBlock)
+      logger.info({ jobId: context.jobId, threadId, policyBlock }, 'Skipped auto-send after current policy check')
+      return { skipped: true, reason: policyBlock }
+    }
+
+    const { data: connection, error: connectionError } = await supabase
+      .from('platform_connections')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('platform', platform)
+      .maybeSingle()
+    if (connectionError) {
+      throw new Error(`Unable to load automation connection: ${connectionError.message}`)
+    }
+    if (!connection) {
+      const reason = 'platform_connection_removed'
+      await cancelQueuedAutoSend(supabase, threadId, reason)
+      logger.info({ jobId: context.jobId, threadId, reason }, 'Skipped auto-send after connection check')
+      return { skipped: true, reason }
+    }
+
     maxPerDay = Number(automationProfile.auto_send_daily_limit) || 3
   }
 
