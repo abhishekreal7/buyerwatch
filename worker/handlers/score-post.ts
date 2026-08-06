@@ -27,6 +27,13 @@ import { recordAutomationDecision, recordEngagementEvent } from '../../src/lib/a
 import { getPlatformCapabilities } from '../../src/lib/platform-capabilities'
 import { isRedditDirectPostingConfigured } from '../../src/lib/reddit-post'
 import { withScoreLock } from '../../src/lib/score-lock'
+import {
+  evaluateRedditReplyPolicy,
+  extractSubredditFromRedditUrl,
+  getSubredditCommunityPolicy,
+  toCommunityPolicyAudit,
+  type RedditReplyPolicyDecision,
+} from '../../src/lib/reddit-community-policy'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -451,6 +458,7 @@ export async function processScorePost(
       : []
     const normalizedTarget = (post.sourceTarget ?? '').trim().toLocaleLowerCase()
     let evaluation = trustEvaluation
+    let redditCommunityPolicyDecision: RedditReplyPolicyDecision | null = null
 
     if (evaluation.approved && !enabledPlatforms.includes(post.platform)) {
       evaluation = blockAutomation(evaluation, 'auto_send_platform_disabled')
@@ -464,6 +472,21 @@ export async function processScorePost(
       evaluation = blockAutomation(evaluation, 'auto_send_target_out_of_scope')
     } else if (evaluation.approved && (!allowAutoSend || capabilities.delivery !== 'direct')) {
       evaluation = blockAutomation(evaluation, 'assisted_delivery_required')
+    }
+
+    if (evaluation.approved && post.platform === 'reddit') {
+      const communityPolicy = await getSubredditCommunityPolicy(
+        userId,
+        extractSubredditFromRedditUrl(post.url) || post.sourceTarget || '',
+      )
+      redditCommunityPolicyDecision = evaluateRedditReplyPolicy(communityPolicy, {
+        text: draftText,
+        businessName: profile.business_name,
+        businessUrl: profile.business_url,
+      })
+      if (redditCommunityPolicyDecision.outcome !== 'auto_send_allowed') {
+        evaluation = blockAutomation(evaluation, redditCommunityPolicyDecision.reason)
+      }
     }
 
     if (
@@ -508,6 +531,7 @@ export async function processScorePost(
           evaluation,
           deliveryMode: capabilities.delivery,
           hasAnthropic,
+          redditCommunityPolicyDecision,
         })
       }
       if (thread && enqueueFollowUpJobs) {
@@ -557,6 +581,7 @@ export async function processScorePost(
           evaluation,
           deliveryMode: capabilities.delivery,
           hasAnthropic,
+          redditCommunityPolicyDecision,
         })
       }
       if (thread && enqueueFollowUpJobs) {
@@ -606,6 +631,7 @@ async function recordInitialAutomationAudit(input: {
   evaluation: Awaited<ReturnType<typeof evaluateAutoSend>>
   deliveryMode: 'direct' | 'assisted' | 'manual' | 'unsupported'
   hasAnthropic: boolean
+  redditCommunityPolicyDecision?: RedditReplyPolicyDecision | null
 }) {
   const {
     userId,
@@ -616,6 +642,7 @@ async function recordInitialAutomationAudit(input: {
     evaluation,
     deliveryMode,
     hasAnthropic,
+    redditCommunityPolicyDecision,
   } = input
   const source = post.externalId.includes(':extension:') ? 'chrome_extension' : 'scheduled_monitor'
 
@@ -672,6 +699,7 @@ async function recordInitialAutomationAudit(input: {
         confidence: evaluation.automationConfidence,
         threshold: evaluation.dynamicThreshold,
         deliveryMode,
+        communityPolicy: toCommunityPolicyAudit(redditCommunityPolicyDecision),
       },
       idempotencyKey: `${threadId}:initial-automation-evaluated`,
     }),
@@ -688,6 +716,9 @@ async function recordInitialAutomationAudit(input: {
         mentionedProduct: draftResult.mentionedProduct,
         hasDisclosure: draftResult.hasDisclosure,
         hasCommercialLink: draftResult.hasCommercialLink,
+        ...(toCommunityPolicyAudit(redditCommunityPolicyDecision)
+          ? { communityPolicy: toCommunityPolicyAudit(redditCommunityPolicyDecision) }
+          : {}),
       },
       modelContext: {
         intentProvider: hasAnthropic ? 'anthropic' : 'deterministic',
@@ -829,6 +860,7 @@ async function saveThread(input: {
     text: string
     platform: 'reddit' | 'bluesky'
     triggerType: 'auto'
+    sourceTarget?: string
   }
 }) {
   const {

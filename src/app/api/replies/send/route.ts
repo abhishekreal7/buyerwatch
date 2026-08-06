@@ -8,6 +8,11 @@ import { boundedString, isUuid, readJsonBody, RequestInputError } from '@/lib/re
 import type { SendReplyData } from '@/lib/send-reply'
 import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
 import { recordEngagementEvent } from '@/lib/automation-audit'
+import {
+  evaluateRedditReplyPolicy,
+  extractSubredditFromRedditUrl,
+  getSubredditCommunityPolicy,
+} from '@/lib/reddit-community-policy'
 
 function safeRedditUrl(value: string | null): string | null {
   if (!value) return null
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('business_name')
+      .select('business_name, business_url')
       .eq('id', user.id)
       .single()
     if (!profile?.business_name) {
@@ -93,7 +98,31 @@ export async function POST(request: Request) {
       .eq('platform', thread.platform)
       .maybeSingle()
 
-    if (thread.platform === 'reddit' && (!connection || !isRedditDirectPostingConfigured())) {
+    let requiresManualRedditSubmit = false
+    let communityPolicy: Awaited<ReturnType<typeof getSubredditCommunityPolicy>> | null = null
+    if (thread.platform === 'reddit') {
+      const subreddit = extractSubredditFromRedditUrl(thread.url)
+      communityPolicy = await getSubredditCommunityPolicy(user.id, subreddit ?? '')
+      const policyDecision = evaluateRedditReplyPolicy(communityPolicy, {
+        text,
+        businessName: profile.business_name,
+        businessUrl: profile.business_url,
+      })
+      if (policyDecision.outcome === 'blocked') {
+        return NextResponse.json({
+          error: policyDecision.reason,
+          message: policyDecision.message,
+          policy: communityPolicy,
+        }, { status: 409 })
+      }
+      requiresManualRedditSubmit = policyDecision.outcome === 'manual_review_required'
+    }
+
+    if (thread.platform === 'reddit' && (
+      !connection
+      || !isRedditDirectPostingConfigured()
+      || requiresManualRedditSubmit
+    )) {
       const postUrl = safeRedditUrl(thread.url)
       if (!postUrl) return NextResponse.json({ error: 'reddit_post_url_missing' }, { status: 409 })
       await recordEngagementEvent(admin, {
@@ -103,7 +132,16 @@ export async function POST(request: Request) {
         platform: 'reddit',
         actorType: 'user',
         source: 'reviewed_reply',
-        metadata: { deliveryMode: 'assisted', textLength: text.length },
+        metadata: {
+          deliveryMode: 'assisted',
+          textLength: text.length,
+          communityPolicy: communityPolicy ? {
+            subreddit: communityPolicy.subreddit,
+            status: communityPolicy.status,
+            reasonCode: communityPolicy.reasonCode,
+            checkedAt: communityPolicy.checkedAt,
+          } : undefined,
+        },
         idempotencyKey: `${threadId}:assisted-reply-prepared`,
       }).catch((auditError) => {
         console.error('[replies/send] Assisted handoff audit failed', auditError)
@@ -114,6 +152,7 @@ export async function POST(request: Request) {
         threadId,
         postUrl,
         text,
+        policy: communityPolicy,
       })
     }
 

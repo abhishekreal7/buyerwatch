@@ -1,11 +1,7 @@
-﻿import { createClient } from '@supabase/supabase-js'
-import { decrypt, encrypt } from './encryption'
 import { fetchWithTimeout } from './http'
+import { getDecryptedRedditConnection, refreshRedditToken } from './reddit-oauth'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export { redditApiFetchForUser } from './reddit-oauth'
 
 export class PlatformPostError extends Error {
   constructor(public platform: string, public responseBody: string, public retryable: boolean) {
@@ -26,93 +22,6 @@ export function isRedditDirectPostingConfigured(): boolean {
     && configured(process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID)
     && configured(process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET)
   return paidProxy || oauth
-}
-
-async function getDecryptedRedditConnection(userId: string) {
-  const { data, error } = await supabase
-    .from('platform_connections')
-    .select('access_token, refresh_token')
-    .eq('user_id', userId)
-    .eq('platform', 'reddit')
-    .single()
-
-  if (error || !data || !data.access_token || !data.refresh_token) {
-    throw new Error('Reddit connection not found for user')
-  }
-
-  const decryptedAccess = decrypt(data.access_token)
-  let accessToken = decryptedAccess
-  let expiresAt = 0
-
-  try {
-    const parsed = JSON.parse(decryptedAccess)
-    accessToken = parsed.token
-    expiresAt = parsed.expires_at
-  } catch {
-    // Plain text legacy token fallback
-  }
-
-  return {
-    accessToken,
-    refreshToken: decrypt(data.refresh_token),
-    expiresAt
-  }
-}
-
-async function refreshRedditToken(userId: string, refreshToken: string) {
-  const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim()
-  const clientSecret = (process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET || '').trim()
-
-  if (process.env.NODE_ENV === 'development' && (!clientId || clientId.includes('TODO'))) {
-    return 'developer_access_token'
-  }
-
-  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
-  
-  const response = await fetchWithTimeout('https://www.reddit.com/api/v1/access_token', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${basicAuth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken
-    })
-  }, 10_000)
-
-  if (!response.ok) {
-    // If the refresh token is revoked or invalid, we clear it from DB to force reconnect
-    if (response.status === 400 || response.status === 401) {
-      await supabase
-        .from('platform_connections')
-        .delete()
-        .eq('user_id', userId)
-        .eq('platform', 'reddit')
-    }
-    throw new Error(`Failed to refresh Reddit token: ${response.statusText}`)
-  }
-
-  const data: any = await response.json()
-  const newAccessToken = data.access_token
-  const newRefreshToken = data.refresh_token || refreshToken
-
-  const accessObj = {
-    token: newAccessToken,
-    expires_at: Date.now() + data.expires_in * 1000
-  }
-
-  await supabase
-    .from('platform_connections')
-    .update({
-      access_token: encrypt(JSON.stringify(accessObj)),
-      refresh_token: encrypt(newRefreshToken)
-    })
-    .eq('user_id', userId)
-    .eq('platform', 'reddit')
-
-  return newAccessToken
 }
 
 function handleRedditRateLimits(headers: Headers) {

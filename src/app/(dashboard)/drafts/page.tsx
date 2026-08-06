@@ -16,6 +16,7 @@ import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-cli
 import { useExtensionStatus } from '@/components/ExtensionInstall'
 import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
 import { BILLING_ADDONS } from '@/lib/billing-addons'
+import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
 
 const PAGE_SIZE = 40
 
@@ -226,9 +227,9 @@ export default function DraftsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ threadId: threadIdToSend, platform: platformToSend, text: replyTextToSend, triggerType: 'manual' })
       })
-      const payload = await res.json().catch(() => null) as (ReplySendResult & { error?: string; issues?: Array<{ message?: string }> }) | null
+      const payload = await res.json().catch(() => null) as (ReplySendResult & { error?: string; message?: string; issues?: Array<{ message?: string }> }) | null
       if (!res.ok) {
-        throw new Error(payload?.issues?.[0]?.message || payload?.error || 'Failed to queue reply')
+        throw new Error(payload?.issues?.[0]?.message || payload?.message || payload?.error || 'Failed to queue reply')
       }
       clearSupabaseReadCache()
 
@@ -568,6 +569,10 @@ export default function DraftsPage() {
                     <p className="text-[13px] leading-relaxed text-[#4A4A45]" style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selected.content}</p>
                   </div>
                 </div>
+
+                {selected.platform === 'reddit' && (
+                  <RedditCommunityPolicyNotice subreddit={selected.community} />
+                )}
 
                 {/* Draft reply — full inline editor */}
                 <div>

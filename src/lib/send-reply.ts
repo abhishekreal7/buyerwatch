@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { logger } from './logger'
-import { postRedditReply, PlatformPostError } from './reddit-post'
+import {
+  isRedditDirectPostingConfigured,
+  postRedditReply,
+  PlatformPostError,
+} from './reddit-post'
 import { postBlueskyReply } from './bluesky-post'
 import {
   recordSuccessfulSend,
@@ -10,7 +14,13 @@ import {
 import { ensureAttributionMapping } from './attribution-store'
 import { recordEngagementEvent } from './automation-audit'
 import { queuedAutoSendBlockReason } from './auto-send-policy'
-import { isRedditDirectPostingConfigured } from './reddit-post'
+import {
+  evaluateRedditReplyPolicy,
+  extractSubredditFromRedditUrl,
+  getSubredditCommunityPolicy,
+  toCommunityPolicyAudit,
+  type RedditReplyPolicyDecision,
+} from './reddit-community-policy'
 
 export type SendReplyData = {
   userId: string
@@ -69,10 +79,12 @@ export async function processSendReply(
   const supabase = getSupabase()
 
   let maxPerDay: number | undefined
+  let businessProfile: { business_name: string; business_url: string | null } | null = null
+  let redditPolicyDecision: RedditReplyPolicyDecision | null = null
   if (triggerType === 'auto') {
     const { data: automationProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, auto_send_enabled, auto_send_daily_limit, auto_send_platforms, auto_send_communities')
+      .select('plan, auto_send_enabled, auto_send_daily_limit, auto_send_platforms, auto_send_communities, business_name, business_url')
       .eq('id', userId)
       .single()
     if (profileError || !automationProfile) {
@@ -108,6 +120,71 @@ export async function processSendReply(
     }
 
     maxPerDay = Number(automationProfile.auto_send_daily_limit) || 3
+    businessProfile = {
+      business_name: automationProfile.business_name,
+      business_url: automationProfile.business_url,
+    }
+  }
+
+  if (platform === 'reddit') {
+    if (!businessProfile) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('business_name, business_url')
+        .eq('id', userId)
+        .single()
+      if (profileError || !profile?.business_name) {
+        throw new Error(`Unable to load Reddit policy profile: ${profileError?.message ?? 'profile not found'}`)
+      }
+      businessProfile = profile
+    }
+
+    const { data: policyThread, error: policyThreadError } = await supabase
+      .from('monitored_threads')
+      .select('url')
+      .eq('id', threadId)
+      .eq('user_id', userId)
+      .single()
+    if (policyThreadError || !policyThread) {
+      throw new Error(`Unable to load Reddit thread for policy check: ${policyThreadError?.message ?? 'thread not found'}`)
+    }
+
+    const subreddit = extractSubredditFromRedditUrl(policyThread.url) || data.sourceTarget
+    const communityPolicy = await getSubredditCommunityPolicy(userId, subreddit ?? '', {
+      // This is the final gate immediately before provider delivery. It must
+      // not rely on a stale decision made while the draft was created.
+      forceRefresh: true,
+    })
+    redditPolicyDecision = evaluateRedditReplyPolicy(communityPolicy, {
+      text,
+      businessName: businessProfile.business_name,
+      businessUrl: businessProfile.business_url,
+    })
+
+    if (redditPolicyDecision.outcome !== 'auto_send_allowed') {
+      await recordEngagementEvent(supabase, {
+        userId,
+        threadId,
+        eventType: 'automation_evaluated',
+        platform,
+        source: 'reddit_community_policy',
+        metadata: toCommunityPolicyAudit(redditPolicyDecision),
+        idempotencyKey: `${threadId}:reddit-policy:${redditPolicyDecision.policy.checkedAt}`,
+      }).catch((auditError) => {
+        logger.warn({ auditError, threadId }, 'Could not record Reddit community policy decision')
+      })
+
+      if (triggerType === 'auto') {
+        await cancelQueuedAutoSend(supabase, threadId, redditPolicyDecision.reason)
+        logger.info(
+          { jobId: context.jobId, threadId, reason: redditPolicyDecision.reason },
+          'Skipped auto-send after Reddit community policy check',
+        )
+        return { skipped: true, reason: redditPolicyDecision.reason }
+      }
+
+      throw new PlatformPostError('reddit', redditPolicyDecision.message, false)
+    }
   }
 
   const reservation = await reserveSendSlot(userId, platform, { maxPerDay })
@@ -146,12 +223,15 @@ export async function processSendReply(
     if (threadError) throw new Error(`Unable to load tracking state: ${threadError.message}`)
 
     if (threadRow.tracking_sid) {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('business_url')
-        .eq('id', userId)
-        .single()
-      if (profileError) throw new Error(`Unable to load attribution destination: ${profileError.message}`)
+      const profile = businessProfile ?? await (async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('business_name, business_url')
+          .eq('id', userId)
+          .single()
+        if (error || !data) throw new Error(`Unable to load attribution destination: ${error?.message ?? 'profile not found'}`)
+        return data
+      })()
       if (!profile.business_url) throw new Error('Attribution is enabled but no business URL is configured')
 
       await ensureAttributionMapping(supabase, {
@@ -194,7 +274,11 @@ export async function processSendReply(
       platform,
       actorType: 'provider',
       source: triggerType === 'auto' ? 'earned_automation' : 'manual_approval',
-      metadata: { triggerType, permalink: result.permalink },
+      metadata: {
+        triggerType,
+        permalink: result.permalink,
+        ...(toCommunityPolicyAudit(redditPolicyDecision) ? { communityPolicy: toCommunityPolicyAudit(redditPolicyDecision) } : {}),
+      },
       idempotencyKey: `${threadId}:reply-sent`,
     }).catch((auditError) => {
       logger.warn({ auditError, threadId }, 'Reply sent but engagement audit was not recorded')

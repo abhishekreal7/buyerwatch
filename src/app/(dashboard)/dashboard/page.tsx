@@ -29,6 +29,7 @@ import {
   normalizeHighIntentThreshold,
 } from '@/lib/high-intent-threshold'
 import { useConversationSearch } from '@/lib/conversation-search'
+import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
 
 interface Thread {
   id: string
@@ -504,8 +505,8 @@ export default function DashboardPage() {
           platform: thread.platform,
         })
       })
-      const payload = await res.json().catch(() => null) as (ReplySendResult & { error?: string }) | null
-      if (!res.ok || !payload) throw new Error(payload?.error || 'Failed to dispatch reply')
+      const payload = await res.json().catch(() => null) as (ReplySendResult & { error?: string; message?: string }) | null
+      if (!res.ok || !payload) throw new Error(payload?.message || payload?.error || 'Failed to dispatch reply')
 
       if (payload.mode === 'manual') {
         const mode = await openRedditAssistedReply({
@@ -1292,6 +1293,9 @@ export default function DashboardPage() {
                               )}
                               {thread.matchedKeyword && (
                                 <span className={`text-xs font-medium tracking-wide ${isLowRelevance ? 'text-[#98A2B3]' : 'text-text-tertiary'}`}>Matched: &quot;{thread.matchedKeyword}&quot;</span>
+                              )}
+                              {isReddit && selectedThread?.id === thread.id && (
+                                <RedditCommunityPolicyNotice subreddit={thread.target} compact />
                               )}
                             </div>
                             <div className="flex items-center gap-1.5">

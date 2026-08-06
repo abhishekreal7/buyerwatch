@@ -35,7 +35,9 @@ export async function GET() {
     state,
     redirect_uri: redirectUri,
     duration: 'permanent',
-    scope: 'identity submit',
+    // `read` is required for the per-community rule check that gates Reddit
+    // automation. Existing connections will be asked to reconnect once.
+    scope: 'identity read submit',
   })
 
   return NextResponse.redirect(`https://www.reddit.com/api/v1/authorize?${params.toString()}`)
