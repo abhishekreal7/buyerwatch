@@ -25,8 +25,8 @@ type KeywordRow = SocialKeywordMapping & {
   platform: MonitorPlatform
   target: string
   profiles:
-    | { plan?: string; last_polled_at?: string | null }
-    | Array<{ plan?: string; last_polled_at?: string | null }>
+    | { plan?: string; last_polled_at?: string | null; competitors?: string[] | null }
+    | Array<{ plan?: string; last_polled_at?: string | null; competitors?: string[] | null }>
 }
 
 type TargetWork = {
@@ -79,7 +79,7 @@ async function loadDueSocialWork(
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
       .from('keywords')
-      .select('id, platform, target, term, user_id, profiles!inner(plan, last_polled_at)')
+      .select('id, platform, target, term, user_id, profiles!inner(plan, last_polled_at, competitors)')
       .in('platform', ['reddit', 'bluesky'])
       .eq('is_active', true)
       .order('id', { ascending: true })
@@ -119,7 +119,12 @@ async function loadDueSocialWork(
     dueUsers.add(row.user_id)
     const key = `${row.platform}\0${target}`
     const item = targets.get(key) ?? { platform: row.platform, target, mappings: [] }
-    item.mappings.push({ id: row.id, user_id: row.user_id, term: row.term })
+    item.mappings.push({
+      id: row.id,
+      user_id: row.user_id,
+      term: row.term,
+      competitors: profile?.competitors ?? [],
+    })
     targets.set(key, item)
   }
 

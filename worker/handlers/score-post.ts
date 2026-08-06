@@ -146,21 +146,58 @@ export async function processScorePost(
       }
       evidenceSignals = existing.matched_signals ?? []
     } else {
-      // 3. Reserve one monthly signal slot before paid AI work.
+      // 3. Reject irrelevant/promotional posts before reserving a paid signal.
+      // A raw keyword hit must never consume a customer's monthly allowance.
+      const preflight = evaluateIntentPreflight(post, profile, {
+        keywordTerm: keyword?.term,
+      })
+      evidenceSignals = preflight.evidenceSignals
+      if (!preflight.isQualifiedCandidate) {
+        await saveThread({
+          userId,
+          keywordId,
+          post,
+          intentScore: preflight.score,
+          intentLabel: preflight.label,
+          status: 'dismissed',
+          flag: preflight.flag,
+          reasoning: preflight.reasoning,
+          evidenceSignals,
+          automationReason: 'preflight_rejected',
+        })
+        logger.info({
+          userId,
+          platform: post.platform,
+          externalId: post.externalId,
+          evidenceSignals: evidenceSignals.slice(0, 6),
+        }, 'Intent preflight rejected an unqualified candidate')
+        return
+      }
+
       const canProcessSignal = await reserveMonthlySignal(
         userId,
         planLimits.threadsPerMonth,
       )
       if (!canProcessSignal) {
-        logger.info({ userId, plan }, 'Monthly signal limit reached')
+        // Make this terminal. Leaving an unscored row pending causes it to sit
+        // at the head of the global queue and starve every later candidate.
+        const dismissedThread = await saveThread({
+          userId,
+          keywordId,
+          post,
+          intentScore: 0,
+          intentLabel: 'other',
+          status: 'dismissed',
+          reasoning: 'Skipped because the monthly signal allowance is exhausted; this post was not analyzed.',
+          evidenceSignals,
+          automationReason: 'signal_limit_reached',
+        })
+        await clearUnscoredIntent(dismissedThread.id)
+        logger.info({ userId, plan }, 'Monthly signal limit reached; candidate dismissed from the scoring queue')
         return
       }
       signalReserved = true
 
-      const preflight = evaluateIntentPreflight(post, profile, {
-        keywordTerm: keyword?.term,
-      })
-      evidenceSignals = preflight.evidenceSignals
       paidIntentGatePassed = !hasAnthropic || preflight.shouldUseAi
 
       if (hasAnthropic && preflight.shouldUseAi) {
@@ -838,4 +875,16 @@ async function saveThread(input: {
   if (!threadId) throw new Error('Failed to persist monitored thread: missing id')
 
   return { id: threadId }
+}
+
+/** Keep unanalysed plan-limited captures out of every customer-facing queue. */
+async function clearUnscoredIntent(threadId: string): Promise<void> {
+  const { error } = await supabase
+    .from('monitored_threads')
+    .update({ intent_score: null, intent_label: null })
+    .eq('id', threadId)
+    .eq('status', 'dismissed')
+  if (error) {
+    throw new Error(`Failed to clear unscored intent state: ${error.message}`)
+  }
 }

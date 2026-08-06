@@ -1,5 +1,6 @@
 import { analyzeBuyingSignals } from './buying-signal-filter'
 import type { IntentLabel, IntentResult } from './intent'
+import { containsConfiguredPhrase } from './phrase-match'
 import type { NormalizedPost } from './types'
 
 export type IntentPreflightProfile = {
@@ -10,6 +11,7 @@ export type IntentPreflightProfile = {
 
 export type IntentPreflightResult = IntentResult & {
   shouldUseAi: boolean
+  isQualifiedCandidate: boolean
   evidenceSignals: string[]
   matchedKeywords: string[]
   relevanceTerms: string[]
@@ -29,14 +31,19 @@ const GENERIC_RELEVANCE_TERMS = new Set([
   'build',
   'business',
   'company',
+  'conversation',
+  'conversations',
   'customer',
   'customers',
   'data',
   'find',
   'founder',
   'from',
+  'generation',
   'good',
   'help',
+  'high',
+  'intent',
   'into',
   'lead',
   'leads',
@@ -52,6 +59,7 @@ const GENERIC_RELEVANCE_TERMS = new Set([
   'saas',
   'sales',
   'service',
+  'social',
   'software',
   'startup',
   'that',
@@ -65,20 +73,40 @@ const GENERIC_RELEVANCE_TERMS = new Set([
 ])
 
 const NOISE_PATTERNS: Array<{ label: string; pattern: RegExp; penalty: number }> = [
-  { label: 'self_promotion', pattern: /\b(i|we)\s+(built|made|launched|created|released|shipped)\b/i, penalty: 32 },
-  { label: 'showcase', pattern: /\b(show\s+hn|roast\s+my|feedback\s+on\s+my|check\s+out\s+my|introducing)\b/i, penalty: 28 },
-  { label: 'hiring_or_job_search', pattern: /\b(hiring|job\s+opening|looking\s+for\s+(a\s+)?job|resume|cv|recruiter|recruiters)\b/i, penalty: 35 },
-  { label: 'content_promo', pattern: /\b(newsletter|webinar|course|ebook|blog\s+post|youtube\s+video)\b/i, penalty: 22 },
-  { label: 'fundraising_or_update', pattern: /\b(fundraising|raised\s+\$|monthly\s+update|weekly\s+update|progress\s+update)\b/i, penalty: 18 },
+  {
+    label: 'self_promotion',
+    pattern: /\b(?:i|we)(?:'ve| have)?\s+(?:(?:just|finally|recently)\s+)?(?:built|made|launched|created|released|shipped|finished|developed|introduced)\b|\b(?:just|finally|recently)\s+(?:finished|launched|shipped)\b/i,
+    penalty: 38,
+  },
+  {
+    label: 'showcase',
+    pattern: /\b(show\s+hn|roast\s+my|feedback\s+on\s+my|check\s+out\s+my|introducing|give\s+me\s+(?:your\s+)?thoughts|looking\s+for\s+(?:your\s+)?feedback|not\s+looking\s+for\s+(?:sign[-\s]?ups?|customers?|sales))\b/i,
+    penalty: 34,
+  },
+  {
+    label: 'hiring_or_job_search',
+    pattern: /\b(hiring|job\s+opening|looking\s+for\s+(a\s+)?job|resume|cv|recruiter|recruiters)\b/i,
+    penalty: 35,
+  },
+  {
+    label: 'content_promo',
+    pattern: /\b(newsletter|webinar|course|ebook|blog\s+post|youtube\s+video)\b/i,
+    penalty: 22,
+  },
+  {
+    label: 'fundraising_or_update',
+    pattern: /\b(fundraising|raised\s+\$|monthly\s+update|weekly\s+update|progress\s+update)\b/i,
+    penalty: 18,
+  },
 ]
+
+const DISQUALIFYING_NOISE_SIGNALS = new Set([
+  'self_promotion',
+  'showcase',
+])
 
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').toLocaleLowerCase()
-}
-
-function includesPhrase(text: string, phrase: string): boolean {
-  const normalizedPhrase = phrase.trim().toLocaleLowerCase()
-  return normalizedPhrase.length > 0 && text.includes(normalizedPhrase)
 }
 
 function termsFrom(value: string | null | undefined): string[] {
@@ -88,6 +116,23 @@ function termsFrom(value: string | null | undefined): string[] {
       .map(term => term.trim())
       .filter(term => term.length >= 4 && !GENERIC_RELEVANCE_TERMS.has(term)),
   )]
+}
+
+export function getIntentNoiseSignals(text: string): string[] {
+  return NOISE_PATTERNS
+    .filter(({ pattern }) => pattern.test(text))
+    .map(({ label }) => label)
+}
+
+/**
+ * These are author-side activities, not requests to buy. Reject them before
+ * saving a lead so generic phrases such as "looking for feedback" cannot turn
+ * into false buyer-intent candidates.
+ */
+export function hasDisqualifyingIntentNoise(text: string): boolean {
+  return getIntentNoiseSignals(text).some(signal =>
+    DISQUALIFYING_NOISE_SIGNALS.has(signal),
+  )
 }
 
 function labelForScore(score: number): IntentLabel {
@@ -121,25 +166,20 @@ export function evaluateIntentPreflight(
   options: { keywordTerm?: string | null } = {},
 ): IntentPreflightResult {
   const text = `${post.title ?? ''} ${post.text ?? ''}`.trim()
-  const normalizedText = normalizeText(text)
   const analysis = analyzeBuyingSignals(text)
   const keywordTerm = options.keywordTerm?.trim() || ''
-  const matchedKeywords = includesPhrase(normalizedText, keywordTerm)
+  const matchedKeywords = containsConfiguredPhrase(text, keywordTerm)
     ? [keywordTerm]
     : []
   const relevanceTerms = [
     ...termsFrom(profile.business_name),
     ...termsFrom(profile.business_description),
-    ...termsFrom(keywordTerm),
-  ].filter(term => normalizedText.includes(term))
+  ].filter(term => containsConfiguredPhrase(text, term))
   const uniqueRelevanceTerms = [...new Set(relevanceTerms)]
-  const noiseSignals = NOISE_PATTERNS
-    .filter(({ pattern }) => pattern.test(text))
-    .map(({ label }) => label)
-  const competitorRisk = (profile.competitors ?? []).some((competitor) => {
-    const normalized = competitor.trim().toLocaleLowerCase()
-    return normalized.length > 1 && normalizedText.includes(normalized)
-  })
+  const noiseSignals = getIntentNoiseSignals(text)
+  const competitorRisk = (profile.competitors ?? []).some((competitor) =>
+    competitor.trim().length > 1 && containsConfiguredPhrase(text, competitor),
+  )
   const noisePenalty = NOISE_PATTERNS
     .filter(({ pattern }) => pattern.test(text))
     .reduce((total, { penalty }) => total + penalty, 0)
@@ -149,25 +189,44 @@ export function evaluateIntentPreflight(
   const competitorBoost = competitorRisk ? 14 : 0
   const questionBoost = /[?]|\b(how|what|which|where|anyone|does|is there)\b/i.test(text) ? 4 : 0
   const shortPenalty = text.length < 36 ? 14 : 0
+  const hasContextualMatch = matchedKeywords.length > 0 || uniqueRelevanceTerms.length > 0 || competitorRisk
+  const hasDisqualifyingNoise = noiseSignals.some(signal =>
+    DISQUALIFYING_NOISE_SIGNALS.has(signal),
+  )
+  const missingContextPenalty = hasContextualMatch ? 0 : 42
+  const disqualifyingNoisePenalty = hasDisqualifyingNoise ? 22 : 0
   const score = Math.max(
     0,
     Math.min(
       95,
-      Math.round(categoryScore + keywordBoost + relevanceBoost + competitorBoost + questionBoost - noisePenalty - shortPenalty),
+      Math.round(
+        categoryScore
+        + keywordBoost
+        + relevanceBoost
+        + competitorBoost
+        + questionBoost
+        - noisePenalty
+        - disqualifyingNoisePenalty
+        - missingContextPenalty
+        - shortPenalty,
+      ),
     ),
   )
   const hasDirectCommercialShape = analysis.categories.some(category =>
     category === 'purchase' || category === 'seeking' || category === 'research',
   )
-  const hasContextualMatch = matchedKeywords.length > 0 || uniqueRelevanceTerms.length > 0 || competitorRisk
+  const isQualifiedCandidate = (
+    hasContextualMatch
+    && analysis.categories.length > 0
+    && !hasDisqualifyingNoise
+  )
   const shouldUseAi = (
     score >= configuredThreshold()
+    && isQualifiedCandidate
     && hasDirectCommercialShape
-    && hasContextualMatch
-    && !(noiseSignals.length > 0 && score < 70)
   ) || (
     competitorRisk
-    && analysis.categories.length > 0
+    && isQualifiedCandidate
     && score >= 50
   )
   const evidenceSignals = [
@@ -177,11 +236,13 @@ export function evaluateIntentPreflight(
     ...noiseSignals.map(signal => `noise:${signal}`),
   ]
   const label = labelForScore(score)
-  const reasoning = shouldUseAi
-    ? `Preflight passed: ${evidenceSignals.slice(0, 4).join(', ') || 'commercial context matched'}.`
-    : evidenceSignals.length > 0
-      ? `Preflight kept this deterministic: ${evidenceSignals.slice(0, 4).join(', ')}.`
-      : 'Preflight found no strong commercial intent signals.'
+  const reasoning = !isQualifiedCandidate
+    ? `Preflight rejected this candidate: ${evidenceSignals.slice(0, 4).join(', ') || 'no verified buyer context'}.`
+    : shouldUseAi
+      ? `Preflight passed: ${evidenceSignals.slice(0, 4).join(', ') || 'commercial context matched'}.`
+      : evidenceSignals.length > 0
+        ? `Preflight kept this deterministic: ${evidenceSignals.slice(0, 4).join(', ')}.`
+        : 'Preflight found no strong commercial intent signals.'
 
   return {
     score,
@@ -189,6 +250,7 @@ export function evaluateIntentPreflight(
     reasoning,
     ...(competitorRisk ? { flag: 'COMPETITOR_RISK' as const } : {}),
     shouldUseAi,
+    isQualifiedCandidate,
     evidenceSignals,
     matchedKeywords,
     relevanceTerms: uniqueRelevanceTerms,

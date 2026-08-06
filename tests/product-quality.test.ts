@@ -131,8 +131,44 @@ describe('intent preflight cost gate', () => {
     }, profile, { keywordTerm: 'lead generation' })
 
     expect(result.shouldUseAi).toBe(false)
+    expect(result.isQualifiedCandidate).toBe(false)
     expect(result.score).toBeLessThan(60)
     expect(result.noiseSignals).toEqual(expect.arrayContaining(['self_promotion', 'showcase']))
+  })
+
+  it('rejects launch feedback posts even when they contain a configured keyword', () => {
+    const result = evaluateIntentPreflight({
+      platform: 'reddit',
+      externalId: 'promo-feedback-1',
+      author: 'maker',
+      title: 'Does anyone drink alcohol?',
+      text: "I finally finished my lead generation app. I'm not looking for sign-ups; I'm looking for feedback. Give me your thoughts.",
+      url: 'https://reddit.example/promo-feedback-1',
+      createdAt: '2026-08-06T00:00:00.000Z',
+      sourceTarget: 'SaaS',
+    }, profile, { keywordTerm: 'lead generation' })
+
+    expect(result.isQualifiedCandidate).toBe(false)
+    expect(result.shouldUseAi).toBe(false)
+    expect(result.score).toBeLessThan(40)
+    expect(result.noiseSignals).toEqual(expect.arrayContaining(['self_promotion', 'showcase']))
+  })
+
+  it('does not treat generic buyer language as relevant without product context', () => {
+    const result = evaluateIntentPreflight({
+      platform: 'reddit',
+      externalId: 'generic-request-1',
+      author: 'maker',
+      title: 'Looking for a developer',
+      text: 'What tool should I use to coordinate a small case study?',
+      url: 'https://reddit.example/generic-request-1',
+      createdAt: '2026-08-06T00:00:00.000Z',
+      sourceTarget: 'SaaS',
+    }, profile, { keywordTerm: 'lead generation' })
+
+    expect(result.isQualifiedCandidate).toBe(false)
+    expect(result.shouldUseAi).toBe(false)
+    expect(result.score).toBeLessThan(40)
   })
 
   it('passes explicit buying research to the paid scorer', () => {
@@ -148,6 +184,7 @@ describe('intent preflight cost gate', () => {
     }, profile, { keywordTerm: 'lead generation' })
 
     expect(result.shouldUseAi).toBe(true)
+    expect(result.isQualifiedCandidate).toBe(true)
     expect(result.score).toBeGreaterThanOrEqual(80)
     expect(result.evidenceSignals).toEqual(expect.arrayContaining([
       'looking for',

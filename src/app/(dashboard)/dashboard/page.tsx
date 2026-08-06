@@ -37,7 +37,7 @@ interface Thread {
   timeAgo: string
   title: string
   content: string
-  score: number
+  score: number | null
   label: string
   matchedKeyword: string
   draft: string
@@ -81,6 +81,10 @@ function getDeliveryActionLabel(platform: string, extensionInstalled: boolean) {
 }
 
 function mapThread(thread: any): Thread {
+  const score = thread.intent_score === null || thread.intent_score === undefined
+    ? null
+    : Number(thread.intent_score)
+
   return {
     id: thread.id,
     platform: thread.platform,
@@ -88,11 +92,13 @@ function mapThread(thread: any): Thread {
     timeAgo: formatTimeAgo(thread.created_at),
     title: thread.title || '',
     content: thread.text_content || '',
-    score: Number(thread.intent_score) || 0,
-    label: getIntentDisplayLabel(
-      thread.intent_label as IntentLabel | undefined,
-      Number(thread.intent_score) || 0,
-    ),
+    score,
+    label: score === null
+      ? 'Awaiting analysis'
+      : getIntentDisplayLabel(
+        thread.intent_label as IntentLabel | undefined,
+        score,
+      ),
     matchedKeyword: (thread.keywords as { term?: string } | null)?.term || '',
     draft: (thread.reply_analytics as { draft_text?: string }[])?.[0]?.draft_text || '',
     originalDraft: (thread.reply_analytics as { draft_text?: string }[])?.[0]?.draft_text || '',
@@ -173,13 +179,15 @@ export default function DashboardPage() {
         .select('*, reply_analytics(draft_text), keywords(term, target)')
         .eq('user_id', userId)
         .in('status', ['pending', 'drafted', 'needs_manual_reply', 'dismissed'])
+        .not('intent_score', 'is', null)
         .order('created_at', { ascending: false })
         .limit(60),
       supabase
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .in('status', activeStatuses),
+        .in('status', activeStatuses)
+        .not('intent_score', 'is', null),
       supabase
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
@@ -564,7 +572,9 @@ export default function DashboardPage() {
     setStats(prev => ({
       ...prev,
       threadsFound: Math.max(0, prev.threadsFound - 1),
-      highIntent: dismissed.score >= highIntentThreshold ? Math.max(0, prev.highIntent - 1) : prev.highIntent,
+      highIntent: dismissed.score !== null && dismissed.score >= highIntentThreshold
+        ? Math.max(0, prev.highIntent - 1)
+        : prev.highIntent,
       draftsReady: dismissed.status === 'drafted'
         ? Math.max(0, prev.draftsReady - 1)
         : prev.draftsReady,
@@ -713,8 +723,8 @@ export default function DashboardPage() {
   const filtered = filterTab === 'dismissed'
     ? searchableThreads.filter(t => t.status === 'dismissed')
     : filterTab === 'high-intent'
-      ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score >= highIntentThreshold)
-      : searchableThreads.filter(t => t.status !== 'dismissed')
+      ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score !== null && t.score >= highIntentThreshold)
+      : searchableThreads.filter(t => t.status !== 'dismissed' && t.score !== null)
   const signalLimitReached = plan === 'free' && signalUsage.used >= signalUsage.limit
   const draftLimitReached = plan === 'free' && draftUsage.used >= draftUsage.limit
 
@@ -924,9 +934,9 @@ export default function DashboardPage() {
       {/* Filtered threads calculation */}
       {(() => {
         const filtered = threads.filter(t => {
-          if (filterTab === 'high-intent') return t.score >= highIntentThreshold && t.status !== 'dismissed'
+          if (filterTab === 'high-intent') return t.score !== null && t.score >= highIntentThreshold && t.status !== 'dismissed'
           if (filterTab === 'dismissed') return t.status === 'dismissed'
-          return t.status !== 'dismissed'
+          return t.status !== 'dismissed' && t.score !== null
         })
         const dismissedCount = threads.filter(t => t.status === 'dismissed').length
 

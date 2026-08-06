@@ -6,6 +6,7 @@ import { X_DAILY_SPEND_LIMIT_CENTS } from '../../src/lib/plan-limits'
 import {
   buildSocialScoreCandidates,
   type SocialKeywordMapping,
+  withProfileCompetitors,
 } from '../../src/lib/reddit-candidates'
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -30,7 +31,7 @@ export async function xFetchHandler(job: Job) {
       for (let offset = 0; ; offset += pageSize) {
         const result = await supabase
           .from('keywords')
-          .select('id, user_id, term')
+          .select('id, user_id, term, profiles!inner(competitors)')
           .eq('platform', 'x')
           .eq('target', target)
           .eq('is_active', true)
@@ -40,7 +41,7 @@ export async function xFetchHandler(job: Job) {
           error = result.error
           break
         }
-        keywordMappings.push(...(result.data ?? []))
+        keywordMappings.push(...withProfileCompetitors(result.data ?? []))
         if ((result.data?.length ?? 0) < pageSize) break
       }
     }

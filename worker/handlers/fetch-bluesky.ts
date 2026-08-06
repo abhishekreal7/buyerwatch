@@ -5,6 +5,7 @@ import { scorePostQueue } from '../../src/lib/queues'
 import {
   buildSocialScoreCandidates,
   type SocialKeywordMapping,
+  withProfileCompetitors,
 } from '../../src/lib/reddit-candidates'
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -29,18 +30,18 @@ export async function blueskyFetchHandler(job: Job) {
     if (!keywordMappings) {
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term')
+        .select('id, user_id, term, profiles!inner(competitors)')
         .eq('platform', 'bluesky')
         .eq('target', target)
         .eq('is_active', true)
       if (error) {
         throw new Error(`Failed to load Bluesky keyword mappings: ${error.message}`)
       }
-      keywordMappings = data ?? []
+      keywordMappings = withProfileCompetitors(data ?? [])
     } else if (keywordMappings.length > 0) {
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term')
+        .select('id, user_id, term, profiles!inner(competitors)')
         .eq('platform', 'bluesky')
         .eq('target', target)
         .eq('is_active', true)
@@ -48,7 +49,7 @@ export async function blueskyFetchHandler(job: Job) {
       if (error) {
         throw new Error(`Failed to validate Bluesky keyword mappings: ${error.message}`)
       }
-      keywordMappings = data ?? []
+      keywordMappings = withProfileCompetitors(data ?? [])
     }
 
     if (keywordMappings.length === 0) return

@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
         .from('monitored_threads')
         .select(SELECT_THREADS)
         .eq('user_id', user.id)
+        .not('intent_score', 'is', null)
 
       if (tab === 'dismissed') {
         threadsQuery = threadsQuery.eq('status', 'dismissed')

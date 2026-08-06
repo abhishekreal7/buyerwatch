@@ -107,6 +107,7 @@ Scoring rubric:
 Requirements:
 - Judge the title and body together.
 - Do not infer buying intent from a keyword match alone.
+- A launch, self-promotion, feedback request, case-study pitch, or request for sign-ups is not buyer intent. The author is promoting their own offer, not seeking this business's solution.
 - Ground the reasoning in the author's actual words; do not invent needs or urgency.
 - Use COMPETITOR_RISK only when the post names an item from the competitor watchlist.
 - Keep the score and label consistent with the rubric.

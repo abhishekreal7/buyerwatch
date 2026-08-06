@@ -6,6 +6,7 @@ import { scorePostQueue } from '../../src/lib/queues'
 import {
   buildRedditScoreCandidates,
   type RedditKeywordMapping,
+  withProfileCompetitors,
 } from '../../src/lib/reddit-candidates'
 import { fetchSubredditNew } from '../../src/lib/reddit'
 
@@ -34,7 +35,7 @@ export async function redditFetchHandler(job: Job) {
     if (!keywordMappings) {
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term')
+        .select('id, user_id, term, profiles!inner(competitors)')
         .eq('platform', 'reddit')
         .eq('target', target)
         .eq('is_active', true)
@@ -42,17 +43,17 @@ export async function redditFetchHandler(job: Job) {
       if (error) {
         throw new Error(`Failed to load Reddit keyword mappings: ${error.message}`)
       }
-      keywordMappings = data ?? []
+      keywordMappings = withProfileCompetitors(data ?? [])
     } else if (keywordMappings.length > 0) {
       const ids = keywordMappings.map(({ id }) => id)
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term')
+        .select('id, user_id, term, profiles!inner(competitors)')
         .in('id', ids)
       if (error) {
         throw new Error(`Failed to validate Reddit keyword mappings: ${error.message}`)
       }
-      keywordMappings = data ?? []
+      keywordMappings = withProfileCompetitors(data ?? [])
     }
 
     if (keywordMappings.length === 0) return

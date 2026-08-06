@@ -32,14 +32,31 @@ describe('serverless social candidate selection', () => {
     })
   })
 
-  it('keeps buying-signal posts even without a literal keyword match', () => {
+  it('rejects generic buyer language without a literal keyword or competitor match', () => {
     const result = buildRedditScoreCandidates([
       post({ title: 'Looking for a recommendation', text: 'What tool should I use?' }),
     ], [
       { id: 'keyword-1', user_id: 'user-1', term: 'lead generation' },
     ])
 
+    expect(result.candidates).toHaveLength(0)
+    expect(result.skipped).toBe(1)
+  })
+
+  it('keeps explicit competitor replacement research in scope', () => {
+    const result = buildRedditScoreCandidates([
+      post({ title: 'Looking for a SignalCo alternative', text: 'What tool should I use?' }),
+    ], [
+      {
+        id: 'keyword-1',
+        user_id: 'user-1',
+        term: 'lead generation',
+        competitors: ['SignalCo'],
+      },
+    ])
+
     expect(result.candidates).toHaveLength(1)
+    expect(result.candidates[0]).toMatchObject({ keywordId: 'keyword-1' })
   })
 
   it('rejects noise before any paid model call', () => {
