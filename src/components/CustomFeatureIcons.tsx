@@ -61,7 +61,26 @@ export function ToneMatchingIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0
         transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
         style={{ transformOrigin: "13.0px 12px" }}
       />
-      {/* Equalizer frequency bars scaled to the larger C-arc */}
+      {/*
+        The pulse only exists in the open side of the waveform.  Keeping it
+        hidden while it crosses the equalizer prevents it appearing on top of
+        a bar at intermediate animation frames.
+      */}
+      <motion.circle
+        cy="12" r="1.3" fill={color} stroke="white" strokeWidth="1"
+        animate={{
+          cx: [12.5, 7.4, 4.5, 7.4, 12.5],
+          opacity: [0, 0, 1, 0, 0],
+          scale: [0, 0, 1.2, 0, 0],
+        }}
+        transition={{
+          repeat: Infinity,
+          duration: 3,
+          times: [0, 0.2, 0.5, 0.8, 1],
+          ease: "easeInOut",
+        }}
+      />
+      {/* Equalizer frequency bars are painted above the pulse as a final visual safeguard. */}
       <motion.line
         x1="9.2" y1="10" x2="9.2" y2="14"
         animate={{ scaleY: [0.5, 1.4, 0.5] }}
@@ -85,20 +104,6 @@ export function ToneMatchingIcon({ size = 24, color = '#0A0A0A', strokeWidth = 0
         animate={{ scaleY: [0.5, 1.3, 0.5] }}
         transition={{ repeat: Infinity, duration: 2.0, ease: "easeInOut" }}
         style={{ transformOrigin: "16.7px 12px" }}
-      />
-      {/* Moving pulse dot sliding smoothly through the waveform opening */}
-      <motion.circle
-        cy="12" r="1.3" fill={color} stroke="white" strokeWidth="1"
-        animate={{
-          cx: [12.5, 4.5, 12.5],
-          opacity: [0, 1, 0],
-          scale: [0, 1.2, 0]
-        }}
-        transition={{
-          repeat: Infinity,
-          duration: 3,
-          ease: "easeInOut"
-        }}
       />
     </svg>
   );
