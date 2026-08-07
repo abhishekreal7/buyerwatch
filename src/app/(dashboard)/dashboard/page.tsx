@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, ArrowUp, ChevronDown } from 'lucide-react'
+import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { toast } from 'sonner'
@@ -28,6 +28,13 @@ import {
   DEFAULT_HIGH_INTENT_THRESHOLD,
   normalizeHighIntentThreshold,
 } from '@/lib/high-intent-threshold'
+import {
+  DASHBOARD_METRIC_PERIODS,
+  getDashboardMetricPeriodLabel,
+  getDashboardMetricPeriodStart,
+  isDashboardMetricPeriod,
+  type DashboardMetricPeriod,
+} from '@/lib/dashboard-metric-period'
 import { useConversationSearch } from '@/lib/conversation-search'
 import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
 
@@ -131,6 +138,9 @@ export default function DashboardPage() {
   const [regenerating, setRegenerating] = useState(false)
   const [filterTab, setFilterTab] = useState<FilterTab>('high-intent')
   const [filterPreferenceReady, setFilterPreferenceReady] = useState(false)
+  const [metricsPeriod, setMetricsPeriod] = useState<DashboardMetricPeriod>('7d')
+  const [metricsLoading, setMetricsLoading] = useState(true)
+  const metricsPeriodRef = useRef<DashboardMetricPeriod>('7d')
   const [showLowRelevance, setShowLowRelevance] = useState(false)
   const { conversationSearch: searchQuery } = useConversationSearch()
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -141,9 +151,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     threadsFound: 0,
     highIntent: 0,
-    highIntentToday: 0,
     draftsReady: 0,
-    postedToday: 0,
+    repliesSent: 0,
   })
   const [keywordsCount, setKeywordsCount] = useState(0)
   const [keywordsMax, setKeywordsMax] = useState(1)
@@ -181,10 +190,8 @@ export default function DashboardPage() {
     }
   }, [filterPreferenceReady, filterTab])
   const loadData = useCallback(async () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayIso = today.toISOString()
-    const activeStatuses = ['pending', 'drafted', 'needs_manual_reply']
+    const requestedMetricsPeriod = metricsPeriod
+    const periodStart = getDashboardMetricPeriodStart(requestedMetricsPeriod)
     const usageMonth = getCurrentUsageMonth()
     const profileResultPromise = supabase
       .from('profiles')
@@ -214,28 +221,6 @@ export default function DashboardPage() {
         .not('intent_score', 'is', null)
         .order('created_at', { ascending: false })
         .limit(60),
-      supabase
-        .from('monitored_threads')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .in('status', activeStatuses)
-        .not('intent_score', 'is', null),
-      supabase
-        .from('monitored_threads')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .in('status', ['drafted', 'needs_manual_reply']),
-      supabase
-        .from('reply_analytics')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('was_sent', true)
-        .gte('sent_at', todayIso),
-      supabase
-        .from('reply_analytics')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('was_sent', true),
     ])
 
     const profileResult = await profileResultPromise
@@ -244,33 +229,55 @@ export default function DashboardPage() {
       profile?.high_intent_threshold,
     )
     const [
-      [
-        addonCreditsResult,
-        keywordsCountResult,
-        feedbackCountResult,
-        threadsResult,
-        activeThreadsCountResult,
-        draftsCountResult,
-        postedTodayCountResult,
-        totalPostedCountResult,
-      ],
+      addonCreditsResult,
+      keywordsCountResult,
+      feedbackCountResult,
+      threadsResult,
+    ] = await independentResultsPromise
+
+    let threadsFoundCountQuery = supabase
+      .from('monitored_threads')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .not('intent_score', 'is', null)
+    let highIntentCountQuery = supabase
+      .from('monitored_threads')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .not('intent_score', 'is', null)
+      .gte('intent_score', effectiveHighIntentThreshold)
+    let repliesSentCountQuery = supabase
+      .from('reply_analytics')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('was_sent', true)
+
+    if (periodStart) {
+      threadsFoundCountQuery = threadsFoundCountQuery.gte('created_at', periodStart)
+      highIntentCountQuery = highIntentCountQuery.gte('created_at', periodStart)
+      repliesSentCountQuery = repliesSentCountQuery.gte('sent_at', periodStart)
+    }
+
+    const [
+      threadsFoundCountResult,
       highIntentCountResult,
-      highIntentTodayCountResult,
+      draftsCountResult,
+      repliesSentCountResult,
+      totalPostedCountResult,
     ] = await Promise.all([
-      independentResultsPromise,
+      threadsFoundCountQuery,
+      highIntentCountQuery,
       supabase
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .in('status', activeStatuses)
-        .gte('intent_score', effectiveHighIntentThreshold),
+        .in('status', ['drafted', 'needs_manual_reply']),
+      repliesSentCountQuery,
       supabase
-        .from('monitored_threads')
+        .from('reply_analytics')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .in('status', activeStatuses)
-        .gte('intent_score', effectiveHighIntentThreshold)
-        .gte('created_at', todayIso),
+        .eq('was_sent', true),
     ])
 
     const normalizedPlan = normalizePlan(profile?.plan)
@@ -298,6 +305,7 @@ export default function DashboardPage() {
 
     if (error) {
       toast.error('Failed to load threads')
+      if (metricsPeriodRef.current === requestedMetricsPeriod) setMetricsLoading(false)
       setLoading(false)
       return
     }
@@ -337,16 +345,18 @@ export default function DashboardPage() {
 
     const totalPosted = totalPostedCountResult.count ?? 0
     setTotalSent(totalPosted)
-    setStats({
-      threadsFound: activeThreadsCountResult.count ?? 0,
-      highIntent: highIntentCountResult.count ?? 0,
-      highIntentToday: highIntentTodayCountResult.count ?? 0,
-      draftsReady: draftsCountResult.count ?? 0,
-      postedToday: postedTodayCountResult.count ?? 0,
-    })
+    if (metricsPeriodRef.current === requestedMetricsPeriod) {
+      setStats({
+        threadsFound: threadsFoundCountResult.count ?? 0,
+        highIntent: highIntentCountResult.count ?? 0,
+        draftsReady: draftsCountResult.count ?? 0,
+        repliesSent: repliesSentCountResult.count ?? 0,
+      })
+      setMetricsLoading(false)
+    }
 
     setLoading(false)
-  }, [supabase, userId])
+  }, [metricsPeriod, supabase, userId])
 
   useEffect(() => {
     void loadData()
@@ -552,7 +562,7 @@ export default function DashboardPage() {
         : current)
       setEditingDraft(null)
       setTotalSent(prev => prev + 1)
-      setStats(prev => ({ ...prev, postedToday: prev.postedToday + 1 }))
+      setStats(prev => ({ ...prev, repliesSent: prev.repliesSent + 1 }))
       void loadData()
       toast.success(totalSent === 0 ? 'First reply posted successfully.' : 'Reply posted successfully.')
     } catch (error) {
@@ -603,10 +613,6 @@ export default function DashboardPage() {
     setEditingDraft(null)
     setStats(prev => ({
       ...prev,
-      threadsFound: Math.max(0, prev.threadsFound - 1),
-      highIntent: dismissed.score !== null && dismissed.score >= highIntentThreshold
-        ? Math.max(0, prev.highIntent - 1)
-        : prev.highIntent,
       draftsReady: dismissed.status === 'drafted'
         ? Math.max(0, prev.draftsReady - 1)
         : prev.draftsReady,
@@ -638,7 +644,7 @@ export default function DashboardPage() {
     setThreads(prev => prev.filter(item => item.id !== thread.id))
     setSelectedThread(threads.find(item => item.id !== thread.id) || null)
     setEditingDraft(null)
-    setStats(prev => ({ ...prev, postedToday: prev.postedToday + 1 }))
+    setStats(prev => ({ ...prev, repliesSent: prev.repliesSent + 1 }))
     setTotalSent(prev => prev + 1)
     void loadData()
     toast.success('Marked as posted')
@@ -759,6 +765,8 @@ export default function DashboardPage() {
       : searchableThreads.filter(t => t.status !== 'dismissed' && t.score !== null)
   const signalLimitReached = plan === 'free' && signalUsage.used >= signalUsage.limit
   const draftLimitReached = plan === 'free' && draftUsage.used >= draftUsage.limit
+  const metricPeriodLabel = getDashboardMetricPeriodLabel(metricsPeriod)
+  const metricsAreLoading = loading || metricsLoading
 
   useEffect(() => {
     if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
@@ -783,7 +791,27 @@ export default function DashboardPage() {
       <PageHeader
         title="Overview"
         action={(
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="relative">
+              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#667085]" aria-hidden="true" />
+              <select
+                aria-label="KPI date range"
+                value={metricsPeriod}
+                onChange={(event) => {
+                  const nextPeriod = event.target.value
+                  if (!isDashboardMetricPeriod(nextPeriod) || nextPeriod === metricsPeriod) return
+                  metricsPeriodRef.current = nextPeriod
+                  setMetricsLoading(true)
+                  setMetricsPeriod(nextPeriod)
+                }}
+                className="min-h-11 appearance-none rounded-xl border border-[#DDE2E8] bg-white py-2 pl-8 pr-8 text-xs font-semibold text-[#344054] shadow-xs outline-none transition-colors hover:border-[#C7D0DB] focus:border-[#0A84FF] focus:ring-2 focus:ring-[#0A84FF]/15 sm:min-h-0"
+              >
+                {DASHBOARD_METRIC_PERIODS.map((period) => (
+                  <option key={period} value={period}>{getDashboardMetricPeriodLabel(period)}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#667085]" aria-hidden="true" />
+            </div>
             <GettingStartedChecklist
               extensionInstalled={extensionInstalled}
               keywordsCount={keywordsCount}
@@ -816,9 +844,9 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {loading ? '—' : stats.threadsFound}
+              {metricsAreLoading ? '—' : stats.threadsFound}
             </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">Pending review</span>
+            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
           </div>
         </div>
 
@@ -832,14 +860,10 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {loading ? '—' : stats.highIntent}
+              {metricsAreLoading ? '—' : stats.highIntent}
             </span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${stats.highIntentToday > 0
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-[#F1F2F3] text-[#667085]'
-              }`}>
-              {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-3 w-3" strokeWidth={2.25} />}
-              {stats.highIntentToday > 0 ? `${stats.highIntentToday} new today` : 'No new today'}
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+              {metricPeriodLabel}
             </span>
           </div>
         </div>
@@ -847,14 +871,16 @@ export default function DashboardPage() {
         {/* Metric 3: Drafts Ready */}
         <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Drafts Ready</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">
+              Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>
+            </span>
             <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {loading ? '—' : stats.draftsReady}
+              {metricsAreLoading ? '—' : stats.draftsReady}
             </span>
             {stats.draftsReady > 0 ? (
               <a
@@ -869,10 +895,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Metric 4: Posted Today */}
+        {/* Metric 4: Replies sent in the selected period */}
         <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Posted Today</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
             <div className="w-8 h-8 rounded-xl text-[#FF5101] flex items-center justify-center shrink-0">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -882,9 +908,9 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {loading ? '—' : stats.postedToday}
+              {metricsAreLoading ? '—' : stats.repliesSent}
             </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">Automated & manual</span>
+            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
           </div>
         </div>
       </div>
@@ -895,7 +921,7 @@ export default function DashboardPage() {
           <Sparkles className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={1.75} />
           <p className="flex-1 text-xs text-amber-900 leading-relaxed">
             <span className="font-semibold">{stats.highIntent} high-intent conversation{stats.highIntent !== 1 ? 's' : ''} found</span>{' '}
-            this month across your {keywordsMax} Starter keyword{keywordsMax !== 1 ? 's' : ''}. Upgrade to Professional for 10 total topics.
+            in {metricPeriodLabel.toLowerCase()} across your {keywordsMax} Starter keyword{keywordsMax !== 1 ? 's' : ''}. Upgrade to Professional for 10 total topics.
           </p>
           <div className="flex shrink-0 items-center gap-2">
             <a
