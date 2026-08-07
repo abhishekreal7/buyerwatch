@@ -288,7 +288,7 @@ export default function LandingPage() {
 
         {/* ━ ━ ━ ━  section separator: DASHBOARD PROOF ━ ━ ━ ━  */}
         <Section className="border-b border-black/[0.05] bg-[#F7F8FA] py-20 sm:py-24 lg:py-[112px]">
-          <div className="mx-auto max-w-[1440px] px-6">
+          <div className="mx-auto max-w-[1180px] px-6">
             <motion.div variants={fadeUp} className="mx-auto mb-11 max-w-[650px] text-center sm:mb-14">
               <SectionBadge color="#0A84FF" text="See it in action" />
               <h2
@@ -319,11 +319,11 @@ export default function LandingPage() {
                   <span className="w-[39px] shrink-0" aria-hidden="true" />
                 </div>
                 <Image
-                  src="/buyerwatch-dashboard-live-preview.jpg"
+                  src="/buyerwatch-dashboard-live-preview.png"
                   alt="BuyerWatch dashboard showing multiple high-intent buyer conversations"
-                  width={1536}
-                  height={826}
-                  sizes="(max-width: 768px) 100vw, 1440px"
+                  width={1917}
+                  height={1028}
+                  sizes="(max-width: 768px) 100vw, 1180px"
                   unoptimized
                   className="block h-auto w-full"
                 />
