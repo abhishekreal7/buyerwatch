@@ -117,7 +117,7 @@ export default function LandingPage() {
       </motion.nav>
 
       {/* ━ ━ ━ ━  section separator: HERO ━ ━ ━ ━  */}
-      <section className="hero-mesh relative flex flex-col items-center justify-center px-6 pt-[100px] pb-[40px] overflow-hidden">
+      <section className="hero-mesh relative flex flex-col items-center justify-center px-6 pt-[82px] pb-7 sm:pt-[92px] sm:pb-8 overflow-hidden">
         {/* Subtle neutral depth — no colored blobs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div
@@ -133,7 +133,7 @@ export default function LandingPage() {
         >
           <EyebrowBadge />
 
-          <h1 className="mb-5 mt-1" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(52px, 6.5vw, 80px)', letterSpacing: '-0.04em', lineHeight: 1.0, color: '#0A0A0A' }}>
+          <h1 className="mb-4 mt-1" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(46px, 5.6vw, 72px)', letterSpacing: '-0.04em', lineHeight: 1.0, color: '#0A0A0A' }}>
             <WordFadeIn text="Find your customers" />
             <br />
             <WordFadeIn text="where they are." delay={0.3} />
@@ -141,11 +141,11 @@ export default function LandingPage() {
             <span style={{ color: '#9B9B9B', fontWeight: 700 }}>Before anyone else does.</span>
           </h1>
 
-          <p className="max-w-[520px] mb-10" style={{ fontFamily: 'var(--font-inter), sans-serif', fontWeight: 400, fontSize: '17px', lineHeight: 1.65, color: '#6B6B6B' }}>
+          <p className="max-w-[520px] mb-7" style={{ fontFamily: 'var(--font-inter), sans-serif', fontWeight: 400, fontSize: '17px', lineHeight: 1.65, color: '#6B6B6B' }}>
             Monitor Reddit and Bluesky on a predictable plan cadence, detect high-intent conversations, and draft personalized replies for review.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
+          <div className="flex flex-col sm:flex-row items-center gap-3 mb-5">
             <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.975 }} transition={springs.snappy}>
               <PremiumCtaButton href="/signup">
                 Get started
@@ -167,7 +167,7 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10 mt-12 w-full"
+          className="relative z-10 mt-7 sm:mt-8 w-full"
         >
           <PlatformSourcesWidget />
         </motion.div>
