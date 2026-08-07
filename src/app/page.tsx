@@ -319,10 +319,10 @@ export default function LandingPage() {
                   <span className="w-[39px] shrink-0" aria-hidden="true" />
                 </div>
                 <Image
-                  src="/buyerwatch-dashboard-users-preview.png"
+                  src="/buyerwatch-dashboard-users-complete-preview.png"
                   alt="BuyerWatch dashboard showing multiple high-intent buyer conversations"
                   width={1917}
-                  height={1155}
+                  height={1176}
                   sizes="(max-width: 768px) 100vw, 1180px"
                   unoptimized
                   className="block h-auto w-full"
