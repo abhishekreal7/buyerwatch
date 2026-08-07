@@ -288,7 +288,7 @@ export default function LandingPage() {
 
         {/* ━ ━ ━ ━  section separator: DASHBOARD PROOF ━ ━ ━ ━  */}
         <Section className="border-b border-black/[0.05] bg-[#F7F8FA] py-20 sm:py-24 lg:py-[112px]">
-          <div className="mx-auto max-w-[1360px] px-6">
+          <div className="mx-auto max-w-[1440px] px-6">
             <motion.div variants={fadeUp} className="mx-auto mb-11 max-w-[650px] text-center sm:mb-14">
               <SectionBadge color="#0A84FF" text="See it in action" />
               <h2
@@ -303,17 +303,31 @@ export default function LandingPage() {
 
             <motion.figure
               variants={fadeUp}
-              className="overflow-hidden rounded-[20px] border border-[#DCE2E8] bg-white shadow-[0_18px_55px_rgba(36,57,79,0.12)] sm:rounded-[24px]"
+              className="relative mx-auto overflow-hidden rounded-[18px] border border-[#C9D0D9] bg-[#EEF1F4] p-1.5 shadow-[0_28px_80px_rgba(28,39,54,0.18),0_3px_8px_rgba(28,39,54,0.10)] sm:rounded-[22px] sm:p-2"
             >
-              <Image
-                src="/buyerwatch-dashboard-live-preview.jpg"
-                alt="BuyerWatch dashboard showing multiple high-intent buyer conversations"
-                width={1536}
-                height={826}
-                sizes="(max-width: 768px) 100vw, 1360px"
-                unoptimized
-                className="h-auto w-full"
-              />
+              <div className="overflow-hidden rounded-[13px] border border-black/[0.10] bg-white sm:rounded-[16px]">
+                <div className="flex h-9 items-center border-b border-black/[0.08] bg-[#F5F6F7] px-3 sm:h-10 sm:px-4">
+                  <div className="flex shrink-0 items-center gap-1.5" aria-hidden="true">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
+                  </div>
+                  <div className="mx-auto flex min-w-0 max-w-[340px] items-center gap-2 rounded-md border border-black/[0.07] bg-white px-3 py-1 text-[10px] font-medium text-[#667085] shadow-[0_1px_1px_rgba(0,0,0,0.03)] sm:text-[11px]">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22C55E]" />
+                    <span className="truncate">buyerwatch.co/dashboard</span>
+                  </div>
+                  <span className="w-[39px] shrink-0" aria-hidden="true" />
+                </div>
+                <Image
+                  src="/buyerwatch-dashboard-live-preview.jpg"
+                  alt="BuyerWatch dashboard showing multiple high-intent buyer conversations"
+                  width={1536}
+                  height={826}
+                  sizes="(max-width: 768px) 100vw, 1440px"
+                  unoptimized
+                  className="block h-auto w-full"
+                />
+              </div>
             </motion.figure>
           </div>
         </Section>
