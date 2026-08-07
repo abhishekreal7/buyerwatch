@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'framer-motion'
+import Image from 'next/image'
 import { RadialGauge } from '@/components/RadialGauge'
 import Link from 'next/link'
 import {
@@ -282,6 +283,44 @@ export default function LandingPage() {
                 </span>
               </div>
             </motion.div>
+          </div>
+        </Section>
+
+        {/* ━ ━ ━ ━  section separator: DASHBOARD PROOF ━ ━ ━ ━  */}
+        <Section className="border-b border-black/[0.05] bg-[#F7F8FA] py-20 sm:py-24 lg:py-[112px]">
+          <div className="mx-auto max-w-[1200px] px-6">
+            <motion.div variants={fadeUp} className="mx-auto mb-11 max-w-[650px] text-center sm:mb-14">
+              <SectionBadge color="#0A84FF" text="See it in action" />
+              <h2
+                style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 54px)', letterSpacing: '-0.045em', lineHeight: 1.05, color: '#0A0A0A', marginBottom: '14px' }}
+              >
+                See which conversations deserve your time.
+              </h2>
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: '16px', color: '#626B76', lineHeight: 1.65 }}>
+                A focused workspace for buyer intent, reply readiness, and the policy signals that keep automation under control.
+              </p>
+            </motion.div>
+
+            <motion.figure
+              variants={fadeUp}
+              className="overflow-hidden rounded-[24px] border border-[#DCE2E8] bg-white shadow-[0_28px_80px_rgba(36,57,79,0.14)] sm:rounded-[30px]"
+            >
+              <Image
+                src="/buyerwatch-dashboard-preview.png"
+                alt="BuyerWatch dashboard showing high-intent conversations, buyer-intent scores, reply actions, and community policy status"
+                width={1639}
+                height={1020}
+                sizes="(max-width: 768px) 100vw, 1200px"
+                className="h-auto w-full"
+              />
+              <figcaption className="flex flex-col gap-3 border-t border-[#E5E9ED] bg-white px-5 py-4 text-left sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                <span className="text-[13px] font-semibold text-[#1B2632]">A live BuyerWatch workspace view</span>
+                <span className="inline-flex items-center gap-2 text-[12px] font-medium text-[#617080]">
+                  <BadgeCheck className="h-4 w-4 text-[#0A84FF]" strokeWidth={2} />
+                  Intent, policy status, and reply actions in one queue
+                </span>
+              </figcaption>
+            </motion.figure>
           </div>
         </Section>
 
