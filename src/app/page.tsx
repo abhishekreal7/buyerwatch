@@ -322,7 +322,7 @@ export default function LandingPage() {
                   src="/buyerwatch-dashboard-users-preview.png"
                   alt="BuyerWatch dashboard showing multiple high-intent buyer conversations"
                   width={1917}
-                  height={1028}
+                  height={1155}
                   sizes="(max-width: 768px) 100vw, 1180px"
                   unoptimized
                   className="block h-auto w-full"
