@@ -133,7 +133,7 @@ export default function LandingPage() {
         >
           <EyebrowBadge />
 
-          <h1 className="mb-4 mt-1" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(46px, 5.6vw, 72px)', letterSpacing: '-0.04em', lineHeight: 1.0, color: '#0A0A0A' }}>
+          <h1 className="mb-4 mt-1" style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(48px, 5.9vw, 76px)', letterSpacing: '-0.04em', lineHeight: 1.0, color: '#0A0A0A' }}>
             <WordFadeIn text="Find your customers" />
             <br />
             <WordFadeIn text="where they are." delay={0.3} />
