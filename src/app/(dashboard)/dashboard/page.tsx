@@ -1043,15 +1043,16 @@ export default function DashboardPage() {
           <>
             {/* Keep one interactive surface instead of nesting controls in a card. */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] pb-4">
-              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-[#F1F2F3] p-1 no-scrollbar">
+              <div role="tablist" aria-label="Conversation filters" className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-[#F1F2F3] p-1 no-scrollbar">
                 <button
                   type="button"
                   onClick={() => {
                     setFilterTab('all')
                     setShowLowRelevance(false)
                   }}
-                  aria-pressed={filterTab === 'all'}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
+                  role="tab"
+                  aria-selected={filterTab === 'all'}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-[#0A84FF] text-white shadow-[0_2px_6px_rgba(10,132,255,0.28)]' : 'text-[#4F5865] hover:bg-white/70 hover:text-gray-950'}`}
                 >
                   All Conversations
                 </button>
@@ -1061,12 +1062,13 @@ export default function DashboardPage() {
                     setFilterTab('high-intent')
                     setShowLowRelevance(false)
                   }}
-                  aria-pressed={filterTab === 'high-intent'}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
+                  role="tab"
+                  aria-selected={filterTab === 'high-intent'}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-[#0A84FF] text-white shadow-[0_2px_6px_rgba(10,132,255,0.28)]' : 'text-[#4F5865] hover:bg-white/70 hover:text-gray-950'}`}
                 >
                   <span>High Intent (≥{highIntentThreshold}%)</span>
                   {highIntentCount > 0 && (
-                    <span className="ml-1.5 rounded-full bg-[#EAF4FF] px-1.5 py-0.5 text-[10px] font-bold text-[#0A84FF]">
+                    <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${filterTab === 'high-intent' ? 'bg-white/20 text-white' : 'bg-[#EAF4FF] text-[#0A84FF]'}`}>
                       {highIntentCount}
                     </span>
                   )}
@@ -1077,12 +1079,13 @@ export default function DashboardPage() {
                     setFilterTab('dismissed')
                     setShowLowRelevance(false)
                   }}
-                  aria-pressed={filterTab === 'dismissed'}
-                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-white shadow-xs text-gray-950' : 'text-[#4F5865] hover:text-gray-950'}`}
+                  role="tab"
+                  aria-selected={filterTab === 'dismissed'}
+                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-[#0A84FF] text-white shadow-[0_2px_6px_rgba(10,132,255,0.28)]' : 'text-[#4F5865] hover:bg-white/70 hover:text-gray-950'}`}
                 >
                   <span>Dismissed</span>
                   {dismissedCount > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${filterTab === 'dismissed' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
                       {dismissedCount}
                     </span>
                   )}
