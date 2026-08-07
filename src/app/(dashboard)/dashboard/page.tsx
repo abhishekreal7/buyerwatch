@@ -867,7 +867,7 @@ export default function DashboardPage() {
         {/* Metric 2: High Intent */}
         <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent (≥{highIntentThreshold}%)</span>
+            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
             <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
               <Sparkles className="w-4 h-4" strokeWidth={2} />
             </div>
