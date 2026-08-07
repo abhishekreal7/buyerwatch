@@ -311,6 +311,7 @@ export default function LandingPage() {
                 width={1639}
                 height={1020}
                 sizes="(max-width: 768px) 100vw, 1200px"
+                unoptimized
                 className="h-auto w-full"
               />
               <figcaption className="flex flex-col gap-3 border-t border-[#E5E9ED] bg-white px-5 py-4 text-left sm:flex-row sm:items-center sm:justify-between sm:px-7">
