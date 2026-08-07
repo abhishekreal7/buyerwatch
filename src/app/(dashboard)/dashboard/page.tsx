@@ -1052,7 +1052,7 @@ export default function DashboardPage() {
                   }}
                   role="tab"
                   aria-selected={filterTab === 'all'}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-[#0A84FF] text-white shadow-[0_2px_6px_rgba(10,132,255,0.28)]' : 'text-[#4F5865] hover:bg-white/70 hover:text-gray-950'}`}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-white text-gray-950 shadow-xs' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   All Conversations
                 </button>
@@ -1064,11 +1064,11 @@ export default function DashboardPage() {
                   }}
                   role="tab"
                   aria-selected={filterTab === 'high-intent'}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-[#0A84FF] text-white shadow-[0_2px_6px_rgba(10,132,255,0.28)]' : 'text-[#4F5865] hover:bg-white/70 hover:text-gray-950'}`}
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white text-gray-950 shadow-xs' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   <span>High Intent (≥{highIntentThreshold}%)</span>
                   {highIntentCount > 0 && (
-                    <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${filterTab === 'high-intent' ? 'bg-white/20 text-white' : 'bg-[#EAF4FF] text-[#0A84FF]'}`}>
+                    <span className="ml-1.5 rounded-full bg-[#EAF4FF] px-1.5 py-0.5 text-[10px] font-bold text-[#0A84FF]">
                       {highIntentCount}
                     </span>
                   )}
@@ -1081,11 +1081,11 @@ export default function DashboardPage() {
                   }}
                   role="tab"
                   aria-selected={filterTab === 'dismissed'}
-                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-[#0A84FF] text-white shadow-[0_2px_6px_rgba(10,132,255,0.28)]' : 'text-[#4F5865] hover:bg-white/70 hover:text-gray-950'}`}
+                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-white text-gray-950 shadow-xs' : 'text-[#4F5865] hover:text-gray-950'}`}
                 >
                   <span>Dismissed</span>
                   {dismissedCount > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${filterTab === 'dismissed' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                    <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-700">
                       {dismissedCount}
                     </span>
                   )}
