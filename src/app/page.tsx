@@ -303,9 +303,9 @@ export default function LandingPage() {
 
             <motion.figure
               variants={fadeUp}
-              className="relative mx-auto overflow-hidden rounded-[18px] border border-[#C9D0D9] bg-[#EEF1F4] p-1.5 shadow-[0_28px_80px_rgba(28,39,54,0.18),0_3px_8px_rgba(28,39,54,0.10)] sm:rounded-[22px] sm:p-2"
+              className="relative mx-auto overflow-hidden rounded-[18px] border border-[#C9D0D9] bg-white shadow-[0_28px_80px_rgba(28,39,54,0.18),0_3px_8px_rgba(28,39,54,0.10)] sm:rounded-[22px]"
             >
-              <div className="overflow-hidden rounded-[13px] border border-black/[0.10] bg-white sm:rounded-[16px]">
+              <div className="bg-white">
                 <div className="flex h-9 items-center border-b border-black/[0.08] bg-[#F5F6F7] px-3 sm:h-10 sm:px-4">
                   <div className="flex shrink-0 items-center gap-1.5" aria-hidden="true">
                     <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
