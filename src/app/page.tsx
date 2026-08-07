@@ -1,7 +1,6 @@
 'use client'
 import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'framer-motion'
-import Image from 'next/image'
 import { RadialGauge } from '@/components/RadialGauge'
 import Link from 'next/link'
 import {
@@ -39,6 +38,7 @@ import {
   CoreFeatureBento,
 } from '@/components/landing/PremiumFeatureSections'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
+import { LiveDashboardPreview } from '@/components/landing/LiveDashboardPreview'
 import { Reveal } from '@/components/Reveal'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
 
@@ -301,21 +301,9 @@ export default function LandingPage() {
               </p>
             </motion.div>
 
-            <motion.figure
-              variants={fadeUp}
-              className="overflow-hidden rounded-[20px] border border-[#DCE2E8] bg-white shadow-[0_18px_55px_rgba(36,57,79,0.12)] sm:rounded-[24px]"
-            >
-              <Image
-                src="/buyerwatch-dashboard-preview.png"
-                alt="BuyerWatch dashboard showing high-intent conversations, buyer-intent scores, reply actions, and community policy status"
-                width={1639}
-                height={1020}
-                sizes="(max-width: 768px) 100vw, 1200px"
-                loading="eager"
-                unoptimized
-                className="h-auto w-full"
-              />
-            </motion.figure>
+            <motion.div variants={fadeUp}>
+              <LiveDashboardPreview />
+            </motion.div>
           </div>
         </Section>
 
