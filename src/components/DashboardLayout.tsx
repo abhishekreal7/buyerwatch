@@ -9,7 +9,7 @@ import {
   PuzzlePieceIcon,
   CubeIcon,
   FolderIcon,
-  IdentificationIcon,
+  Cog6ToothIcon,
   QuestionMarkCircleIcon,
 } from '@heroicons/react/24/solid'
 import {
@@ -390,7 +390,7 @@ function DashboardShell({
                       : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
                   }
                 >
-                  <IdentificationIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.startsWith('/settings') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
+                  <Cog6ToothIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.startsWith('/settings') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
                   <span>Settings</span>
                 </Link>
 
@@ -603,7 +603,7 @@ function DashboardShell({
                 {[
                   { name: 'Dashboard', href: '/dashboard', icon: CustomDashboardIcon, isHeroicon: true },
                   { name: 'Posted replies', href: '/posted', icon: FolderIcon, isHeroicon: true },
-                  { name: 'Settings', href: '/settings', icon: IdentificationIcon, isHeroicon: true },
+                  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon, isHeroicon: true },
                 ].map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
                   const IconComp = item.icon as any

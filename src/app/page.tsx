@@ -319,7 +319,7 @@ export default function LandingPage() {
                   <span className="w-[39px] shrink-0" aria-hidden="true" />
                 </div>
                 <Image
-                  src="/buyerwatch-dashboard-showcase-v7.png"
+                  src="/buyerwatch-dashboard-showcase-v8.png"
                   alt="BuyerWatch dashboard showing multiple high-intent buyer conversations"
                   width={1917}
                   height={1176}
