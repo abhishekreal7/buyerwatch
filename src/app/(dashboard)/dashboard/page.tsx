@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown } from 'lucide-react'
+import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown, ArrowUp } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { toast } from 'sonner'
@@ -151,6 +151,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     threadsFound: 0,
     highIntent: 0,
+    highIntentToday: 0,
     draftsReady: 0,
     repliesSent: 0,
   })
@@ -192,6 +193,9 @@ export default function DashboardPage() {
   const loadData = useCallback(async () => {
     const requestedMetricsPeriod = metricsPeriod
     const periodStart = getDashboardMetricPeriodStart(requestedMetricsPeriod)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayIso = today.toISOString()
     const usageMonth = getCurrentUsageMonth()
     const profileResultPromise = supabase
       .from('profiles')
@@ -264,6 +268,7 @@ export default function DashboardPage() {
       draftsCountResult,
       repliesSentCountResult,
       totalPostedCountResult,
+      highIntentTodayCountResult,
     ] = await Promise.all([
       threadsFoundCountQuery,
       highIntentCountQuery,
@@ -278,6 +283,14 @@ export default function DashboardPage() {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .eq('was_sent', true),
+      supabase
+        .from('monitored_threads')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+        .not('intent_score', 'is', null)
+        .gte('intent_score', effectiveHighIntentThreshold)
+        .gte('created_at', todayIso),
     ])
 
     const normalizedPlan = normalizePlan(profile?.plan)
@@ -349,6 +362,7 @@ export default function DashboardPage() {
       setStats({
         threadsFound: threadsFoundCountResult.count ?? 0,
         highIntent: highIntentCountResult.count ?? 0,
+        highIntentToday: highIntentTodayCountResult.count ?? 0,
         draftsReady: draftsCountResult.count ?? 0,
         repliesSent: repliesSentCountResult.count ?? 0,
       })
@@ -862,8 +876,17 @@ export default function DashboardPage() {
             <span className="text-2xl font-bold text-gray-900 tracking-tight">
               {metricsAreLoading ? '—' : stats.highIntent}
             </span>
-            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-              {metricPeriodLabel}
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
+              stats.highIntentToday > 0
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-[#F1F2F3] text-[#667085]'
+            }`}>
+              {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-3 w-3" strokeWidth={2.25} />}
+              {metricsAreLoading
+                ? 'Updating'
+                : stats.highIntentToday > 0
+                  ? `${stats.highIntentToday} new today`
+                  : 'No new today'}
             </span>
           </div>
         </div>
