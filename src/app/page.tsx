@@ -303,7 +303,7 @@ export default function LandingPage() {
 
             <motion.figure
               variants={fadeUp}
-              className="overflow-hidden rounded-[24px] border border-[#DCE2E8] bg-white shadow-[0_28px_80px_rgba(36,57,79,0.14)] sm:rounded-[30px]"
+              className="overflow-hidden rounded-[20px] border border-[#DCE2E8] bg-white shadow-[0_18px_55px_rgba(36,57,79,0.12)] sm:rounded-[24px]"
             >
               <Image
                 src="/buyerwatch-dashboard-preview.png"
@@ -311,16 +311,10 @@ export default function LandingPage() {
                 width={1639}
                 height={1020}
                 sizes="(max-width: 768px) 100vw, 1200px"
+                loading="eager"
                 unoptimized
                 className="h-auto w-full"
               />
-              <figcaption className="flex flex-col gap-3 border-t border-[#E5E9ED] bg-white px-5 py-4 text-left sm:flex-row sm:items-center sm:justify-between sm:px-7">
-                <span className="text-[13px] font-semibold text-[#1B2632]">A live BuyerWatch workspace view</span>
-                <span className="inline-flex items-center gap-2 text-[12px] font-medium text-[#617080]">
-                  <BadgeCheck className="h-4 w-4 text-[#0A84FF]" strokeWidth={2} />
-                  Intent, policy status, and reply actions in one queue
-                </span>
-              </figcaption>
             </motion.figure>
           </div>
         </Section>
