@@ -481,7 +481,7 @@ function DashboardShell({
         {/* Main Content App Panel (Untouched) */}
         <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-white rounded-2xl border border-[#E2E2DE] shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
           {/* Header Bar */}
-          <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] bg-white px-4 lg:px-6">
+          <header className="flex h-14 shrink-0 items-center justify-between bg-white px-4 lg:px-6">
             <div className="flex items-center gap-3">
               <button
                 type="button"
