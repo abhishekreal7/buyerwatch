@@ -1,5 +1,6 @@
 export const INTENT_LABELS = ['buying', 'researching', 'complaining', 'other'] as const
 export const LOW_RELEVANCE_THRESHOLD = 40
+export const ACTIONABLE_INTENT_THRESHOLD = 60
 
 export type IntentLabel = (typeof INTENT_LABELS)[number]
 

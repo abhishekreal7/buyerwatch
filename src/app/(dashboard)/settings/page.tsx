@@ -29,6 +29,7 @@ import {
   HIGH_INTENT_THRESHOLD_MIN,
   normalizeHighIntentThreshold,
 } from '@/lib/high-intent-threshold'
+import { DataLoadError } from '@/components/DataLoadError'
 
 /* ─── Nav sections ────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -132,6 +133,9 @@ function PlatformRow({
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('profile')
   const [saving, setSaving] = useState(false)
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
   const [openingPortal, setOpeningPortal] = useState(false)
@@ -171,7 +175,9 @@ export default function SettingsPage() {
   const [bskyConnecting, setBskyConnecting] = useState(false)
 
   const [slack, setSlack] = useState({ webhookUrl: '', threshold: 70 })
+  const [slackConfigured, setSlackConfigured] = useState(false)
   const [slackTesting, setSlackTesting] = useState(false)
+  const [slackDisconnecting, setSlackDisconnecting] = useState(false)
   const [webhookSecret, setWebhookSecret] = useState('')
 
   const [notifications, setNotifications] = useState({
@@ -196,43 +202,67 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function load() {
-      const now = new Date()
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const [
-        extendedProfileResult,
-        connectionsResult,
-        threadsCountResult,
-        draftsCountResult,
-        sentCountResult,
-        keywordsCountResult,
-        trustResult,
-      ] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, high_intent_threshold, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
-          .eq('id', userId)
-          .single(),
-        supabase.from('platform_connections').select('platform, external_username').eq('user_id', userId),
-        supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay),
-        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).not('draft_text', 'is', null),
-        supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).eq('was_sent', true),
-        supabase.from('keywords').select('*', { count: 'exact', head: true }).eq('user_id', userId),
-        supabase
-          .from('user_trust_metrics')
-          .select('total_drafts_reviewed')
-          .eq('user_id', userId)
-          .maybeSingle(),
-      ])
+      setSettingsLoading(true)
+      setLoadFailed(false)
 
-      const extendedProfile = extendedProfileResult.data
-      let p = extendedProfile
-      if (!p) {
-        const { data: legacyProfile } = await supabase
-          .from('profiles')
-          .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, high_intent_threshold, slack_webhook_url, slack_notify_threshold, webhook_secret, plan')
-          .eq('id', userId)
-          .single()
-        p = legacyProfile
+      try {
+        const now = new Date()
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        const slackSettingsPromise = fetch('/api/settings/slack', { cache: 'no-store' })
+          .then(async response => {
+            const payload = await response.json().catch(() => null)
+            if (!response.ok) throw new Error(payload?.error || 'slack_settings_failed')
+            return payload as { configured?: boolean; threshold?: number }
+          })
+        const [
+          extendedProfileResult,
+          connectionsResult,
+          threadsCountResult,
+          draftsCountResult,
+          sentCountResult,
+          keywordsCountResult,
+          trustResult,
+          slackSettings,
+        ] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, high_intent_threshold, webhook_secret, plan')
+            .eq('id', userId)
+            .single(),
+          supabase.from('platform_connections').select('platform, external_username').eq('user_id', userId),
+          supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay),
+          supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).not('draft_text', 'is', null),
+          supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).eq('was_sent', true),
+          supabase.from('keywords').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase
+            .from('user_trust_metrics')
+            .select('total_drafts_reviewed')
+            .eq('user_id', userId)
+            .maybeSingle(),
+          slackSettingsPromise,
+        ])
+
+        const requiredQueryError = [
+          connectionsResult,
+          threadsCountResult,
+          draftsCountResult,
+          sentCountResult,
+          keywordsCountResult,
+          trustResult,
+        ].find(result => result.error)?.error
+        if (requiredQueryError) throw requiredQueryError
+
+        const extendedProfile = extendedProfileResult.data
+        let p = extendedProfile
+        if (!p) {
+          const legacyProfileResult = await supabase
+            .from('profiles')
+            .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, referral_tracking_enabled, notification_preferences, high_intent_threshold, webhook_secret, plan')
+            .eq('id', userId)
+            .single()
+          if (legacyProfileResult.error) throw legacyProfileResult.error
+          const legacyProfile = legacyProfileResult.data
+          p = legacyProfile
           ? {
               ...legacyProfile,
               tone_archetype: null,
@@ -241,9 +271,10 @@ export default function SettingsPage() {
               auto_send_platforms: ['bluesky'],
               auto_send_communities: [],
             }
-          : null
-      }
-      if (p) {
+            : null
+        }
+        if (!p) throw new Error('Settings profile was not found')
+
         setProfile({
           businessName: p.business_name || '',
           businessDescription: p.business_description || '',
@@ -264,28 +295,27 @@ export default function SettingsPage() {
         })
         if (p.notification_preferences) setNotifications(p.notification_preferences)
         setHighIntentThreshold(normalizeHighIntentThreshold(p.high_intent_threshold))
-        setSlack({ webhookUrl: p.slack_webhook_url || '', threshold: p.slack_notify_threshold ?? 70 })
+        setSlack({ webhookUrl: '', threshold: slackSettings.threshold ?? 70 })
+        setSlackConfigured(Boolean(slackSettings.configured))
         setWebhookSecret(p.webhook_secret || '')
-      }
 
-      const conns = connectionsResult.data
-      if (conns) {
+        const conns = connectionsResult.data
+        if (conns) {
         const redditConn = conns.find(c => c.platform === 'reddit')
         setConnections({
           reddit: conns.some(c => c.platform === 'reddit'),
           bluesky: conns.some(c => c.platform === 'bluesky'),
           redditUsername: redditConn?.external_username || '',
         })
-      }
+        }
 
-      setUsageStats({
+        setUsageStats({
         threads: threadsCountResult.count || 0,
         drafts: draftsCountResult.count || 0,
         replies: sentCountResult.count || 0,
         keywords: keywordsCountResult.count || 0,
-      })
+        })
 
-      if (p) {
         const plan = normalizePlan(p.plan)
         const limits = getPlanLimits(plan)
         setPlanState({
@@ -294,12 +324,18 @@ export default function SettingsPage() {
           threadsMax: limits.threadsPerMonth,
           draftsMax: limits.aiDraftsPerMonth,
         })
-      }
 
-      const trustData = trustResult.data
-      setDraftsReviewed(Math.min(trustData?.total_drafts_reviewed ?? 0, 10))
+        const trustData = trustResult.data
+        setDraftsReviewed(Math.min(trustData?.total_drafts_reviewed ?? 0, 10))
+      } catch (error) {
+        console.error('[settings] Unable to load settings', error)
+        setLoadFailed(true)
+        toast.error('Unable to load settings.')
+      } finally {
+        setSettingsLoading(false)
+      }
     }
-    load()
+    void load()
 
     // Handle OAuth Callback search parameters
     const params = new URLSearchParams(window.location.search)
@@ -333,71 +369,86 @@ export default function SettingsPage() {
       const newUrl = window.location.pathname + window.location.hash
       window.history.replaceState({}, '', newUrl)
     }
-  }, [supabase, userId])
+  }, [loadAttempt, supabase, userId])
 
   const handleSave = async () => {
+    if (settingsLoading || loadFailed) {
+      toast.error('Load your settings successfully before saving changes.')
+      return
+    }
     setSaving(true)
 
-    const baseProfileUpdates = {
-      business_name: profile.businessName,
-      business_description: profile.businessDescription,
-      business_url: profile.businessUrl,
-      business_type: profile.businessType,
-      writing_style: profile.writingStyle,
-      competitors: profile.competitors.split(',').map(s => s.trim()).filter(Boolean),
-      tone_examples: profile.toneExamples,
-      reddit_username: profile.redditUsername,
-      referral_tracking_enabled: profile.referralTrackingEnabled,
-      notification_preferences: notifications,
-      high_intent_threshold: normalizeHighIntentThreshold(highIntentThreshold),
-    }
-    const saveProfile = async () => {
-      const extendedResult = await supabase.from('profiles').update({
-        ...baseProfileUpdates,
-        tone_archetype: profile.toneArchetype,
-        style_guardrails: profile.styleGuardrails,
-      }).eq('id', userId)
-      if (!extendedResult.error) return extendedResult
-      return supabase.from('profiles').update(baseProfileUpdates).eq('id', userId)
-    }
+    try {
+      const baseProfileUpdates = {
+        business_name: profile.businessName,
+        business_description: profile.businessDescription,
+        business_url: profile.businessUrl,
+        business_type: profile.businessType,
+        writing_style: profile.writingStyle,
+        competitors: profile.competitors.split(',').map(s => s.trim()).filter(Boolean),
+        tone_examples: profile.toneExamples,
+        reddit_username: profile.redditUsername,
+        referral_tracking_enabled: profile.referralTrackingEnabled,
+        notification_preferences: notifications,
+        high_intent_threshold: normalizeHighIntentThreshold(highIntentThreshold),
+      }
+      const saveProfile = async () => {
+        const extendedResult = await supabase.from('profiles').update({
+          ...baseProfileUpdates,
+          tone_archetype: profile.toneArchetype,
+          style_guardrails: profile.styleGuardrails,
+        }).eq('id', userId)
+        if (!extendedResult.error) return extendedResult
+        return supabase.from('profiles').update(baseProfileUpdates).eq('id', userId)
+      }
 
-    const slackRequest = slack.webhookUrl
-      ? fetch('/api/settings/slack', {
+      const slackWebhookUrl = slack.webhookUrl.trim()
+      const slackPayload: { threshold: number; webhookUrl?: string } = {
+        threshold: slack.threshold,
+      }
+      if (slackWebhookUrl || !slackConfigured) slackPayload.webhookUrl = slackWebhookUrl
+      const slackRequest = fetch('/api/settings/slack', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(slackPayload),
+      })
+      const [{ error }, autoSendResponse, slackResponse] = await Promise.all([
+        saveProfile(),
+        fetch('/api/settings/autosend', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            webhookUrl: slack.webhookUrl,
-            threshold: slack.threshold,
+            auto_send_enabled: profile.autoSendEnabled,
+            auto_send_threshold: profile.autoSendThreshold,
+            auto_send_daily_limit: profile.autoSendDailyLimit,
+            auto_send_platforms: profile.autoSendPlatforms,
+            auto_send_communities: profile.autoSendCommunities
+              .split(',')
+              .map(value => value.trim())
+              .filter(Boolean),
+            activation_acknowledged: activationAcknowledged,
           }),
-        })
-      : Promise.resolve(new Response(null, { status: 204 }))
-    const [{ error }, autoSendResponse, slackResponse] = await Promise.all([
-      saveProfile(),
-      fetch('/api/settings/autosend', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auto_send_enabled: profile.autoSendEnabled,
-          auto_send_threshold: profile.autoSendThreshold,
-          auto_send_daily_limit: profile.autoSendDailyLimit,
-          auto_send_platforms: profile.autoSendPlatforms,
-          auto_send_communities: profile.autoSendCommunities
-            .split(',')
-            .map(value => value.trim())
-            .filter(Boolean),
-          activation_acknowledged: activationAcknowledged,
         }),
-      }),
-      slackRequest,
-    ])
+        slackRequest,
+      ])
 
-    setSaving(false)
-    if (error || !autoSendResponse.ok || !slackResponse.ok) { toast.error('Failed to save'); return }
-    clearSupabaseReadCache()
-    setSaveSuccess(true)
-    setActivationAcknowledged(false)
-    toast.success('Settings saved')
-    setTimeout(() => setSaveSuccess(false), 2500)
+      if (error || !autoSendResponse.ok || !slackResponse.ok) {
+        throw new Error('One or more settings could not be saved')
+      }
+      const savedSlack = await slackResponse.json().catch(() => null)
+      setSlackConfigured(Boolean(savedSlack?.configured))
+      if (slackWebhookUrl) setSlack(current => ({ ...current, webhookUrl: '' }))
+      clearSupabaseReadCache()
+      setSaveSuccess(true)
+      setActivationAcknowledged(false)
+      toast.success('Settings saved')
+      setTimeout(() => setSaveSuccess(false), 2500)
+    } catch (error) {
+      console.error('[settings] Unable to save settings', error)
+      toast.error('Some settings could not be saved. Reload this page to confirm the saved values.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleUpgrade = async (
@@ -461,35 +512,73 @@ export default function SettingsPage() {
   const handleConnectBluesky = async () => {
     if (!bskyHandle || !bskyPassword) { toast.error('Enter your handle and app password'); return }
     setBskyConnecting(true)
-    const res = await fetch('/api/settings/bluesky', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ handle: bskyHandle, password: bskyPassword }),
-    })
-    setBskyConnecting(false)
-    if (res.ok) {
+    try {
+      const res = await fetch('/api/settings/bluesky', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: bskyHandle, password: bskyPassword }),
+      })
+      if (!res.ok) throw new Error('connection_rejected')
       clearSupabaseReadCache()
       setConnections(p => ({ ...p, bluesky: true }))
       setBskyPassword('')
       toast.success('Bluesky connected')
-    } else {
-      toast.error('Invalid credentials')
+    } catch (error) {
+      console.error('[settings] Unable to connect Bluesky', error)
+      toast.error(error instanceof Error && error.message === 'connection_rejected'
+        ? 'Invalid credentials'
+        : 'Could not connect Bluesky. Check your connection and try again.')
+    } finally {
+      setBskyConnecting(false)
     }
   }
 
   const handleDisconnect = async (platform: 'reddit' | 'bluesky') => {
-    const response = await fetch('/api/settings/connections', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ platform }),
-    })
-    if (!response.ok) {
+    try {
+      const response = await fetch('/api/settings/connections', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform }),
+      })
+      if (!response.ok) throw new Error('disconnect_failed')
+      clearSupabaseReadCache()
+      setConnections(p => ({ ...p, [platform]: false }))
+      toast.success(`${platform} disconnected`)
+    } catch (error) {
+      console.error(`[settings] Unable to disconnect ${platform}`, error)
       toast.error(`Failed to disconnect ${platform}`)
-      return
     }
-    clearSupabaseReadCache()
-    setConnections(p => ({ ...p, [platform]: false }))
-    toast.success(`${platform} disconnected`)
+  }
+
+  const copySettingValue = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`${label} copied`)
+    } catch (error) {
+      console.error(`[settings] Unable to copy ${label.toLowerCase()}`, error)
+      toast.error(`Could not copy ${label.toLowerCase()}.`)
+    }
+  }
+
+  const handleDisconnectSlack = async () => {
+    if (slackDisconnecting) return
+    setSlackDisconnecting(true)
+    try {
+      const response = await fetch('/api/settings/slack', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: '', threshold: slack.threshold }),
+      })
+      if (!response.ok) throw new Error('slack_disconnect_failed')
+      setSlackConfigured(false)
+      setSlack(current => ({ ...current, webhookUrl: '' }))
+      toast.success('Slack disconnected')
+    } catch (error) {
+      console.error('[settings] Unable to disconnect Slack', error)
+      toast.error('Could not disconnect Slack.')
+    } finally {
+      setSlackDisconnecting(false)
+    }
   }
 
   const BUSINESS_TYPES = [
@@ -500,6 +589,32 @@ export default function SettingsPage() {
     { value: 'other', label: 'Other' },
   ]
   const canActivateAutomation = getPlanLimits(planState.plan).autoSend && draftsReviewed >= 10
+  const conversionWebhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://buyerwatch.co'}/api/webhooks/conversion`
+
+  if (settingsLoading) {
+    return (
+      <AppPage>
+        <div className="flex min-h-64 w-full max-w-[960px] items-center justify-center" role="status" aria-label="Loading settings">
+          <Activity className="h-5 w-5 animate-spin text-gray-400" aria-hidden="true" />
+        </div>
+      </AppPage>
+    )
+  }
+
+  if (loadFailed) {
+    return (
+      <AppPage>
+        <div className="w-full max-w-[960px]">
+          <h1 className="page-title">Settings</h1>
+          <DataLoadError
+            title="Couldn’t load settings"
+            description="BuyerWatch did not load your saved values, so editing is disabled to protect them. Check your connection and try again."
+            onRetry={() => setLoadAttempt(attempt => attempt + 1)}
+          />
+        </div>
+      </AppPage>
+    )
+  }
 
   return (
     <AppPage>
@@ -513,7 +628,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || settingsLoading || loadFailed}
             className="flex h-9 items-center gap-2 rounded-xl bg-gray-900 px-4 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-black disabled:opacity-50 cursor-pointer"
           >
             {saving ? <Activity className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
@@ -528,7 +643,9 @@ export default function SettingsPage() {
               {SECTIONS.map(s => (
                 <li key={s.id}>
                   <button
+                    type="button"
                     onClick={() => setActiveSection(s.id)}
+                    aria-pressed={activeSection === s.id}
                     className={`group flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all duration-150 md:gap-3 ${activeSection === s.id
                       ? 'bg-gray-900 text-white'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -1070,13 +1187,20 @@ export default function SettingsPage() {
                             type="url"
                             value={slack.webhookUrl}
                             onChange={e => setSlack(s => ({ ...s, webhookUrl: e.target.value }))}
-                            placeholder="https://hooks.slack.com/services/T.../B.../..."
+                            placeholder={slackConfigured
+                              ? 'Paste a new webhook URL to replace the saved one'
+                              : 'https://hooks.slack.com/services/T.../B.../...'}
                             className={inputCls}
                           />
+                          {slackConfigured && !slack.webhookUrl && (
+                            <p className="mt-2 text-[12px] font-medium text-emerald-700" role="status">
+                              Connected. The saved webhook is encrypted and never displayed here.
+                            </p>
+                          )}
                         </Field>
 
                         {/* Threshold slider */}
-                        {slack.webhookUrl && (
+                        {(slackConfigured || slack.webhookUrl) && (
                           <div>
                             <div className="flex items-center justify-between mb-2">
                               <label className="text-[13px] font-medium text-gray-700">Minimum intent score to notify</label>
@@ -1096,31 +1220,45 @@ export default function SettingsPage() {
                         )}
 
                         {/* Test button */}
-                        {slack.webhookUrl && (
-                          <button
-                            onClick={async () => {
-                              if (!slack.webhookUrl) return
-                              setSlackTesting(true)
-                              try {
-                                const res = await fetch('/api/settings/test-slack', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ webhookUrl: slack.webhookUrl }),
-                                })
-                                if (res.ok) toast.success('Test message sent to Slack ✓')
-                                else toast.error('Failed to send test — check your webhook URL')
-                              } catch {
-                                toast.error('Network error sending test')
-                              } finally {
-                                setSlackTesting(false)
-                              }
-                            }}
-                            disabled={slackTesting}
-                            className="flex items-center gap-2 text-[13px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl transition-colors cursor-pointer"
-                          >
-                            <Send className="w-3.5 h-3.5" strokeWidth={2} />
-                            {slackTesting ? 'Sending...' : 'Send test message'}
-                          </button>
+                        {(slackConfigured || slack.webhookUrl) && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setSlackTesting(true)
+                                try {
+                                  const res = await fetch('/api/settings/test-slack', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(slack.webhookUrl
+                                      ? { webhookUrl: slack.webhookUrl }
+                                      : {}),
+                                  })
+                                  if (res.ok) toast.success('Test message sent to Slack ✓')
+                                  else toast.error('Failed to send test — check your webhook URL')
+                                } catch {
+                                  toast.error('Network error sending test')
+                                } finally {
+                                  setSlackTesting(false)
+                                }
+                              }}
+                              disabled={slackTesting || slackDisconnecting}
+                              className="flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-2 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-wait disabled:opacity-50"
+                            >
+                              <Send className="h-3.5 w-3.5" strokeWidth={2} />
+                              {slackTesting ? 'Sending...' : 'Send test message'}
+                            </button>
+                            {slackConfigured && (
+                              <button
+                                type="button"
+                                onClick={() => void handleDisconnectSlack()}
+                                disabled={slackTesting || slackDisconnecting}
+                                className="rounded-xl px-4 py-2 text-[13px] font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+                              >
+                                {slackDisconnecting ? 'Disconnecting...' : 'Disconnect Slack'}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </SectionCard>
@@ -1136,13 +1274,10 @@ export default function SettingsPage() {
                           hint="POST JSON payloads to this endpoint when a user who clicked a BuyerWatch link converts."
                         >
                           <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800 sm:flex-row sm:items-center">
-                            <span className="min-w-0 break-all">{process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion</span>
+                            <span className="min-w-0 break-all">{conversionWebhookUrl}</span>
                             <button
                               type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/conversion`)
-                                toast.success('Webhook URL copied')
-                              }}
+                              onClick={() => void copySettingValue(conversionWebhookUrl, 'Webhook URL')}
                               className="min-h-11 shrink-0 px-2 font-sans text-[12px] font-semibold text-blue-600 hover:underline"
                             >
                               Copy
@@ -1159,10 +1294,7 @@ export default function SettingsPage() {
                             {webhookSecret && (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(webhookSecret)
-                                  toast.success('Webhook secret copied')
-                                }}
+                                onClick={() => void copySettingValue(webhookSecret, 'Webhook secret')}
                                 className="min-h-11 shrink-0 px-2 font-sans text-[12px] font-semibold text-blue-600 hover:underline"
                               >
                                 Copy

@@ -15,6 +15,8 @@ import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
 import { createClient } from '@/utils/supabase/client'
 import { IntentBadge } from '@/components/IntentBadge'
+import { DataLoadError } from '@/components/DataLoadError'
+import { toast } from 'sonner'
 
 const PAGE_SIZE = 40
 
@@ -97,7 +99,7 @@ function parsePostedThreads(data: any[]): PostedReply[] {
       matchedKeyword: keyword?.term || '',
       title,
       body,
-      discoveredAt: formatRelativeDate(thread.created_at),
+      discoveredAt: formatRelativeDate(thread.source_created_at || thread.created_at),
       sentAt: formatSentDate(analytics?.sent_at || thread.created_at),
       reply: analytics?.edited_text || analytics?.draft_text || 'Reply logged.',
       threadUrl: thread.url || null,
@@ -322,6 +324,7 @@ export default function PostedPage() {
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
 
@@ -332,61 +335,65 @@ export default function PostedPage() {
       setLoading(true)
       setLoadFailed(false)
 
-      const [pageResult, countResult] = await Promise.all([
-        supabase
-          .from('monitored_threads')
-          .select('id, platform, author, title, text_content, url, intent_score, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)')
-          .eq('user_id', userId)
-          .eq('status', 'replied')
-          .order('created_at', { ascending: false })
-          .range(0, PAGE_SIZE - 1),
-        supabase
-          .from('monitored_threads')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('status', 'replied'),
-      ])
-      const { data, error } = pageResult
+      try {
+        const [pageResult, countResult] = await Promise.all([
+          supabase
+            .from('monitored_threads')
+            .select('id, platform, author, title, text_content, url, intent_score, source_created_at, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)')
+            .eq('user_id', userId)
+            .eq('status', 'replied')
+            .order('created_at', { ascending: false })
+            .range(0, PAGE_SIZE - 1),
+          supabase
+            .from('monitored_threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('status', 'replied'),
+        ])
+        if (pageResult.error) throw pageResult.error
+        if (countResult.error) throw countResult.error
+        if (cancelled) return
 
-      if (cancelled) return
-
-      if (error) {
+        const parsed = parsePostedThreads(pageResult.data ?? [])
+        setPosted(parsed)
+        setSelected(parsed[0] ?? null)
+        setTotalCount(countResult.count ?? pageResult.data?.length ?? 0)
+        setHasMore((pageResult.data?.length ?? 0) === PAGE_SIZE)
+      } catch (error) {
+        if (cancelled) return
+        console.error('[posted] Unable to load posted replies', error)
         setLoadFailed(true)
-        setLoading(false)
-        return
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      const parsed = parsePostedThreads(data ?? [])
-      setPosted(parsed)
-      if (parsed.length > 0) setSelected(parsed[0])
-      setTotalCount(countResult.count ?? data?.length ?? 0)
-      setHasMore((data?.length ?? 0) === PAGE_SIZE)
-      setLoading(false)
     }
 
     void fetchPosted()
     return () => { cancelled = true }
-  }, [supabase, userId])
+  }, [loadAttempt, supabase, userId])
 
   async function loadMorePosted() {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
-    const from = posted.length
-    const { data, error } = await supabase
-      .from('monitored_threads')
-      .select('id, platform, author, title, text_content, url, intent_score, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)')
-      .eq('user_id', userId)
-      .eq('status', 'replied')
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1)
+    try {
+      const from = posted.length
+      const { data, error } = await supabase
+        .from('monitored_threads')
+        .select('id, platform, author, title, text_content, url, intent_score, source_created_at, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)')
+        .eq('user_id', userId)
+        .eq('status', 'replied')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1)
+      if (error) throw error
 
-    if (error) {
-      setLoadFailed(true)
-    } else {
       setPosted(current => [...current, ...parsePostedThreads(data ?? [])])
       setHasMore((data?.length ?? 0) === PAGE_SIZE)
+    } catch (error) {
+      console.error('[posted] Unable to load more posted replies', error)
+      toast.error('Unable to load more replies.')
+    } finally {
+      setLoadingMore(false)
     }
-    setLoadingMore(false)
   }
 
   return (
@@ -406,15 +413,12 @@ export default function PostedPage() {
         />
 
         {loadFailed ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center py-24">
-            <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#FFF3E8] text-[#D34519]">
-              <MessageSquare className="h-7 w-7" strokeWidth={2.2} />
-            </div>
-            <h2 className="mb-2 text-[18px] font-semibold text-[#1C1C1A]">Couldn&apos;t load replies</h2>
-            <p className="max-w-sm text-[14px] leading-relaxed text-[#6B6B66]">
-              Refresh the page to try again.
-            </p>
-          </div>
+          <DataLoadError
+            title="Couldn’t load replies"
+            description="Your posted reply history is still safe. Check your connection and try loading it again."
+            onRetry={() => setLoadAttempt(attempt => attempt + 1)}
+            className="flex-1"
+          />
         ) : (
           <div className="flex flex-1 min-h-0 overflow-hidden">
 

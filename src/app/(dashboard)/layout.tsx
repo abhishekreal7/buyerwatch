@@ -19,19 +19,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const usageMonth = getCurrentUsageMonth()
-  const [profileResult, unreviewedResult, addonCreditsResult] = await Promise.all([
+  const [profileResult, addonCreditsResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('auto_send_enabled, plan, draft_count, draft_month, business_name')
       .eq('id', userId)
       .single(),
-    supabase
-      .from('monitored_threads')
-      .select('id')
-      .eq('user_id', userId)
-      .in('status', ['pending', 'drafted', 'needs_manual_reply'])
-      .is('reviewed_at', null)
-      .limit(1),
     supabase
       .from('billing_addon_credits')
       .select('addon_type, credits')
@@ -54,7 +47,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     autoSend: profile?.auto_send_enabled ?? false,
     plan,
     credits: { used, limit },
-    hasUnreviewedOpportunities: (unreviewedResult.data?.length ?? 0) > 0,
     user: {
       name: userName,
       email,

@@ -69,6 +69,20 @@ describe('serverless social candidate selection', () => {
     expect(result.candidates).toHaveLength(0)
     expect(result.skipped).toBe(1)
   })
+
+  it('does not discard a genuine buyer just because their background includes offering services', () => {
+    const result = buildRedditScoreCandidates([
+      post({
+        title: 'Our agency needs lead generation monitoring software',
+        text: 'We help B2B clients, but we need a Reddit monitoring tool for our own team and are comparing pricing this week.',
+      }),
+    ], [
+      { id: 'keyword-1', user_id: 'user-1', term: 'lead generation' },
+    ])
+
+    expect(result.candidates).toHaveLength(1)
+    expect(result.candidates[0]).toMatchObject({ keywordId: 'keyword-1' })
+  })
 })
 
 describe('QStash monitoring route contract', () => {
@@ -88,12 +102,20 @@ describe('QStash monitoring route contract', () => {
     join(process.cwd(), 'src/app/api/jobs/score/route.ts'),
     'utf8',
   )
+  const workerScorer = readFileSync(
+    join(process.cwd(), 'worker/handlers/score-post.ts'),
+    'utf8',
+  )
   const reddit = readFileSync(
     join(process.cwd(), 'src/lib/reddit.ts'),
     'utf8',
   )
   const fetchNow = readFileSync(
     join(process.cwd(), 'src/app/api/keywords/fetch-now/route.ts'),
+    'utf8',
+  )
+  const sourceTimeMigration = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20260808010000_preserve_source_post_time.sql'),
     'utf8',
   )
 
@@ -154,5 +176,15 @@ describe('QStash monitoring route contract', () => {
     expect(scoreJob).toContain('processScorePost')
     expect(scoreJob).toContain(".from('ingestion_events')")
     expect(scoreJob).toContain('processed_at: new Date().toISOString()')
+  })
+
+  it('preserves source publication time across persistence and checkpoint recovery', () => {
+    expect(sourceTimeMigration).toContain('add column if not exists source_created_at timestamptz')
+    expect(sourceTimeMigration).toContain('create or replace function public.persist_scored_thread_v2')
+    expect(workerScorer).toContain("supabase.rpc('persist_scored_thread_v2'")
+    expect(workerScorer).toContain('p_source_created_at: post.createdAt')
+    expect(monitor).toContain('source_created_at, created_at')
+    expect(monitor).toContain('source_created_at: post.createdAt')
+    expect(monitor).toContain('createdAt: row.source_created_at || row.created_at')
   })
 })

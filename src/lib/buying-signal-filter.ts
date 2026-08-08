@@ -23,6 +23,7 @@ const SEEKING_SIGNALS = [
   'searching for',
   'anyone know of',
   'does anyone know',
+  'point me to',
   'where can i',
   'how do i',
   'how can i',
@@ -47,7 +48,6 @@ const RESEARCH_SIGNALS = [
   ' vs ',
   'alternative to',
   'alternatives to',
-  'competitor',
   'comparison',
   'best tool',
   'best app',
@@ -87,6 +87,11 @@ const PAIN_SIGNALS = [
   'stopped working',
   'broken',
   'buggy',
+  'by hand',
+  'manually',
+  'too late',
+  'already replied',
+  'missing out',
 ]
 
 /** Phrases that indicate purchase intent or evaluation */
@@ -107,6 +112,13 @@ const PURCHASE_SIGNALS = [
   'should i buy',
   'should i pay',
   'roi',
+  'evaluating vendors',
+  'evaluating providers',
+  'request for proposal',
+  'approved budget',
+  'approved a budget',
+  'vendor shortlist',
+  'select a vendor',
 ]
 
 export type BuyingSignalCategory = 'seeking' | 'research' | 'pain' | 'purchase'

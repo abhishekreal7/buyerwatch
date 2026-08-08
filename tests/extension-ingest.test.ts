@@ -7,6 +7,7 @@ import {
   buildExtensionScoreJobId,
   isExtensionPlatform,
   isValidExtensionSourceUrl,
+  normalizeExtensionTimestamps,
 } from '../src/lib/extension-ingest'
 
 const manifest = JSON.parse(readFileSync(
@@ -32,6 +33,10 @@ const optionsScript = readFileSync(
 )
 const bridgeScript = readFileSync(
   join(process.cwd(), 'browser-extension/bridge.js'),
+  'utf8',
+)
+const contentScript = readFileSync(
+  join(process.cwd(), 'browser-extension/content.js'),
   'utf8',
 )
 const extensionInstallSource = readFileSync(
@@ -81,6 +86,35 @@ describe('extension capture validation', () => {
       .toBe(buildExtensionScoreJobId('user-1', externalId))
     expect(buildExtensionScoreJobId('user-1', externalId))
       .not.toBe(buildExtensionScoreJobId('user-2', externalId))
+  })
+
+  it('keeps a valid source publication time separate from capture time', () => {
+    const now = Date.parse('2026-08-08T12:00:00.000Z')
+    expect(normalizeExtensionTimestamps(
+      '2026-08-08T11:59:00.000Z',
+      '2026-07-01T09:30:00.000Z',
+      now,
+    )).toEqual({
+      capturedAt: '2026-08-08T11:59:00.000Z',
+      sourceCreatedAt: '2026-07-01T09:30:00.000Z',
+    })
+  })
+
+  it('rejects untrusted future or implausibly old source timestamps', () => {
+    const now = Date.parse('2026-08-08T12:00:00.000Z')
+    expect(normalizeExtensionTimestamps(
+      '2026-08-08T11:59:00.000Z',
+      '2026-08-09T00:00:00.000Z',
+      now,
+    ).sourceCreatedAt).toBe('2026-08-08T11:59:00.000Z')
+    expect(normalizeExtensionTimestamps(
+      'invalid',
+      '1980-01-01T00:00:00.000Z',
+      now,
+    )).toEqual({
+      capturedAt: '2026-08-08T12:00:00.000Z',
+      sourceCreatedAt: '2026-08-08T12:00:00.000Z',
+    })
   })
 })
 
@@ -207,6 +241,15 @@ describe('extension vertical-slice contracts', () => {
     expect(ingestRoute).toContain("status: 'awaiting_analysis'")
     expect(ingestRoute).toContain('const canDispatch = Boolean(')
     expect(ingestRoute).toContain("publishQStashJson('/api/jobs/score'")
+  })
+
+  it('extracts and persists Reddit publication time instead of capture time', () => {
+    expect(contentScript).toContain("'created-timestamp'")
+    expect(contentScript).toContain("'faceplate-timeago[ts], time[datetime]'")
+    expect(contentScript).toContain('publishedAt: details.publishedAt || undefined')
+    expect(ingestRoute).toContain('body.publishedAt')
+    expect(ingestRoute).toContain('source_created_at: sourceCreatedAt')
+    expect(ingestRoute).toContain('createdAt: sourceCreatedAt')
   })
 
   it('does not mistake an unscored capture for a paid AI checkpoint', () => {

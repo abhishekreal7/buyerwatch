@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   CheckCircle, FileText, Send, AlertTriangle, Activity
 } from 'lucide-react'
@@ -17,6 +17,7 @@ import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { useExtensionStatus } from '@/components/ExtensionInstall'
 import { normalizeHighIntentThreshold } from '@/lib/high-intent-threshold'
+import { DataLoadError } from '@/components/DataLoadError'
 
 // Custom Label for Horizontal Bar Chart
 const CustomBarLabel = (props: any) => {
@@ -116,6 +117,8 @@ const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const hasLoadedDataRef = useRef(false)
   const [data, setData] = useState<{
     stats: { found: number, drafted: number, sent: number, sentThisMonth: number, sentLastMonth: number }
     trendData: { date: string, discovered: number, qualified: number }[]
@@ -134,6 +137,13 @@ export default function AnalyticsPage() {
   const { status: extensionStatus, openInstall } = useExtensionStatus()
 
   const loadData = useCallback(async () => {
+      const isInitialLoad = !hasLoadedDataRef.current
+      if (isInitialLoad) {
+        setLoading(true)
+        setLoadFailed(false)
+      }
+
+      try {
       const now = new Date()
       const thirtyDaysAgo = subDays(now, 30)
       const sixtyDaysAgo = subDays(now, 60)
@@ -154,7 +164,7 @@ export default function AnalyticsPage() {
       ] = await Promise.all([
         supabase.from('profiles').select('auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
-        fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).range(from, to)),
+        fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).not('intent_score', 'is', null).range(from, to)),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).not('sent_at', 'is', null),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).gte('sent_at', thirtyDaysAgoIso),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).gte('sent_at', sixtyDaysAgoIso).lt('sent_at', thirtyDaysAgoIso),
@@ -163,6 +173,20 @@ export default function AnalyticsPage() {
         supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('converted_at', 'is', null),
         fetchAllPages((from, to) => supabase.from('reply_attribution').select('revenue_usd').eq('user_id', userId).not('revenue_usd', 'is', null).range(from, to)),
       ])
+
+      const queryError = [
+        profileRes,
+        connsRes,
+        threadsRes,
+        totalSentRes,
+        sentThisMonthRes,
+        sentLastMonthRes,
+        feedbackRes,
+        clicksRes,
+        conversionsRes,
+        revenueRes,
+      ].find(result => result.error)?.error
+      if (queryError) throw queryError
 
       const threads = threadsRes.data || []
       const feedback = feedbackRes.data || []
@@ -300,7 +324,14 @@ export default function AnalyticsPage() {
         highIntentThreshold,
         attributionStats: { clicks, conversions, totalRevenue }
       })
-      setLoading(false)
+      hasLoadedDataRef.current = true
+      setLoadFailed(false)
+      } catch (error) {
+        console.error('[analytics] Unable to load analytics', error)
+        if (!hasLoadedDataRef.current) setLoadFailed(true)
+      } finally {
+        if (isInitialLoad) setLoading(false)
+      }
     }, [supabase, userId])
 
   useEffect(() => {
@@ -348,6 +379,21 @@ export default function AnalyticsPage() {
       void supabase.removeChannel(channel)
     }
   }, [loadData, supabase, userId])
+
+  if (loadFailed && !data) {
+    return (
+      <AppPage>
+        <div className="w-full max-w-[1200px]">
+          <h1 className="page-title">Analytics</h1>
+          <DataLoadError
+            title="Couldn’t load analytics"
+            description="BuyerWatch couldn’t retrieve the reporting data. Check your connection and try again."
+            onRetry={() => void loadData()}
+          />
+        </div>
+      </AppPage>
+    )
+  }
 
   if (loading || !data) {
     return (

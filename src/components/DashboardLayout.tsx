@@ -39,12 +39,12 @@ import {
 } from '@/components/ExtensionInstall'
 import { signOutAction } from '@/app/actions/auth'
 import { ConversationSearchProvider, useConversationSearch } from '@/lib/conversation-search'
+import { ACTIONABLE_INTENT_THRESHOLD } from '@/lib/intent'
 
 export type DashboardBootstrap = {
   autoSend: boolean
   plan: PlanTier
   credits: { used: number; limit: number }
-  hasUnreviewedOpportunities: boolean
   user?: {
     name?: string
     email?: string
@@ -142,6 +142,7 @@ function DashboardShell({
   const [plan, setPlan] = useState<PlanTier>(initialData.plan)
   const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
+  const [draftReadyCount, setDraftReadyCount] = useState<number | null>(null)
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
   const [openingCheckout, setOpeningCheckout] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -165,50 +166,72 @@ function DashboardShell({
 
   useEffect(() => {
     async function loadSidebarData() {
-      const usageMonth = getCurrentUsageMonth()
-      const [profileResult, unreviewedResult, keywordCountResult, addonCreditsResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('auto_send_enabled, plan, draft_count, draft_month')
-          .eq('id', userId)
-          .single(),
-        supabase
-          .from('monitored_threads')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .in('status', ['pending', 'drafted', 'needs_manual_reply'])
-          .is('reviewed_at', null),
-        supabase
-          .from('keywords')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('is_active', true),
-        supabase
-          .from('billing_addon_credits')
-          .select('addon_type, credits')
-          .eq('user_id', userId)
-          .eq('usage_month', usageMonth),
-      ])
+      try {
+        const usageMonth = getCurrentUsageMonth()
+        const [profileResult, opportunityCountResult, draftReadyCountResult, keywordCountResult, addonCreditsResult] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('auto_send_enabled, plan, draft_count, draft_month')
+            .eq('id', userId)
+            .single(),
+          supabase
+            .from('monitored_threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+            .not('intent_score', 'is', null)
+            .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD),
+          supabase
+            .from('monitored_threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .in('status', ['drafted', 'needs_manual_reply']),
+          supabase
+            .from('keywords')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_active', true),
+          supabase
+            .from('billing_addon_credits')
+            .select('addon_type, credits')
+            .eq('user_id', userId)
+            .eq('usage_month', usageMonth),
+        ])
 
-      const profile = profileResult.data
-      if (profile) {
-        const normalizedPlan = normalizePlan(profile.plan)
-        const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
-        const limit = getPlanLimitsWithAddons(normalizedPlan, addonCredits).aiDraftsPerMonth
-        const currentMonth = usageMonth
-        const used = profile.draft_month === currentMonth
-          ? Math.max(profile.draft_count ?? 0, 0)
-          : 0
-        setAutoSend(profile.auto_send_enabled ?? false)
-        setPlan(normalizedPlan)
-        setCredits({ used, limit })
+        const sidebarError = [
+          profileResult,
+          opportunityCountResult,
+          draftReadyCountResult,
+          keywordCountResult,
+          addonCreditsResult,
+        ].find(result => result.error)?.error
+        if (sidebarError) {
+          console.error('[dashboard-layout] Unable to refresh sidebar metrics', sidebarError)
+        }
+
+        const profile = profileResult.error ? null : profileResult.data
+        if (profile && !addonCreditsResult.error) {
+          const normalizedPlan = normalizePlan(profile.plan)
+          const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
+          const limit = getPlanLimitsWithAddons(normalizedPlan, addonCredits).aiDraftsPerMonth
+          const currentMonth = usageMonth
+          const used = profile.draft_month === currentMonth
+            ? Math.max(profile.draft_count ?? 0, 0)
+            : 0
+          setAutoSend(profile.auto_send_enabled ?? false)
+          setPlan(normalizedPlan)
+          setCredits({ used, limit })
+        }
+
+        if (!opportunityCountResult.error) setOpportunityCount(opportunityCountResult.count ?? 0)
+        if (!draftReadyCountResult.error) setDraftReadyCount(draftReadyCountResult.count ?? 0)
+        if (!keywordCountResult.error) setKeywordCount(keywordCountResult.count ?? 0)
+      } catch (error) {
+        console.error('[dashboard-layout] Unable to refresh sidebar metrics', error)
       }
-
-      const oppsCount = unreviewedResult.count ?? 0
-      setOpportunityCount(oppsCount)
-      setKeywordCount(keywordCountResult.count ?? null)
     }
 
+    void loadSidebarData()
     const refreshCredits = () => void loadSidebarData()
     const refreshInterval = window.setInterval(loadSidebarData, 60_000)
     window.addEventListener('buyerwatch:credits-changed', refreshCredits)
@@ -239,21 +262,23 @@ function DashboardShell({
     setTogglingAutoSend(true)
     setAutoSend(next)
 
-    const res = await fetch('/api/settings/autosend', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ auto_send_enabled: next }),
-    })
-
-    if (!res.ok) {
-      setAutoSend(!next)
-      toast.error('Failed to update auto-send setting')
-    } else {
+    try {
+      const res = await fetch('/api/settings/autosend', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_send_enabled: next }),
+      })
+      if (!res.ok) throw new Error('autosend_update_failed')
       clearSupabaseReadCache()
       toast.success(next ? 'Auto-send enabled' : 'Auto-send paused')
       window.dispatchEvent(new CustomEvent('buyerwatch:auto-send-changed', { detail: next }))
+    } catch (error) {
+      console.error('[dashboard-layout] Unable to update auto-send', error)
+      setAutoSend(!next)
+      toast.error('Failed to update auto-send setting')
+    } finally {
+      setTogglingAutoSend(false)
     }
-    setTogglingAutoSend(false)
   }
 
   async function openCheckout(body: Record<string, string>, checkoutKey: string) {
@@ -336,8 +361,8 @@ function DashboardShell({
                 
                 // Get count badge data if available
                 let badgeCount: number | undefined = undefined
-                if (item.name === 'Drafts Ready' && credits) {
-                  badgeCount = credits.used
+                if (item.name === 'Drafts Ready' && draftReadyCount !== null) {
+                  badgeCount = draftReadyCount
                 } else if (item.name === 'Opportunities' && opportunityCount !== null) {
                   badgeCount = opportunityCount
                 } else if (item.name === 'Keywords' && keywordCount !== null) {

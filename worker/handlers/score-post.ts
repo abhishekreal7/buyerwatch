@@ -9,9 +9,9 @@ import path from 'path'
 import { randomBytes } from 'crypto'
 import { buildAttributionShortUrl } from '../../src/lib/attribution'
 import { getAppUrl } from '../../src/lib/app-url'
-import { IntentLabel } from '../../src/lib/intent'
+import { ACTIONABLE_INTENT_THRESHOLD, type IntentLabel } from '../../src/lib/intent'
 import { evaluateIntentPreflight } from '../../src/lib/intent-preflight'
-import { getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
+import { getIntentDailyLimit, getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
 import { getConfiguredSecret } from '../../src/lib/env'
 import {
   emptyAiUsage,
@@ -38,8 +38,6 @@ import {
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
 import { supabaseWorker as supabase } from '../lib/supabase'
-
-const INTENT_THRESHOLD = 60
 
 export type ScorePostPayload = {
   userId: string
@@ -143,6 +141,7 @@ export async function processScorePost(
     let scoreResult: Awaited<ReturnType<typeof scoreIntent>>
     let evidenceSignals: string[]
     let paidIntentGatePassed = true
+    let intentManualReviewReason = 'preflight_ai_bypassed'
     if (hasScoringCheckpoint && existing) {
       scoreResult = {
         score: Number(existing.intent_score ?? 0),
@@ -216,41 +215,63 @@ export async function processScorePost(
         })
         if (!intentSpend) {
           logger.warn({ userId, plan }, 'AI spend cap blocked intent scoring')
-          await safelyReleaseMonthlySignal(userId)
-          signalReserved = false
-          return
-        }
-
-        let canScore: boolean
-        try {
-          canScore = await checkBudget(userId, profile.plan, 'intent')
-        } catch (error) {
-          await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
-          throw error
-        }
-        if (!canScore) {
-          await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
-          logger.info({ userId }, 'Daily intent-scoring limit reached')
-          await safelyReleaseMonthlySignal(userId)
-          signalReserved = false
-          return
-        }
-
-        // Score intent and reconcile the reservation with actual usage.
-        try {
-          scoreResult = await scoreIntent(post, profile, {
-            maxRetries: providerRetries,
-          })
-          await safelyRecordAiUsage(intentSpend.id, scoreResult.usage, {
-            userId,
-            purpose: 'intent',
-          })
-        } catch (error) {
-          await settleFailedAiSpend(intentSpend.id, error, {
-            userId,
-            purpose: 'intent',
-          })
-          throw error
+          scoreResult = {
+            score: preflight.score,
+            label: preflight.label,
+            flag: preflight.flag,
+            reasoning: preflight.reasoning,
+            usage: emptyAiUsage(),
+          }
+          paidIntentGatePassed = false
+          intentManualReviewReason = 'intent_spend_limit_reached'
+        } else {
+          let canScore: boolean
+          try {
+            canScore = await checkBudget(userId, profile.plan, 'intent')
+          } catch (error) {
+            await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
+            throw error
+          }
+          if (!canScore) {
+            await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' })
+            logger.info({ userId }, 'Daily intent-scoring limit reached; preserving deterministic result')
+            scoreResult = {
+              score: preflight.score,
+              label: preflight.label,
+              flag: preflight.flag,
+              reasoning: preflight.reasoning,
+              usage: emptyAiUsage(),
+            }
+            paidIntentGatePassed = false
+            intentManualReviewReason = 'intent_plan_limit_reached'
+          } else {
+            // Score intent and reconcile the reservation with actual usage.
+            try {
+              scoreResult = await scoreIntent(post, profile, {
+                maxRetries: providerRetries,
+                keywordTerm: keyword?.term,
+              })
+              await safelyRecordAiUsage(intentSpend.id, scoreResult.usage, {
+                userId,
+                purpose: 'intent',
+              })
+            } catch (error) {
+              await settleFailedAiSpend(intentSpend.id, error, {
+                userId,
+                purpose: 'intent',
+              })
+              logger.warn({ err: error, userId }, 'AI intent scoring failed; preserving deterministic result for manual review')
+              scoreResult = {
+                score: preflight.score,
+                label: preflight.label,
+                flag: preflight.flag,
+                reasoning: preflight.reasoning,
+                usage: emptyAiUsage(),
+              }
+              paidIntentGatePassed = false
+              intentManualReviewReason = 'intent_provider_failed'
+            }
+          }
         }
       } else {
         scoreResult = {
@@ -273,7 +294,7 @@ export async function processScorePost(
     }
     
     // Save thread early if score is low
-    if (scoreResult.score < INTENT_THRESHOLD) {
+    if (scoreResult.score < ACTIONABLE_INTENT_THRESHOLD) {
       await saveThread({
         userId,
         keywordId,
@@ -301,7 +322,7 @@ export async function processScorePost(
         flag: scoreResult.flag,
         reasoning: scoreResult.reasoning,
         evidenceSignals,
-        automationReason: 'preflight_ai_bypassed',
+        automationReason: intentManualReviewReason,
       })
       signalReserved = false
       return
@@ -421,7 +442,21 @@ export async function processScorePost(
       })
       await safelyReleaseMonthlyDraft(userId)
       draftReserved = false
-      throw error
+      logger.warn({ err: error, userId }, 'AI drafting failed; routing scored conversation to manual reply')
+      await saveThread({
+        userId,
+        keywordId,
+        post,
+        intentScore: scoreResult.score,
+        intentLabel: scoreResult.label,
+        status: 'needs_manual_reply',
+        flag: scoreResult.flag,
+        reasoning: scoreResult.reasoning,
+        evidenceSignals,
+        automationReason: 'draft_provider_failed',
+      })
+      signalReserved = false
+      return
     }
     const draftText = draftResult.text
 
@@ -818,14 +853,7 @@ async function checkBudget(userId: string, plan: string, service: 'intent' | 'dr
     return data
   }
 
-  const limits: Record<string, number> = {
-    free: 50,
-    pro: 500,
-    growth: 2000,
-  }
-  
-  const userPlan = limits[plan] ? plan : 'free'
-  const limit = limits[userPlan]
+  const limit = getIntentDailyLimit(plan)
 
   const { data, error } = await supabase.rpc('increment_usage_if_under_limit', {
     p_user_id: userId,
@@ -879,7 +907,7 @@ async function saveThread(input: {
     automationReason,
     autoSendPayload,
   } = input
-  const { data: threadId, error } = await supabase.rpc('persist_scored_thread', {
+  const { data: threadId, error } = await supabase.rpc('persist_scored_thread_v2', {
     p_user_id: userId,
     p_keyword_id: keywordId,
     p_platform: post.platform,
@@ -888,6 +916,7 @@ async function saveThread(input: {
     p_title: post.title || null,
     p_text_content: post.text,
     p_url: post.url,
+    p_source_created_at: post.createdAt,
     p_intent_score: intentScore,
     p_intent_label: intentLabel,
     p_status: status,

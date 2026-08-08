@@ -17,8 +17,20 @@ import { useExtensionStatus } from '@/components/ExtensionInstall'
 import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
 import { BILLING_ADDONS } from '@/lib/billing-addons'
 import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
+import { DataLoadError } from '@/components/DataLoadError'
 
 const PAGE_SIZE = 40
+
+const MANUAL_DRAFT_REASON_LABELS: Record<string, string> = {
+  ai_provider_unavailable: 'AI drafting is unavailable right now. You can still write and send this reply manually.',
+  ai_spend_limit_reached: 'The AI drafting budget was reached. You can still write and send this reply manually.',
+  draft_plan_limit_reached: 'The AI draft allowance was reached. You can still write and send this reply manually.',
+  draft_provider_failed: 'AI drafting failed for this conversation. Your opportunity is safe, and you can write the reply manually or retry later.',
+  intent_provider_failed: 'AI intent scoring was unavailable. Review the deterministic match before writing a reply.',
+  intent_spend_limit_reached: 'The AI scoring budget was reached. Review the deterministic match before writing a reply.',
+  intent_plan_limit_reached: 'The daily AI scoring allowance was reached. Review the deterministic match before writing a reply.',
+  preflight_ai_bypassed: 'This conversation was scored deterministically. Review it before writing a reply.',
+}
 
 function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm' | 'md' }) {
   const cls = size === 'md' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5'
@@ -48,7 +60,7 @@ function parseDrafts(data: any[]) {
       platform: t.platform,
       target: t.author || 'unknown',
       community: keyword?.target || t.platform,
-      timeAgo: formatTimeAgo(t.created_at),
+      timeAgo: formatTimeAgo(t.source_created_at || t.created_at),
       title: t.title || '',
       content: t.text_content,
       score,
@@ -83,6 +95,8 @@ export default function DraftsPage() {
   const [connections, setConnections] = useState<string[]>([])
   const [businessName, setBusinessName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
@@ -92,61 +106,74 @@ export default function DraftsPage() {
 
   useEffect(() => {
     async function fetchDrafts() {
-      const [connectionsResult, profileResult, draftsResult, draftCountResult] = await Promise.all([
-        supabase.from('platform_connections').select('platform').eq('user_id', userId),
-        supabase.from('profiles').select('business_name').eq('id', userId).single(),
-        supabase
-          .from('monitored_threads')
-          .select('*, reply_analytics(draft_text), keywords(term, target)')
-          .eq('user_id', userId)
-          .in('status', ['drafted', 'needs_manual_reply'])
-          .order('created_at', { ascending: false })
-          .range(0, PAGE_SIZE - 1),
-        supabase
-          .from('monitored_threads')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .in('status', ['drafted', 'needs_manual_reply']),
-      ])
-      const conns = connectionsResult.data
-      if (conns) setConnections(conns.map(c => c.platform))
-      const profile = profileResult.data
-      setBusinessName(profile?.business_name || '')
-      const data = draftsResult.data
+      setLoading(true)
+      setLoadFailed(false)
 
-      if (data && data.length > 0) {
+      try {
+        const [connectionsResult, profileResult, draftsResult, draftCountResult] = await Promise.all([
+          supabase.from('platform_connections').select('platform').eq('user_id', userId),
+          supabase.from('profiles').select('business_name').eq('id', userId).single(),
+          supabase
+            .from('monitored_threads')
+            .select('*, reply_analytics(draft_text), keywords(term, target)')
+            .eq('user_id', userId)
+            .in('status', ['drafted', 'needs_manual_reply'])
+            .order('created_at', { ascending: false })
+            .range(0, PAGE_SIZE - 1),
+          supabase
+            .from('monitored_threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .in('status', ['drafted', 'needs_manual_reply']),
+        ])
+        const queryError = [connectionsResult, profileResult, draftsResult, draftCountResult]
+          .find(result => result.error)?.error
+        if (queryError) throw queryError
+
+        const conns = connectionsResult.data
+        setConnections((conns ?? []).map(connection => connection.platform))
+        setBusinessName(profileResult.data?.business_name || '')
+        const data = draftsResult.data ?? []
         const parsed = parseDrafts(data)
         setDrafts(parsed)
-        setSelected(parsed[0])
-        setDraftContent(parsed[0].draft)
-        originalDraftRef.current = parsed[0].draft
+        setSelected(parsed[0] ?? null)
+        setDraftContent(parsed[0]?.draft ?? '')
+        originalDraftRef.current = parsed[0]?.draft ?? ''
+        setHasMore(data.length === PAGE_SIZE)
+        setTotalCount(draftCountResult.count ?? data.length)
+      } catch (error) {
+        console.error('[drafts] Unable to load drafts', error)
+        toast.error('Unable to load drafts.')
+        setLoadFailed(true)
+      } finally {
+        setLoading(false)
       }
-      setHasMore((data?.length ?? 0) === PAGE_SIZE)
-      setTotalCount(draftCountResult.count ?? data?.length ?? 0)
-      setLoading(false)
     }
     void fetchDrafts()
-  }, [supabase, userId])
+  }, [loadAttempt, supabase, userId])
 
   async function loadMoreDrafts() {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
-    const from = drafts.length
-    const { data, error } = await supabase
-      .from('monitored_threads')
-      .select('*, reply_analytics(draft_text), keywords(term, target)')
-      .eq('user_id', userId)
-      .in('status', ['drafted', 'needs_manual_reply'])
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1)
+    try {
+      const from = drafts.length
+      const { data, error } = await supabase
+        .from('monitored_threads')
+        .select('*, reply_analytics(draft_text), keywords(term, target)')
+        .eq('user_id', userId)
+        .in('status', ['drafted', 'needs_manual_reply'])
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1)
+      if (error) throw error
 
-    if (error) {
-      toast.error('Unable to load more drafts.')
-    } else {
       setDrafts(current => [...current, ...parseDrafts(data ?? [])])
       setHasMore((data?.length ?? 0) === PAGE_SIZE)
+    } catch (error) {
+      console.error('[drafts] Unable to load more drafts', error)
+      toast.error('Unable to load more drafts.')
+    } finally {
+      setLoadingMore(false)
     }
-    setLoadingMore(false)
   }
 
   const handleSelect = (d: any) => {
@@ -166,10 +193,15 @@ export default function DraftsPage() {
     }
   }, [drafts])
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(draftContent)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(draftContent)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('[drafts] Unable to copy reply', error)
+      toast.error('Could not copy the reply.')
+    }
   }
 
   const handleApproveAndSend = async () => {
@@ -285,33 +317,46 @@ export default function DraftsPage() {
     }
   }
 
-  const handleDismiss = () => {
+  const handleDismiss = async () => {
     if (!selected) return
     const threadIdToDismiss = selected.id
 
-    fetch('/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        threadId: threadIdToDismiss,
-        originalDraft: originalDraftRef.current,
-        finalDraft: draftContent,
-        actionType: 'REJECTED',
-        platform: selected.platform,
-        targetCommunity: selected.target,
-        keywordCluster: selected.matchedKeyword
+    try {
+      const { error } = await supabase.rpc('dismiss_thread', { p_thread_id: threadIdToDismiss })
+      if (error) throw error
+    } catch (error) {
+      console.error('[drafts] Unable to dismiss draft', error)
+      toast.error('Could not dismiss this draft. Nothing was removed.')
+      return
+    }
+
+    void fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threadId: threadIdToDismiss,
+          originalDraft: originalDraftRef.current,
+          finalDraft: draftContent,
+          actionType: 'REJECTED',
+          platform: selected.platform,
+          targetCommunity: selected.target,
+          keywordCluster: selected.matchedKeyword
+        })
       })
-    }).catch(console.error)
+      .then(response => {
+        if (!response.ok) console.error('[drafts] Dismissed draft but failed to record rejection feedback')
+      })
+      .catch(error => console.error('[drafts] Dismissed draft but failed to record rejection feedback', error))
 
     // Reset ref so it doesn't bleed into the next selected draft
     originalDraftRef.current = ''
-    supabase.rpc('dismiss_thread', { p_thread_id: threadIdToDismiss }).then()
     clearSupabaseReadCache()
     setDrafts(prev => prev.filter(d => d.id !== threadIdToDismiss))
     setTotalCount(current => Math.max(0, current - 1))
     const nextSelected = drafts.find(d => d.id !== threadIdToDismiss) || null
     setSelected(nextSelected)
-    if (nextSelected) setDraftContent(nextSelected.draft)
+    setDraftContent(nextSelected?.draft ?? '')
+    originalDraftRef.current = nextSelected?.draft ?? ''
     toast.success('Draft dismissed')
   }
 
@@ -330,7 +375,7 @@ export default function DraftsPage() {
           setDraftLimitReached(true)
           toast.error('Draft limit reached. Add 20 more drafts for $5.')
         } else {
-          toast.error(err.error || 'Failed to regenerate draft')
+          toast.error(err.message || err.error || 'Failed to regenerate draft')
         }
         return
       }
@@ -395,6 +440,22 @@ export default function DraftsPage() {
     )
   })
 
+  if (loadFailed) {
+    return (
+      <AppPage>
+        <div className="flex w-full flex-col" style={{ height: 'calc(100vh - 56px)' }}>
+          <PageHeader title="Drafts Ready" />
+          <DataLoadError
+            title="Couldn’t load drafts"
+            description="Your saved drafts are still safe. Check your connection and try loading them again."
+            onRetry={() => setLoadAttempt(attempt => attempt + 1)}
+            className="flex-1"
+          />
+        </div>
+      </AppPage>
+    )
+  }
+
   return (
     <AppPage>
       <div className="flex w-full flex-col" style={{ height: 'calc(100vh - 56px)' }}>
@@ -442,6 +503,7 @@ export default function DraftsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Search drafts"
                   placeholder="Search"
                   className="h-8 w-36 rounded-[9px] border border-[#DEDEDA] bg-white pl-8 pr-3 text-[12px] text-[#1C1C1A] placeholder-[#8C8C85] focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15"
                 />
@@ -574,6 +636,13 @@ export default function DraftsPage() {
                   <RedditCommunityPolicyNotice subreddit={selected.community} />
                 )}
 
+                {!draftContent && MANUAL_DRAFT_REASON_LABELS[selected.automationReason] && (
+                  <div role="status" className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12px] font-medium leading-relaxed text-amber-800">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                    <span>{MANUAL_DRAFT_REASON_LABELS[selected.automationReason]}</span>
+                  </div>
+                )}
+
                 {/* Draft reply — full inline editor */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -585,33 +654,23 @@ export default function DraftsPage() {
                       className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold text-[#4A4A45] hover:bg-[#F0F0ED] transition-colors disabled:opacity-40"
                     >
                       <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
-                      {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+                      {isRegenerating
+                        ? (draftContent ? 'Regenerating…' : 'Generating…')
+                        : (draftContent ? 'Regenerate' : 'Generate reply')}
                     </button>
                   </div>
 
-                  {draftContent ? (
-                    <textarea
-                      value={draftContent}
-                      onChange={e => setDraftContent(e.target.value)}
-                      className="w-full rounded-[16px] border border-[#DEDEDA] bg-white px-4 py-3.5 text-[13.5px] leading-relaxed text-[#1C1C1A] resize-none focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15 transition-colors"
-                      rows={6}
-                      spellCheck
-                      placeholder="Your draft will appear here…"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleRegenerate}
-                      disabled={isRegenerating}
-                      className="w-full rounded-[16px] border-2 border-dashed border-[#DEDEDA] px-4 py-8 text-[13px] font-semibold text-[#8C8C85] hover:border-[#0A84FF] hover:text-[#0A84FF] transition-colors disabled:opacity-50"
-                    >
-                      {isRegenerating ? 'Generating reply…' : '+ Generate reply'}
-                    </button>
-                  )}
+                  <textarea
+                    value={draftContent}
+                    onChange={e => setDraftContent(e.target.value)}
+                    aria-label="Reply draft"
+                    className="w-full rounded-[16px] border border-[#DEDEDA] bg-white px-4 py-3.5 text-[13.5px] leading-relaxed text-[#1C1C1A] resize-none focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15 transition-colors"
+                    rows={6}
+                    spellCheck
+                    placeholder="Write a reply here, or use Generate reply when AI drafting is available."
+                  />
 
-                  {draftContent && (
-                    <p className="mt-1.5 text-right text-[10.5px] tabular-nums text-[#8C8C85]">{draftContent.length} characters</p>
-                  )}
+                  <p className="mt-1.5 text-right text-[10.5px] tabular-nums text-[#8C8C85]">{draftContent.length} characters</p>
                 </div>
 
                 {/* Quality Issues */}

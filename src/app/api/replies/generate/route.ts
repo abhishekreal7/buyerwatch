@@ -18,6 +18,7 @@ import { aiRateLimit, getIp } from '@/lib/ratelimit'
 import { isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 import { recordEngagementEvent } from '@/lib/automation-audit'
 import { BILLING_ADDONS } from '@/lib/billing-addons'
+import { getConfiguredSecret, isDevelopmentMockEnabled } from '@/lib/env'
 
 export async function POST(req: Request) {
   try {
@@ -38,18 +39,32 @@ export async function POST(req: Request) {
     }
 
     // 1. Fetch thread and user profile
-    const { data: thread } = await supabase
+    const { data: thread, error: threadError } = await supabase
       .from('monitored_threads')
-      .select('id, external_id, platform, author, title, text_content, url, created_at, intent_score, tracking_sid, status, keywords(term, target)')
+      .select('id, external_id, platform, author, title, text_content, url, source_created_at, created_at, intent_score, tracking_sid, status, keywords(term, target)')
       .eq('id', threadId)
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (threadError) throw threadError
 
     if (!thread) {
       return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
     }
     if (!['pending', 'drafted', 'needs_manual_reply'].includes(thread.status)) {
       return NextResponse.json({ error: 'Thread is not draftable' }, { status: 409 })
+    }
+    if (
+      !getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
+      && !isDevelopmentMockEnabled('USE_MOCK_DRAFTS')
+    ) {
+      return NextResponse.json(
+        {
+          error: 'ai_provider_unavailable',
+          message: 'AI drafting is temporarily unavailable. You can write and send this reply manually.',
+        },
+        { status: 503 },
+      )
     }
 
     const { data: extendedProfile } = await supabase
@@ -84,7 +99,7 @@ export async function POST(req: Request) {
       title: thread.title || undefined,
       text: thread.text_content,
       url: thread.url,
-      createdAt: thread.created_at || new Date().toISOString(),
+      createdAt: thread.source_created_at || thread.created_at || new Date().toISOString(),
       sourceTarget: (thread.keywords as unknown as { target?: string } | null)?.target || '',
     }
 
@@ -228,6 +243,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
     console.error('Error generating draft:', error)
-    return NextResponse.json({ error: 'draft_generation_failed' }, { status: 502 })
+    return NextResponse.json(
+      {
+        error: 'draft_generation_failed',
+        message: 'AI drafting is temporarily unavailable. You can write and send this reply manually.',
+      },
+      { status: 502 },
+    )
   }
 }

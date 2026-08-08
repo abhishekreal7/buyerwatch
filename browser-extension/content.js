@@ -27,6 +27,36 @@ const BuyerWatchCapture = (() => {
     return pathname.match(/\/comments\/([^/]+)/i)?.[1] || pathname
   }
 
+  const isoTimestamp = (value) => {
+    const raw = clean(value)
+    if (!raw) return ''
+    const numeric = /^\d+(?:\.\d+)?$/.test(raw) ? Number(raw) : Number.NaN
+    const milliseconds = Number.isFinite(numeric)
+      ? numeric * (numeric < 10_000_000_000 ? 1_000 : 1)
+      : Date.parse(raw)
+    if (!Number.isFinite(milliseconds)) return ''
+    const now = Date.now()
+    if (milliseconds > now + 5 * 60_000 || milliseconds < now - 30 * 365 * 24 * 60 * 60_000) {
+      return ''
+    }
+    return new Date(milliseconds).toISOString()
+  }
+
+  const publishedAtFrom = (post) => {
+    const attributeValue = [
+      'created-timestamp',
+      'created-at',
+      'data-created-at',
+      'data-timestamp',
+    ].map((attribute) => post?.getAttribute?.(attribute)).find(Boolean)
+    const timeElement = post?.querySelector?.('faceplate-timeago[ts], time[datetime]')
+    return isoTimestamp(
+      attributeValue
+      || timeElement?.getAttribute?.('ts')
+      || timeElement?.getAttribute?.('datetime'),
+    )
+  }
+
   const findArticleForPath = (path) => {
     const articles = [...document.querySelectorAll('main article, article')]
     return articles.find((article) => (
@@ -60,7 +90,13 @@ const BuyerWatchCapture = (() => {
       || pathname.match(/\/r\/([^/]+)/i)?.[1],
     ).replace(/^r\//i, '')
 
-    return { title, text, author, community }
+    return {
+      title,
+      text,
+      author,
+      community,
+      publishedAt: publishedAtFrom(post),
+    }
   }
 
   const capture = () => {
@@ -84,6 +120,7 @@ const BuyerWatchCapture = (() => {
       text: details.text,
       author: details.author,
       community: details.community,
+      publishedAt: details.publishedAt || undefined,
       capturedAt: new Date().toISOString(),
     }
   }

@@ -33,4 +33,8 @@ describe('dashboard intent hierarchy', () => {
     expect(dashboard).toContain('Generate reply anyway')
     expect(dashboard).toContain('border border-[#CBD5E1] bg-white')
   })
+
+  it('keeps dismissed low-relevance cards muted too', () => {
+    expect(dashboard).toContain('isLowRelevance: isLowRelevanceScore(thread.score)')
+  })
 })

@@ -37,6 +37,7 @@ import {
 } from '@/lib/dashboard-metric-period'
 import { useConversationSearch } from '@/lib/conversation-search'
 import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
+import { DataLoadError } from '@/components/DataLoadError'
 
 interface Thread {
   id: string
@@ -97,6 +98,7 @@ function getDeliveryActionLabel(platform: string, extensionInstalled: boolean) {
 }
 
 function mapThread(thread: any): Thread {
+  const sourceCreatedAt = thread.source_created_at || thread.created_at
   const score = thread.intent_score === null || thread.intent_score === undefined
     ? null
     : Number(thread.intent_score)
@@ -105,7 +107,7 @@ function mapThread(thread: any): Thread {
     id: thread.id,
     platform: thread.platform,
     target: (thread.keywords as { target?: string } | null)?.target || thread.platform,
-    timeAgo: formatTimeAgo(thread.created_at),
+    timeAgo: formatTimeAgo(sourceCreatedAt),
     title: thread.title || '',
     content: thread.text_content || '',
     score,
@@ -122,7 +124,7 @@ function mapThread(thread: any): Thread {
     flag: thread.flag || undefined,
     reasoning: thread.score_reasoning || undefined,
     googleRanked: thread.google_rank_position > 0,
-    createdAt: thread.created_at,
+    createdAt: sourceCreatedAt,
     status: thread.status || 'pending',
     reviewedAt: thread.reviewed_at || null,
   }
@@ -133,6 +135,8 @@ export default function DashboardPage() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const hasLoadedDataRef = useRef(false)
   const [totalSent, setTotalSent] = useState(0)
   const [plan, setPlan] = useState<PlanTier>('free')
   const [regenerating, setRegenerating] = useState(false)
@@ -163,6 +167,7 @@ export default function DashboardPage() {
   const [autoSendEnabled, setAutoSendEnabled] = useState(false)
   const [highIntentThreshold, setHighIntentThreshold] = useState(DEFAULT_HIGH_INTENT_THRESHOLD)
   const [sendingThreadId, setSendingThreadId] = useState<string | null>(null)
+  const [checkingNow, setCheckingNow] = useState(false)
   const [signalUsage, setSignalUsage] = useState({ used: 0, limit: 250 })
   const [draftUsage, setDraftUsage] = useState({ used: 0, limit: 40 })
   const [openingAddonCheckout, setOpeningAddonCheckout] = useState<BillingAddonType | null>(null)
@@ -193,6 +198,13 @@ export default function DashboardPage() {
   const loadData = useCallback(async () => {
     const requestedMetricsPeriod = metricsPeriod
     const periodStart = getDashboardMetricPeriodStart(requestedMetricsPeriod)
+    const isInitialLoad = !hasLoadedDataRef.current
+    if (isInitialLoad) {
+      setLoading(true)
+      setLoadFailed(false)
+    }
+
+    try {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const todayIso = today.toISOString()
@@ -238,6 +250,14 @@ export default function DashboardPage() {
       feedbackCountResult,
       threadsResult,
     ] = await independentResultsPromise
+    const initialQueryError = [
+      profileResult,
+      addonCreditsResult,
+      keywordsCountResult,
+      feedbackCountResult,
+      threadsResult,
+    ].find(result => result.error)?.error
+    if (initialQueryError) throw initialQueryError
 
     let threadsFoundCountQuery = supabase
       .from('monitored_threads')
@@ -287,11 +307,19 @@ export default function DashboardPage() {
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .in('status', ['pending', 'drafted', 'needs_manual_reply'])
         .not('intent_score', 'is', null)
         .gte('intent_score', effectiveHighIntentThreshold)
         .gte('created_at', todayIso),
     ])
+    const metricsQueryError = [
+      threadsFoundCountResult,
+      highIntentCountResult,
+      draftsCountResult,
+      repliesSentCountResult,
+      totalPostedCountResult,
+      highIntentTodayCountResult,
+    ].find(result => result.error)?.error
+    if (metricsQueryError) throw metricsQueryError
 
     const normalizedPlan = normalizePlan(profile?.plan)
     const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
@@ -314,14 +342,7 @@ export default function DashboardPage() {
     setHasCopiedOrApproved((feedbackCountResult.count ?? 0) > 0)
 
     // Load threads including dismissed for audit tab
-    const { data: threadData, error } = threadsResult
-
-    if (error) {
-      toast.error('Failed to load threads')
-      if (metricsPeriodRef.current === requestedMetricsPeriod) setMetricsLoading(false)
-      setLoading(false)
-      return
-    }
+    const { data: threadData } = threadsResult
 
     const parsed = (threadData || []).map(mapThread)
 
@@ -336,10 +357,13 @@ export default function DashboardPage() {
       setFilterTab(requestedThread.status === 'dismissed' ? 'dismissed' : 'all')
       setSelectedThread(requestedThread)
       setHasInspectedLead(true)
-    } else if (activeParsed.length > 0) {
-      setSelectedThread(activeParsed[0])
-    } else {
-      setSelectedThread(null)
+    } else if (!searchQueryRef.current) {
+      setSelectedThread(current => {
+        const refreshedSelection = current
+          ? parsed.find(thread => thread.id === current.id)
+          : null
+        return refreshedSelection ?? activeParsed[0] ?? null
+      })
     }
 
     // Feature 3: Load community health for all unique targets
@@ -369,7 +393,18 @@ export default function DashboardPage() {
       setMetricsLoading(false)
     }
 
-    setLoading(false)
+    hasLoadedDataRef.current = true
+    setLoadFailed(false)
+    } catch (error) {
+      console.error('[dashboard] Failed to load dashboard data', error)
+      if (!hasLoadedDataRef.current) {
+        setLoadFailed(true)
+        toast.error('Failed to load dashboard data')
+      }
+    } finally {
+      if (metricsPeriodRef.current === requestedMetricsPeriod) setMetricsLoading(false)
+      if (isInitialLoad) setLoading(false)
+    }
   }, [metricsPeriod, supabase, userId])
 
   useEffect(() => {
@@ -504,11 +539,14 @@ export default function DashboardPage() {
     const reviewedAt = new Date().toISOString()
     setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, reviewedAt } : item))
     setSelectedThread(prev => prev?.id === thread.id ? { ...prev, reviewedAt } : prev)
-    const { error } = await supabase.rpc('mark_thread_reviewed', {
-      p_user_id: userId,
-      p_thread_id: thread.id,
-    })
-    if (error) {
+    try {
+      const { error } = await supabase.rpc('mark_thread_reviewed', {
+        p_user_id: userId,
+        p_thread_id: thread.id,
+      })
+      if (error) throw error
+    } catch (error) {
+      console.error('[dashboard] Unable to mark conversation reviewed', error)
       setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, reviewedAt: null } : item))
       setSelectedThread(prev => prev?.id === thread.id ? { ...prev, reviewedAt: null } : prev)
       setHasInspectedLead(threads.some(item => Boolean(item.reviewedAt)))
@@ -616,6 +654,15 @@ export default function DashboardPage() {
     const dismissed = threadToDismiss ?? selectedThread
     if (!dismissed || dismissed.status === 'dismissed') return
 
+    try {
+      const { error } = await supabase.rpc('dismiss_thread', { p_thread_id: dismissed.id })
+      if (error) throw error
+    } catch (error) {
+      console.error('[dashboard] Unable to dismiss conversation', error)
+      toast.error('Could not dismiss this conversation. Nothing was changed.')
+      return
+    }
+
     setThreads(prev => prev.map(thread => (
       thread.id === dismissed.id ? { ...thread, status: 'dismissed' } : thread
     )))
@@ -632,36 +679,68 @@ export default function DashboardPage() {
         : prev.draftsReady,
     }))
 
-    const { error } = await supabase.rpc('dismiss_thread', { p_thread_id: dismissed.id })
-    if (error) {
-      toast.error('Could not dismiss this conversation')
-      await loadData()
-      return
-    }
     void loadData()
     toast.success('Moved to Dismissed')
+  }
+
+  const handleCheckNow = async () => {
+    if (checkingNow) return
+    setCheckingNow(true)
+    toast.info('Checking for new posts...')
+    try {
+      const { data: keywords, error } = await supabase
+        .from('keywords')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .limit(1)
+      if (error) throw error
+      const keyword = keywords?.[0]
+      if (!keyword) throw new Error('no_active_keyword')
+
+      const response = await fetch('/api/keywords/fetch-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywordId: keyword.id }),
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.message || payload?.error || 'scan_request_failed')
+      }
+      toast.success('Check requested. Refreshing...')
+      window.setTimeout(() => void loadData(), 3000)
+    } catch (error) {
+      console.error('[dashboard] Unable to request a monitoring check', error)
+      toast.error(error instanceof Error && error.message === 'no_active_keyword'
+        ? 'Activate a monitoring rule before checking now.'
+        : 'Could not request a new scan. Try again.')
+    } finally {
+      setCheckingNow(false)
+    }
   }
 
   const handleMarkAsPosted = async () => {
     if (!selectedThread) return
     const thread = selectedThread
-    const response = await fetch('/api/replies/mark-posted', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ threadId: thread.id, text: thread.draft, platform: thread.platform }),
-    })
-    if (!response.ok) {
+    try {
+      const response = await fetch('/api/replies/mark-posted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: thread.id, text: thread.draft, platform: thread.platform }),
+      })
+      if (!response.ok) throw new Error('mark_posted_failed')
+      clearSupabaseReadCache()
+      setThreads(prev => prev.filter(item => item.id !== thread.id))
+      setSelectedThread(threads.find(item => item.id !== thread.id) || null)
+      setEditingDraft(null)
+      setStats(prev => ({ ...prev, repliesSent: prev.repliesSent + 1 }))
+      setTotalSent(prev => prev + 1)
+      void loadData()
+      toast.success('Marked as posted')
+    } catch (error) {
+      console.error('[dashboard] Unable to mark reply as posted', error)
       toast.error('Could not confirm this reply as posted')
-      return
     }
-    clearSupabaseReadCache()
-    setThreads(prev => prev.filter(item => item.id !== thread.id))
-    setSelectedThread(threads.find(item => item.id !== thread.id) || null)
-    setEditingDraft(null)
-    setStats(prev => ({ ...prev, repliesSent: prev.repliesSent + 1 }))
-    setTotalSent(prev => prev + 1)
-    void loadData()
-    toast.success('Marked as posted')
   }
 
   const handleBuyAddon = async (type: BillingAddonType) => {
@@ -710,7 +789,7 @@ export default function DashboardPage() {
           toast.error('Draft limit reached. Add 20 more drafts for $5.')
           return
         }
-        throw new Error()
+        throw new Error(payload?.message || payload?.error || 'Failed to request regeneration')
       }
 
       const { draft } = await res.json()
@@ -740,8 +819,8 @@ export default function DashboardPage() {
       window.dispatchEvent(new Event('buyerwatch:credits-changed'))
       void loadData()
       toast.success(isFirstDraft ? 'Reply ready.' : 'Reply rewritten.')
-    } catch {
-      toast.error('Failed to request regeneration')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to request regeneration')
     } finally {
       setRegenerating(false)
     }
@@ -787,6 +866,19 @@ export default function DashboardPage() {
       setSelectedThread(null)
     }
   }, [filterTab, deferredSearchQuery, highIntentThreshold, threads])
+
+  if (loadFailed) {
+    return (
+      <div className="w-full space-y-6">
+        <PageHeader title="Overview" />
+        <DataLoadError
+          title="Couldn’t load your dashboard"
+          description="Your conversations and drafts are still safe. Check your connection and try loading the dashboard again."
+          onRetry={() => void loadData()}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="w-full space-y-6">
@@ -1025,7 +1117,11 @@ export default function DashboardPage() {
           : filtered
         const lowRelevanceExpanded = showLowRelevance || Boolean(normalizedSearch)
         const feedItems = [
-          ...primaryThreads.map(thread => ({ kind: 'thread' as const, thread, isLowRelevance: false })),
+          ...primaryThreads.map(thread => ({
+            kind: 'thread' as const,
+            thread,
+            isLowRelevance: isLowRelevanceScore(thread.score),
+          })),
           ...(lowRelevanceThreads.length > 0 ? [{ kind: 'low-toggle' as const }] : []),
           ...(lowRelevanceExpanded
             ? lowRelevanceThreads.map(thread => ({ kind: 'thread' as const, thread, isLowRelevance: true }))
@@ -1172,27 +1268,13 @@ export default function DashboardPage() {
                       <p className="text-xs text-[#667085] mt-1">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
                     </div>
                     <button
-                      onClick={async () => {
-                        toast.info('Checking for new posts...')
-                        try {
-                          const { data: kws } = await supabase.from('keywords').select('id').eq('user_id', userId).limit(1)
-                          if (kws && kws.length > 0) {
-                            await fetch('/api/keywords/fetch-now', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ keywordId: kws[0].id }),
-                            })
-                            toast.success('Check requested. Refreshing...')
-                            setTimeout(() => loadData(), 3000)
-                          }
-                        } catch {
-                          toast.error('Scan check failed')
-                        }
-                      }}
-                      className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#F1F2F3] px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-[#E8EAEC]"
+                      type="button"
+                      onClick={() => void handleCheckNow()}
+                      disabled={checkingNow}
+                      className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#F1F2F3] px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-[#E8EAEC] disabled:cursor-wait disabled:opacity-60"
                     >
-                      <RefreshCcw className="w-3.5 h-3.5 text-gray-400" />
-                      Check now
+                      <RefreshCcw className={`h-3.5 w-3.5 text-gray-400 ${checkingNow ? 'animate-spin' : ''}`} />
+                      {checkingNow ? 'Checking...' : 'Check now'}
                     </button>
                   </div>
                 )}

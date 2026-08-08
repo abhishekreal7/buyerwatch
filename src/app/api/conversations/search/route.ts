@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getIp, searchRateLimit } from '@/lib/ratelimit'
+import { normalizeHighIntentThreshold } from '@/lib/high-intent-threshold'
 
 const PAGE_SIZE = 500
 const ACTIVE_STATUSES = ['pending', 'drafted', 'needs_manual_reply']
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = (searchParams.get('q') ?? '').trim().toLocaleLowerCase()
   const tab = searchParams.get('tab') ?? 'all'
-  const threshold = Number(searchParams.get('threshold') ?? 80)
+  const threshold = normalizeHighIntentThreshold(searchParams.get('threshold'))
 
   if (!query || query.length > 100 || !['all', 'high-intent', 'dismissed'].includes(tab)) {
     return NextResponse.json({ error: 'invalid_search' }, { status: 400 })
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
       } else {
         threadsQuery = threadsQuery.in('status', ACTIVE_STATUSES)
         if (tab === 'high-intent') {
-          threadsQuery = threadsQuery.gte('intent_score', Number.isFinite(threshold) ? threshold : 80)
+          threadsQuery = threadsQuery.gte('intent_score', threshold)
         }
       }
 

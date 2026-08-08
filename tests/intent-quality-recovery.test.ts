@@ -31,6 +31,7 @@ describe('intent quality recovery', () => {
     expect(reservation).toBeGreaterThan(rejection)
     expect(handler).toContain("automationReason: 'signal_limit_reached'")
     expect(handler).toContain("automationReason: 'preflight_rejected'")
+    expect(handler).toContain('scoreResult.score < ACTIONABLE_INTENT_THRESHOLD')
   })
 
   it('clears only unscored pending discovery rows during the one-time recovery', () => {

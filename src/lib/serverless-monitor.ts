@@ -146,7 +146,7 @@ async function loadPendingSocialCheckpoints(
   )
   let query = supabase
     .from('monitored_threads')
-    .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, created_at, keywords!inner(target)')
+    .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, source_created_at, created_at, keywords!inner(target)')
     .in('platform', ['reddit', 'bluesky'])
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
@@ -168,7 +168,7 @@ async function loadPendingSocialCheckpoints(
         title: row.title ?? undefined,
         text: row.text_content ?? '',
         url: row.url,
-        createdAt: row.created_at,
+        createdAt: row.source_created_at || row.created_at,
         sourceTarget: keyword?.target ?? row.platform,
       },
     }
@@ -230,6 +230,7 @@ async function persistPendingCandidates(
         title: post.title || null,
         text_content: post.text,
         url: post.url,
+        source_created_at: post.createdAt,
         intent_score: null,
         intent_label: null,
         status: 'pending',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ChevronDown,
@@ -17,13 +17,14 @@ import { toast } from 'sonner'
 import { AppPage } from '@/components/AppPage'
 import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
-import { getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
+import { ACTIONABLE_INTENT_THRESHOLD, getIntentDisplayLabel, type IntentLabel } from '@/lib/intent'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { IntentBadge } from '@/components/IntentBadge'
+import { DataLoadError } from '@/components/DataLoadError'
 
-const FILTERS = ['All', 'Buying intent', 'Researching', 'Pain signals', 'Reddit', 'Bluesky', 'X']
+const FILTERS = ['All', 'Buying intent', 'Researching', 'Reddit', 'Bluesky', 'X']
 const PAGE_SIZE = 60
 
 type OpportunityStatus = 'pending' | 'drafted' | 'needs_manual_reply'
@@ -61,6 +62,14 @@ const AUTOMATION_REASON_LABELS: Record<string, string> = {
   platform_connection_required: 'Connect this platform before direct posting can be considered.',
   auto_send_target_out_of_scope: 'This community is outside your approved automation scope.',
   assisted_delivery_required: 'This platform requires your review and final submit.',
+  preflight_ai_bypassed: 'This match was scored deterministically and needs your review.',
+  intent_provider_failed: 'AI intent scoring was unavailable, so BuyerWatch preserved the deterministic match for your review.',
+  intent_spend_limit_reached: 'The AI scoring budget was reached, so BuyerWatch preserved the deterministic match for your review.',
+  intent_plan_limit_reached: 'The daily AI scoring allowance was reached, so BuyerWatch preserved the deterministic match for your review.',
+  ai_provider_unavailable: 'AI drafting is unavailable. You can write and send this reply manually.',
+  ai_spend_limit_reached: 'The AI drafting budget was reached. You can write and send this reply manually.',
+  draft_plan_limit_reached: 'The AI draft allowance was reached. You can write and send this reply manually.',
+  draft_provider_failed: 'AI drafting failed, but the conversation was preserved so you can write the reply manually.',
 }
 
 function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm' | 'md' }) {
@@ -95,7 +104,7 @@ function parseOpportunities(data: any[]): Opportunity[] {
       platform: thread.platform,
       author: thread.author || 'Unknown author',
       target: keyword.target || thread.platform,
-      createdAt: thread.created_at,
+      createdAt: thread.source_created_at || thread.created_at,
       title: thread.title || '',
       content: thread.text_content || '',
       score,
@@ -338,6 +347,8 @@ export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
@@ -347,55 +358,72 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     async function fetchOpportunities() {
-      const [pageResult, countResult] = await Promise.all([
-        supabase
-          .from('monitored_threads')
-          .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, created_at, keywords(term, target)')
-          .eq('user_id', userId)
-          .in('status', ['pending', 'drafted', 'needs_manual_reply'])
-          .order('created_at', { ascending: false })
-          .range(0, PAGE_SIZE - 1),
-        supabase
-          .from('monitored_threads')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .in('status', ['pending', 'drafted', 'needs_manual_reply']),
-      ])
-      const { data, error } = pageResult
-      if (error) {
+      setLoading(true)
+      setLoadFailed(false)
+
+      try {
+        const [pageResult, countResult] = await Promise.all([
+          supabase
+            .from('monitored_threads')
+            .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, source_created_at, created_at, keywords(term, target)')
+            .eq('user_id', userId)
+            .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+            .not('intent_score', 'is', null)
+            .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD)
+            .order('created_at', { ascending: false })
+            .range(0, PAGE_SIZE - 1),
+          supabase
+            .from('monitored_threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+            .not('intent_score', 'is', null)
+            .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD),
+        ])
+        if (pageResult.error) throw pageResult.error
+        if (countResult.error) throw countResult.error
+
+        const data = pageResult.data
+        const parsed = parseOpportunities(data ?? [])
+        setOpportunities(parsed)
+        setTotalCount(countResult.count ?? data?.length ?? 0)
+        setHasMore((data?.length ?? 0) === PAGE_SIZE)
+        setSelectedId(parsed[0]?.id ?? null)
+      } catch (error) {
+        console.error('[opportunities] Unable to load opportunities', error)
         toast.error('Unable to load opportunities.')
+        setLoadFailed(true)
+      } finally {
         setLoading(false)
-        return
       }
-      const parsed = parseOpportunities(data ?? [])
-      setOpportunities(parsed)
-      setTotalCount(countResult.count ?? data?.length ?? 0)
-      setHasMore((data?.length ?? 0) === PAGE_SIZE)
-      if (parsed.length > 0) setSelectedId(parsed[0].id)
-      setLoading(false)
     }
     void fetchOpportunities()
-  }, [supabase, userId])
+  }, [loadAttempt, supabase, userId])
 
   async function loadMoreOpportunities() {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
-    const from = opportunities.length
-    const { data, error } = await supabase
-      .from('monitored_threads')
-      .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, created_at, keywords(term, target)')
-      .eq('user_id', userId)
-      .in('status', ['pending', 'drafted', 'needs_manual_reply'])
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1)
+    try {
+      const from = opportunities.length
+      const { data, error } = await supabase
+        .from('monitored_threads')
+        .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, source_created_at, created_at, keywords(term, target)')
+        .eq('user_id', userId)
+        .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+        .not('intent_score', 'is', null)
+        .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD)
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1)
+      if (error) throw error
 
-    if (error) {
-      toast.error('Unable to load more opportunities.')
-    } else {
       setOpportunities(current => [...current, ...parseOpportunities(data ?? [])])
       setHasMore((data?.length ?? 0) === PAGE_SIZE)
+    } catch (error) {
+      console.error('[opportunities] Unable to load more opportunities', error)
+      toast.error('Unable to load more opportunities.')
+    } finally {
+      setLoadingMore(false)
     }
-    setLoadingMore(false)
   }
 
   const handleDraftReply = async (id: string) => {
@@ -409,7 +437,7 @@ export default function OpportunitiesPage() {
       })
       const payload = await response.json().catch(() => null)
       if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to generate draft')
+        throw new Error(payload?.message || payload?.error || 'Failed to generate draft')
       }
       clearSupabaseReadCache()
       setOpportunities(current => current.map(opportunity => (
@@ -423,7 +451,7 @@ export default function OpportunitiesPage() {
     }
   }
 
-  const filtered = opportunities
+  const filtered = useMemo(() => opportunities
     .filter(opportunity => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
@@ -437,7 +465,6 @@ export default function OpportunitiesPage() {
       if (activeFilter === 'All') return true
       if (activeFilter === 'Buying intent') return opportunity.intentLabel === 'buying'
       if (activeFilter === 'Researching') return opportunity.intentLabel === 'researching'
-      if (activeFilter === 'Pain signals') return opportunity.intentLabel === 'complaining'
       if (activeFilter === 'Reddit') return opportunity.platform === 'reddit'
       if (activeFilter === 'Bluesky') return opportunity.platform === 'bluesky'
       if (activeFilter === 'X') return opportunity.platform === 'x'
@@ -447,7 +474,14 @@ export default function OpportunitiesPage() {
       const aScore = a.score ?? -1
       const bScore = b.score ?? -1
       return sortOrder === 'desc' ? bScore - aScore : aScore - bScore
+    }), [activeFilter, opportunities, searchQuery, sortOrder])
+
+  useEffect(() => {
+    setSelectedId((current) => {
+      if (current !== null && filtered.some(opportunity => opportunity.id === current)) return current
+      return filtered[0]?.id ?? null
     })
+  }, [filtered])
 
   const selectedOpportunity = filtered.find(o => o.id === selectedId) ?? null
 
@@ -480,6 +514,7 @@ export default function OpportunitiesPage() {
                 <button
                   type="button"
                   onClick={() => setActiveFilter(filter)}
+                  aria-pressed={activeFilter === filter}
                   className={`min-h-9 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] transition-colors duration-150 ${
                     activeFilter === filter
                       ? 'bg-[#EFEFEC] font-semibold text-text-primary'
@@ -504,6 +539,7 @@ export default function OpportunitiesPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search opportunities"
                 placeholder="Search thread"
                 className="h-9 w-48 rounded-[10px] border border-[#DEDEDA] bg-white pl-9 pr-4 text-xs font-normal text-gray-800 placeholder-gray-400 focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15"
               />
@@ -512,6 +548,7 @@ export default function OpportunitiesPage() {
             <button
               type="button"
               onClick={() => setSortOrder(curr => curr === 'desc' ? 'asc' : 'desc')}
+              aria-label={`Sort by intent ${sortOrder === 'desc' ? 'ascending' : 'descending'}`}
               className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-[#DEDEDA] bg-white px-3 text-[13px] font-medium text-text-secondary transition-colors hover:bg-[#F7F7F4]"
             >
               {sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
@@ -532,6 +569,13 @@ export default function OpportunitiesPage() {
               <div className="h-6 w-32 animate-pulse rounded-full bg-[#F2F2EF]" />
             </div>
           </div>
+        ) : loadFailed ? (
+          <DataLoadError
+            title="Couldn’t load opportunities"
+            description="Your saved conversations are still safe. Check your connection and try loading them again."
+            onRetry={() => setLoadAttempt(attempt => attempt + 1)}
+            className="flex-1"
+          />
         ) : filtered.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">

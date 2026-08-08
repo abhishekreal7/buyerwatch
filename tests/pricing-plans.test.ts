@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { PRICING_PLANS } from '../src/lib/pricing-plans'
-import { PLAN_LIMITS } from '../src/lib/plan-limits'
+import { getIntentDailyLimit, PLAN_LIMITS } from '../src/lib/plan-limits'
 import { afterAuthenticationDestination } from '../src/lib/billing-selection'
 
 describe('pricing plan promises', () => {
+  it('gives every billing tier an explicit daily intent-scoring allowance', () => {
+    expect(getIntentDailyLimit('free')).toBe(50)
+    expect(getIntentDailyLimit('starter')).toBe(250)
+    expect(getIntentDailyLimit('pro')).toBe(500)
+    expect(getIntentDailyLimit('growth')).toBe(2000)
+    expect(getIntentDailyLimit('unknown')).toBe(50)
+  })
+
   it('keeps Growth at $149 with the five-minute cadence', () => {
     const growth = PRICING_PLANS.find(plan => plan.id === 'growth')
 

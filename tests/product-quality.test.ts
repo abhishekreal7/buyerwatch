@@ -98,11 +98,18 @@ describe('intent result validation', () => {
       business_name: 'BuyerWatch',
       business_description: 'Finds relevant buying conversations.',
       competitors: ['Acme'],
+    }, {
+      keywordTerm: 'lead generation',
     })
 
     expect(prompt).toContain('Title: Looking for an alternative to Acme')
     expect(prompt).toContain('Body: Our current workflow keeps breaking.')
     expect(prompt).toContain('Competitor watchlist: Acme')
+    expect(prompt).toContain('Author: buyer')
+    expect(prompt).toContain('Matched target: SaaS')
+    expect(prompt).toContain('Matched keyword or rule: lead generation')
+    expect(prompt).toContain('Published at: 2026-07-28T00:00:00.000Z')
+    expect(prompt).toContain("Identify the author's role before scoring")
   })
 
   it('keeps display labels faithful to the model category', () => {

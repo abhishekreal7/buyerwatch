@@ -31,10 +31,14 @@ describe('high-intent threshold preference', () => {
   it('keeps dashboard analytics separate from canonical AI classification', () => {
     const dashboard = source('src/app/(dashboard)/dashboard/page.tsx')
     const analytics = source('src/app/(dashboard)/analytics/page.tsx')
+    const searchRoute = source('src/app/api/conversations/search/route.ts')
     const scorer = source('src/lib/intent-scorer.ts')
 
     expect(dashboard).toContain('normalizeHighIntentThreshold')
     expect(analytics).toContain('normalizeHighIntentThreshold')
+    expect(searchRoute).toContain('normalizeHighIntentThreshold')
+    expect(searchRoute).toContain("threadsQuery.gte('intent_score', threshold)")
+    expect(searchRoute).not.toContain('Number.isFinite(threshold)')
     expect(dashboard).not.toMatch(/\.gte\('intent_score',\s*80\)/)
     expect(scorer).toContain("if (score >= 80) return 'buying'")
     expect(scorer).not.toContain('high_intent_threshold')

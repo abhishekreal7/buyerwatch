@@ -15,6 +15,7 @@ import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { useExtensionStatus } from '@/components/ExtensionInstall'
+import { DataLoadError } from '@/components/DataLoadError'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
 
@@ -95,6 +96,8 @@ const fieldCls = `w-full bg-surface border border-black/[0.08] rounded-[10px] px
 export default function KeywordsPage() {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [showAdd, setShowAdd] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newTerm, setNewTerm] = useState('')
@@ -127,32 +130,41 @@ export default function KeywordsPage() {
 
   useEffect(() => {
     async function init() {
-      const [profileResult, keywordsResult, threadsResult] = await Promise.all([
-        supabase.from('profiles').select('plan').eq('id', userId).single(),
-        supabase.from('keywords').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        fetchAllPages((from, to) => supabase.from('monitored_threads').select('keyword_id, status').eq('user_id', userId).range(from, to)),
-      ])
+      setLoading(true)
+      setLoadFailed(false)
 
-      setUserPlan(normalizePlan(profileResult.data?.plan))
-      if (keywordsResult.error) {
-        toast.error('Failed to load keywords')
-      } else {
+      try {
+        const [profileResult, keywordsResult, threadsResult] = await Promise.all([
+          supabase.from('profiles').select('plan').eq('id', userId).single(),
+          supabase.from('keywords').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+          fetchAllPages((from, to) => supabase.from('monitored_threads').select('keyword_id, status').eq('user_id', userId).not('intent_score', 'is', null).range(from, to)),
+        ])
+        const queryError = [profileResult, keywordsResult, threadsResult]
+          .find(result => result.error)?.error
+        if (queryError) throw queryError
+
+        setUserPlan(normalizePlan(profileResult.data?.plan))
         setKeywords(keywordsResult.data || [])
-      }
 
-      const counts: Record<string, { total: number; replied: number }> = {}
-      for (const thread of threadsResult.data || []) {
-        if (!thread.keyword_id) continue
-        counts[thread.keyword_id] ??= { total: 0, replied: 0 }
-        counts[thread.keyword_id].total++
-        if (thread.status === 'replied') counts[thread.keyword_id].replied++
+        const counts: Record<string, { total: number; replied: number }> = {}
+        for (const thread of threadsResult.data || []) {
+          if (!thread.keyword_id) continue
+          counts[thread.keyword_id] ??= { total: 0, replied: 0 }
+          counts[thread.keyword_id].total++
+          if (thread.status === 'replied') counts[thread.keyword_id].replied++
+        }
+        setMetrics(counts)
+      } catch (error) {
+        console.error('[keywords] Failed to load monitoring rules', error)
+        toast.error('Failed to load keywords')
+        setLoadFailed(true)
+      } finally {
+        setLoading(false)
       }
-      setMetrics(counts)
-      setLoading(false)
     }
 
     void init()
-  }, [supabase, userId])
+  }, [loadAttempt, supabase, userId])
 
   const handleAdd = async () => {
     if (newPlatform === 'reddit' && !requireExtension('Install the BuyerWatch extension before creating a Reddit monitoring rule.')) return
@@ -213,20 +225,32 @@ export default function KeywordsPage() {
     const next = !kw.is_active
     setKeywords(prev => prev.map(k => k.id === kw.id ? { ...k, is_active: next } : k))
     setMenuId(null)
-    const { error } = await supabase.from('keywords').update({ is_active: next }).eq('id', kw.id)
-    if (error) {
+    try {
+      const { error } = await supabase.from('keywords').update({ is_active: next }).eq('id', kw.id)
+      if (error) throw error
+      clearSupabaseReadCache()
+      toast.success(next ? 'Rule activated' : 'Rule paused')
+    } catch (error) {
+      console.error('[keywords] Unable to update monitoring rule', error)
       setKeywords(prev => prev.map(k => k.id === kw.id ? { ...k, is_active: kw.is_active } : k))
       toast.error('Failed to update')
-    } else toast.success(next ? 'Rule activated' : 'Rule paused')
+    }
   }
 
   const handleDelete = async (id: string) => {
     setMenuId(null)
     const removed = keywords.find(k => k.id === id)
     setKeywords(prev => prev.filter(k => k.id !== id))
-    const { error } = await supabase.from('keywords').delete().eq('id', id)
-    if (error) { if (removed) setKeywords(prev => [removed, ...prev]); toast.error('Failed to delete') }
-    else toast.success('Rule deleted')
+    try {
+      const { error } = await supabase.from('keywords').delete().eq('id', id)
+      if (error) throw error
+      clearSupabaseReadCache()
+      toast.success('Rule deleted')
+    } catch (error) {
+      console.error('[keywords] Unable to delete monitoring rule', error)
+      if (removed) setKeywords(prev => [removed, ...prev])
+      toast.error('Failed to delete')
+    }
   }
 
   const filtered = useMemo(() => keywords.filter(kw => {
@@ -240,6 +264,21 @@ export default function KeywordsPage() {
   const activeCount = keywords.filter(k => k.is_active).length
   const pausedCount = keywords.filter(k => !k.is_active).length
   const keywordLimit = Number(getPlanLimits(userPlan).keywords)
+
+  if (loadFailed) {
+    return (
+      <AppPage>
+        <div className="w-full">
+          <h1 className="page-title">Monitoring Rules</h1>
+          <DataLoadError
+            title="Couldn’t load monitoring rules"
+            description="Your rules are still safe. Check your connection and try loading them again."
+            onRetry={() => setLoadAttempt(attempt => attempt + 1)}
+          />
+        </div>
+      </AppPage>
+    )
+  }
 
   return (
     <AppPage>

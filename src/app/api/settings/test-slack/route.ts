@@ -1,5 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { getServiceRoleClient } from '@/lib/admin'
+import { decrypt } from '@/lib/encryption'
 import { fetchWithTimeout } from '@/lib/http'
 import { isAllowedSlackWebhookUrl } from '@/lib/security/outbound-url'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
@@ -12,14 +14,33 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { webhookUrl: rawWebhookUrl } = await readJsonBody<Record<string, unknown>>(req, 2_048)
-  const webhookUrl = boundedString(rawWebhookUrl, 1_000, { required: true })
-  if (!webhookUrl || !isAllowedSlackWebhookUrl(webhookUrl)) {
+  const body = await readJsonBody<Record<string, unknown>>(req, 2_048)
+  const hasSuppliedWebhook = Object.prototype.hasOwnProperty.call(body, 'webhookUrl')
+  const suppliedWebhook = hasSuppliedWebhook
+    ? boundedString(body.webhookUrl, 1_000, { required: true })
+    : ''
+  if (hasSuppliedWebhook && (!suppliedWebhook || !isAllowedSlackWebhookUrl(suppliedWebhook))) {
     return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
   }
   const rate = await settingsRateLimit.limit(`slack-test:${user.id}:${await getIp()}`)
   if (!rate.success) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
+
+  let webhookUrl = suppliedWebhook
+  if (!webhookUrl) {
+    const { data: profile, error } = await getServiceRoleClient()
+      .from('profiles')
+      .select('slack_webhook_ciphertext, slack_webhook_url')
+      .eq('id', user.id)
+      .single()
+    if (error) throw error
+    webhookUrl = profile?.slack_webhook_ciphertext
+      ? decrypt(profile.slack_webhook_ciphertext)
+      : profile?.slack_webhook_url || ''
+  }
+  if (!webhookUrl || !isAllowedSlackWebhookUrl(webhookUrl)) {
+    return NextResponse.json({ error: 'Slack webhook is not configured' }, { status: 400 })
   }
 
   const payload = {
@@ -52,7 +73,7 @@ export async function POST(req: NextRequest) {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*AI Draft Reply:*\n```Hey! I\'ve been building exactly this — BuyerWatch monitors subreddits for high-intent posts and drafts replies automatically. Happy to share more if you\'re interested!```',
+          text: '*AI Draft Reply:*\n```One useful way to reduce noise is to separate broad mentions from posts where the author names a current problem, constraint, or buying decision. I work on BuyerWatch, which monitors for those signals and keeps replies in review. (Disclosure: I\'m affiliated with BuyerWatch.)```',
         },
       },
       {

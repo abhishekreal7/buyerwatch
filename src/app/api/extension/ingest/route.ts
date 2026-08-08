@@ -8,6 +8,7 @@ import {
   buildExtensionExternalId,
   isExtensionPlatform,
   isValidExtensionSourceUrl,
+  normalizeExtensionTimestamps,
 } from '@/lib/extension-ingest'
 
 const PACKAGED_EXTENSION_ORIGIN = 'chrome-extension://akfjpaggkndebeidadabipjpkbchlhfe'
@@ -74,15 +75,10 @@ export async function POST(request: Request) {
     const text = boundedString(body.text, 100_000, { required: true, trim: false })
     const author = boundedString(body.author, 500) ?? ''
     const community = boundedString(body.community, 500) ?? ''
-    const capturedTime = typeof body.capturedAt === 'string'
-      ? new Date(body.capturedAt).getTime()
-      : Number.NaN
-    const now = Date.now()
-    const capturedAt = Number.isFinite(capturedTime)
-      && capturedTime <= now + 5 * 60_000
-      && capturedTime >= now - 10 * 365 * 24 * 60 * 60_000
-      ? new Date(capturedTime).toISOString()
-      : new Date(now).toISOString()
+    const { capturedAt, sourceCreatedAt } = normalizeExtensionTimestamps(
+      body.capturedAt,
+      body.publishedAt,
+    )
 
     if (
       !isExtensionPlatform(platform)
@@ -159,6 +155,7 @@ export async function POST(request: Request) {
         title: title || null,
         text_content: text,
         url: sourceUrl,
+        source_created_at: sourceCreatedAt,
         intent_score: null,
         intent_label: null,
         status: 'pending',
@@ -196,7 +193,7 @@ export async function POST(request: Request) {
           title: title || undefined,
           text,
           url: sourceUrl,
-          createdAt: capturedAt,
+          createdAt: sourceCreatedAt,
           sourceTarget: community || keyword.target,
         },
       })
