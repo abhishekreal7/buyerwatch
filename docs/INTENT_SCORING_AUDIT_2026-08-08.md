@@ -585,14 +585,25 @@ Final repository, build, migration, deployment, and production-browser results a
 1. **Live LLM quality is unverified in this audit.** No Anthropic credits were available, so no live provider outputs are included. The prompt/schema/retry/fallback logic is tested, but semantic model accuracy is not.
 2. **The 47 examples are curated and English-only.** A perfect result here guards known classes; it is not a population estimate.
 3. **Provider-connected posting and billing require sandbox credentials.** Automated static/offline contracts cannot prove Reddit/Bluesky posting, Dodo webhook ordering, or external API rate-limit behavior end to end.
-4. **The dashboard feed intentionally loads the latest 60 rows; search queries all stored scored rows.** This is acceptable for the current review queue but should become explicit cursor pagination if active accounts routinely exceed that queue size.
+4. **The dashboard feed intentionally loads the latest 60 active and latest 60 dismissed rows; search queries all stored scored rows.** This is acceptable for the current review queue but should become explicit cursor pagination if active accounts routinely exceed either window.
 
 These limitations are release evidence still to obtain, not reasons to weaken the deterministic automation path.
 
-## 11. Release verification (deployment evidence appended after release)
+## 11. Release verification
 
 - Full `npm run verify`: passed — 281/281 tests, typecheck/lint/audit clean.
 - Production `npm run build`: passed.
 - Playwright E2E: 5 passed, 1 credential-dependent test skipped.
 - Supabase migrations `20260808010000` and `20260808162000`: applied and ledger-verified.
-- Production deployment and browser smoke: pending this release commit.
+- Release commit: `007e2884144af456e3f4723fa77da2d74ebf306c` (`fix: rescore historical intent safely`).
+- Vercel application verification deployment: `dpl_4XwBFM4diKPFAkFFdhyJW55EVn8x`, status Ready. `www.buyerwatch.co`, `buyerwatch.co`, and `matchsignal.vercel.app` resolved to this deployment during the checks below.
+- Production HTTP smoke: liveness 200, readiness 200, homepage 200 with required security headers, login 200 with strict nonce CSP, and unauthenticated cron access correctly rejected with 401.
+- Signed-in Chrome verification on `https://www.buyerwatch.co/dashboard`:
+  - All Conversations renders exactly the one retained active request at 79 / researching; sidebar Drafts and Opportunities each report 1.
+  - Search-as-you-type for `Stele` renders that expected row and clearing restores the feed.
+  - All Conversations, High Intent, and Dismissed each expose correct `aria-selected` state; visible row counts were 1, 0, and 60 respectively.
+  - The first KPI card measured exactly `294.25px` in All, High Intent, Dismissed, and restored All states, proving scrollbar presence no longer stretches the KPI grid.
+  - Last 90 days selected successfully and Last 7 days restored successfully.
+  - A dismissed seller listing rendered with the muted card style and outline reply button; reply generation remained available as an override.
+  - Browser warning/error console: empty.
+- Vercel runtime-log checks for the deployed release returned no error-level entries and no 5xx entries after the smoke/browser requests.
