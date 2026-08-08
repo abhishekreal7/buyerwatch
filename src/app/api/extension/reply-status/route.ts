@@ -5,19 +5,14 @@ import { recordEngagementEvent } from '@/lib/automation-audit'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { boundedString, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 import { extensionSourceIdentity } from '@/lib/extension-ingest'
-
-const PACKAGED_EXTENSION_ORIGIN = 'chrome-extension://akfjpaggkndebeidadabipjpkbchlhfe'
+import { isAllowedBuyerWatchExtensionOrigin } from '@/lib/extension-identity'
 
 function allowedOrigin(origin: string | null): string | null {
   if (!origin) return null
-  if (process.env.NODE_ENV !== 'production' && origin.startsWith('chrome-extension://')) {
-    return origin
-  }
-  const configured = (process.env.CHROME_EXTENSION_ORIGINS ?? '')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean)
-  return configured.includes(origin) || origin === PACKAGED_EXTENSION_ORIGIN ? origin : null
+  return isAllowedBuyerWatchExtensionOrigin(
+    origin,
+    process.env.CHROME_EXTENSION_ORIGINS,
+  ) ? origin : null
 }
 
 function corsHeaders(origin: string | null): HeadersInit {

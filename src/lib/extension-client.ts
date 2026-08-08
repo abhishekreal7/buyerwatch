@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
+import { BUYERWATCH_EXTENSION_ID as PACKAGED_EXTENSION_ID } from './extension-identity'
 
-const PACKAGED_EXTENSION_ID = 'akfjpaggkndebeidadabipjpkbchlhfe'
 const configuredExtensionId = process.env.NEXT_PUBLIC_CHROME_EXTENSION_ID?.trim()
 
 export const BUYERWATCH_EXTENSION_ID = configuredExtensionId

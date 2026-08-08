@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { unzipSync } from 'fflate'
@@ -11,6 +12,11 @@ import {
   isValidExtensionSourceUrl,
   normalizeExtensionTimestamps,
 } from '../src/lib/extension-ingest'
+import {
+  BUYERWATCH_EXTENSION_ID,
+  BUYERWATCH_EXTENSION_ORIGIN,
+  isAllowedBuyerWatchExtensionOrigin,
+} from '../src/lib/extension-identity'
 
 const manifest = JSON.parse(readFileSync(
   join(process.cwd(), 'browser-extension/manifest.json'),
@@ -71,6 +77,13 @@ const replyStatusRoute = readFileSync(
   join(process.cwd(), 'src/app/api/extension/reply-status/route.ts'),
   'utf8',
 )
+
+function extensionIdFromManifestKey(key: string): string {
+  const digest = createHash('sha256').update(Buffer.from(key, 'base64')).digest()
+  return [...digest.subarray(0, 16)]
+    .map(byte => `${String.fromCharCode(97 + (byte >> 4))}${String.fromCharCode(97 + (byte & 15))}`)
+    .join('')
+}
 
 describe('extension capture validation', () => {
   it.each(['reddit', 'bluesky', 'x'] as const)(
@@ -212,7 +225,7 @@ describe('extension vertical-slice contracts', () => {
 
   it('uses the BuyerWatch production identity and extension icons', () => {
     expect(manifest.name).toBe('BuyerWatch')
-    expect(manifest.key).toBeTruthy()
+    expect(extensionIdFromManifestKey(manifest.key)).toBe(BUYERWATCH_EXTENSION_ID)
     expect(manifest.icons).toEqual({
       16: 'icons/icon-16.png',
       32: 'icons/icon-32.png',
@@ -226,7 +239,28 @@ describe('extension vertical-slice contracts', () => {
     expect(commonScript).toContain("const DEFAULT_APP_URL = 'https://buyerwatch.co'")
     expect(popupScript).toContain('BuyerWatchExtensionCommon.getConfig()')
     expect(optionsScript).toContain('BuyerWatchExtensionCommon.DEFAULT_APP_URL')
-    expect(ingestRoute).toContain("chrome-extension://akfjpaggkndebeidadabipjpkbchlhfe")
+    expect(extensionClientSource).toContain('PACKAGED_EXTENSION_ID')
+    expect(ingestRoute).toContain('isAllowedBuyerWatchExtensionOrigin')
+    expect(replyStatusRoute).toContain('isAllowedBuyerWatchExtensionOrigin')
+  })
+
+  it('allows only the signed or explicitly configured extension origins in production', () => {
+    expect(isAllowedBuyerWatchExtensionOrigin(BUYERWATCH_EXTENSION_ORIGIN, '', true)).toBe(true)
+    expect(isAllowedBuyerWatchExtensionOrigin(
+      'chrome-extension://phcokpjbojimiijfebdbiepgfmnopkbd',
+      '',
+      true,
+    )).toBe(false)
+    expect(isAllowedBuyerWatchExtensionOrigin(
+      'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      '',
+      true,
+    )).toBe(false)
+    expect(isAllowedBuyerWatchExtensionOrigin(
+      'chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      true,
+    )).toBe(true)
   })
 
   it('uses origin-restricted external messaging for the production session handoff', () => {
