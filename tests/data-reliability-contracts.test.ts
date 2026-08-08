@@ -38,6 +38,15 @@ describe('dashboard data reliability contracts', () => {
     expect(keywords).toMatch(/from\('monitored_threads'\)[\s\S]{0,220}not\('intent_score', 'is', null\)/)
   })
 
+  it('loads active and dismissed dashboard windows independently', () => {
+    expect(dashboard).toContain('activeThreadsResult')
+    expect(dashboard).toContain('dismissedThreadsResult')
+    expect(dashboard).toContain(".in('status', ['pending', 'drafted', 'needs_manual_reply'])")
+    expect(dashboard).toContain(".eq('status', 'dismissed')")
+    expect(dashboard).toContain('...(activeThreadsResult.data ?? [])')
+    expect(dashboard).toContain('...(dismissedThreadsResult.data ?? [])')
+  })
+
   it('blocks settings writes until saved values load successfully', () => {
     expect(settings).toContain("throw new Error('Settings profile was not found')")
     expect(settings).toContain('settingsLoading || loadFailed')

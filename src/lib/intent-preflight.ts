@@ -63,6 +63,9 @@ const GENERIC_RELEVANCE_TERMS = new Set([
   'social',
   'software',
   'startup',
+  'test',
+  'tester',
+  'testing',
   'that',
   'this',
   'tool',
@@ -110,9 +113,24 @@ const NOISE_PATTERNS: Array<{ label: string; pattern: RegExp; penalty: number }>
     penalty: 46,
   },
   {
+    label: 'product_sale_listing',
+    pattern: /\b(?:i|we)(?:'m|'re|\s+am|\s+are)?\s+(?:looking|hoping|trying)\s+to\s+(?:either\s+)?(?:sell|list|flip|exit)\s+(?:for\s+)?(?:my|our|the)\s+(?:\w+\s+){0,4}(?:saas|app|product|startup|business|website)\b|\blooking\s+to\s+(?:either\s+)?sell\s+(?:for\s+)?(?:my|our|the)\s+(?:\w+\s+){0,4}(?:saas|app|product|startup|business|website)\b|\b(?:my|our)\s+(?:\w+\s+){0,4}(?:saas|app|product|startup|business|website)\s+is\s+for\s+sale\b|\b(?:asking\s+price|acquire\.com\s+listing)\b/i,
+    penalty: 52,
+  },
+  {
     label: 'launch_recruitment',
-    pattern: /\b(?:beta\s+testers?|opening\s+(?:up\s+)?early\s+access|join\s+(?:the\s+)?waitlist|sign\s+up\s+for\s+(?:the\s+)?beta|looking\s+for\s+(?:\w+\s+){0,3}(?:to\s+)?try\s+(?:my|our)|try\s+(?:my|our)\s+(?:app|product|platform|tool|saas))\b/i,
+    pattern: /\b(?:beta\s+testers?|testers?\s+for\s+(?:a\s+)?beta|looking\s+for\s+testers?|need\s+(?:people|users|founders|teams)\s+to\s+beta\s+test|design\s+partners?|pilot(?:\s+it)?\s+for\s+free|free\s+for\s+30\s+days|opening\s+(?:up\s+)?early\s+access|join\s+(?:the\s+)?waitlist|sign\s+up\s+for\s+(?:the\s+)?beta|looking\s+for\s+(?:\w+\s+){0,3}(?:to\s+)?try\s+(?:my|our)|try\s+(?:my|our)\s+(?:app|product|platform|tool|saas))\b/i,
     penalty: 46,
+  },
+  {
+    label: 'partnership_solicitation',
+    pattern: /\b(?:i|we)(?:'m|'re|\s+am|\s+are)?\s+looking\s+to\s+(?:partner|collaborate)\s+with\b|\b(?:looking\s+for|seeking)\s+(?:strategic\s+)?partners?\b|\bi(?:'d|\s+would)\s+like\s+to\s+connect\b|\blet'?s\s+build\s+(?:this|the\s+standard)\b/i,
+    penalty: 46,
+  },
+  {
+    label: 'retrospective_or_educational_post',
+    pattern: /\b(?:here'?s\s+what\s+it\s+actually\s+took|before\s+it\s+actually\s+worked|sharing\s+a\s+(?:customer\s+)?review|my\s+(?:first\s+)?customer\s+review|my\s+thoughts\s+on)\b/i,
+    penalty: 40,
   },
   {
     label: 'content_solicitation',
@@ -151,7 +169,10 @@ const DISQUALIFYING_NOISE_SIGNALS = new Set([
   'showcase',
   'hiring_or_job_search',
   'seller_or_service_offer',
+  'product_sale_listing',
   'launch_recruitment',
+  'partnership_solicitation',
+  'retrospective_or_educational_post',
   'content_solicitation',
   'third_party_or_editorial_context',
   'academic_or_hypothetical',
@@ -160,6 +181,7 @@ const DISQUALIFYING_NOISE_SIGNALS = new Set([
   'unrelated_request_pivot',
   'own_product_technical_request',
   'stale_post',
+  'no_first_party_demand',
 ])
 
 const BUYER_CONTEXT_OVERRIDABLE_NOISE_SIGNALS = new Set([
@@ -260,6 +282,57 @@ function getPostAgeDays(createdAt: string): number | null {
   return Math.max(0, (Date.now() - timestamp) / 86_400_000)
 }
 
+const LOW_CONTEXT_KEYWORDS = new Set([
+  'app',
+  'business',
+  'marketing',
+  'saas',
+  'sales',
+  'software',
+  'startup',
+  'tech',
+  'technology',
+  'tool',
+])
+
+const GENERIC_KEYWORD_BUYER_CONTEXT = /\b(?:need|looking\s+for|seeking|recommend(?:ation|ations)?|suggestions?|help|strategy|service|agency|consultant|platform|software|tool|app|solution|vendor|provider|alternative|replacement)\b/i
+
+function normalizedPhrase(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function hasContextualKeywordMatch(text: string, keywordTerm: string): boolean {
+  if (!containsConfiguredPhrase(text, keywordTerm)) return false
+  if (!LOW_CONTEXT_KEYWORDS.has(normalizedPhrase(keywordTerm))) return true
+
+  return text
+    .split(/(?:[.!?;]|\n)/)
+    .some(clause => (
+      containsConfiguredPhrase(clause, keywordTerm)
+      && GENERIC_KEYWORD_BUYER_CONTEXT.test(clause)
+    ))
+}
+
+function hasFirstPartyBuyerDemand(text: string): boolean {
+  const clauses = text.split(/(?:[.!?;]|\n)/)
+  const hasFirstPartyReference = /\b(?:i|me|my|mine|we|us|our|ours)\b/i.test(text)
+  const firstPartyClause = clauses.some((clause) => {
+    if (!/\b(?:i|me|my|mine|we|us|our|ours)\b/i.test(clause)) return false
+    return analyzeBuyingSignals(clause).categories.length > 0
+  })
+  const directRequestTitle = /^(?:need|looking\s+for|seeking|recommend(?:ation|ations)?(?:\s+for)?|anyone\s+know|does\s+anyone\s+know|is\s+there\s+(?:a|an)|what\s+(?:tool|software|platform))\b/i.test(text.trim())
+  const crossClauseFirstPartyRequest = hasFirstPartyReference
+    && /\b(?:point\s+me\s+to|is\s+there\s+(?:a\s+way|a\s+tool|an\s+app|software)|what\s+do\s+you\s+use|what\s+are\s+you\s+using|does\s+anyone\s+know|anyone\s+know\s+of)\b/i.test(text)
+
+  return firstPartyClause
+    || directRequestTitle
+    || crossClauseFirstPartyRequest
+    || hasAffirmedSolutionNeed(text)
+}
+
 function hasAffirmedSolutionNeed(text: string): boolean {
   return text
     .split(/(?:[.!?;]|\bbut\b|\bhowever\b|\byet\b)/i)
@@ -288,6 +361,9 @@ export function evaluateIntentPreflight(
   const matchedKeywords = containsConfiguredPhrase(text, keywordTerm)
     ? [keywordTerm]
     : []
+  const contextualKeywordMatch = keywordTerm.length > 0
+    && hasContextualKeywordMatch(text, keywordTerm)
+  const hasFirstPartyDemand = hasFirstPartyBuyerDemand(text)
   const relevanceTerms = [
     ...termsFrom(profile.business_name),
     ...termsFrom(profile.business_description),
@@ -306,6 +382,7 @@ export function evaluateIntentPreflight(
   const noiseSignals = [
     ...getIntentNoiseSignals(text),
     ...(isStalePost ? ['stale_post'] : []),
+    ...(!hasFirstPartyDemand ? ['no_first_party_demand'] : []),
   ]
   const competitorRisk = (profile.competitors ?? []).some((competitor) =>
     competitor.trim().length > 1 && containsConfiguredPhrase(text, competitor),
@@ -328,7 +405,7 @@ export function evaluateIntentPreflight(
     ? 4
     : 0
   const shortPenalty = text.length < 36 ? 14 : 0
-  const hasContextualMatch = matchedKeywords.length > 0
+  const hasContextualMatch = contextualKeywordMatch
     || uniqueRelevanceTerms.length > 0
     || competitorRisk
     || platformTopicMatch
@@ -362,6 +439,7 @@ export function evaluateIntentPreflight(
   )
   const isQualifiedCandidate = (
     hasContextualMatch
+    && hasFirstPartyDemand
     && analysis.categories.length > 0
     && !hasDisqualifyingNoise
   )
@@ -394,8 +472,10 @@ export function evaluateIntentPreflight(
   const evidenceSignals = [
     ...analysis.matchedSignals,
     ...matchedKeywords.map(term => `keyword:${term}`),
+    ...(contextualKeywordMatch ? [`context:keyword:${keywordTerm}`] : []),
     ...uniqueRelevanceTerms.map(term => `context:${term}`),
     ...(platformTopicMatch ? [`context:platform:${post.platform}`] : []),
+    ...(hasFirstPartyDemand ? ['context:first_party_demand'] : []),
     ...(buyerContextOverride ? ['context:affirmed_buyer_need'] : []),
     ...noiseSignals.map(signal => `noise:${signal}`),
   ]

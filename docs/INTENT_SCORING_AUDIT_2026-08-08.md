@@ -9,7 +9,7 @@ Execution note: the original investigation-only constraint was superseded by the
 ## Executive result
 
 - The initial deterministic scoring battery classified only **5 of 18 cases correctly (27.8%)**. It materially confused sellers, hiring posts, sarcasm, stale posts, academic questions, and unrelated requests with buyer intent.
-- After remediation, the production provider-free scorer classified **36 of 36 controlled cases correctly (100.0%)**. This is the exact result of this curated regression battery, not a claim of 100% real-world accuracy.
+- After remediation, the production provider-free scorer classified **47 of 47 controlled cases correctly (100.0%)**. This is the exact result of this curated regression battery, not a claim of 100% real-world accuracy.
 - BuyerWatch is now a **hybrid intent system**: a deterministic relevance/role/recency gate protects cost and provides a resilient fallback, while qualifying ambiguous or high-value cases can be sent to an LLM for semantic classification.
 - With Anthropic unavailable or out of credits, the running system is **a comparatively strong deterministic heuristic classifier, not a top-tier semantic classifier**. The code no longer pretends otherwise: qualified opportunities survive as manual-review items when the provider or paid allowance is unavailable.
 - A statistically meaningful production-quality claim still requires the credentialed 200+ labelled-conversation evaluation described in `docs/QUALITY_ASSURANCE.md`. No paid Anthropic request was made during this audit, so provider-level precision, recall, calibration, and multilingual behavior remain unverified.
@@ -128,7 +128,7 @@ Before remediation, 13 of the first 18 cases were wrong:
 
 The five initially correct cases were `clear-buyer` (95/buying), `founder-promotion` (0/other), `stacked-pain` (95/buying), `competitor-replacement` (95/buying), and `feedback-showcase` (0/other). That is `5 / 18 = 27.8%`.
 
-## 5. Final 36-case battery: full inputs and real outputs
+## 5. Final 47-case battery: full inputs and real outputs
 
 Every assessment below passed an executable assertion against the expected human band.
 
@@ -150,7 +150,7 @@ Every assessment below passed an executable assertion against the expected human
 4. **Vague general discussion**
    - Title: `Is lead generation changing?`
    - Body: `Curious what everyone thinks about lead generation in 2026. There are many opinions and no single right answer.`
-   - Output: **38 / other** — Correct. No first-party problem or evaluation.
+   - Output: **16 / other** — Correct. No first-party problem or evaluation; a generic matched keyword alone is not enough.
 
 5. **Old keyword-matching request**
    - Title: `Need lead generation software by Friday`
@@ -237,7 +237,7 @@ Every assessment below passed an executable assertion against the expected human
 21. **Negated category followed by an affirmed relevant need**
     - Title: `We do not need another CRM, but we do need Reddit monitoring`
     - Body: `We do not need another CRM. What we do need is lead generation monitoring software with Reddit alerts, and I have a $120 monthly budget to choose one this week.`
-    - Output: **87 / buying** — Correct. The negation applies to CRM, not the separate monitoring purchase.
+   - Output: **95 / buying** — Correct. The negation applies to CRM, not the separate monitoring purchase, which includes a monthly budget and current decision window.
 
 22. **Academic organization making a real purchase**
     - Title: `University lab needs social monitoring software`
@@ -310,13 +310,79 @@ Every assessment below passed an executable assertion against the expected human
     - Output: **0 / other** — Correct.
 
 36. **Content publisher with an independent purchase need**
-    - Title: `Our newsletter team needs Reddit monitoring software`
-    - Body: `I publish a B2B newsletter, and our team needs a Reddit monitoring platform for lead alerts. We have approved a $120 monthly budget and will select a vendor Friday.`
-    - Output: **85 / buying** — Correct. The editorial-role hint is incidental and is overridden by first-party budget and vendor selection evidence.
+   - Title: `Our newsletter team needs Reddit monitoring software`
+   - Body: `I publish a B2B newsletter, and our team needs a Reddit monitoring platform for lead alerts. We have approved a $120 monthly budget and will select a vendor Friday.`
+   - Output: **85 / buying** — Correct. The editorial-role hint is incidental and is overridden by first-party budget and vendor selection evidence.
+
+37. **Editorial pricing news with commercial vocabulary**
+   - Title: `AI compute pricing could reshape startups`
+   - Body: `AI compute could cost ten times more as demand outpaces supply. What happens if Anthropic becomes a trillion-dollar business? A deep look at pricing power and startup implications. https://example.com/analysis`
+   - Matched keyword: `startup`
+   - Output: **30 / other** — Correct. This is third-party commentary with no first-party need.
+
+38. **Prescriptive sales advice**
+   - Title: `Fix the story before adding sales channels`
+   - Body: `Most B2B SaaS founders blame channels when growth stalls. More channels just amplify unclear messaging and a weak sales story.`
+   - Matched keyword: `sales`
+   - Output: **0 / other** — Correct. The author is teaching, not seeking help.
+
+39. **A real buyer in an unrelated solution category**
+   - Title: `Labor is taking 37% of sales`
+   - Body: `Our labor costs are wrecking margins. We are looking for restaurant management software that connects POS data with shift forecasts.`
+   - Matched keyword: `sales`
+   - Output: **38 / other** — Correct. The requested product is restaurant operations software; `sales` is only a generic metric.
+
+40. **Founder listing a SaaS for sale, including the production typo shape**
+   - Title: `Looking to sell for my SaaS with $1.8k revenue in 3.5 months`
+   - Body: `Three months old with a 92% margin and low maintenance. Send me a message if you want the asking price.`
+   - Matched keyword: `sales`
+   - Output: **0 / other** — Correct. The author is selling an asset, not buying lead-generation help.
+
+41. **Design-partner recruitment**
+   - Title: `Looking for sales-led SaaS founders`
+   - Body: `I built a proactive website chat product and am looking for five design partners. I will run it free for 30 days in return for feedback.`
+   - Matched keyword: `sales`
+   - Output: **0 / other** — Correct. This recruits pilot users for the author's product.
+
+42. **Generic sales keyword attached to a genuine first-party purchase**
+   - Title: `Need sales prospecting software for our team`
+   - Body: `Our team needs a sales prospecting platform with Reddit alerts. We have approved a $150 monthly budget and will select a vendor Friday.`
+   - Matched keyword: `sales`
+   - Output: **93 / buying** — Correct. The keyword is part of the requested category and is backed by budget and timing.
+
+43. **Affiliate advertorial**
+   - Title: `The best tech deal this week`
+   - Body: `Most people never realize what technology can do. Buy this gadget through my paid Amazon affiliate link. #ad #paidlink #tech`
+   - Matched keyword: `tech`
+   - Output: **0 / other** — Correct. This is an advertisement, not first-party demand.
+
+44. **Long-form founder essay**
+   - Title: `My thoughts on incorporating AI into your business`
+   - Body: `I have a computer science background. Here are principles for deciding whether AI pricing and sales automation make sense. You should fix your process before automating it. Open to opinions and pushback.`
+   - Matched keyword: `sales`
+   - Output: **0 / other** — Correct. The author is publishing a viewpoint rather than shopping.
+
+45. **Placeholder workspace token contaminating relevance**
+   - Profile: `Scouto Test` / `We build a premium lead generation platform.`
+   - Title: `Web test recorders with reliable playback`
+   - Body: `I am looking for a Chrome extension for UI testing. The ones I tried break when buttons move. Does anyone know a testing tool that understands the DOM?`
+   - Matched keyword: `lead generation`
+   - Output: **34 / other** — Correct. The placeholder word `test` must not make unrelated QA tooling relevant.
+
+46. **Partnership solicitation**
+   - Title: `AI compliance partnership`
+   - Body: `I am looking to partner with lead vendors and outbound agencies to build a new compliance standard. I would like to connect with companies that want to collaborate.`
+   - Output: **0 / other** — Correct. The author is recruiting collaborators, not buying a product.
+
+47. **Retrospective cold-email guide**
+   - Title: `We over-engineered cold email for a year before it actually worked`
+   - Body: `We run outbound and had too many broken inboxes. Here is the setup we eventually settled on and the lessons we learned for anyone following the same path.`
+   - Matched keyword: `cold email`
+   - Output: **4 / other** — Correct. This describes a resolved workflow and teaches the outcome.
 
 ### Battery result
 
-`36 correct / 36 total = 100.0%` on this controlled suite. This proves the listed regressions and counter-regressions. It does **not** estimate real-world accuracy because the examples are curated, English-only, and not sampled from a labelled production distribution.
+`47 correct / 47 total = 100.0%` on this controlled suite. This proves the listed regressions and counter-regressions. It does **not** estimate real-world accuracy because the examples are curated, English-only, and not sampled from a labelled production distribution.
 
 ## 6. Direct sophistication assessment
 
@@ -338,9 +404,9 @@ Honest conclusion: **with a functioning Anthropic provider, this is a defensible
 
 - Reproduction: run the initial 18 cases above; 13 were misclassified, including seller-agency at 80, stale-buyer at 94, unrelated payroll at 88, and explicit negation at 88.
 - Impact: wrong posts could enter the opportunity/drafting pipeline as buyers.
-- Fix: expanded evidence/noise gates, clause-aware buyer overrides, stale-source handling, active-decision ceiling, community context, and a stronger LLM prompt.
-- Code: `src/lib/intent-preflight.ts:22`, `src/lib/intent-preflight.ts:76-174`, `src/lib/intent-preflight.ts:263-417`; `src/lib/intent-scorer.ts:86-137`; `src/lib/buying-signal-filter.ts`.
-- Regression: `tests/intent-sophistication-audit.test.ts` — 36/36 current cases.
+- Fix: expanded evidence/noise gates, first-party-demand validation, clause-aware buyer overrides, generic-keyword context checks, stale-source handling, active-decision ceiling, community context, whole-phrase signal matching, and a stronger LLM prompt. Whole-phrase matching specifically prevents `roi` inside `Android` and `vs` inside `devs` from becoming purchase/research evidence.
+- Code: `src/lib/intent-preflight.ts:79-193`, `src/lib/intent-preflight.ts:285-358`, `src/lib/intent-preflight.ts:440-469`; `src/lib/intent-scorer.ts:86-137`; `src/lib/buying-signal-filter.ts:1-151`.
+- Regression: `tests/intent-sophistication-audit.test.ts` — 47/47 current cases.
 
 ### M2 — Source publication time was lost, making stale posts look fresh
 
@@ -414,6 +480,22 @@ Honest conclusion: **with a functioning Anthropic provider, this is a defensible
 - Code: `src/app/api/settings/slack/route.ts:9-87`; `src/app/api/settings/test-slack/route.ts:13-72`; `src/app/(dashboard)/settings/page.tsx`.
 - Regression: `tests/data-reliability-contracts.test.ts:78-86`.
 
+### M11 — Corrected scoring logic did not repair historical rows
+
+- Reproduction: the scoped production dry-run found **325 active historical rows**, of which **127 were still marked high intent** under older logic. The final deterministic policy retained only the genuine first-party `Need advice on getting the first 10–100 users for my SaaS startup` request at **79 / researching** and dismissed the other **324** seller, launch, editorial, partnership, stale, unrelated, or otherwise non-actionable rows.
+- Impact: deploying a better scorer alone left old false positives visible and eligible for downstream review/automation.
+- Fix: a dry-run-first maintenance command now reconstructs each row with its exact profile and keyword context. A service-role-only database RPC applies every score/status update atomically, guards against concurrent workflow changes, and cancels pending/dispatched auto-send handoffs when a row is rejected. User dismissal now performs the same cancellation atomically and records `user_dismissed`.
+- Code: `scripts/rescore-intent.mjs:57-211`; `src/lib/intent-rescore.ts:47-82`; `supabase/migrations/20260808162000_atomic_intent_rescore.sql:7-126`.
+- Regression/evidence: `tests/intent-rescore.test.ts`; production apply reported zero failures and zero concurrent-change skips; the immediate repeat dry-run scanned one active row and reported `changed: 0`.
+
+### M12 — A mixed 60-row dashboard window could hide active conversations
+
+- Reproduction: after historical cleanup, the database still contained 30 active rows, but the dashboard rendered only 9 because newer dismissed rows consumed most of the single `limit(60)` result before client-side filtering.
+- Impact: genuine actionable conversations could disappear from All Conversations and High Intent even though they remained active in the database.
+- Fix: query the latest 60 active rows and latest 60 dismissed rows independently, then merge/sort them for the tabs. A large dismissed history can no longer starve the active queue.
+- Code: `src/app/(dashboard)/dashboard/page.tsx:229-274`, `src/app/(dashboard)/dashboard/page.tsx:354-359`.
+- Regression: `tests/data-reliability-contracts.test.ts:41-49` asserts the independent windows and merge contract.
+
 ## 8. Minor bugs found and fixed
 
 ### m1 — Network failures looked like valid empty data
@@ -477,16 +559,23 @@ Honest conclusion: **with a functioning Anthropic provider, this is a defensible
 - Fix: lockfile resolves `js-yaml@4.3.1`; the release gate reruns npm audit.
 - Code: `package-lock.json`.
 
+### m10 — A second transitive development dependency regressed the security gate
+
+- Reproduction: after adding the TypeScript maintenance runner, `npm audit --audit-level=high` reported the vulnerable transitive `nanoid@3.3.16` resolution.
+- Fix: the lockfile now resolves `nanoid@3.3.18`; a fresh audit reports zero vulnerabilities.
+- Code: `package-lock.json`.
+
 ## 9. Verification record
 
-Completed before deployment:
+Completed for the final release candidate:
 
-- Targeted scoring/data/product suite: **153/153 passed** before the final context regression, followed by **83/83 passed** for the updated scorer subset.
-- Controlled intent battery: **37 tests passed** (36 cases plus aggregate).
-- Full `npm run verify`: **27 test files / 265 tests passed**, app and worker TypeScript passed, zero-warning ESLint passed, and `npm audit` reported **0 vulnerabilities**.
+- Focused scorer/rescore/data suite: **81 tests exercised**; two regressions were exposed and fixed, then the corrected scorer subset passed **53/53** and the complete audit rerun passed below.
+- Controlled intent battery: **48 tests passed** (47 cases plus aggregate).
+- Full `npm run verify`: **28 test files / 281 tests passed**, app and worker TypeScript passed, zero-warning ESLint passed, and `npm audit` reported **0 vulnerabilities**.
 - Production `npm run build`: **passed** on Next.js 16.2.11; all 47 app routes/pages compiled and page-data generation completed.
 - Playwright: **5 passed, 1 skipped**. Public landing/navigation, health/readiness, security headers/cron authorization, nonce-protected authenticated surfaces, and unauthenticated billing degradation passed. The authenticated journey was skipped because no dedicated E2E account credentials were supplied.
-- Supabase migration dry-run named only `20260808010000_preserve_source_post_time.sql`; the push succeeded and a second remote-ledger read showed `local=20260808010000` and `remote=20260808010000`.
+- Supabase migrations `20260808010000_preserve_source_post_time.sql` and `20260808162000_atomic_intent_rescore.sql` were applied; the remote ledger contains both versions.
+- Scoped production rescore: **325 active rows evaluated, 324 dismissed, 1 retained**, with zero RPC failures or concurrent-change skips. The final dry-run was idempotent (`changed: 0`).
 - `git diff --check`: passed; only Git's expected LF-to-CRLF notices were emitted.
 
 Final repository, build, migration, deployment, and production-browser results are appended during release verification below.
@@ -494,16 +583,16 @@ Final repository, build, migration, deployment, and production-browser results a
 ## 10. Remaining evidence limitations (not hidden as “no bugs”)
 
 1. **Live LLM quality is unverified in this audit.** No Anthropic credits were available, so no live provider outputs are included. The prompt/schema/retry/fallback logic is tested, but semantic model accuracy is not.
-2. **The 36 examples are curated and English-only.** A perfect result here guards known classes; it is not a population estimate.
+2. **The 47 examples are curated and English-only.** A perfect result here guards known classes; it is not a population estimate.
 3. **Provider-connected posting and billing require sandbox credentials.** Automated static/offline contracts cannot prove Reddit/Bluesky posting, Dodo webhook ordering, or external API rate-limit behavior end to end.
 4. **The dashboard feed intentionally loads the latest 60 rows; search queries all stored scored rows.** This is acceptable for the current review queue but should become explicit cursor pagination if active accounts routinely exceed that queue size.
 
 These limitations are release evidence still to obtain, not reasons to weaken the deterministic automation path.
 
-## 11. Release verification (to be finalized)
+## 11. Release verification (deployment evidence appended after release)
 
-- Full `npm run verify`: passed — 265/265 tests, typecheck/lint/audit clean.
+- Full `npm run verify`: passed — 281/281 tests, typecheck/lint/audit clean.
 - Production `npm run build`: passed.
 - Playwright E2E: 5 passed, 1 credential-dependent test skipped.
-- Supabase migration `20260808010000_preserve_source_post_time.sql`: applied and ledger-verified.
-- Production deployment and browser smoke: pending.
+- Supabase migrations `20260808010000` and `20260808162000`: applied and ledger-verified.
+- Production deployment and browser smoke: pending this release commit.

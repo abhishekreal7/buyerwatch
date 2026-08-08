@@ -14,6 +14,11 @@ type AuditCase = {
   createdAt?: string
   sourceTarget?: string
   keywordTerm?: string
+  profile?: {
+    business_name?: string
+    business_description?: string
+    competitors?: string[]
+  }
   expectedBand: ExpectedBand
   humanReason: string
 }
@@ -318,6 +323,109 @@ const cases: AuditCase[] = [
     expectedBand: 'buying',
     humanReason: 'Publishing a newsletter is incidental; the author independently states a relevant need, budget, and vendor decision.',
   },
+  {
+    id: 'editorial-pricing-news',
+    category: 'Editorial link with commercial vocabulary',
+    title: 'AI compute pricing could reshape startups',
+    text: 'AI compute could cost ten times more as demand outpaces supply. What happens if Anthropic becomes a trillion-dollar business? A deep look at pricing power and startup implications. https://example.com/analysis',
+    keywordTerm: 'startup',
+    expectedBand: 'other',
+    humanReason: 'This is third-party editorial commentary with no first-party need or purchase decision.',
+  },
+  {
+    id: 'prescriptive-sales-advice',
+    category: 'Prescriptive sales advice',
+    title: 'Fix the story before adding sales channels',
+    text: 'Most B2B SaaS founders blame channels when growth stalls. More channels just amplify unclear messaging and a weak sales story.',
+    keywordTerm: 'sales',
+    expectedBand: 'other',
+    humanReason: 'The author is publishing advice, not requesting help for their own operation.',
+  },
+  {
+    id: 'generic-keyword-unrelated-buyer',
+    category: 'Real buyer in an unrelated solution category',
+    title: 'Labor is taking 37% of sales',
+    text: 'Our labor costs are wrecking margins. We are looking for restaurant management software that connects POS data with shift forecasts.',
+    keywordTerm: 'sales',
+    expectedBand: 'other',
+    humanReason: 'The buyer need is restaurant operations; sales appears only as a generic financial metric.',
+  },
+  {
+    id: 'saas-for-sale-listing',
+    category: 'Founder listing their SaaS for sale',
+    title: 'Looking to sell for my SaaS with $1.8k revenue in 3.5 months',
+    text: 'Three months old with a 92% margin and low maintenance. Send me a message if you want the asking price.',
+    keywordTerm: 'sales',
+    expectedBand: 'other',
+    humanReason: 'The author is selling an asset, not buying lead-generation help.',
+  },
+  {
+    id: 'design-partner-recruitment',
+    category: 'Design-partner recruitment',
+    title: 'Looking for sales-led SaaS founders',
+    text: 'I built a proactive website chat product and am looking for five design partners. I will run it free for 30 days in return for feedback.',
+    keywordTerm: 'sales',
+    expectedBand: 'other',
+    humanReason: 'The author is recruiting pilot users for their own product.',
+  },
+  {
+    id: 'generic-sales-keyword-real-buyer',
+    category: 'Generic keyword in a real first-party request',
+    title: 'Need sales prospecting software for our team',
+    text: 'Our team needs a sales prospecting platform with Reddit alerts. We have approved a $150 monthly budget and will select a vendor Friday.',
+    keywordTerm: 'sales',
+    expectedBand: 'buying',
+    humanReason: 'Sales is directly tied to the requested platform, with first-party need, budget, and timing.',
+  },
+  {
+    id: 'affiliate-advertorial',
+    category: 'Affiliate advertisement',
+    title: 'The best tech deal this week',
+    text: 'Most people never realize what technology can do. Buy this gadget through my paid Amazon affiliate link. #ad #paidlink #tech',
+    keywordTerm: 'tech',
+    expectedBand: 'other',
+    humanReason: 'This is an affiliate promotion, not a first-party technology request.',
+  },
+  {
+    id: 'long-form-business-essay',
+    category: 'Long-form founder essay',
+    title: 'My thoughts on incorporating AI into your business',
+    text: 'I have a computer science background. Here are principles for deciding whether AI pricing and sales automation make sense. You should fix your process before automating it. Open to opinions and pushback.',
+    keywordTerm: 'sales',
+    expectedBand: 'other',
+    humanReason: 'The author is teaching and inviting discussion, not seeking a solution for their own company.',
+  },
+  {
+    id: 'placeholder-profile-token',
+    category: 'Placeholder workspace name contamination',
+    title: 'Web test recorders with reliable playback',
+    text: 'I am looking for a Chrome extension for UI testing. The ones I tried break when buttons move. Does anyone know a testing tool that understands the DOM?',
+    keywordTerm: 'lead generation',
+    profile: {
+      business_name: 'Scouto Test',
+      business_description: 'We build a premium lead generation platform.',
+      competitors: [],
+    },
+    expectedBand: 'other',
+    humanReason: 'The placeholder word “test” in the workspace name must not make unrelated QA tooling relevant.',
+  },
+  {
+    id: 'partnership-solicitation',
+    category: 'Partnership solicitation',
+    title: 'AI compliance partnership',
+    text: 'I am looking to partner with lead vendors and outbound agencies to build a new compliance standard. I would like to connect with companies that want to collaborate.',
+    expectedBand: 'other',
+    humanReason: 'The author is recruiting partners for their own initiative, not seeking a product to buy.',
+  },
+  {
+    id: 'retrospective-cold-email-guide',
+    category: 'Retrospective operational guide',
+    title: 'We over-engineered cold email for a year before it actually worked',
+    text: 'We run outbound and had too many broken inboxes. Here is the setup we eventually settled on and the lessons we learned for anyone following the same path.',
+    keywordTerm: 'cold email',
+    expectedBand: 'other',
+    humanReason: 'This is a retrospective guide with a resolved workflow, not an active request.',
+  },
 ]
 
 function bandForScore(score: number): ExpectedBand {
@@ -343,10 +451,11 @@ function postFromCase(testCase: AuditCase): NormalizedPost {
 describe('intent sophistication audit battery', () => {
   it.each(cases)('$id — $category', (testCase) => {
     const post = postFromCase(testCase)
-    const result = evaluateIntentPreflight(post, profile, {
+    const caseProfile = { ...profile, ...testCase.profile }
+    const result = evaluateIntentPreflight(post, caseProfile, {
       keywordTerm: testCase.keywordTerm ?? 'lead generation',
     })
-    const productionFallback = scoreWithoutProvider(post, profile, {
+    const productionFallback = scoreWithoutProvider(post, caseProfile, {
       keywordTerm: testCase.keywordTerm ?? 'lead generation',
     })
     const actualBand = bandForScore(result.score)
@@ -380,9 +489,13 @@ describe('intent sophistication audit battery', () => {
 
   it('emits a compact aggregate for the audit report', () => {
     const results = cases.map((testCase) => {
-      const result = evaluateIntentPreflight(postFromCase(testCase), profile, {
-        keywordTerm: testCase.keywordTerm ?? 'lead generation',
-      })
+      const result = evaluateIntentPreflight(
+        postFromCase(testCase),
+        { ...profile, ...testCase.profile },
+        {
+          keywordTerm: testCase.keywordTerm ?? 'lead generation',
+        },
+      )
       const actualBand = bandForScore(result.score)
       return {
         id: testCase.id,

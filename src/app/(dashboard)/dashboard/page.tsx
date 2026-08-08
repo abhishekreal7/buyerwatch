@@ -233,7 +233,15 @@ export default function DashboardPage() {
         .from('monitored_threads')
         .select('*, reply_analytics(draft_text), keywords(term, target)')
         .eq('user_id', userId)
-        .in('status', ['pending', 'drafted', 'needs_manual_reply', 'dismissed'])
+        .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+        .not('intent_score', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(60),
+      supabase
+        .from('monitored_threads')
+        .select('*, reply_analytics(draft_text), keywords(term, target)')
+        .eq('user_id', userId)
+        .eq('status', 'dismissed')
         .not('intent_score', 'is', null)
         .order('created_at', { ascending: false })
         .limit(60),
@@ -248,14 +256,16 @@ export default function DashboardPage() {
       addonCreditsResult,
       keywordsCountResult,
       feedbackCountResult,
-      threadsResult,
+      activeThreadsResult,
+      dismissedThreadsResult,
     ] = await independentResultsPromise
     const initialQueryError = [
       profileResult,
       addonCreditsResult,
       keywordsCountResult,
       feedbackCountResult,
-      threadsResult,
+      activeThreadsResult,
+      dismissedThreadsResult,
     ].find(result => result.error)?.error
     if (initialQueryError) throw initialQueryError
 
@@ -342,7 +352,12 @@ export default function DashboardPage() {
     setHasCopiedOrApproved((feedbackCountResult.count ?? 0) > 0)
 
     // Load threads including dismissed for audit tab
-    const { data: threadData } = threadsResult
+    const threadData = [
+      ...(activeThreadsResult.data ?? []),
+      ...(dismissedThreadsResult.data ?? []),
+    ].sort((left, right) => (
+      Date.parse(right.created_at) - Date.parse(left.created_at)
+    ))
 
     const parsed = (threadData || []).map(mapThread)
 

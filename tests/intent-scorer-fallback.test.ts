@@ -89,7 +89,8 @@ describe('intent scoring without a paid provider', () => {
     const withRule = await scoreIntent(input, profile, { keywordTerm: 'lead generation' })
 
     expect(withoutRule.score).toBe(0)
-    expect(withRule.score).toBe(38)
+    expect(withRule.score).toBeGreaterThan(withoutRule.score)
+    expect(withRule.score).toBeLessThan(40)
     expect(withRule.label).toBe('other')
   })
 })

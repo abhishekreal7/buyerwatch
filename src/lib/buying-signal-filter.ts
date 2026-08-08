@@ -1,3 +1,5 @@
+import { containsConfiguredPhrase } from './phrase-match'
+
 /**
  * Buying-signal pre-filter
  *
@@ -75,7 +77,6 @@ const PAIN_SIGNALS = [
   'annoyed by',
   'switching from',
   'switched from',
-  'leaving',
   'canceling',
   'cancelled my',
   'too expensive',
@@ -117,6 +118,8 @@ const PURCHASE_SIGNALS = [
   'request for proposal',
   'approved budget',
   'approved a budget',
+  'monthly budget',
+  'annual budget',
   'vendor shortlist',
   'select a vendor',
 ]
@@ -139,12 +142,11 @@ const SIGNAL_GROUPS: Array<{
 ]
 
 export function analyzeBuyingSignals(text: string): BuyingSignalAnalysis {
-  const lower = text.toLocaleLowerCase()
   const matches: string[] = []
   const categories: BuyingSignalCategory[] = []
 
   for (const group of SIGNAL_GROUPS) {
-    const groupMatches = group.signals.filter(signal => lower.includes(signal))
+    const groupMatches = group.signals.filter(signal => containsConfiguredPhrase(text, signal))
     if (groupMatches.length === 0) continue
     categories.push(group.category)
     matches.push(...groupMatches)
