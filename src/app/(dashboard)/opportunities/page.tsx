@@ -55,6 +55,8 @@ const AUTOMATION_REASON_LABELS: Record<string, string> = {
   auto_send_disabled: 'Manual review is enabled in your settings.',
   reply_quality_blocked: 'The draft needs edits before it can be considered for automation.',
   missing_disclosure: 'The draft needs an affiliation disclosure.',
+  intent_score_unavailable: 'A verified high-intent score is required before automation can run.',
+  below_high_intent_threshold: 'This conversation is below your configured high-intent threshold.',
   cold_start_insufficient_data: 'Manual review is required until enough approval history exists.',
   below_dynamic_threshold: 'The draft did not clear your confidence threshold.',
   draft_budget_exhausted: 'The monthly AI draft allowance was reached.',

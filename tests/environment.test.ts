@@ -39,6 +39,11 @@ function stubProductionCore() {
     'ANTHROPIC_INTENT_MODEL',
     'REDDIT_OAUTH_CLIENT_ID',
     'REDDIT_OAUTH_SECRET',
+    'REDDIT_CLIENT_ID',
+    'REDDIT_CLIENT_SECRET',
+    'REDDIT_DIRECT_POSTING_ENABLED',
+    'REDDITAPIS_API_KEY',
+    'REDDITAPIS_FALLBACK_ENABLED',
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
   ]) {
@@ -183,5 +188,25 @@ describe('production capability configuration', () => {
 
     expect(() => validateWorkerEnvironment()).not.toThrow()
     expect(getProviderCapabilities().redditDiscovery).toBe(true)
+  })
+
+  it('never treats a discovery proxy key as customer-authorized Reddit posting', () => {
+    stubProductionCore()
+    vi.stubEnv('REDDITAPIS_API_KEY', 'proxy-key')
+    vi.stubEnv('REDDITAPIS_FALLBACK_ENABLED', 'true')
+
+    expect(getProviderCapabilities().redditDiscovery).toBe(true)
+    expect(getProviderCapabilities().redditPosting).toBe(false)
+  })
+
+  it('enables Reddit posting only with explicit OAuth delivery configuration', () => {
+    stubProductionCore()
+    vi.stubEnv('REDDIT_OAUTH_CLIENT_ID', 'client-id')
+    vi.stubEnv('REDDIT_OAUTH_SECRET', 'client-secret')
+    vi.stubEnv('REDDIT_DIRECT_POSTING_ENABLED', 'false')
+    expect(getProviderCapabilities().redditPosting).toBe(false)
+
+    vi.stubEnv('REDDIT_DIRECT_POSTING_ENABLED', 'true')
+    expect(getProviderCapabilities().redditPosting).toBe(true)
   })
 })

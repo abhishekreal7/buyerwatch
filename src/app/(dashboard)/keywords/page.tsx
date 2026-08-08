@@ -109,6 +109,7 @@ export default function KeywordsPage() {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<Record<string, { total: number; replied: number }>>({})
   const [userPlan, setUserPlan] = useState<string>('free')
+  const [redditScheduledDiscovery, setRedditScheduledDiscovery] = useState(false)
   const termRef = useRef<HTMLInputElement>(null)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
@@ -134,16 +135,24 @@ export default function KeywordsPage() {
       setLoadFailed(false)
 
       try {
-        const [profileResult, keywordsResult, threadsResult] = await Promise.all([
+        const capabilitiesPromise = fetch('/api/settings/connections', { cache: 'no-store' })
+          .then(async response => {
+            const payload = await response.json().catch(() => null)
+            if (!response.ok) throw new Error(payload?.error || 'capabilities_load_failed')
+            return payload as { capabilities?: { redditScheduledDiscovery?: boolean } }
+          })
+        const [profileResult, keywordsResult, threadsResult, providerResult] = await Promise.all([
           supabase.from('profiles').select('plan').eq('id', userId).single(),
           supabase.from('keywords').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
           fetchAllPages((from, to) => supabase.from('monitored_threads').select('keyword_id, status').eq('user_id', userId).not('intent_score', 'is', null).range(from, to)),
+          capabilitiesPromise,
         ])
         const queryError = [profileResult, keywordsResult, threadsResult]
           .find(result => result.error)?.error
         if (queryError) throw queryError
 
         setUserPlan(normalizePlan(profileResult.data?.plan))
+        setRedditScheduledDiscovery(Boolean(providerResult.capabilities?.redditScheduledDiscovery))
         setKeywords(keywordsResult.data || [])
 
         const counts: Record<string, { total: number; replied: number }> = {}
@@ -167,7 +176,11 @@ export default function KeywordsPage() {
   }, [loadAttempt, supabase, userId])
 
   const handleAdd = async () => {
-    if (newPlatform === 'reddit' && !requireExtension('Install the BuyerWatch extension before creating a Reddit monitoring rule.')) return
+    if (
+      newPlatform === 'reddit'
+      && !redditScheduledDiscovery
+      && !requireExtension('Install the BuyerWatch extension before creating a Reddit monitoring rule.')
+    ) return
     if (!newTerm.trim() || !newTarget.trim()) { toast.error('Fill in keyword and target'); return }
     setSaving(true)
 

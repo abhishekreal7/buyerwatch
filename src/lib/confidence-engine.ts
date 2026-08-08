@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { normalizeHighIntentThreshold } from './high-intent-threshold'
 
 const MIN_FEEDBACK_FOR_TRUST = 10
 const MIN_COMMUNITY_SAMPLE = 10
@@ -71,6 +72,19 @@ export function evaluateAutoSendContentPolicy(
   return null
 }
 
+export function evaluateAutoSendIntentPolicy(
+  intentScore: number,
+  highIntentThreshold: number | undefined,
+): AutoSendEvaluation | null {
+  if (!Number.isFinite(intentScore)) {
+    return blockedDecision('intent_score_unavailable')
+  }
+  if (intentScore < normalizeHighIntentThreshold(highIntentThreshold)) {
+    return blockedDecision('below_high_intent_threshold')
+  }
+  return null
+}
+
 export function calculateAutomationDecision(input: {
   userTrust: number
   communityTrust: number
@@ -138,12 +152,21 @@ export async function evaluateAutoSend(
   profile: {
     auto_send_enabled: boolean
     auto_send_threshold?: number
+    high_intent_threshold?: number
     plan: string
   },
   targetCommunity?: string | null,
+  intentScore?: number,
 ): Promise<AutoSendEvaluation> {
   const userMetrics = await getUserTrustMetrics(userId)
   const totalReviewed = userMetrics?.total_drafts_reviewed ?? 0
+  const intentDecision = evaluateAutoSendIntentPolicy(
+    intentScore ?? Number.NaN,
+    profile.high_intent_threshold,
+  )
+  if (intentDecision) {
+    return { ...intentDecision, totalDraftsReviewed: totalReviewed }
+  }
   const contentDecision = evaluateAutoSendContentPolicy(draftResult, profile)
   if (contentDecision) {
     return { ...contentDecision, totalDraftsReviewed: totalReviewed }

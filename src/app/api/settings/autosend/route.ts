@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { getPlanLimits } from '@/lib/plan-limits'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
+import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
 
 export async function PATCH(req: Request) {
   try {
@@ -75,7 +76,7 @@ export async function PATCH(req: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, auto_send_enabled')
+      .select('plan, auto_send_enabled, auto_send_platforms')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
@@ -102,6 +103,36 @@ export async function PATCH(req: Request) {
           { error: 'auto_send_activation_acknowledgement_required' },
           { status: 400 },
         )
+      }
+    }
+
+    if (enabled) {
+      const effectivePlatforms = platforms ?? (
+        Array.isArray(profile.auto_send_platforms) ? profile.auto_send_platforms : []
+      )
+      if (effectivePlatforms.length === 0) {
+        return NextResponse.json({ error: 'auto_send_platform_required' }, { status: 409 })
+      }
+
+      const { data: connectionRows, error: connectionError } = await supabase
+        .from('platform_connections')
+        .select('platform')
+        .eq('user_id', user.id)
+        .in('platform', effectivePlatforms)
+      if (connectionError) {
+        return NextResponse.json({ error: 'platform_connection_check_failed' }, { status: 500 })
+      }
+
+      const connected = new Set((connectionRows ?? []).map(row => row.platform))
+      const unavailable = effectivePlatforms.filter(platform => (
+        !connected.has(platform)
+        || (platform === 'reddit' && !isRedditDirectPostingConfigured())
+      ))
+      if (unavailable.length > 0) {
+        return NextResponse.json({
+          error: 'auto_send_platform_unavailable',
+          platforms: unavailable,
+        }, { status: 409 })
       }
     }
 

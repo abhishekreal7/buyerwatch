@@ -131,6 +131,7 @@ export default function AnalyticsPage() {
     attributionStats: { clicks: number; conversions: number; totalRevenue: number }
   } | null>(null)
   const [leadDiscoveryRange, setLeadDiscoveryRange] = useState<LeadDiscoveryRange>(14)
+  const [redditScheduledDiscovery, setRedditScheduledDiscovery] = useState<boolean | null>(null)
 
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
@@ -149,6 +150,17 @@ export default function AnalyticsPage() {
       const sixtyDaysAgo = subDays(now, 60)
       const thirtyDaysAgoIso = thirtyDaysAgo.toISOString()
       const sixtyDaysAgoIso = sixtyDaysAgo.toISOString()
+      const capabilitiesPromise = fetch('/api/settings/connections', { cache: 'no-store' })
+        .then(async response => {
+          const payload = await response.json().catch(() => null)
+          if (!response.ok) throw new Error(payload?.error || 'capabilities_load_failed')
+          return payload as {
+            capabilities?: {
+              redditDirectPosting?: boolean
+              redditScheduledDiscovery?: boolean
+            }
+          }
+        })
       // Parallel fetching for performance
       const [
         profileRes,
@@ -161,6 +173,7 @@ export default function AnalyticsPage() {
         clicksRes,
         conversionsRes,
         revenueRes,
+        providerResult,
       ] = await Promise.all([
         supabase.from('profiles').select('auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
@@ -172,6 +185,7 @@ export default function AnalyticsPage() {
         supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('clicked_at', 'is', null),
         supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('converted_at', 'is', null),
         fetchAllPages((from, to) => supabase.from('reply_attribution').select('revenue_usd').eq('user_id', userId).not('revenue_usd', 'is', null).range(from, to)),
+        capabilitiesPromise,
       ])
 
       const queryError = [
@@ -191,6 +205,7 @@ export default function AnalyticsPage() {
       const threads = threadsRes.data || []
       const feedback = feedbackRes.data || []
       const conns = connsRes.data || []
+      setRedditScheduledDiscovery(Boolean(providerResult.capabilities?.redditScheduledDiscovery))
       const profile = profileRes.data
       const highIntentThreshold = normalizeHighIntentThreshold(profile?.high_intent_threshold)
 
@@ -289,7 +304,7 @@ export default function AnalyticsPage() {
       if (draftedCount > 0) {
         alerts.push({ id: 'drafts', type: 'warning', label: `${draftedCount} drafts ready for review`, actionLabel: 'Take action →', href: '/dashboard' })
       }
-      if (!conns.some(c => c.platform === 'reddit')) {
+      if (providerResult.capabilities?.redditDirectPosting && !conns.some(c => c.platform === 'reddit')) {
         alerts.push({ id: 'reddit_api', type: 'warning', label: 'Reddit not connected', actionLabel: 'Connect Reddit →', href: '/settings' })
       }
       if (profile && !profile.auto_send_enabled) {
@@ -417,7 +432,7 @@ export default function AnalyticsPage() {
     )
   }
 
-  const needsAttention = extensionStatus === 'missing'
+  const needsAttention = extensionStatus === 'missing' && redditScheduledDiscovery === false
     ? [
         {
           id: 'extension',

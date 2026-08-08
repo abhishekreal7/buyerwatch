@@ -150,6 +150,7 @@ function DashboardShell({
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { status: extensionStatus } = useExtensionStatus()
   const extensionMissing = extensionStatus === 'missing'
+  const [redditScheduledDiscovery, setRedditScheduledDiscovery] = useState<boolean | null>(null)
   const showConversationSearch = pathname === '/dashboard'
 
   useEffect(() => {
@@ -168,7 +169,14 @@ function DashboardShell({
     async function loadSidebarData() {
       try {
         const usageMonth = getCurrentUsageMonth()
-        const [profileResult, opportunityCountResult, draftReadyCountResult, keywordCountResult, addonCreditsResult] = await Promise.all([
+        const capabilitiesPromise = fetch('/api/settings/connections', { cache: 'no-store' })
+          .then(async response => {
+            const payload = await response.json().catch(() => null)
+            if (!response.ok) return null
+            return Boolean(payload?.capabilities?.redditScheduledDiscovery)
+          })
+          .catch(() => null)
+        const [profileResult, opportunityCountResult, draftReadyCountResult, keywordCountResult, addonCreditsResult, scheduledDiscovery] = await Promise.all([
           supabase
             .from('profiles')
             .select('auto_send_enabled, plan, draft_count, draft_month')
@@ -196,7 +204,10 @@ function DashboardShell({
             .select('addon_type, credits')
             .eq('user_id', userId)
             .eq('usage_month', usageMonth),
+          capabilitiesPromise,
         ])
+
+        setRedditScheduledDiscovery(scheduledDiscovery)
 
         const sidebarError = [
           profileResult,
@@ -357,7 +368,9 @@ function DashboardShell({
               {MAIN_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
                 const IconComp = item.icon as any
-                const showExtensionAlert = extensionMissing && ['Keywords', 'Opportunities'].includes(item.name)
+                const showExtensionAlert = extensionMissing
+                  && redditScheduledDiscovery === false
+                  && ['Keywords', 'Opportunities'].includes(item.name)
                 
                 // Get count badge data if available
                 let badgeCount: number | undefined = undefined
@@ -564,7 +577,7 @@ function DashboardShell({
 
           {/* Content Container */}
           <div className="scrollbar-gutter-stable relative z-10 w-full flex-1 min-h-0 overflow-y-scroll px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
-            {extensionMissing && ['/dashboard', '/keywords', '/opportunities'].some((href) => pathname === href || pathname.startsWith(`${href}/`)) && (
+            {extensionMissing && redditScheduledDiscovery === false && ['/dashboard', '/keywords', '/opportunities'].some((href) => pathname === href || pathname.startsWith(`${href}/`)) && (
               <ExtensionPriorityNotice />
             )}
             {children}

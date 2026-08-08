@@ -3,6 +3,30 @@ import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
+import { hasRedditDiscoveryProvider, hasRedditPostingProvider } from '@/lib/env'
+
+export async function GET() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data, error } = await supabase
+    .from('platform_connections')
+    .select('platform, external_username')
+    .eq('user_id', user.id)
+  if (error) {
+    return NextResponse.json({ error: 'connections_load_failed' }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    connections: data ?? [],
+    capabilities: {
+      blueskyDirectPosting: true,
+      redditDirectPosting: hasRedditPostingProvider(),
+      redditScheduledDiscovery: hasRedditDiscoveryProvider(),
+    },
+  })
+}
 
 export async function DELETE(request: Request) {
   try {

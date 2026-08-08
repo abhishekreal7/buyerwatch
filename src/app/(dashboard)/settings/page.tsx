@@ -170,6 +170,11 @@ export default function SettingsPage() {
   const [activationAcknowledged, setActivationAcknowledged] = useState(false)
 
   const [connections, setConnections] = useState({ reddit: false, bluesky: false, redditUsername: '' })
+  const [deliveryCapabilities, setDeliveryCapabilities] = useState({
+    redditDirectPosting: false,
+    redditScheduledDiscovery: false,
+    blueskyDirectPosting: true,
+  })
   const [bskyHandle, setBskyHandle] = useState('')
   const [bskyPassword, setBskyPassword] = useState('')
   const [bskyConnecting, setBskyConnecting] = useState(false)
@@ -214,6 +219,19 @@ export default function SettingsPage() {
             if (!response.ok) throw new Error(payload?.error || 'slack_settings_failed')
             return payload as { configured?: boolean; threshold?: number }
           })
+        const connectionsPromise = fetch('/api/settings/connections', { cache: 'no-store' })
+          .then(async response => {
+            const payload = await response.json().catch(() => null)
+            if (!response.ok) throw new Error(payload?.error || 'connections_load_failed')
+            return payload as {
+              connections: Array<{ platform: string; external_username: string | null }>
+              capabilities: {
+                redditDirectPosting: boolean
+                redditScheduledDiscovery: boolean
+                blueskyDirectPosting: boolean
+              }
+            }
+          })
         const [
           extendedProfileResult,
           connectionsResult,
@@ -229,7 +247,7 @@ export default function SettingsPage() {
             .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, high_intent_threshold, webhook_secret, plan')
             .eq('id', userId)
             .single(),
-          supabase.from('platform_connections').select('platform, external_username').eq('user_id', userId),
+          connectionsPromise,
           supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay),
           supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).not('draft_text', 'is', null),
           supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay).eq('was_sent', true),
@@ -243,7 +261,6 @@ export default function SettingsPage() {
         ])
 
         const requiredQueryError = [
-          connectionsResult,
           threadsCountResult,
           draftsCountResult,
           sentCountResult,
@@ -299,7 +316,7 @@ export default function SettingsPage() {
         setSlackConfigured(Boolean(slackSettings.configured))
         setWebhookSecret(p.webhook_secret || '')
 
-        const conns = connectionsResult.data
+        const conns = connectionsResult.connections
         if (conns) {
         const redditConn = conns.find(c => c.platform === 'reddit')
         setConnections({
@@ -308,6 +325,7 @@ export default function SettingsPage() {
           redditUsername: redditConn?.external_username || '',
         })
         }
+        setDeliveryCapabilities(connectionsResult.capabilities)
 
         setUsageStats({
         threads: threadsCountResult.count || 0,
@@ -589,6 +607,12 @@ export default function SettingsPage() {
     { value: 'other', label: 'Other' },
   ]
   const canActivateAutomation = getPlanLimits(planState.plan).autoSend && draftsReviewed >= 10
+  const redditDirectConnected = deliveryCapabilities.redditDirectPosting && connections.reddit
+  const hasSelectedDirectConnection = (
+    profile.autoSendPlatforms.includes('bluesky') && connections.bluesky
+  ) || (
+    profile.autoSendPlatforms.includes('reddit') && redditDirectConnected
+  )
   const conversionWebhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://buyerwatch.co'}/api/webhooks/conversion`
 
   if (settingsLoading) {
@@ -858,10 +882,14 @@ export default function SettingsPage() {
                           description={
                             connections.reddit && connections.redditUsername
                               ? `Connected as u/${connections.redditUsername}`
-                              : 'Post replies via OAuth. Requires a Reddit account.'
+                              : deliveryCapabilities.redditDirectPosting
+                                ? 'Post replies via OAuth. Requires a Reddit account.'
+                                : deliveryCapabilities.redditScheduledDiscovery
+                                  ? 'Scheduled discovery is active. Direct posting awaits an approved Reddit OAuth provider.'
+                                  : 'Use the browser extension for assisted Reddit capture and submission.'
                           }
                           connected={connections.reddit}
-                          onConnect={handleConnectReddit}
+                          onConnect={deliveryCapabilities.redditDirectPosting ? handleConnectReddit : undefined}
                           onDisconnect={() => handleDisconnect('reddit')}
                         />
 
@@ -925,6 +953,10 @@ export default function SettingsPage() {
                                   toast.info('Confirm the activation acknowledgement first.')
                                   return
                                 }
+                                if (value && !hasSelectedDirectConnection) {
+                                  toast.info('Connect and select at least one direct-delivery platform first.')
+                                  return
+                                }
                                 setProfile(current => ({ ...current, autoSendEnabled: value }))
                               }}
                             />
@@ -971,12 +1003,21 @@ export default function SettingsPage() {
                               transition={{ duration: 0.2 }}
                             >
                               <div className="space-y-5 border-t border-gray-100 pt-4">
-                                <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
-                                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                  <p className="text-[12.5px] leading-relaxed text-amber-700">
-                                    Reddit remains assisted: BuyerWatch may prefill the reply, but you submit it. Direct automation is enabled only for supported connected providers.
-                                  </p>
-                                </div>
+                                {redditDirectConnected ? (
+                                  <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                                    <Shield className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                    <p className="text-[12.5px] leading-relaxed text-emerald-800">
+                                      Reddit direct delivery is connected. Eligible high-intent replies can publish without individual approval after every safety and community-policy gate clears.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                    <p className="text-[12.5px] leading-relaxed text-amber-700">
+                                      Reddit direct delivery is not available for this workspace. The extension can prefill a reply, but you still submit it; it is not the automation engine.
+                                    </p>
+                                  </div>
+                                )}
 
                                 <div>
                                   <div className="mb-2 flex items-center justify-between">
@@ -1033,14 +1074,30 @@ export default function SettingsPage() {
                                       className="h-4 w-4 accent-gray-900"
                                     />
                                   </label>
-                                  <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3.5 py-3 text-[12.5px]">
+                                  <label className={`flex items-center justify-between rounded-xl border px-3.5 py-3 text-[12.5px] ${redditDirectConnected ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'}`}>
                                     <span className="flex items-center gap-2.5 font-medium text-gray-700">
                                       <RedditIcon className="h-4 w-4 text-[#FF4500]" />
                                       Reddit
-                                      <span className="font-normal text-gray-400">Assisted submission</span>
+                                      <span className="font-normal text-gray-400">
+                                        {redditDirectConnected ? 'Direct' : 'Assisted submission'}
+                                      </span>
                                     </span>
-                                    <span className="text-[11px] font-semibold text-gray-500">You submit</span>
-                                  </div>
+                                    {redditDirectConnected ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={profile.autoSendPlatforms.includes('reddit')}
+                                        onChange={event => setProfile(current => ({
+                                          ...current,
+                                          autoSendPlatforms: event.target.checked
+                                            ? [...new Set([...current.autoSendPlatforms, 'reddit'])]
+                                            : current.autoSendPlatforms.filter(platform => platform !== 'reddit'),
+                                        }))}
+                                        className="h-4 w-4 accent-gray-900"
+                                      />
+                                    ) : (
+                                      <span className="text-[11px] font-semibold text-gray-500">You submit</span>
+                                    )}
+                                  </label>
                                 </div>
 
                                 <Field label="Allowed targets" hint="Optional">

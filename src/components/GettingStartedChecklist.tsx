@@ -6,7 +6,6 @@ import { CheckCircle2, X, Sparkles, ArrowRight, Trophy } from 'lucide-react'
 import Link from 'next/link'
 
 interface GettingStartedChecklistProps {
-  extensionInstalled: boolean
   keywordsCount: number
   hasInspectedLead: boolean
   hasCopiedOrApproved: boolean
@@ -14,7 +13,6 @@ interface GettingStartedChecklistProps {
 }
 
 export function GettingStartedChecklist({
-  extensionInstalled,
   keywordsCount,
   hasInspectedLead,
   hasCopiedOrApproved,
@@ -25,13 +23,6 @@ export function GettingStartedChecklist({
   const [dismissed, setDismissed] = useState(false)
 
   const steps = [
-    {
-      id: 'extension',
-      title: 'Reddit Extension Installed',
-      desc: 'Connect Chrome to BuyerWatch',
-      done: extensionInstalled,
-      link: '/settings?section=extension',
-    },
     {
       id: 'keyword',
       title: 'Topic Monitored',
@@ -91,7 +82,7 @@ export function GettingStartedChecklist({
       }, 4500)
       return () => clearTimeout(timer)
     }
-  }, [completedCount, extensionInstalled, keywordsCount, hasInspectedLead, hasCopiedOrApproved, autoSendEnabled])
+  }, [completedCount, keywordsCount, hasInspectedLead, hasCopiedOrApproved, autoSendEnabled])
 
   if (dismissed) return null
 

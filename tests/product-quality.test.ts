@@ -10,6 +10,7 @@ import {
 import {
   calculateAutomationDecision,
   evaluateAutoSendContentPolicy,
+  evaluateAutoSendIntentPolicy,
 } from '../src/lib/confidence-engine'
 import {
   getIntentDisplayLabel,
@@ -311,6 +312,13 @@ describe('auto-send policy', () => {
       plan: 'pro',
       auto_send_enabled: false,
     })?.reason).toBe('auto_send_disabled')
+  })
+
+  it('requires a verified score at or above the configured high-intent threshold', () => {
+    expect(evaluateAutoSendIntentPolicy(Number.NaN, 80)?.reason).toBe('intent_score_unavailable')
+    expect(evaluateAutoSendIntentPolicy(79, 80)?.reason).toBe('below_high_intent_threshold')
+    expect(evaluateAutoSendIntentPolicy(80, 80)).toBeNull()
+    expect(evaluateAutoSendIntentPolicy(94, 95)?.reason).toBe('below_high_intent_threshold')
   })
 
   it('blocks deterministic quality failures', () => {

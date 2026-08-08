@@ -87,6 +87,21 @@ export function hasRedditDiscoveryProvider(): boolean {
   return proxyConfigured || approvedOauthConfigured
 }
 
+/**
+ * Reddit write access must be explicitly enabled and backed by a registered
+ * OAuth application. A redditapis.com bearer key can fund discovery requests,
+ * but it does not identify the customer's Reddit account for write actions.
+ */
+export function hasRedditPostingProvider(): boolean {
+  return process.env.REDDIT_DIRECT_POSTING_ENABLED === 'true'
+    && Boolean(getConfiguredSecret(
+      process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID,
+    ))
+    && Boolean(getConfiguredSecret(
+      process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET,
+    ))
+}
+
 export function getProviderCapabilities(): ProviderCapabilities {
   return {
     aiDrafting: Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY)),
@@ -105,10 +120,7 @@ export function getProviderCapabilities(): ProviderCapabilities {
       )
     ),
     redditDiscovery: hasRedditDiscoveryProvider(),
-    redditPosting: Boolean(
-      process.env.REDDIT_OAUTH_CLIENT_ID
-      && process.env.REDDIT_OAUTH_SECRET
-    ),
+    redditPosting: hasRedditPostingProvider(),
     // Public Bluesky discovery is keyless. Credentials are only needed when a
     // user connects their own account for posting.
     bluesky: true,

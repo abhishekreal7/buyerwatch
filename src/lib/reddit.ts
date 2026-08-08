@@ -120,6 +120,52 @@ function decodeXmlEntities(str: string): string {
     .replace(/&apos;/g, "'")
 }
 
+type RedditApisPost = {
+  id?: unknown
+  title?: unknown
+  author?: unknown
+  text?: unknown
+  permalink?: unknown
+  url?: unknown
+  created?: unknown
+  created_utc?: unknown
+}
+
+export function normalizeRedditApisPosts(payload: unknown, subreddit: string): NormalizedPost[] {
+  if (!payload || typeof payload !== 'object') return []
+  const posts = (payload as { posts?: unknown }).posts
+  if (!Array.isArray(posts)) return []
+
+  return posts.flatMap((candidate): NormalizedPost[] => {
+    if (!candidate || typeof candidate !== 'object') return []
+    const post = candidate as RedditApisPost
+    const externalId = typeof post.id === 'string' ? post.id.trim() : ''
+    const title = typeof post.title === 'string' ? post.title.trim() : ''
+    const body = typeof post.text === 'string' ? post.text.trim() : ''
+    const author = typeof post.author === 'string' ? post.author.trim() : ''
+    const permalink = typeof post.permalink === 'string' ? post.permalink.trim() : ''
+    const directUrl = typeof post.url === 'string' ? post.url.trim() : ''
+    const url = directUrl || (permalink.startsWith('/') ? `https://reddit.com${permalink}` : '')
+    const createdAt = typeof post.created === 'string' && Number.isFinite(Date.parse(post.created))
+      ? new Date(post.created).toISOString()
+      : typeof post.created_utc === 'number' && Number.isFinite(post.created_utc)
+        ? new Date(post.created_utc * 1_000).toISOString()
+        : ''
+
+    if (!externalId || !url || !createdAt) return []
+    return [{
+      platform: 'reddit',
+      externalId,
+      author,
+      title,
+      text: body ? `${title}\n\n${body}`.trim() : title,
+      url,
+      createdAt,
+      sourceTarget: subreddit,
+    }]
+  })
+}
+
 export async function fetchSubredditNew(subreddit: string, limit: number = 25): Promise<NormalizedPost[]> {
   const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
   const paidFallbackEnabled = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
@@ -189,7 +235,12 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   ) {
     try {
       console.log(`[reddit] Falling back to redditapis.com proxy for r/${subreddit}`)
-      const url = `https://api.redditapis.com/r/${subreddit}/new?limit=${limit}`
+      const params = new URLSearchParams({
+        subreddit,
+        sort: 'new',
+        limit: String(Math.min(100, Math.max(1, limit))),
+      })
+      const url = `https://api.redditapis.com/api/reddit/posts?${params.toString()}`
       const response = await fetchWithTimeout(url, {
         headers: {
           'Authorization': `Bearer ${redditApisKey}`,
@@ -197,17 +248,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
         }
       }, 10_000)
       if (response.ok) {
-        const json = await response.json() as any
-        const posts = json.data?.children?.map((child: any) => child.data) || []
-        const normalized = posts.map((post: any): NormalizedPost => ({
-          platform: 'reddit',
-          externalId: post.id,
-          author: post.author,
-          text: `${post.title || ''}\n\n${post.selftext || ''}`.trim(),
-          url: `https://reddit.com${post.permalink}`,
-          createdAt: new Date(post.created_utc * 1000).toISOString(),
-          sourceTarget: subreddit
-        }))
+        const normalized = normalizeRedditApisPosts(await response.json(), subreddit)
         if (redisClient && normalized.length > 0) {
           await redisClient.set(cacheKey, JSON.stringify(normalized), 'EX', CACHE_TTL).catch(() => {})
         }

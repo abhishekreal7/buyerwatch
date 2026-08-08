@@ -103,14 +103,14 @@ export async function processScorePost(
     // 2. Fetch user profile for context and plan
     const { data: extendedProfile } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, auto_send_platforms, auto_send_communities, auto_send_daily_limit, referral_tracking_enabled')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, high_intent_threshold, auto_send_platforms, auto_send_communities, auto_send_daily_limit, referral_tracking_enabled')
       .eq('id', userId)
       .single()
     let profile = extendedProfile
     if (!profile) {
       const legacyResult = await supabase
         .from('profiles')
-        .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+        .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, high_intent_threshold, referral_tracking_enabled')
         .eq('id', userId)
         .single()
       if (legacyResult.error) throw legacyResult.error
@@ -122,6 +122,7 @@ export async function processScorePost(
             auto_send_platforms: ['bluesky'],
             auto_send_communities: [],
             auto_send_daily_limit: 3,
+            high_intent_threshold: 80,
           }
         : null
     }
@@ -470,9 +471,11 @@ export async function processScorePost(
       {
         auto_send_enabled: profile.auto_send_enabled,
         auto_send_threshold: profile.auto_send_threshold,
+        high_intent_threshold: profile.high_intent_threshold,
         plan: profile.plan ?? 'free',
       },
-      post.sourceTarget ?? null
+      post.sourceTarget ?? null,
+      scoreResult.score,
     )
     const capabilities = getPlatformCapabilities(post.platform, {
       redditDirectPosting: isRedditDirectPostingConfigured(),

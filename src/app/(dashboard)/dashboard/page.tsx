@@ -934,7 +934,6 @@ export default function DashboardPage() {
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#667085]" aria-hidden="true" />
             </div>
             <GettingStartedChecklist
-              extensionInstalled={extensionInstalled}
               keywordsCount={keywordsCount}
               hasInspectedLead={hasInspectedLead}
               hasCopiedOrApproved={hasCopiedOrApproved}

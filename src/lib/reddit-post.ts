@@ -1,5 +1,6 @@
 import { fetchWithTimeout } from './http'
 import { getDecryptedRedditConnection, refreshRedditToken } from './reddit-oauth'
+import { hasRedditPostingProvider } from './env'
 
 export { redditApiFetchForUser } from './reddit-oauth'
 
@@ -10,18 +11,15 @@ export class PlatformPostError extends Error {
   }
 }
 
-function configured(value: string | undefined): boolean {
-  const normalized = value?.trim() ?? ''
-  return Boolean(normalized && !normalized.includes('TODO'))
+export function isRedditDirectPostingConfigured(): boolean {
+  return hasRedditPostingProvider()
 }
 
-export function isRedditDirectPostingConfigured(): boolean {
-  const paidProxy = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
-    && configured(process.env.REDDITAPIS_API_KEY)
-  const oauth = process.env.REDDIT_DIRECT_POSTING_ENABLED === 'true'
-    && configured(process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID)
-    && configured(process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET)
-  return paidProxy || oauth
+export function normalizeRedditThingId(value: string): string {
+  const normalized = value.trim()
+  if (/^t[13]_[a-z0-9]+$/i.test(normalized)) return normalized
+  if (/^[a-z0-9]+$/i.test(normalized)) return `t3_${normalized}`
+  throw new PlatformPostError('reddit', 'Invalid Reddit post identifier.', false)
 }
 
 function handleRedditRateLimits(headers: Headers) {
@@ -46,46 +44,13 @@ function parseRedditJsonError(data: any): string | null {
 }
 
 export async function postRedditReply(userId: string, threadExternalId: string, text: string) {
-  const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
-  const paidFallbackEnabled = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
-  
-  if (paidFallbackEnabled && redditApisKey && !redditApisKey.includes('TODO')) {
-    console.log(`[reddit] Posting reply using redditapis.com proxy for thread ${threadExternalId}`)
-    const response = await fetchWithTimeout('https://api.redditapis.com/api/comment', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${redditApisKey}`,
-        'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        api_type: 'json',
-        thing_id: threadExternalId,
-        text
-      })
-    }, 10_000)
-
-    handleRedditRateLimits(response.headers)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new PlatformPostError('reddit', errorText, response.status === 429 || response.status >= 500)
-    }
-
-    const data: any = await response.json()
-    const errorMsg = parseRedditJsonError(data)
-    if (errorMsg) {
-      throw new PlatformPostError('reddit', errorMsg, errorMsg.includes('RATELIMIT'))
-    }
-
-    const permalink = data?.json?.data?.things?.[0]?.data?.permalink
-    return { permalink: permalink ? `https://reddit.com${permalink}` : null }
-  }
-
   const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim()
   if (process.env.NODE_ENV === 'development' && (!clientId || clientId.includes('TODO'))) {
     await getDecryptedRedditConnection(userId)
     return { permalink: `https://reddit.com/r/developer/comments/${threadExternalId}/dev_reply` }
+  }
+  if (!isRedditDirectPostingConfigured()) {
+    throw new PlatformPostError('reddit', 'Direct Reddit posting is not configured.', false)
   }
 
   const connection = await getDecryptedRedditConnection(userId)
@@ -111,7 +76,7 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
       },
       body: new URLSearchParams({
         api_type: 'json',
-        thing_id: threadExternalId,
+        thing_id: normalizeRedditThingId(threadExternalId),
         text
       })
     }, 10_000)
@@ -149,48 +114,13 @@ export async function postRedditReply(userId: string, threadExternalId: string, 
 }
 
 export async function submitRedditPost(userId: string, subreddit: string, title: string, text: string) {
-  const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
-  const paidFallbackEnabled = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
-
-  if (paidFallbackEnabled && redditApisKey && !redditApisKey.includes('TODO')) {
-    console.log(`[reddit] Submitting post using redditapis.com proxy to r/${subreddit}`)
-    const response = await fetchWithTimeout('https://api.redditapis.com/api/submit', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${redditApisKey}`,
-        'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        api_type: 'json',
-        kind: 'self',
-        sr: subreddit,
-        title,
-        text
-      })
-    }, 10_000)
-
-    handleRedditRateLimits(response.headers)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new PlatformPostError('reddit', errorText, response.status === 429 || response.status >= 500)
-    }
-
-    const data: any = await response.json()
-    const errorMsg = parseRedditJsonError(data)
-    if (errorMsg) {
-      throw new PlatformPostError('reddit', errorMsg, errorMsg.includes('RATELIMIT'))
-    }
-
-    const url = data?.json?.data?.url
-    return { permalink: url || null }
-  }
-
   const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim()
   if (process.env.NODE_ENV === 'development' && (!clientId || clientId.includes('TODO'))) {
     await getDecryptedRedditConnection(userId)
     return { permalink: `https://reddit.com/r/developer/submit_mock` }
+  }
+  if (!isRedditDirectPostingConfigured()) {
+    throw new PlatformPostError('reddit', 'Direct Reddit posting is not configured.', false)
   }
 
   const connection = await getDecryptedRedditConnection(userId)
