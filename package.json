@@ -13,6 +13,7 @@
     "extension:check": "node scripts/package-extension.mjs --check",
     "extension:dev": "node scripts/package-extension.mjs --development",
     "extension:smoke": "npm run extension:dev && node scripts/smoke-extension.mjs",
+    "extension:smoke:production": "npm run extension:check && node scripts/smoke-extension.mjs --production",
     "start": "next start",
     "lint": "eslint src worker tests e2e playwright.config.ts --max-warnings=0",
     "typecheck": "tsc --noEmit --incremental false && tsc -p tsconfig.worker.json --noEmit --incremental false",

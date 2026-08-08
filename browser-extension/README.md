@@ -19,6 +19,13 @@ source file:
 npm run extension:check
 ```
 
+Load the signed production manifest in an isolated Chromium profile and test
+its exact production origin and extension identity before any store upload:
+
+```text
+npm run extension:smoke:production
+```
+
 The production manifest is restricted to BuyerWatch, the configured Supabase
 project, and Reddit conversation paths. Production session handoff uses
 Chrome's externally-connectable messaging API, restricted to BuyerWatch's two
