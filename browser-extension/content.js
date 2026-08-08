@@ -1,5 +1,5 @@
 const BuyerWatchCapture = (() => {
-  const clean = (value) => String(value ?? '')
+  const cleanText = (value) => String(value ?? '')
     .replace(/\u00a0/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -8,27 +8,19 @@ const BuyerWatchCapture = (() => {
   const textFrom = (root, selectors) => {
     for (const selector of selectors) {
       const element = root?.querySelector?.(selector)
-      const value = clean(element?.innerText || element?.textContent)
+      const value = cleanText(element?.innerText || element?.textContent)
       if (value) return value
     }
     return ''
   }
 
-  const canonicalUrl = () => {
+  const canonicalPost = () => {
     const canonical = document.querySelector('link[rel="canonical"]')?.href
-    const url = new URL(canonical || window.location.href)
-    url.search = ''
-    url.hash = ''
-    return url.toString()
-  }
-
-  const eventIdFromUrl = (url) => {
-    const pathname = new URL(url).pathname
-    return pathname.match(/\/comments\/([^/]+)/i)?.[1] || pathname
+    return BuyerWatchExtensionCommon.parseRedditPostUrl(canonical || window.location.href)
   }
 
   const isoTimestamp = (value) => {
-    const raw = clean(value)
+    const raw = BuyerWatchExtensionCommon.clean(value)
     if (!raw) return ''
     const numeric = /^\d+(?:\.\d+)?$/.test(raw) ? Number(raw) : Number.NaN
     const milliseconds = Number.isFinite(numeric)
@@ -48,7 +40,7 @@ const BuyerWatchCapture = (() => {
       'created-at',
       'data-created-at',
       'data-timestamp',
-    ].map((attribute) => post?.getAttribute?.(attribute)).find(Boolean)
+    ].map(attribute => post?.getAttribute?.(attribute)).find(Boolean)
     const timeElement = post?.querySelector?.('faceplate-timeago[ts], time[datetime]')
     return isoTimestamp(
       attributeValue
@@ -57,39 +49,83 @@ const BuyerWatchCapture = (() => {
     )
   }
 
-  const findArticleForPath = (path) => {
-    const articles = [...document.querySelectorAll('main article, article')]
-    return articles.find((article) => (
-      [...article.querySelectorAll('a[href]')]
-        .some((link) => link.getAttribute('href')?.includes(path))
-    )) || articles[0] || document.querySelector('main')
+  const postIdFromElement = (element) => {
+    const directIds = [
+      element?.getAttribute?.('post-id'),
+      element?.getAttribute?.('data-fullname'),
+    ]
+    if (/^t3_[a-z0-9]+$/i.test(String(element?.id || ''))) {
+      directIds.push(element.id)
+    }
+    for (const value of directIds) {
+      const directId = String(value || '').replace(/^t3_/i, '').toLowerCase()
+      if (directId && /^[a-z0-9]+$/i.test(directId)) return directId
+    }
+
+    const urls = [
+      element?.getAttribute?.('permalink'),
+      element?.getAttribute?.('data-permalink'),
+      ...[...(element?.querySelectorAll?.('a[href*="/comments/"]') || [])]
+        .map(link => link.href || link.getAttribute('href')),
+    ]
+    for (const value of urls) {
+      try {
+        const parsed = BuyerWatchExtensionCommon.parseRedditPostUrl(
+          new URL(value, window.location.origin).toString(),
+        )
+        if (parsed) return parsed.postId
+      } catch {
+        // Keep looking for an exact post identity.
+      }
+    }
+    return ''
   }
 
-  const captureReddit = (url) => {
-    const pathname = new URL(url).pathname
-    const post = [...document.querySelectorAll('shreddit-post')]
-      .find((element) => element.getAttribute('permalink')?.includes(pathname))
-      || document.querySelector('shreddit-post')
-      || findArticleForPath(pathname)
+  const findPost = (postId) => {
+    const candidates = [
+      ...document.querySelectorAll('shreddit-post'),
+      ...document.querySelectorAll('[data-testid="post-container"]'),
+      ...document.querySelectorAll('.thing.link[data-fullname^="t3_"]'),
+      ...document.querySelectorAll('main article'),
+    ]
+    return [...new Set(candidates)].find(element => postIdFromElement(element) === postId) || null
+  }
 
-    const title = clean(
-      post?.getAttribute?.('post-title')
-      || document.querySelector('h1')?.textContent,
+  const captureReddit = (postIdentity) => {
+    const post = findPost(postIdentity.postId)
+    if (!post) return null
+
+    const title = cleanText(
+      post.getAttribute?.('post-title')
+      || textFrom(post, [
+        '[slot="title"]',
+        '[data-testid="post-title"]',
+        'h1',
+        'a.title',
+      ]),
     )
-    const text = textFrom(post, [
+    const body = textFrom(post, [
       '[slot="text-body"]',
       '[data-post-click-location="text-body"]',
       '[data-testid="post-content"]',
-    ]) || clean(post?.innerText)
-    const author = clean(
-      post?.getAttribute?.('author')
-      || textFrom(post, ['[data-testid="post_author_link"]', 'a[href*="/user/"]']),
+      '[data-click-id="text"]',
+      '.usertext-body',
+    ])
+    const text = body || title
+    const author = cleanText(
+      post.getAttribute?.('author')
+      || textFrom(post, [
+        '[data-testid="post_author_link"]',
+        'a[href*="/user/"]',
+        'a.author',
+      ]),
     )
-    const community = clean(
-      post?.getAttribute?.('subreddit-prefixed-name')
-      || pathname.match(/\/r\/([^/]+)/i)?.[1],
+    const community = cleanText(
+      post.getAttribute?.('subreddit-prefixed-name')
+      || new URL(postIdentity.url).pathname.match(/\/r\/([^/]+)/i)?.[1],
     ).replace(/^r\//i, '')
 
+    if (!text || text.length < 12) return null
     return {
       title,
       text,
@@ -100,22 +136,15 @@ const BuyerWatchCapture = (() => {
   }
 
   const capture = () => {
-    const hostname = window.location.hostname.toLowerCase()
-    if (!hostname.endsWith('reddit.com')) {
-      return { error: 'unsupported_site' }
-    }
-
-    const url = canonicalUrl()
-    const details = captureReddit(url)
-
-    if (!details.text || details.text.length < 12) {
-      return { error: 'conversation_not_found' }
-    }
+    const postIdentity = canonicalPost()
+    if (!postIdentity) return { error: 'unsupported_site' }
+    const details = captureReddit(postIdentity)
+    if (!details) return { error: 'conversation_not_found' }
 
     return {
       platform: 'reddit',
-      sourceEventId: eventIdFromUrl(url),
-      url,
+      sourceEventId: postIdentity.postId,
+      url: postIdentity.url,
       title: details.title,
       text: details.text,
       author: details.author,
@@ -125,8 +154,10 @@ const BuyerWatchCapture = (() => {
     }
   }
 
-  return { capture }
+  return { capture, captureReddit, findPost }
 })()
+
+globalThis.BuyerWatchCapture = BuyerWatchCapture
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'BUYERWATCH_CAPTURE') return
@@ -134,19 +165,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 })
 
 const BuyerWatchReplyAssist = (() => {
-  const DEFAULT_APP_URL = 'https://buyerwatch.co'
-
-  const clean = (value) => String(value ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  const postId = (value) => {
-    try {
-      return new URL(value).pathname.match(/\/comments\/([^/]+)/i)?.[1] || ''
-    } catch {
-      return ''
-    }
-  }
+  const clean = BuyerWatchExtensionCommon.clean
 
   const queryDeep = (selector, root = document) => {
     const direct = root.querySelector?.(selector)
@@ -159,8 +178,16 @@ const BuyerWatchReplyAssist = (() => {
     return null
   }
 
+  const queryDeepAll = (selector, root = document, matches = []) => {
+    matches.push(...(root.querySelectorAll?.(selector) || []))
+    for (const element of root.querySelectorAll?.('*') || []) {
+      if (element.shadowRoot) queryDeepAll(selector, element.shadowRoot, matches)
+    }
+    return matches
+  }
+
   const clickComposerTrigger = () => {
-    const candidates = [...document.querySelectorAll('button, [role="button"]')]
+    const candidates = queryDeepAll('button, [role="button"]')
     const trigger = candidates.find((element) => {
       const label = clean(element.getAttribute('aria-label') || element.textContent).toLowerCase()
       return label === 'add a comment' || label === 'join the conversation'
@@ -198,12 +225,11 @@ const BuyerWatchReplyAssist = (() => {
     }
 
     if (composer.getAttribute('contenteditable') === 'true') {
-      const selection = window.getSelection()
-      const range = document.createRange()
-      range.selectNodeContents(composer)
-      selection?.removeAllRanges()
-      selection?.addRange(range)
-      document.execCommand('insertText', false, text)
+      composer.textContent = ''
+      composer.focus()
+      const inserted = typeof document.execCommand === 'function'
+        && document.execCommand('insertText', false, text)
+      if (!inserted) composer.textContent = text
       composer.dispatchEvent(new InputEvent('input', {
         bubbles: true,
         inputType: 'insertText',
@@ -214,81 +240,156 @@ const BuyerWatchReplyAssist = (() => {
     return false
   }
 
-  const getAppUrl = async () => {
-    const { appUrl } = await chrome.storage.sync.get('appUrl')
-    const raw = String(appUrl || DEFAULT_APP_URL).trim().replace(/\/+$/, '')
-    if (/^https?:\/\//i.test(raw)) return raw
-    return `https://${raw}`
+  const trackComposerText = (composer, pending) => {
+    const update = () => {
+      const currentText = clean(
+        'value' in composer ? composer.value : composer.textContent,
+      )
+      // Reddit clears the composer after submission. Preserve the last
+      // non-empty value so confirmation can still match the posted comment.
+      if (!currentText || currentText.length > 10_000) return
+      pending.text = currentText
+      void chrome.storage.local.set({ buyerwatchPendingReply: pending })
+    }
+    composer.addEventListener?.('input', update)
+    return update
   }
 
   const reportStatus = async (pending, action, permalink) => {
-    const { buyerwatchSession } = await chrome.storage.local.get('buyerwatchSession')
-    if (!buyerwatchSession?.access_token) return false
-    const appUrl = await getAppUrl()
-    const response = await fetch(`${appUrl}/api/extension/reply-status`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${buyerwatchSession.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action,
-        threadId: pending.threadId,
-        text: pending.text,
-        permalink: permalink || undefined,
-      }),
-    })
-    return response.ok
-  }
-
-  const findPostedPermalink = (text) => {
-    const excerpt = clean(text).slice(0, 120)
-    if (excerpt.length < 12) return null
-    const comments = [
-      ...document.querySelectorAll('shreddit-comment, [data-testid="comment"], article'),
-    ]
-    const comment = comments.find(element => clean(element.textContent).includes(excerpt))
-    if (!comment) return null
-    const raw = comment.getAttribute?.('permalink')
-      || [...comment.querySelectorAll('a[href]')]
-        .map(link => link.href)
-        .find(href => /\/comments\/[^/]+\/[^/]+\/[^/]+/i.test(href))
-    if (!raw) return null
-    try {
-      return new URL(raw, window.location.origin).toString()
-    } catch {
-      return null
+    const send = async (forceRefresh = false) => {
+      let session
+      try {
+        session = await BuyerWatchExtensionCommon.getValidSession({ forceRefresh })
+      } catch {
+        return null
+      }
+      if (!session?.access_token) return null
+      const appUrl = await BuyerWatchExtensionCommon.getAppUrl()
+      try {
+        return await BuyerWatchExtensionCommon.fetchWithTimeout(
+          `${appUrl}/api/extension/reply-status`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action,
+              threadId: pending.threadId,
+              text: pending.text,
+              permalink: permalink || undefined,
+            }),
+          },
+        )
+      } catch {
+        return null
+      }
     }
+
+    let response = await send(false)
+    if (response?.status === 401) response = await send(true)
+    return response?.ok === true
   }
 
-  const watchForConfirmation = (pending) => {
+  const findPostedPermalinks = (text, postUrl) => {
+    const post = BuyerWatchExtensionCommon.parseRedditPostUrl(postUrl)
+    const excerpt = clean(text).slice(0, 120)
+    if (!post || excerpt.length < 12) return []
+    const comments = [
+      ...document.querySelectorAll('shreddit-comment'),
+      ...document.querySelectorAll('[data-testid="comment"]'),
+      ...document.querySelectorAll('.thing.comment[data-fullname^="t1_"]'),
+    ]
+    const permalinks = []
+    for (const comment of comments) {
+      if (!clean(comment.textContent).includes(excerpt)) continue
+      const candidates = [
+        comment.getAttribute?.('permalink'),
+        comment.getAttribute?.('data-permalink'),
+        ...[...comment.querySelectorAll('a[href]')].map(link => link.href),
+      ]
+      for (const raw of candidates) {
+        try {
+          const url = new URL(raw, window.location.origin)
+          const parsed = BuyerWatchExtensionCommon.parseRedditPostUrl(url.toString())
+          if (
+            parsed?.postId === post.postId
+            && /\/comments\/[^/]+\/[^/]+\/[^/]+\/?$/i.test(url.pathname)
+          ) {
+            url.search = ''
+            url.hash = ''
+            permalinks.push(url.toString())
+            break
+          }
+        } catch {
+          // Ignore malformed links injected into Reddit content.
+        }
+      }
+    }
+    return [...new Set(permalinks)]
+  }
+
+  const watchForConfirmation = (pending, baselinePermalinks = []) => {
+    const baseline = new Set(baselinePermalinks)
     const deadline = Math.min(pending.expiresAt, Date.now() + 10 * 60_000)
-    const timer = window.setInterval(async () => {
-      if (Date.now() >= deadline) {
-        window.clearInterval(timer)
+    let inFlight = false
+    let timer
+    let reportFailures = 0
+    let nextReportAt = 0
+
+    const check = async () => {
+      if (inFlight || Date.now() >= deadline) {
+        if (Date.now() >= deadline && timer) window.clearInterval(timer)
         return
       }
-      const permalink = findPostedPermalink(pending.text)
-      if (!permalink) return
-      window.clearInterval(timer)
-      if (await reportStatus(pending, 'confirmed', permalink)) {
-        await chrome.storage.local.remove('buyerwatchPendingReply')
+      const permalink = findPostedPermalinks(pending.text, pending.postUrl)
+        .find(candidate => !baseline.has(candidate))
+      if (!permalink || Date.now() < nextReportAt) return
+      inFlight = true
+      try {
+        if (await reportStatus(pending, 'confirmed', permalink)) {
+          if (timer) window.clearInterval(timer)
+          await chrome.storage.local.remove('buyerwatchPendingReply')
+        } else {
+          reportFailures += 1
+          nextReportAt = Date.now() + Math.min(30_000, 2_000 * (2 ** (reportFailures - 1)))
+        }
+      } finally {
+        inFlight = false
       }
-    }, 2_000)
+    }
+
+    timer = window.setInterval(() => void check(), 2_000)
+    void check()
+    return timer
   }
 
   const initialize = async () => {
     const { buyerwatchPendingReply: pending } = await chrome.storage.local.get('buyerwatchPendingReply')
+    const pendingPost = BuyerWatchExtensionCommon.parseRedditPostUrl(pending?.postUrl)
+    const currentPost = BuyerWatchExtensionCommon.parseRedditPostUrl(window.location.href)
     if (
       !pending
       || pending.expiresAt <= Date.now()
-      || !postId(pending.postUrl)
-      || postId(pending.postUrl) !== postId(window.location.href)
+      || !pendingPost
+      || !currentPost
+      || pendingPost.postId !== currentPost.postId
     ) {
       if (pending?.expiresAt <= Date.now()) {
         await chrome.storage.local.remove('buyerwatchPendingReply')
       }
       return
+    }
+
+    const existingPermalinks = findPostedPermalinks(pending.text, pending.postUrl)
+    if (pending.prefilledAt && existingPermalinks.length > 0) {
+      for (const permalink of existingPermalinks) {
+        if (await reportStatus(pending, 'confirmed', permalink)) {
+          await chrome.storage.local.remove('buyerwatchPendingReply')
+          return
+        }
+      }
     }
 
     clickComposerTrigger()
@@ -300,14 +401,23 @@ const BuyerWatchReplyAssist = (() => {
     }
     if (!composer || !setComposerText(composer, pending.text)) return
 
-    await chrome.storage.local.set({
-      buyerwatchPendingReply: { ...pending, prefilledAt: Date.now() },
-    })
-    await reportStatus(pending, 'prefilled')
-    watchForConfirmation(pending)
+    const updatedPending = { ...pending, prefilledAt: Date.now() }
+    await chrome.storage.local.set({ buyerwatchPendingReply: updatedPending })
+    trackComposerText(composer, updatedPending)
+    await reportStatus(updatedPending, 'prefilled')
+    watchForConfirmation(updatedPending, existingPermalinks)
   }
 
-  return { initialize }
+  return {
+    findPostedPermalinks,
+    initialize,
+    reportStatus,
+    setComposerText,
+    trackComposerText,
+    watchForConfirmation,
+  }
 })()
 
-void BuyerWatchReplyAssist.initialize()
+globalThis.BuyerWatchReplyAssist = BuyerWatchReplyAssist
+
+void BuyerWatchReplyAssist.initialize().catch(() => undefined)

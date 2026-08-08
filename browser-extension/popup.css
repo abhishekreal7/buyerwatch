@@ -270,3 +270,18 @@ input:focus {
 .status-message.error {
   color: #b42318;
 }
+
+.privacy-link {
+  display: block;
+  width: fit-content;
+  margin: 0 auto;
+  color: #686b72;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.privacy-link:hover,
+.privacy-link:focus-visible {
+  color: #171717;
+  text-decoration: underline;
+}

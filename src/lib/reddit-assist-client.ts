@@ -1,3 +1,5 @@
+import { prepareBuyerWatchRedditReply } from './extension-client'
+
 type AssistedReplyInput = {
   threadId: string
   text: string
@@ -35,6 +37,13 @@ export async function openRedditAssistedReply(
     return 'copy'
   }
 
+  if (await prepareBuyerWatchRedditReply(input)) {
+    await browser.navigator.clipboard.writeText(input.text).catch(() => undefined)
+    navigate()
+    return 'prefill'
+  }
+
+  // Backward-compatible path for pre-1.0 development builds.
   const ready = new Promise<boolean>((resolve) => {
     const onReady = (event: Event) => {
       if ((event as CustomEvent<string>).detail !== input.threadId) return

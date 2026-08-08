@@ -12,6 +12,12 @@ const PLATFORM_HOSTS: Record<ExtensionPlatform, RegExp> = {
   x: /(^|\.)(x\.com|twitter\.com)$/i,
 }
 
+const PLATFORM_PATHS: Record<ExtensionPlatform, RegExp> = {
+  reddit: /^\/(?:r\/[^/]+\/)?comments\/([a-z0-9]+)(?:\/[^/?#]*){0,2}\/?$/i,
+  bluesky: /^\/profile\/[^/]+\/post\/([^/?#]+)\/?$/i,
+  x: /^\/[^/]+\/status\/(\d+)\/?$/i,
+}
+
 export function isExtensionPlatform(value: unknown): value is ExtensionPlatform {
   return value === 'reddit' || value === 'bluesky' || value === 'x'
 }
@@ -22,9 +28,42 @@ export function isValidExtensionSourceUrl(
 ): boolean {
   try {
     const parsed = new URL(sourceUrl)
-    return parsed.protocol === 'https:' && PLATFORM_HOSTS[platform].test(parsed.hostname)
+    return parsed.protocol === 'https:'
+      && PLATFORM_HOSTS[platform].test(parsed.hostname)
+      && !parsed.username
+      && !parsed.password
+      && !parsed.port
+      && PLATFORM_PATHS[platform].test(parsed.pathname)
   } catch {
     return false
+  }
+}
+
+export function extensionSourceIdentity(
+  platform: ExtensionPlatform,
+  sourceUrl: string,
+): { sourceEventId: string; sourceUrl: string } | null {
+  try {
+    const parsed = new URL(sourceUrl)
+    if (
+      parsed.protocol !== 'https:'
+      || !PLATFORM_HOSTS[platform].test(parsed.hostname)
+      || parsed.username
+      || parsed.password
+      || parsed.port
+    ) {
+      return null
+    }
+    const match = parsed.pathname.match(PLATFORM_PATHS[platform])
+    if (!match?.[1]) return null
+    parsed.search = ''
+    parsed.hash = ''
+    return {
+      sourceEventId: match[1].toLowerCase(),
+      sourceUrl: parsed.toString(),
+    }
+  } catch {
+    return null
   }
 }
 

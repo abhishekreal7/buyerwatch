@@ -4,10 +4,11 @@ import { getServiceRoleClient } from '@/lib/admin'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { hasQStashConfiguration, publishQStashJson } from '@/lib/qstash'
 import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
+import { containsConfiguredPhrase } from '@/lib/phrase-match'
 import {
   buildExtensionExternalId,
+  extensionSourceIdentity,
   isExtensionPlatform,
-  isValidExtensionSourceUrl,
   normalizeExtensionTimestamps,
 } from '@/lib/extension-ingest'
 
@@ -69,8 +70,8 @@ export async function POST(request: Request) {
 
     const body = await readJsonBody<Record<string, unknown>>(request, 120_000)
     const platform = body.platform
-    const sourceEventId = boundedString(body.sourceEventId, 900, { required: true })
-    const sourceUrl = boundedString(body.url, 2_000, { required: true })
+    const submittedSourceEventId = boundedString(body.sourceEventId, 900, { required: true })
+    const submittedSourceUrl = boundedString(body.url, 2_000, { required: true })
     const title = boundedString(body.title, 1_000)
     const text = boundedString(body.text, 100_000, { required: true, trim: false })
     const author = boundedString(body.author, 500) ?? ''
@@ -82,16 +83,21 @@ export async function POST(request: Request) {
 
     if (
       !isExtensionPlatform(platform)
-      || !sourceEventId
-      || !sourceUrl
+      || !submittedSourceEventId
+      || !submittedSourceUrl
       || text === null
       || !text.trim()
     ) {
       return NextResponse.json({ error: 'invalid_capture' }, { status: 400, headers })
     }
-    if (!isValidExtensionSourceUrl(platform, sourceUrl)) {
+    const sourceIdentity = extensionSourceIdentity(platform, submittedSourceUrl)
+    if (!sourceIdentity) {
       return NextResponse.json({ error: 'invalid_source_url' }, { status: 400, headers })
     }
+    if (submittedSourceEventId.toLowerCase() !== sourceIdentity.sourceEventId) {
+      return NextResponse.json({ error: 'source_identity_mismatch' }, { status: 400, headers })
+    }
+    const { sourceEventId, sourceUrl } = sourceIdentity
 
     const admin = getServiceRoleClient()
     const { data: keywords, error: keywordError } = await admin
@@ -103,7 +109,7 @@ export async function POST(request: Request) {
       .limit(100)
     if (keywordError) throw keywordError
     const searchable = `${title ?? ''}\n${text}`.toLowerCase()
-    const keyword = (keywords ?? []).find(({ term }) => searchable.includes(term.toLowerCase()))
+    const keyword = (keywords ?? []).find(({ term }) => containsConfiguredPhrase(searchable, term))
     if (!keyword) {
       return NextResponse.json({ error: 'no_matching_keyword' }, { status: 422, headers })
     }

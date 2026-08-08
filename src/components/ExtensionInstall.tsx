@@ -12,6 +12,10 @@ import {
   X,
 } from 'lucide-react'
 import { BrandLogo } from '@/components/BrandLogo'
+import {
+  detectBuyerWatchExtension,
+  syncBuyerWatchExtensionSession,
+} from '@/lib/extension-client'
 import { createClient } from '@/utils/supabase/client'
 import type { Session } from '@supabase/supabase-js'
 
@@ -29,13 +33,13 @@ const ExtensionContext = createContext<ExtensionContextValue | null>(null)
 const EXTENSION_URL = process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL || '/buyerwatch-extension.zip'
 const IS_STORE_URL = EXTENSION_URL.includes('chromewebstore.google.com')
 
-function hasExtensionMarker() {
+function hasLegacyExtensionMarker() {
   return document.documentElement.getAttribute('data-buyerwatch-extension') === 'installed'
 }
 
-function publishExtensionSession(session: Session, userId: string) {
-  if (!hasExtensionMarker() || session.user.id !== userId) return
-
+async function publishExtensionSession(session: Session, userId: string) {
+  if (await syncBuyerWatchExtensionSession(session, userId)) return
+  if (!hasLegacyExtensionMarker() || session.user.id !== userId) return
   window.dispatchEvent(new CustomEvent('buyerwatch:extension-session', {
     detail: JSON.stringify({
       access_token: session.access_token,
@@ -59,8 +63,16 @@ export function ExtensionProvider({ children, userId }: { children: ReactNode; u
 
   function refreshStatus() {
     setStatus('checking')
-    window.dispatchEvent(new Event('buyerwatch:extension-detect'))
-    window.setTimeout(() => setStatus(hasExtensionMarker() ? 'installed' : 'missing'), 350)
+    void (async () => {
+      if (await detectBuyerWatchExtension()) {
+        setStatus('installed')
+        return
+      }
+      window.dispatchEvent(new Event('buyerwatch:extension-detect'))
+      window.setTimeout(() => {
+        setStatus(hasLegacyExtensionMarker() ? 'installed' : 'missing')
+      }, 350)
+    })()
   }
 
   function openInstall(nextReason?: string) {
@@ -80,29 +92,35 @@ export function ExtensionProvider({ children, userId }: { children: ReactNode; u
   }
 
   useEffect(() => {
-    let missingTimer: number | undefined
+    let cancelled = false
 
     const markInstalled = () => {
-      window.clearTimeout(missingTimer)
+      if (cancelled) return
       setStatus('installed')
       setModalOpen(false)
     }
 
     window.addEventListener('buyerwatch:extension-ready', markInstalled)
-    window.dispatchEvent(new Event('buyerwatch:extension-detect'))
+    void (async () => {
+      if (await detectBuyerWatchExtension()) {
+        markInstalled()
+        return
+      }
 
-    if (hasExtensionMarker()) {
-      markInstalled()
-    } else {
-      missingTimer = window.setTimeout(() => {
-        setStatus('missing')
-        const seen = window.localStorage.getItem(`buyerwatch_extension_prompt_seen:${userId}`) === 'true'
-        if (!seen) setModalOpen(true)
-      }, 650)
-    }
+      window.dispatchEvent(new Event('buyerwatch:extension-detect'))
+      await new Promise(resolve => window.setTimeout(resolve, 350))
+      if (hasLegacyExtensionMarker()) {
+        markInstalled()
+        return
+      }
+      if (cancelled) return
+      setStatus('missing')
+      const seen = window.localStorage.getItem(`buyerwatch_extension_prompt_seen:${userId}`) === 'true'
+      if (!seen) setModalOpen(true)
+    })()
 
     return () => {
-      window.clearTimeout(missingTimer)
+      cancelled = true
       window.removeEventListener('buyerwatch:extension-ready', markInstalled)
     }
   }, [userId])
@@ -110,7 +128,7 @@ export function ExtensionProvider({ children, userId }: { children: ReactNode; u
   useEffect(() => {
     async function syncSession() {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) publishExtensionSession(session, userId)
+      if (session) await publishExtensionSession(session, userId)
     }
 
     const handleExtensionReady = () => {
@@ -121,7 +139,7 @@ export function ExtensionProvider({ children, userId }: { children: ReactNode; u
     void syncSession()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) publishExtensionSession(session, userId)
+      if (session) void publishExtensionSession(session, userId)
     })
 
     return () => {
@@ -189,6 +207,13 @@ function ExtensionInstallModal({
             Connect BuyerWatch to Reddit
           </h2>
           <p className="mt-3 max-w-[430px] text-[14px] leading-6 text-[#666660]">{reason}</p>
+
+          <div className="mt-5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-[12px] leading-5 text-[#52525B]">
+            <p><strong className="font-semibold text-[#27272A]">You stay in control.</strong> BuyerWatch captures only Reddit posts you choose, prefills replies for review, and never presses Reddit&apos;s submit button.</p>
+            <a href="/privacy" target="_blank" rel="noreferrer" className="mt-1.5 inline-flex min-h-8 items-center font-semibold text-[#0A72E8] hover:underline">
+              See exactly what the extension accesses
+            </a>
+          </div>
 
           <div className="my-6 space-y-2.5">
             {[

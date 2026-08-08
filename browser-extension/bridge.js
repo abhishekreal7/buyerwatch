@@ -12,7 +12,7 @@ function readBuyerWatchSession(event) {
       typeof session?.access_token !== 'string'
       || typeof session?.refresh_token !== 'string'
       || typeof session?.expires_at !== 'number'
-      || typeof session?.user?.id !== 'string'
+      || !BuyerWatchExtensionCommon.isUuid(session?.user?.id)
     ) {
       return null
     }
@@ -34,22 +34,20 @@ function readPendingReply(event) {
   if (typeof event?.detail !== 'string') return null
   try {
     const pending = JSON.parse(event.detail)
-    const url = new URL(pending?.postUrl)
+    const post = BuyerWatchExtensionCommon.parseRedditPostUrl(pending?.postUrl)
     if (
-      !/^[0-9a-f-]{36}$/i.test(pending?.threadId || '')
+      !BuyerWatchExtensionCommon.isUuid(pending?.threadId)
       || typeof pending?.text !== 'string'
       || pending.text.length < 1
       || pending.text.length > 10_000
-      || url.protocol !== 'https:'
-      || !(url.hostname === 'reddit.com' || url.hostname.endsWith('.reddit.com'))
+      || !post
     ) {
       return null
     }
-    url.hash = ''
     return {
       threadId: pending.threadId,
       text: pending.text,
-      postUrl: url.toString(),
+      postUrl: post.url,
       expiresAt: Date.now() + 15 * 60_000,
     }
   } catch {

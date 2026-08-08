@@ -1,5 +1,3 @@
-const DEFAULT_APP_URL = 'https://buyerwatch.co'
-
 const views = {
   loading: document.querySelector('#loading-view'),
   login: document.querySelector('#login-view'),
@@ -8,13 +6,6 @@ const views = {
 const statusMessage = document.querySelector('#status-message')
 const loginStatus = document.querySelector('#login-status')
 const captureButton = document.querySelector('#capture-button')
-
-function normalizeAppUrl(value) {
-  const raw = String(value || DEFAULT_APP_URL).trim().replace(/\/+$/, '')
-  if (/^https?:\/\//i.test(raw)) return raw
-  if (/^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(raw)) return `http://${raw}`
-  return `https://${raw}`
-}
 
 function showView(name) {
   Object.entries(views).forEach(([key, element]) => {
@@ -27,49 +18,17 @@ function setStatus(message, tone = '') {
   statusMessage.className = `status-message ${tone}`.trim()
 }
 
-async function getAppUrl() {
-  const { appUrl } = await chrome.storage.sync.get('appUrl')
-  return normalizeAppUrl(appUrl)
-}
-
-async function getConfig() {
-  const appUrl = await getAppUrl()
-  const response = await fetch(`${appUrl}/api/extension/config`)
-  if (!response.ok) throw new Error('BuyerWatch authentication is unavailable.')
-  return { appUrl, ...await response.json() }
-}
-
-async function refreshSession(config, session) {
-  const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST',
-    headers: {
-      apikey: config.supabaseAnonKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refresh_token: session.refresh_token }),
-  })
-  if (!response.ok) {
-    await chrome.storage.local.remove('buyerwatchSession')
-    return null
-  }
-  const payload = await response.json()
-  const refreshed = {
-    ...payload,
-    expires_at: Math.floor(Date.now() / 1000) + payload.expires_in,
-  }
-  await chrome.storage.local.set({ buyerwatchSession: refreshed })
-  return refreshed
-}
-
 async function getSession(config) {
-  const { buyerwatchSession } = await chrome.storage.local.get('buyerwatchSession')
-  if (!buyerwatchSession) return null
-  const expiresSoon = Number(buyerwatchSession.expires_at || 0) < Math.floor(Date.now() / 1000) + 60
-  return expiresSoon ? refreshSession(config, buyerwatchSession) : buyerwatchSession
+  try {
+    return await BuyerWatchExtensionCommon.getValidSession({ config })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'session_expired') return null
+    throw error
+  }
 }
 
 async function signIn(config, email, password) {
-  const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=password`, {
+  const response = await BuyerWatchExtensionCommon.fetchWithTimeout(`${config.supabaseUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
       apikey: config.supabaseAnonKey,
@@ -85,6 +44,14 @@ async function signIn(config, email, password) {
     }
     throw new Error(message)
   }
+  if (
+    typeof payload.access_token !== 'string'
+    || typeof payload.refresh_token !== 'string'
+    || typeof payload.expires_in !== 'number'
+    || typeof payload.user?.id !== 'string'
+  ) {
+    throw new Error('BuyerWatch returned an invalid session. Please try again.')
+  }
   const session = {
     ...payload,
     expires_at: Math.floor(Date.now() / 1000) + payload.expires_in,
@@ -94,13 +61,9 @@ async function signIn(config, email, password) {
 }
 
 function platformForUrl(url) {
-  try {
-    const hostname = new URL(url).hostname.toLowerCase()
-    if (hostname.endsWith('reddit.com')) return { id: 'reddit', name: 'Reddit conversation', icon: 'R' }
-  } catch {
-    return null
-  }
-  return null
+  return BuyerWatchExtensionCommon.parseRedditPostUrl(url)
+    ? { id: 'reddit', name: 'Reddit conversation', icon: 'R' }
+    : null
 }
 
 async function updateCurrentSite() {
@@ -135,6 +98,10 @@ function captureErrorMessage(error) {
     invalid_source_url: 'This source URL is not supported.',
     origin_not_allowed: 'Add this extension origin to CHROME_EXTENSION_ORIGINS.',
     rate_limited: 'Too many captures. Please wait a moment.',
+    request_timeout: 'The request timed out. Check your connection and try again.',
+    receiving_end_missing: 'Refresh the Reddit tab, then try capturing again.',
+    session_expired: 'Your BuyerWatch session expired. Sign in again to continue.',
+    source_identity_mismatch: 'Reddit returned an inconsistent post URL. Refresh the page and retry.',
   }
   return messages[error] || 'The conversation could not be captured.'
 }
@@ -142,7 +109,7 @@ function captureErrorMessage(error) {
 async function initialize() {
   showView('loading')
   try {
-    const config = await getConfig()
+    const config = await BuyerWatchExtensionCommon.getConfig()
     const session = await getSession(config)
     if (!session) {
       showView('login')
@@ -154,9 +121,14 @@ async function initialize() {
   } catch (error) {
     showView('login')
     const loginButton = document.querySelector('#login-button')
-    loginStatus.textContent = error instanceof Error ? error.message : 'Connection unavailable'
+    const message = error instanceof Error ? error.message : ''
+    loginStatus.textContent = message === 'request_timeout'
+      ? 'BuyerWatch took too long to respond. Reopen the extension to retry.'
+      : message === 'extension_auth_unavailable'
+        ? 'BuyerWatch authentication is temporarily unavailable.'
+        : message || 'Connection unavailable'
     loginStatus.className = 'status-message error'
-    loginButton.disabled = true
+    loginButton.disabled = false
   }
 }
 
@@ -167,12 +139,13 @@ document.querySelector('#login-form').addEventListener('submit', async (event) =
   button.textContent = 'Connecting...'
   loginStatus.textContent = ''
   try {
-    const config = await getConfig()
+    const config = await BuyerWatchExtensionCommon.getConfig()
     const session = await signIn(
       config,
       document.querySelector('#email').value.trim(),
       document.querySelector('#password').value,
     )
+    document.querySelector('#password').value = ''
     document.querySelector('#account-email').textContent = session.user?.email || 'BuyerWatch account'
     showView('capture')
     await updateCurrentSite()
@@ -185,8 +158,22 @@ document.querySelector('#login-form').addEventListener('submit', async (event) =
 })
 
 document.querySelector('#logout-button').addEventListener('click', async () => {
-  await chrome.storage.local.remove('buyerwatchSession')
-  showView('login')
+  try {
+    const config = await BuyerWatchExtensionCommon.getConfig()
+    const { buyerwatchSession } = await chrome.storage.local.get('buyerwatchSession')
+    if (buyerwatchSession?.access_token) {
+      await BuyerWatchExtensionCommon.fetchWithTimeout(`${config.supabaseUrl}/auth/v1/logout`, {
+        method: 'POST',
+        headers: {
+          apikey: config.supabaseAnonKey,
+          Authorization: `Bearer ${buyerwatchSession.access_token}`,
+        },
+      }).catch(() => undefined)
+    }
+  } finally {
+    await chrome.storage.local.remove(['buyerwatchSession', 'buyerwatchPendingReply'])
+    showView('login')
+  }
 })
 
 document.querySelector('#settings-button').addEventListener('click', () => {
@@ -198,7 +185,7 @@ captureButton.addEventListener('click', async () => {
   captureButton.textContent = 'Capturing...'
   setStatus('')
   try {
-    const config = await getConfig()
+    const config = await BuyerWatchExtensionCommon.getConfig()
     const session = await getSession(config)
     if (!session) {
       showView('login')
@@ -206,23 +193,45 @@ captureButton.addEventListener('click', async () => {
     }
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!tab?.id) throw new Error('unsupported_site')
-    const capture = await chrome.tabs.sendMessage(tab.id, { type: 'BUYERWATCH_CAPTURE' })
+    let capture
+    try {
+      capture = await BuyerWatchExtensionCommon.withTimeout(
+        chrome.tabs.sendMessage(tab.id, { type: 'BUYERWATCH_CAPTURE' }),
+        5_000,
+      )
+    } catch (error) {
+      if (/receiving end does not exist/i.test(String(error))) {
+        throw new Error('receiving_end_missing')
+      }
+      throw error
+    }
     if (capture?.error) throw new Error(capture.error)
 
-    const response = await fetch(`${config.appUrl}/api/extension/ingest`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
+    const ingest = activeSession => BuyerWatchExtensionCommon.fetchWithTimeout(
+      `${config.appUrl}/api/extension/ingest`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${activeSession.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(capture),
       },
-      body: JSON.stringify(capture),
-    })
+    )
+    let response = await ingest(session)
+    if (response.status === 401) {
+      const refreshed = await BuyerWatchExtensionCommon.getValidSession({ config, forceRefresh: true })
+      if (!refreshed) throw new Error('session_expired')
+      response = await ingest(refreshed)
+    }
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(payload.error || 'capture_failed')
 
-    captureButton.textContent = 'Captured'
+    captureButton.textContent = payload.duplicate ? 'Already captured' : 'Captured'
     setStatus(
-      payload.queued
+      payload.duplicate
+        ? 'This conversation is already in BuyerWatch.'
+        : payload.queued
         ? 'Saved and queued for analysis.'
         : 'Saved. Analysis will begin when AI processing is connected.',
       'success',
