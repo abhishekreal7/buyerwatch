@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Bell, CreditCard, Save, Check,
   Globe, AtSign, Shield,
-  Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info, Puzzle
+  Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
@@ -22,7 +22,6 @@ import {
   type StyleGuardrail,
   type ToneArchetype,
 } from '@/lib/writing-style'
-import { ExtensionSettingsPanel, useExtensionStatus } from '@/components/ExtensionInstall'
 import {
   DEFAULT_HIGH_INTENT_THRESHOLD,
   HIGH_INTENT_THRESHOLD_MAX,
@@ -35,7 +34,6 @@ import { DataLoadError } from '@/components/DataLoadError'
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User, description: 'Business info & writing style' },
   { id: 'connections', label: 'Connections', icon: Link, description: 'Platform accounts & automation' },
-  { id: 'extension', label: 'Browser Extension', icon: Puzzle, description: 'Reddit capture setup' },
   { id: 'notifications', label: 'Notifications', icon: Bell, description: 'Alerts & digest preferences' },
   { id: 'plan', label: 'Plan & Billing', icon: CreditCard, description: 'Subscription & usage' },
 ]
@@ -140,7 +138,6 @@ export default function SettingsPage() {
   const [upgrading, setUpgrading] = useState(false)
   const [openingPortal, setOpeningPortal] = useState(false)
   const upgradeHandledRef = useRef(false)
-  const { status: extensionStatus } = useExtensionStatus()
 
   useEffect(() => {
     const requestedSection = new URLSearchParams(window.location.search).get('section')
@@ -169,7 +166,12 @@ export default function SettingsPage() {
   })
   const [activationAcknowledged, setActivationAcknowledged] = useState(false)
 
-  const [connections, setConnections] = useState({ reddit: false, bluesky: false, redditUsername: '' })
+  const [connections, setConnections] = useState({
+    reddit: false,
+    bluesky: false,
+    redditUsername: '',
+    redditStatus: 'missing' as 'active' | 'reauth_required' | 'error' | 'missing',
+  })
   const [deliveryCapabilities, setDeliveryCapabilities] = useState({
     redditDirectPosting: false,
     redditScheduledDiscovery: false,
@@ -178,6 +180,10 @@ export default function SettingsPage() {
   const [bskyHandle, setBskyHandle] = useState('')
   const [bskyPassword, setBskyPassword] = useState('')
   const [bskyConnecting, setBskyConnecting] = useState(false)
+  const [redditLoginUsername, setRedditLoginUsername] = useState('')
+  const [redditPassword, setRedditPassword] = useState('')
+  const [redditTotpSecret, setRedditTotpSecret] = useState('')
+  const [redditConnecting, setRedditConnecting] = useState(false)
 
   const [slack, setSlack] = useState({ webhookUrl: '', threshold: 70 })
   const [slackConfigured, setSlackConfigured] = useState(false)
@@ -224,7 +230,11 @@ export default function SettingsPage() {
             const payload = await response.json().catch(() => null)
             if (!response.ok) throw new Error(payload?.error || 'connections_load_failed')
             return payload as {
-              connections: Array<{ platform: string; external_username: string | null }>
+              connections: Array<{
+                platform: string
+                external_username: string | null
+                status?: 'active' | 'reauth_required' | 'error' | 'missing'
+              }>
               capabilities: {
                 redditDirectPosting: boolean
                 redditScheduledDiscovery: boolean
@@ -320,9 +330,10 @@ export default function SettingsPage() {
         if (conns) {
         const redditConn = conns.find(c => c.platform === 'reddit')
         setConnections({
-          reddit: conns.some(c => c.platform === 'reddit'),
+          reddit: redditConn?.status === 'active',
           bluesky: conns.some(c => c.platform === 'bluesky'),
           redditUsername: redditConn?.external_username || '',
+          redditStatus: redditConn?.status ?? 'missing',
         })
         }
         setDeliveryCapabilities(connectionsResult.capabilities)
@@ -355,37 +366,14 @@ export default function SettingsPage() {
     }
     void load()
 
-    // Handle OAuth Callback search parameters
     const params = new URLSearchParams(window.location.search)
     const requestedSection = params.get('section')
     if (SECTIONS.some(section => section.id === requestedSection)) {
       setActiveSection(requestedSection!)
     }
-    const success = params.get('success')
-    const error = params.get('error')
     if (params.get('billing') === 'plan_change_pending') {
       toast.success('Your plan change was submitted. Billing will update shortly.')
       window.history.replaceState({}, '', '/settings?section=plan')
-    }
-
-    if (success === 'reddit_connected') {
-      toast.success('Successfully connected Reddit account!')
-      const newUrl = window.location.pathname + window.location.hash
-      window.history.replaceState({}, '', newUrl)
-    } else if (error) {
-      if (error === 'reddit_state_mismatch') {
-        toast.error('Reddit connection failed: State mismatch (CSRF protection triggered).')
-      } else if (error === 'reddit_token_failed') {
-        toast.error('Reddit connection failed: Could not exchange authorization token.')
-      } else if (error === 'reddit_auth_failed') {
-        toast.error('Reddit connection failed: Access denied or authorization failed.')
-      } else if (error === 'reddit_credentials_missing') {
-        toast.error('Reddit connection failed: REDDIT_CLIENT_ID is missing or empty in .env.local.')
-      } else {
-        toast.error(`Reddit connection failed: ${error.replace(/_/g, ' ')}`)
-      }
-      const newUrl = window.location.pathname + window.location.hash
-      window.history.replaceState({}, '', newUrl)
     }
   }, [loadAttempt, supabase, userId])
 
@@ -525,7 +513,56 @@ export default function SettingsPage() {
     void handleUpgrade(requestedPlan, requestedBilling)
   }, [])
 
-  const handleConnectReddit = () => { window.location.href = '/api/auth/reddit' }
+  const handleConnectReddit = async () => {
+    if (!redditLoginUsername.trim() || !redditPassword) {
+      toast.error('Enter your Reddit username and password.')
+      return
+    }
+    setRedditConnecting(true)
+    try {
+      const response = await fetch('/api/settings/reddit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: redditLoginUsername.trim(),
+          password: redditPassword,
+          ...(redditTotpSecret.trim() ? { totpSecret: redditTotpSecret.trim() } : {}),
+        }),
+      })
+      const payload = await response.json().catch(() => null) as {
+        error?: string
+        connection?: { external_username?: string }
+      } | null
+      if (!response.ok) throw new Error(payload?.error || 'reddit_connection_failed')
+
+      const connectedUsername = payload?.connection?.external_username || redditLoginUsername.trim()
+      clearSupabaseReadCache()
+      setConnections(current => ({
+        ...current,
+        reddit: true,
+        redditUsername: connectedUsername,
+        redditStatus: 'active',
+      }))
+      setRedditLoginUsername('')
+      window.dispatchEvent(new Event('buyerwatch:connections-changed'))
+      toast.success(`Reddit connected as u/${connectedUsername}`)
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'reddit_connection_failed'
+      if (code === 'reddit_credentials_or_2fa_rejected') {
+        toast.error('Reddit rejected the credentials or 2FA secret.')
+      } else if (code === 'rate_limited') {
+        toast.error('Too many connection attempts. Please wait and try again.')
+      } else if (code === 'reddit_provider_temporarily_unavailable') {
+        toast.error('Reddit connection service is temporarily unavailable. Try again shortly.')
+      } else {
+        toast.error('Could not connect Reddit. Check the details and try again.')
+      }
+    } finally {
+      setRedditPassword('')
+      setRedditTotpSecret('')
+      setRedditConnecting(false)
+    }
+  }
 
   const handleConnectBluesky = async () => {
     if (!bskyHandle || !bskyPassword) { toast.error('Enter your handle and app password'); return }
@@ -560,7 +597,10 @@ export default function SettingsPage() {
       })
       if (!response.ok) throw new Error('disconnect_failed')
       clearSupabaseReadCache()
-      setConnections(p => ({ ...p, [platform]: false }))
+      setConnections(p => platform === 'reddit'
+        ? { ...p, reddit: false, redditUsername: '', redditStatus: 'missing' }
+        : { ...p, bluesky: false })
+      window.dispatchEvent(new Event('buyerwatch:connections-changed'))
       toast.success(`${platform} disconnected`)
     } catch (error) {
       console.error(`[settings] Unable to disconnect ${platform}`, error)
@@ -677,9 +717,6 @@ export default function SettingsPage() {
                   >
                     <s.icon className={`w-4 h-4 shrink-0 ${activeSection === s.id ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={2} />
                     <span className="text-[13.5px] font-medium">{s.label}</span>
-                    {s.id === 'extension' && extensionStatus === 'missing' && (
-                      <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 ring-2 ring-amber-100" aria-label="Extension setup required" />
-                    )}
                   </button>
                 </li>
               ))}
@@ -882,16 +919,64 @@ export default function SettingsPage() {
                           description={
                             connections.reddit && connections.redditUsername
                               ? `Connected as u/${connections.redditUsername}`
+                              : connections.redditStatus === 'reauth_required'
+                                ? `Reconnect u/${connections.redditUsername || 'your account'} to resume delivery.`
                               : deliveryCapabilities.redditDirectPosting
-                                ? 'Post replies via OAuth. Requires a Reddit account.'
+                                ? 'Connect once for encrypted, server-side reply delivery.'
                                 : deliveryCapabilities.redditScheduledDiscovery
-                                  ? 'Scheduled discovery is active. Direct posting awaits an approved Reddit OAuth provider.'
-                                  : 'Use the browser extension for assisted Reddit capture and submission.'
+                                  ? 'Scheduled discovery is active. Direct delivery is temporarily unavailable.'
+                                  : 'Reddit monitoring and delivery are not configured.'
                           }
                           connected={connections.reddit}
-                          onConnect={deliveryCapabilities.redditDirectPosting ? handleConnectReddit : undefined}
                           onDisconnect={() => handleDisconnect('reddit')}
-                        />
+                        >
+                          {!connections.reddit && deliveryCapabilities.redditDirectPosting && (
+                            <div className="space-y-3">
+                              {connections.redditStatus === 'reauth_required' && (
+                                <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-[12px] leading-5 text-amber-800" role="status">
+                                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                  Reddit expired the saved session. Automatic Reddit replies are paused until you reconnect.
+                                </div>
+                              )}
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <input
+                                  value={redditLoginUsername}
+                                  onChange={event => setRedditLoginUsername(event.target.value)}
+                                  placeholder="Reddit username"
+                                  autoComplete="username"
+                                  className={inputCls}
+                                />
+                                <input
+                                  type="password"
+                                  value={redditPassword}
+                                  onChange={event => setRedditPassword(event.target.value)}
+                                  placeholder="Reddit password"
+                                  autoComplete="current-password"
+                                  className={inputCls}
+                                />
+                              </div>
+                              <input
+                                type="password"
+                                value={redditTotpSecret}
+                                onChange={event => setRedditTotpSecret(event.target.value)}
+                                placeholder="2FA setup secret (optional; not the 6-digit code)"
+                                autoComplete="off"
+                                className={inputCls}
+                              />
+                              <p className="text-[11.5px] leading-5 text-gray-500">
+                                Credentials are sent once to RedditAPIs to establish a Reddit session. BuyerWatch never stores your password or 2FA secret; only the returned session cookies are encrypted at rest. RedditAPIs is an independent provider, not Reddit.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => void handleConnectReddit()}
+                                disabled={redditConnecting}
+                                className="rounded-lg bg-[#FF4500] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#e63e00] disabled:cursor-wait disabled:opacity-60"
+                              >
+                                {redditConnecting ? 'Connecting securely...' : connections.redditStatus === 'reauth_required' ? 'Reconnect Reddit' : 'Connect Reddit'}
+                              </button>
+                            </div>
+                          )}
+                        </PlatformRow>
 
                         <PlatformRow
                           icon={<BlueskyIcon className="w-5 h-5 text-[#1185FE]" />}
@@ -1014,7 +1099,7 @@ export default function SettingsPage() {
                                   <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
                                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                                     <p className="text-[12.5px] leading-relaxed text-amber-700">
-                                      Reddit direct delivery is not available for this workspace. The extension can prefill a reply, but you still submit it; it is not the automation engine.
+                                      Reddit direct delivery is paused. Connect or reconnect Reddit above before enabling automatic Reddit replies.
                                     </p>
                                   </div>
                                 )}
@@ -1079,7 +1164,7 @@ export default function SettingsPage() {
                                       <RedditIcon className="h-4 w-4 text-[#FF4500]" />
                                       Reddit
                                       <span className="font-normal text-gray-400">
-                                        {redditDirectConnected ? 'Direct' : 'Assisted submission'}
+                                        {redditDirectConnected ? 'Direct' : 'Not connected'}
                                       </span>
                                     </span>
                                     {redditDirectConnected ? (
@@ -1095,7 +1180,7 @@ export default function SettingsPage() {
                                         className="h-4 w-4 accent-gray-900"
                                       />
                                     ) : (
-                                      <span className="text-[11px] font-semibold text-gray-500">You submit</span>
+                                      <span className="text-[11px] font-semibold text-gray-500">Connect above</span>
                                     )}
                                   </label>
                                 </div>
@@ -1147,11 +1232,6 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </>
-                )}
-
-                {/* ── BROWSER EXTENSION ───────────────────────────── */}
-                {activeSection === 'extension' && (
-                  <ExtensionSettingsPanel />
                 )}
 
                 {/* ── NOTIFICATIONS ────────────────────────────────── */}

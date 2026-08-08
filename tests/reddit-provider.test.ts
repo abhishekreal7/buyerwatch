@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeRedditThingId, PlatformPostError } from '../src/lib/reddit-post'
 import { normalizeRedditApisPosts } from '../src/lib/reddit'
+import {
+  parseRedditApisListing,
+  parseRedditApisListingPage,
+  parseRedditCommentResponse,
+  parseRedditLoginResponse,
+  parseRedditPostTarget,
+  RedditApisContractError,
+} from '../src/lib/redditapis-contract'
 
 describe('Reddit provider contracts', () => {
   it('normalizes the current redditapis.com listing response shape', () => {
@@ -31,10 +38,84 @@ describe('Reddit provider contracts', () => {
     expect(normalizeRedditApisPosts({ data: { children: [] } }, 'SaaS')).toEqual([])
   })
 
-  it('uses Reddit fullnames for official comment delivery', () => {
-    expect(normalizeRedditThingId('abc123')).toBe('t3_abc123')
-    expect(normalizeRedditThingId('t3_abc123')).toBe('t3_abc123')
-    expect(normalizeRedditThingId('t1_reply123')).toBe('t1_reply123')
-    expect(() => normalizeRedditThingId('../bad')).toThrow(PlatformPostError)
+  it('accepts only canonical Reddit post targets', () => {
+    expect(parseRedditPostTarget('https://www.reddit.com/r/SaaS/comments/abc123/a-title/')).toEqual({
+      subreddit: 'SaaS',
+      postId: 'abc123',
+      canonicalUrl: 'https://www.reddit.com/r/SaaS/comments/abc123/',
+    })
+    expect(parseRedditPostTarget('https://reddit.com.evil.test/r/SaaS/comments/abc123/title')).toBeNull()
+    expect(parseRedditPostTarget('http://reddit.com/r/SaaS/comments/abc123/title')).toBeNull()
+    expect(parseRedditPostTarget('https://www.reddit.com/user/example')).toBeNull()
+  })
+
+  it('requires the complete write-session cookie contract', () => {
+    const login = parseRedditLoginResponse({
+      success: true,
+      username: 'buyer-account',
+      link_karma: 4,
+      comment_karma: 12,
+      cookies: {
+        reddit_session: 'encrypted-session-value',
+        loid: 'long-lived-id',
+        csrf_token: 'csrf',
+      },
+    })
+    expect(login).toEqual({
+      username: 'buyer-account',
+      linkKarma: 4,
+      commentKarma: 12,
+      cookies: {
+        reddit_session: 'encrypted-session-value',
+        loid: 'long-lived-id',
+        csrf_token: 'csrf',
+      },
+    })
+    expect(() => parseRedditLoginResponse({
+      success: true,
+      username: 'buyer-account',
+      cookies: { reddit_session: 'missing-loid' },
+    })).toThrow(RedditApisContractError)
+  })
+
+  it('validates provider proof and preflight flags', () => {
+    expect(parseRedditCommentResponse({
+      success: true,
+      comment_id: 't1_reply123',
+      permalink: 'https://www.reddit.com/r/SaaS/comments/abc123/comment/reply123/',
+    })).toEqual({
+      commentId: 't1_reply123',
+      permalink: 'https://www.reddit.com/r/SaaS/comments/abc123/comment/reply123/',
+    })
+    expect(() => parseRedditCommentResponse({
+      success: true,
+      comment_id: 'not-a-comment',
+      permalink: 'https://evil.test/reply',
+    })).toThrow(RedditApisContractError)
+
+    expect(parseRedditApisListing({ posts: [{
+      id: 'abc123',
+      author: 'prospect',
+      subreddit: 'SaaS',
+      url: 'https://www.reddit.com/r/SaaS/comments/abc123/title/',
+      created: '2026-08-08T08:30:00.000Z',
+      locked: true,
+      stickied: false,
+      over_18: true,
+    }] })[0]).toMatchObject({
+      id: 'abc123',
+      locked: true,
+      stickied: false,
+      over18: true,
+    })
+
+    expect(parseRedditApisListingPage({
+      posts: [],
+      after: 't3_next123',
+    })).toEqual({ posts: [], after: 't3_next123' })
+    expect(parseRedditApisListingPage({
+      posts: [],
+      after: 'https://evil.test/cursor',
+    }).after).toBeNull()
   })
 })

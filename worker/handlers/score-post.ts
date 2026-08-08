@@ -12,7 +12,7 @@ import { getAppUrl } from '../../src/lib/app-url'
 import { ACTIONABLE_INTENT_THRESHOLD, type IntentLabel } from '../../src/lib/intent'
 import { evaluateIntentPreflight } from '../../src/lib/intent-preflight'
 import { getIntentDailyLimit, getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
-import { getConfiguredSecret } from '../../src/lib/env'
+import { getConfiguredSecret, hasRedditPostingProvider } from '../../src/lib/env'
 import {
   emptyAiUsage,
   getAiUsageFromError,
@@ -25,7 +25,6 @@ import { dispatchPendingOutbox } from '../../src/lib/backend-maintenance'
 import { checkGoogleRankQueue, notifySlackQueue } from '../../src/lib/queues'
 import { recordAutomationDecision, recordEngagementEvent } from '../../src/lib/automation-audit'
 import { getPlatformCapabilities } from '../../src/lib/platform-capabilities'
-import { isRedditDirectPostingConfigured } from '../../src/lib/reddit-post'
 import { withScoreLock } from '../../src/lib/score-lock'
 import {
   evaluateRedditReplyPolicy,
@@ -478,16 +477,23 @@ export async function processScorePost(
       scoreResult.score,
     )
     const capabilities = getPlatformCapabilities(post.platform, {
-      redditDirectPosting: isRedditDirectPostingConfigured(),
+      redditDirectPosting: hasRedditPostingProvider(),
     })
-    const { data: platformConnection } = ['reddit', 'bluesky'].includes(post.platform)
-      ? await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('platform', post.platform)
-        .maybeSingle()
-      : { data: null }
+    const platformConnected = post.platform === 'reddit'
+      ? Boolean((await supabase
+          .from('reddit_connection_secrets')
+          .select('connection_id')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .maybeSingle()).data)
+      : post.platform === 'bluesky'
+        ? Boolean((await supabase
+            .from('platform_connections')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('platform', post.platform)
+            .maybeSingle()).data)
+        : false
     const enabledPlatforms = Array.isArray(profile.auto_send_platforms)
       ? profile.auto_send_platforms
       : ['bluesky']
@@ -500,7 +506,7 @@ export async function processScorePost(
 
     if (evaluation.approved && !enabledPlatforms.includes(post.platform)) {
       evaluation = blockAutomation(evaluation, 'auto_send_platform_disabled')
-    } else if (evaluation.approved && capabilities.delivery === 'direct' && !platformConnection) {
+    } else if (evaluation.approved && capabilities.delivery === 'direct' && !platformConnected) {
       evaluation = blockAutomation(evaluation, 'platform_connection_required')
     } else if (
       evaluation.approved
@@ -682,7 +688,7 @@ async function recordInitialAutomationAudit(input: {
     hasAnthropic,
     redditCommunityPolicyDecision,
   } = input
-  const source = post.externalId.includes(':extension:') ? 'chrome_extension' : 'scheduled_monitor'
+  const source = 'scheduled_monitor'
 
   await Promise.all([
     recordEngagementEvent(supabase, {

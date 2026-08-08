@@ -37,13 +37,11 @@ function stubProductionCore() {
     'DODO_PAYMENTS_DRAFT_PACK_PRODUCT_ID',
     'ANTHROPIC_MODEL',
     'ANTHROPIC_INTENT_MODEL',
-    'REDDIT_OAUTH_CLIENT_ID',
-    'REDDIT_OAUTH_SECRET',
     'REDDIT_CLIENT_ID',
     'REDDIT_CLIENT_SECRET',
-    'REDDIT_DIRECT_POSTING_ENABLED',
     'REDDITAPIS_API_KEY',
     'REDDITAPIS_FALLBACK_ENABLED',
+    'REDDITAPIS_POSTING_ENABLED',
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
   ]) {
@@ -199,14 +197,13 @@ describe('production capability configuration', () => {
     expect(getProviderCapabilities().redditPosting).toBe(false)
   })
 
-  it('enables Reddit posting only with explicit OAuth delivery configuration', () => {
+  it('enables Reddit posting only with the RedditAPIs key and explicit kill switch', () => {
     stubProductionCore()
-    vi.stubEnv('REDDIT_OAUTH_CLIENT_ID', 'client-id')
-    vi.stubEnv('REDDIT_OAUTH_SECRET', 'client-secret')
-    vi.stubEnv('REDDIT_DIRECT_POSTING_ENABLED', 'false')
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_POSTING_ENABLED', 'false')
     expect(getProviderCapabilities().redditPosting).toBe(false)
 
-    vi.stubEnv('REDDIT_DIRECT_POSTING_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_POSTING_ENABLED', 'true')
     expect(getProviderCapabilities().redditPosting).toBe(true)
   })
 })

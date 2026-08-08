@@ -7,7 +7,7 @@
 5. Register `/api/billing/webhook` in Dodo Payments and copy its signing secret into the deployment.
 6. Configure the monitor scheduler every 15 minutes and the digest scheduler at the intended digest cadence. Confirm the hosting plan supports sub-hour cron jobs.
 7. Keep the worker HTTP service private where possible. If public ingress is unavoidable, require `ADMIN_SECRET` and restrict ingress at the platform/load-balancer layer.
-8. Configure Reddit OAuth, Reddit API approval, Resend sender-domain verification, Slack, Google CSE, Sentry, and healthcheck endpoints as applicable.
+8. Configure `REDDITAPIS_API_KEY`, explicitly enable the Reddit discovery/posting kill switches, verify provider account health, and configure Resend sender-domain verification, Slack, Google CSE, Sentry, and healthcheck endpoints as applicable.
 9. Run `npm run verify`, deploy to staging, and exercise signup, onboarding, billing, monitoring, draft generation, manual send, auto-send, click attribution, conversion, and downgrade.
 10. If any Docker image was previously built from a context containing `.env.local`, remove it from every registry/cache and rotate every credential that image could contain.
 11. Set `DEPLOYMENT_VERSION` and a stable `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` for rolling or multi-instance deployments.
@@ -15,4 +15,4 @@
 13. Create a staging smoke account and set `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` when running authenticated Playwright coverage.
 14. Configure load balancers with `/api/health/ready` for the web service and `/readyz` for the worker. Keep worker `/metrics` and `/admin/queues` private or bearer-protected.
 15. Enable point-in-time recovery and complete the backup/restore drill in [OPERATIONS.md](./OPERATIONS.md).
-16. Until Dodo is configured, paid-plan links intentionally route to contact. Until Reddit OAuth is configured, direct Reddit posting must remain unavailable.
+16. Until Dodo is configured, paid-plan links intentionally route to contact. Until the RedditAPIs provider key, posting kill switch, database migration, and encrypted user session are all present, direct Reddit posting must remain unavailable.

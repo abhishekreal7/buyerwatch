@@ -87,19 +87,10 @@ export function hasRedditDiscoveryProvider(): boolean {
   return proxyConfigured || approvedOauthConfigured
 }
 
-/**
- * Reddit write access must be explicitly enabled and backed by a registered
- * OAuth application. A redditapis.com bearer key can fund discovery requests,
- * but it does not identify the customer's Reddit account for write actions.
- */
+/** Reddit writes require both the provider key and an explicit kill switch. */
 export function hasRedditPostingProvider(): boolean {
-  return process.env.REDDIT_DIRECT_POSTING_ENABLED === 'true'
-    && Boolean(getConfiguredSecret(
-      process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID,
-    ))
-    && Boolean(getConfiguredSecret(
-      process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET,
-    ))
+  return process.env.REDDITAPIS_POSTING_ENABLED === 'true'
+    && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
 }
 
 export function getProviderCapabilities(): ProviderCapabilities {
@@ -162,10 +153,12 @@ function validateOptionalProviders(): void {
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
   ], 'Resend email')
-  assertCompleteOptionalGroup([
-    'REDDIT_OAUTH_CLIENT_ID',
-    'REDDIT_OAUTH_SECRET',
-  ], 'Reddit OAuth posting')
+  if (
+    process.env.REDDITAPIS_POSTING_ENABLED === 'true'
+    && !getConfiguredSecret(process.env.REDDITAPIS_API_KEY)
+  ) {
+    throw new Error('RedditAPIs posting is enabled but REDDITAPIS_API_KEY is missing')
+  }
   assertCompleteOptionalGroup([
     'BLUESKY_HANDLE',
     'BLUESKY_APP_PASSWORD',

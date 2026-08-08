@@ -19,11 +19,10 @@ import {
 } from '@/lib/billing-addons'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { getIntentDisplayLabel, isLowRelevanceScore, type IntentLabel } from '@/lib/intent'
-import { useExtensionStatus } from '@/components/ExtensionInstall'
 import { getSafeThreadUrl } from '@/lib/thread-url'
 import { IntentBadge } from '@/components/IntentBadge'
 import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
-import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
+import { copyAndOpenRedditReply } from '@/lib/reddit-handoff-client'
 import {
   DEFAULT_HIGH_INTENT_THRESHOLD,
   normalizeHighIntentThreshold,
@@ -89,9 +88,9 @@ function getWindowHoursLeft(createdAt: string): number | null {
   return Math.floor(hoursLeft)
 }
 
-function getDeliveryActionLabel(platform: string, extensionInstalled: boolean) {
+function getDeliveryActionLabel(platform: string) {
   if (platform === 'reddit') {
-    return extensionInstalled ? 'Prefill in Reddit' : 'Copy & Open Reddit'
+    return 'Copy & Open Reddit'
   }
   if (platform === 'bluesky') return 'Post through Bluesky'
   return 'Review delivery'
@@ -173,7 +172,6 @@ export default function DashboardPage() {
   const [openingAddonCheckout, setOpeningAddonCheckout] = useState<BillingAddonType | null>(null)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
-  const { isInstalled: extensionInstalled } = useExtensionStatus()
 
   useEffect(() => {
     try {
@@ -586,16 +584,12 @@ export default function DashboardPage() {
       if (!res.ok || !payload) throw new Error(payload?.message || payload?.error || 'Failed to dispatch reply')
 
       if (payload.mode === 'manual') {
-        const mode = await openRedditAssistedReply({
-          threadId: payload.threadId,
+        await copyAndOpenRedditReply({
           text: payload.text,
           postUrl: payload.postUrl,
-          extensionInstalled,
         })
         setHasCopiedOrApproved(true)
-        toast.success(mode === 'prefill'
-          ? 'Opening Reddit with your reply prefilled. Review it, then submit on Reddit.'
-          : 'Reply copied. Post it on Reddit, then click Mark as Posted.')
+        toast.success('Reply copied. Post it on Reddit, then click Mark as Posted.')
         return
       }
 
@@ -1536,7 +1530,7 @@ export default function DashboardPage() {
                                       <CheckCircle className="h-3.5 w-3.5" />
                                       {sendingThreadId === thread.id
                                         ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                                        : getDeliveryActionLabel(thread.platform, extensionInstalled)}
+                                        : getDeliveryActionLabel(thread.platform)}
                                     </button>
                                   </div>
                                 </div>
@@ -1717,7 +1711,7 @@ export default function DashboardPage() {
                               <CheckCircle className="h-4 w-4" />
                               {sendingThreadId === thread.id
                                 ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                                : getDeliveryActionLabel(thread.platform, extensionInstalled)}
+                                : getDeliveryActionLabel(thread.platform)}
                             </button>
                             <div className="flex flex-wrap items-center justify-between gap-3">
                               <div className="flex items-center gap-1.5">
@@ -1949,7 +1943,7 @@ export default function DashboardPage() {
                         <CheckCircle className="w-4 h-4 text-white" />
                         {sendingThreadId === selectedThread.id
                           ? (selectedThread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                          : getDeliveryActionLabel(selectedThread.platform, extensionInstalled)}
+                          : getDeliveryActionLabel(selectedThread.platform)}
                       </button>
 
                       <div className="flex items-center justify-between pt-1">

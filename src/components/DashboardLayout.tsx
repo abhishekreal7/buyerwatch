@@ -13,6 +13,7 @@ import {
   QuestionMarkCircleIcon,
 } from '@heroicons/react/24/solid'
 import {
+  AlertTriangle,
   Bell,
   LogOut,
   Menu,
@@ -32,11 +33,6 @@ import {
 import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
-import {
-  ExtensionPriorityNotice,
-  ExtensionProvider,
-  useExtensionStatus,
-} from '@/components/ExtensionInstall'
 import { signOutAction } from '@/app/actions/auth'
 import { ConversationSearchProvider, useConversationSearch } from '@/lib/conversation-search'
 import { ACTIONABLE_INTENT_THRESHOLD } from '@/lib/intent'
@@ -120,11 +116,9 @@ type DashboardLayoutProps = {
 
 export default function DashboardLayout(props: DashboardLayoutProps) {
   return (
-    <ExtensionProvider userId={props.userId}>
-      <ConversationSearchProvider>
-        <DashboardShell {...props} />
-      </ConversationSearchProvider>
-    </ExtensionProvider>
+    <ConversationSearchProvider>
+      <DashboardShell {...props} />
+    </ConversationSearchProvider>
   )
 }
 
@@ -146,11 +140,11 @@ function DashboardShell({
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
   const [openingCheckout, setOpeningCheckout] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [redditConnectionAttention, setRedditConnectionAttention] = useState<
+    'reauth_required' | 'error' | null
+  >(null)
   const { conversationSearch, setConversationSearch } = useConversationSearch()
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const { status: extensionStatus } = useExtensionStatus()
-  const extensionMissing = extensionStatus === 'missing'
-  const [redditScheduledDiscovery, setRedditScheduledDiscovery] = useState<boolean | null>(null)
   const showConversationSearch = pathname === '/dashboard'
 
   useEffect(() => {
@@ -169,14 +163,7 @@ function DashboardShell({
     async function loadSidebarData() {
       try {
         const usageMonth = getCurrentUsageMonth()
-        const capabilitiesPromise = fetch('/api/settings/connections', { cache: 'no-store' })
-          .then(async response => {
-            const payload = await response.json().catch(() => null)
-            if (!response.ok) return null
-            return Boolean(payload?.capabilities?.redditScheduledDiscovery)
-          })
-          .catch(() => null)
-        const [profileResult, opportunityCountResult, draftReadyCountResult, keywordCountResult, addonCreditsResult, scheduledDiscovery] = await Promise.all([
+        const [profileResult, opportunityCountResult, draftReadyCountResult, keywordCountResult, addonCreditsResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('auto_send_enabled, plan, draft_count, draft_month')
@@ -204,10 +191,7 @@ function DashboardShell({
             .select('addon_type, credits')
             .eq('user_id', userId)
             .eq('usage_month', usageMonth),
-          capabilitiesPromise,
         ])
-
-        setRedditScheduledDiscovery(scheduledDiscovery)
 
         const sidebarError = [
           profileResult,
@@ -251,6 +235,38 @@ function DashboardShell({
       window.removeEventListener('buyerwatch:credits-changed', refreshCredits)
     }
   }, [supabase, userId])
+
+  useEffect(() => {
+    async function loadConnectionHealth() {
+      try {
+        const response = await fetch('/api/settings/connections', {
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        })
+        if (!response.ok) return
+        const payload = await response.json() as {
+          connections?: Array<{ platform?: string; status?: string }>
+        }
+        const reddit = payload.connections?.find(connection => connection.platform === 'reddit')
+        setRedditConnectionAttention(
+          reddit?.status === 'reauth_required' || reddit?.status === 'error'
+            ? reddit.status
+            : null,
+        )
+      } catch {
+        // A transient status request must not disrupt dashboard navigation.
+      }
+    }
+
+    void loadConnectionHealth()
+    const refresh = () => void loadConnectionHealth()
+    const interval = window.setInterval(loadConnectionHealth, 60_000)
+    window.addEventListener('buyerwatch:connections-changed', refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('buyerwatch:connections-changed', refresh)
+    }
+  }, [])
 
   useEffect(() => {
     setMobileMenuOpen(false)
@@ -368,10 +384,6 @@ function DashboardShell({
               {MAIN_NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
                 const IconComp = item.icon as any
-                const showExtensionAlert = extensionMissing
-                  && redditScheduledDiscovery === false
-                  && ['Keywords', 'Opportunities'].includes(item.name)
-                
                 // Get count badge data if available
                 let badgeCount: number | undefined = undefined
                 if (item.name === 'Drafts Ready' && draftReadyCount !== null) {
@@ -405,9 +417,6 @@ function DashboardShell({
                       <span className="ml-auto text-xs text-zinc-400">{badgeCount}</span>
                     )}
 
-                    {showExtensionAlert && badgeCount === undefined && (
-                      <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-amber-500" title="Extension setup required" />
-                    )}
                   </Link>
                 )
               })}
@@ -577,8 +586,25 @@ function DashboardShell({
 
           {/* Content Container */}
           <div className="scrollbar-gutter-stable relative z-10 w-full flex-1 min-h-0 overflow-y-scroll px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
-            {extensionMissing && redditScheduledDiscovery === false && ['/dashboard', '/keywords', '/opportunities'].some((href) => pathname === href || pathname.startsWith(`${href}/`)) && (
-              <ExtensionPriorityNotice />
+            {redditConnectionAttention && (
+              <div
+                role="alert"
+                className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-950"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">Reddit automation is paused</p>
+                  <p className="mt-0.5 text-xs leading-5 text-amber-800">
+                    The saved Reddit session needs attention. Reconnect once to resume future automation safely.
+                  </p>
+                </div>
+                <Link
+                  href="/settings?section=connections"
+                  className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-100"
+                >
+                  Reconnect
+                </Link>
+              </div>
             )}
             {children}
           </div>

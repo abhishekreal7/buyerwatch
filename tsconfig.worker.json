@@ -17,5 +17,8 @@
   "include": [
     "worker/**/*",
     "src/lib/**/*"
+  ],
+  "exclude": [
+    "src/lib/reddit-handoff-client.ts"
   ]
 }

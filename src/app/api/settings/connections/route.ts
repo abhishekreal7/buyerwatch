@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
-import { readJsonBody, RequestInputError } from '@/lib/request'
+import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 import { hasRedditDiscoveryProvider, hasRedditPostingProvider } from '@/lib/env'
+import { getRedditConnectionSummary } from '@/lib/reddit-session'
 
 export async function GET() {
   const supabase = await createClient()
@@ -18,18 +19,36 @@ export async function GET() {
     return NextResponse.json({ error: 'connections_load_failed' }, { status: 500 })
   }
 
+  const redditSummary = await getRedditConnectionSummary(user.id)
+  const connections = (data ?? []).map(connection => connection.platform === 'reddit'
+    ? {
+        ...connection,
+        status: redditSummary.status,
+        last_verified_at: redditSummary.lastVerifiedAt,
+        last_used_at: redditSummary.lastUsedAt,
+        account_created_at: redditSummary.accountCreatedAt,
+        link_karma: redditSummary.linkKarma,
+        comment_karma: redditSummary.commentKarma,
+      }
+    : { ...connection, status: 'active' })
+
   return NextResponse.json({
-    connections: data ?? [],
+    connections,
     capabilities: {
       blueskyDirectPosting: true,
       redditDirectPosting: hasRedditPostingProvider(),
       redditScheduledDiscovery: hasRedditDiscoveryProvider(),
+      redditConnectionProvider: 'redditapis',
     },
-  })
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function DELETE(request: Request) {
   try {
+    if (!isTrustedSameOriginMutation(request)) {
+      return NextResponse.json({ error: 'untrusted_request_origin' }, { status: 403 })
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

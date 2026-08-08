@@ -14,7 +14,6 @@ import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
-import { useExtensionStatus } from '@/components/ExtensionInstall'
 import { DataLoadError } from '@/components/DataLoadError'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
@@ -113,7 +112,6 @@ export default function KeywordsPage() {
   const termRef = useRef<HTMLInputElement>(null)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
-  const { requireExtension } = useExtensionStatus()
 
 
   useEffect(() => {
@@ -176,11 +174,10 @@ export default function KeywordsPage() {
   }, [loadAttempt, supabase, userId])
 
   const handleAdd = async () => {
-    if (
-      newPlatform === 'reddit'
-      && !redditScheduledDiscovery
-      && !requireExtension('Install the BuyerWatch extension before creating a Reddit monitoring rule.')
-    ) return
+    if (newPlatform === 'reddit' && !redditScheduledDiscovery) {
+      toast.error('Reddit monitoring is temporarily unavailable. Try again shortly.')
+      return
+    }
     if (!newTerm.trim() || !newTarget.trim()) { toast.error('Fill in keyword and target'); return }
     setSaving(true)
 

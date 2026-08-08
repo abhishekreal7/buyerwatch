@@ -5,15 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:worker": "tsc -p tsconfig.worker.json",
+    "build:worker": "tsc -p tsconfig.worker.json && node scripts/verify-worker-load.mjs",
     "deploy:worker:gcp": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-worker-gcp.ps1",
     "setup:qstash": "node scripts/setup-qstash-schedule.mjs",
     "rescore:intent": "tsx scripts/rescore-intent.mjs",
-    "extension:package": "node scripts/package-extension.mjs",
-    "extension:check": "node scripts/package-extension.mjs --check",
-    "extension:dev": "node scripts/package-extension.mjs --development",
-    "extension:smoke": "npm run extension:dev && node scripts/smoke-extension.mjs",
-    "extension:smoke:production": "npm run extension:check && node scripts/smoke-extension.mjs --production",
     "start": "next start",
     "lint": "eslint src worker tests e2e playwright.config.ts --max-warnings=0",
     "typecheck": "tsc --noEmit --incremental false && tsc -p tsconfig.worker.json --noEmit --incremental false",
@@ -22,8 +17,9 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "smoke:production": "node scripts/smoke-production.mjs",
-    "verify": "npm run typecheck && npm run lint && npm test && npm run extension:check && npm audit --audit-level=high",
-    "verify:offline": "npm run typecheck && npm run lint && npm run test:offline && npm run extension:check && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm test && npm audit --audit-level=high",
+    "verify:reddit": "node scripts/verify-reddit-provider.mjs",
+    "verify:offline": "npm run typecheck && npm run lint && npm run test:offline && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -74,7 +70,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.11",
-    "fflate": "^0.8.3",
     "pino-pretty": "^13.1.3",
     "postcss": "^8.5.25",
     "tailwindcss": "^4",

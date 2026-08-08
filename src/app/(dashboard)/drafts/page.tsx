@@ -13,8 +13,7 @@ import { useDashboardSession } from '@/components/DashboardContext'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { IntentBadge } from '@/components/IntentBadge'
 import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
-import { useExtensionStatus } from '@/components/ExtensionInstall'
-import { openRedditAssistedReply } from '@/lib/reddit-assist-client'
+import { copyAndOpenRedditReply } from '@/lib/reddit-handoff-client'
 import { BILLING_ADDONS } from '@/lib/billing-addons'
 import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
 import { DataLoadError } from '@/components/DataLoadError'
@@ -102,7 +101,6 @@ export default function DraftsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
-  const { isInstalled: extensionInstalled } = useExtensionStatus()
 
   useEffect(() => {
     async function fetchDrafts() {
@@ -266,20 +264,14 @@ export default function DraftsPage() {
       clearSupabaseReadCache()
 
       if (payload?.mode === 'manual') {
-        const mode = await openRedditAssistedReply({
-          threadId: payload.threadId,
+        await copyAndOpenRedditReply({
           text: payload.text,
           postUrl: payload.postUrl,
-          extensionInstalled,
         })
         setManualPostReadyId(selected.id)
-        if (mode === 'copy') {
-          setCopied(true)
-          setTimeout(() => setCopied(false), 2000)
-        }
-        toast.success(mode === 'prefill'
-          ? 'Opening Reddit with your reply prefilled. Review it, then submit on Reddit.'
-          : 'Reply copied. Post it on Reddit, then confirm it here.')
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+        toast.success('Reply copied. Post it on Reddit, then confirm it here.')
         return
       }
 
@@ -713,7 +705,7 @@ export default function DraftsPage() {
                           isMarkAsPosted
                             ? 'Mark as Posted'
                             : isReddit
-                              ? (extensionInstalled ? 'Prefill in Reddit' : 'Copy & Open Reddit')
+                              ? 'Copy & Open Reddit'
                               : 'Post through Bluesky'
                         }</>
                       )}

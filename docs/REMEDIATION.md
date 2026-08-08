@@ -75,6 +75,8 @@ plan executes the 15-minute cron schedule.
   Inline styles remain allowed because the existing visual system uses React
   style attributes; eliminating that final directive is a separate visual
   refactor.
-- Billing, Reddit OAuth, and Resend are complete optional capability groups.
+- Billing and Resend are complete optional capability groups. Reddit discovery
+  and direct posting use explicit RedditAPIs kill switches; direct posting also
+  requires an encrypted, service-role-only session for the connected user.
   Anthropic is required for intent scoring, onboarding intelligence, and reply
   drafting.

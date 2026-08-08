@@ -92,7 +92,7 @@ Never test a restore by resetting the production project.
 
 The worker's daily maintenance removes completed AI spend reservations after
 90 days, stale pending reservations after one day, dispatched outbox records
-after 30 days, processed extension captures after 90 days, and billing webhook
+after 30 days, processed ingestion events after 90 days, and billing webhook
 receipts after two years. Customer-owned opportunities and analytics remain
 until the customer deletes the account. `GET /api/account/export` provides a
 machine-readable export; `DELETE /api/account` requires a recent login plus the
@@ -106,14 +106,17 @@ Anthropic. These integrations are optional when their complete environment
 groups are absent:
 
 - Dodo Payments: paid checkout is disabled and pricing sends users to contact.
-- Reddit OAuth: direct Reddit posting is unavailable without OAuth credentials.
+- RedditAPIs: Reddit discovery fallback and direct delivery are unavailable
+  without `REDDITAPIS_API_KEY`; writes also require the independent
+  `REDDITAPIS_POSTING_ENABLED=true` kill switch.
 - Resend: digest email is unavailable unless both API key and sender are set.
 
-The Chrome extension calls `POST /api/extension/ingest` with a Supabase bearer
-token. Set `CHROME_EXTENSION_ORIGINS` to the exact production extension origin.
-Captures are URL-validated, size-limited, idempotent on
-`(user_id, source, source_event_id)`, and queued only when they match one of the
-customer's active keywords.
+Reddit accounts are connected through `POST /api/settings/reddit`. Passwords
+and optional TOTP setup secrets are forwarded once to RedditAPIs and are never
+persisted. Only the returned Reddit session cookies are encrypted and stored in
+the service-role-only `reddit_connection_secrets` table. A session failure marks
+the connection `reauth_required`, cancels queued Reddit auto-sends, and requires
+the customer to reconnect before delivery resumes.
 
 ## Low-cost production topology
 
@@ -133,9 +136,8 @@ cannot provide 15/30-minute monitoring. Configure Railway's health check as
 - all Supabase values plus `SUPABASE_DATABASE_URL` in the backup runner
 - `UPSTASH_REDIS_URL`, `ADMIN_SECRET`, `CRON_SECRET`, and `ENCRYPTION_KEY`
 - Dodo API key, webhook secret, product IDs, and explicit environment
-- Reddit OAuth credentials if direct posting is enabled
+- RedditAPIs key, funded balance, and explicit posting kill switch
 - Resend key, verified sender, and `EMAIL_UNSUBSCRIBE_SECRET`
-- exact `CHROME_EXTENSION_ORIGINS` after the extension ID is assigned
 - Sentry values and an external uptime/heartbeat URL
 
 ## Release procedure

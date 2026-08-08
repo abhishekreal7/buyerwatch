@@ -5,6 +5,24 @@ export class RequestInputError extends Error {
   }
 }
 
+/**
+ * Protect cookie-authenticated browser mutations from cross-site submission.
+ * Production callers must provide a same-origin Origin header; development
+ * keeps headerless CLI smoke checks possible.
+ */
+export function isTrustedSameOriginMutation(request: Request): boolean {
+  const fetchSite = request.headers.get('sec-fetch-site')
+  if (fetchSite && fetchSite !== 'same-origin') return false
+
+  const origin = request.headers.get('origin')
+  if (!origin) return process.env.NODE_ENV !== 'production'
+  try {
+    return new URL(origin).origin === new URL(request.url).origin
+  } catch {
+    return false
+  }
+}
+
 export async function readJsonBody<T = Record<string, unknown>>(
   request: Request,
   maxBytes = 16_384,

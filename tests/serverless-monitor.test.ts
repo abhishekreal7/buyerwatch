@@ -171,7 +171,7 @@ describe('QStash monitoring route contract', () => {
     expect(fetchNow).toContain("keyword.platform !== 'reddit' && keyword.platform !== 'bluesky'")
   })
 
-  it('runs extension scoring through a signed, retryable job endpoint', () => {
+  it('runs scoring through a signed, retryable job endpoint', () => {
     expect(scoreJob).toContain('verifyQStashRequest')
     expect(scoreJob).toContain('processScorePost')
     expect(scoreJob).toContain(".from('ingestion_events')")

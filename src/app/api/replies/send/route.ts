@@ -4,7 +4,13 @@ import { getServiceRoleClient } from '@/lib/admin'
 import { evaluateReplyQuality } from '@/lib/reply-quality'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { hasQStashConfiguration, publishQStashJson } from '@/lib/qstash'
-import { boundedString, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
+import {
+  boundedString,
+  isTrustedSameOriginMutation,
+  isUuid,
+  readJsonBody,
+  RequestInputError,
+} from '@/lib/request'
 import type { SendReplyData } from '@/lib/send-reply'
 import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
 import { recordEngagementEvent } from '@/lib/automation-audit'
@@ -13,6 +19,7 @@ import {
   extractSubredditFromRedditUrl,
   getSubredditCommunityPolicy,
 } from '@/lib/reddit-community-policy'
+import { hasActiveRedditConnection } from '@/lib/reddit-session'
 
 function safeRedditUrl(value: string | null): string | null {
   if (!value) return null
@@ -35,6 +42,10 @@ function safeRedditUrl(value: string | null): string | null {
  */
 export async function POST(request: Request) {
   try {
+    if (!isTrustedSameOriginMutation(request)) {
+      return NextResponse.json({ error: 'untrusted_request_origin' }, { status: 403 })
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -97,6 +108,9 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .eq('platform', thread.platform)
       .maybeSingle()
+    const connectionActive = thread.platform === 'reddit'
+      ? await hasActiveRedditConnection(user.id)
+      : Boolean(connection)
 
     let requiresManualRedditSubmit = false
     let communityPolicy: Awaited<ReturnType<typeof getSubredditCommunityPolicy>> | null = null
@@ -120,6 +134,7 @@ export async function POST(request: Request) {
 
     if (thread.platform === 'reddit' && (
       !connection
+      || !connectionActive
       || !isRedditDirectPostingConfigured()
       || requiresManualRedditSubmit
     )) {
@@ -156,7 +171,7 @@ export async function POST(request: Request) {
       })
     }
 
-    if (!connection) {
+    if (!connectionActive) {
       return NextResponse.json({ error: `${thread.platform}_connection_required` }, { status: 409 })
     }
     if (!hasQStashConfiguration()) {

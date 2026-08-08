@@ -24,7 +24,7 @@ export async function recordEngagementEvent(
     threadId?: string | null
     eventType: EngagementEventType
     platform?: string | null
-    actorType?: 'system' | 'user' | 'extension' | 'provider'
+    actorType?: 'system' | 'user' | 'provider'
     source?: string
     metadata?: Record<string, unknown>
     idempotencyKey: string

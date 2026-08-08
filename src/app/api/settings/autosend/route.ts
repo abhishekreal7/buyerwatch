@@ -4,11 +4,16 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPlanLimits } from '@/lib/plan-limits'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
-import { readJsonBody, RequestInputError } from '@/lib/request'
+import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
+import { hasActiveRedditConnection } from '@/lib/reddit-session'
 
 export async function PATCH(req: Request) {
   try {
+    if (!isTrustedSameOriginMutation(req)) {
+      return NextResponse.json({ error: 'untrusted_request_origin' }, { status: 403 })
+    }
+
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -124,8 +129,12 @@ export async function PATCH(req: Request) {
       }
 
       const connected = new Set((connectionRows ?? []).map(row => row.platform))
+      const redditConnectionActive = effectivePlatforms.includes('reddit')
+        ? await hasActiveRedditConnection(user.id)
+        : false
       const unavailable = effectivePlatforms.filter(platform => (
         !connected.has(platform)
+        || (platform === 'reddit' && !redditConnectionActive)
         || (platform === 'reddit' && !isRedditDirectPostingConfigured())
       ))
       if (unavailable.length > 0) {

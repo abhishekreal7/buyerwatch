@@ -14,6 +14,7 @@ import {
 import { ensureAttributionMapping } from './attribution-store'
 import { recordEngagementEvent } from './automation-audit'
 import { queuedAutoSendBlockReason } from './auto-send-policy'
+import { hasActiveRedditConnection } from './reddit-session'
 import {
   evaluateRedditReplyPolicy,
   extractSubredditFromRedditUrl,
@@ -81,6 +82,7 @@ export async function processSendReply(
   let maxPerDay: number | undefined
   let businessProfile: { business_name: string; business_url: string | null } | null = null
   let redditPolicyDecision: RedditReplyPolicyDecision | null = null
+  let redditPostUrl: string | null = null
   if (triggerType === 'auto') {
     const { data: automationProfile, error: profileError } = await supabase
       .from('profiles')
@@ -103,16 +105,22 @@ export async function processSendReply(
       return { skipped: true, reason: policyBlock }
     }
 
-    const { data: connection, error: connectionError } = await supabase
-      .from('platform_connections')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('platform', platform)
-      .maybeSingle()
-    if (connectionError) {
-      throw new Error(`Unable to load automation connection: ${connectionError.message}`)
+    let connectionActive = false
+    if (platform === 'reddit') {
+      connectionActive = await hasActiveRedditConnection(userId)
+    } else {
+      const { data: connection, error: connectionError } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('platform', platform)
+        .maybeSingle()
+      if (connectionError) {
+        throw new Error(`Unable to load automation connection: ${connectionError.message}`)
+      }
+      connectionActive = Boolean(connection)
     }
-    if (!connection) {
+    if (!connectionActive) {
       const reason = 'platform_connection_removed'
       await cancelQueuedAutoSend(supabase, threadId, reason)
       logger.info({ jobId: context.jobId, threadId, reason }, 'Skipped auto-send after connection check')
@@ -148,6 +156,7 @@ export async function processSendReply(
     if (policyThreadError || !policyThread) {
       throw new Error(`Unable to load Reddit thread for policy check: ${policyThreadError?.message ?? 'thread not found'}`)
     }
+    redditPostUrl = policyThread.url
 
     const subreddit = extractSubredditFromRedditUrl(policyThread.url) || data.sourceTarget
     const communityPolicy = await getSubredditCommunityPolicy(userId, subreddit ?? '', {
@@ -243,7 +252,13 @@ export async function processSendReply(
     }
 
     const result = platform === 'reddit'
-      ? await postRedditReply(userId, threadExternalId, text)
+      ? await postRedditReply({
+          userId,
+          threadExternalId,
+          postUrl: redditPostUrl ?? '',
+          text,
+          triggerType,
+        })
       : await postBlueskyReply(userId, threadExternalId, text)
     externalSendSucceeded = true
     externalPermalink = result.permalink
@@ -286,8 +301,13 @@ export async function processSendReply(
 
     return { success: true, permalink: result.permalink }
   } catch (error) {
-    if (externalSendSucceeded) {
-      await recordSuccessfulSend(userId, platform, reservation.token).catch(() => undefined)
+    const deliveryUncertain = error instanceof PlatformPostError && error.deliveryUncertain
+    if (externalSendSucceeded || deliveryUncertain) {
+      if (externalSendSucceeded) {
+        await recordSuccessfulSend(userId, platform, reservation.token).catch(() => undefined)
+      } else {
+        await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
+      }
       await supabase.rpc('mark_send_reconciliation', {
         p_thread_id: threadId,
         p_user_id: userId,
@@ -299,6 +319,7 @@ export async function processSendReply(
           ? error.message
           : 'Post-send persistence error',
       })
+      if (deliveryUncertain) context.discard?.()
       throw error
     }
 

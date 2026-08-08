@@ -17,20 +17,16 @@ function policyFromRules(
   return classifySubredditCommunityPolicy({
     subreddit: 'saas',
     rules: {
-      rules: [{ short_name: 'Promotion policy', description }],
+      rules: [{ name: 'Promotion policy', description }],
     },
     about: {
-      data: {
-        description: options.sidebar ?? 'Practical conversations for SaaS builders.',
-        subreddit_type: 'public',
-      },
+      description: options.sidebar ?? 'Practical conversations for SaaS builders.',
+      subreddit_type: 'public',
     },
     hot: {
-      data: {
-        children: options.stickyTitle
-          ? [{ data: { stickied: true, title: options.stickyTitle, permalink: '/r/SaaS/comments/promo/weekly/' } }]
-          : [],
-      },
+      posts: options.stickyTitle
+        ? [{ stickied: true, title: options.stickyTitle, permalink: '/r/SaaS/comments/promo/weekly/' }]
+        : [],
     },
     incompleteSources: options.incompleteSources ?? false,
   })
@@ -126,13 +122,15 @@ describe('Reddit community policy', () => {
     const scoreWorker = read('worker/handlers/score-post.ts')
     const sender = read('src/lib/send-reply.ts')
     const manualRoute = read('src/app/api/replies/send/route.ts')
-    const redditOAuth = read('src/app/api/auth/reddit/route.ts')
+    const providerClient = read('src/lib/redditapis-client.ts')
+    const communityPolicy = read('src/lib/reddit-community-policy.ts')
 
     expect(scoreWorker).toContain('getSubredditCommunityPolicy(')
     expect(scoreWorker).toContain('extractSubredditFromRedditUrl(post.url)')
     expect(sender).toContain('forceRefresh: true')
     expect(sender).toContain('Skipped auto-send after Reddit community policy check')
     expect(manualRoute).toContain('requiresManualRedditSubmit')
-    expect(redditOAuth).toContain("scope: 'identity read submit'")
+    expect(providerClient).toContain('Authorization')
+    expect(communityPolicy).toContain('/api/reddit/sub/${encodeURIComponent(subreddit)}/rules')
   })
 })

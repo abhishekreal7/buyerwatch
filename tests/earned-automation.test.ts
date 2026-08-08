@@ -9,13 +9,14 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 describe('earned automation safety contracts', () => {
   it('keeps Reddit human-submitted unless an approved direct provider exists', () => {
     const assisted = getPlatformCapabilities('reddit')
-    expect(assisted.delivery).toBe('assisted')
+    expect(assisted.delivery).toBe('manual')
     expect(assisted.requiresUserSubmit).toBe(true)
-    expect(assisted.proof).toBe('extension_confirmation')
+    expect(assisted.proof).toBe('manual_confirmation')
 
     const direct = getPlatformCapabilities('reddit', { redditDirectPosting: true })
     expect(direct.delivery).toBe('direct')
     expect(direct.requiresUserSubmit).toBe(false)
+    expect(direct.compliance).toBe('provisional')
   })
 
   it('allows direct automation only on a supported direct provider', () => {
@@ -57,13 +58,4 @@ describe('earned automation safety contracts', () => {
     expect(migration).toContain('revoke insert, update, delete')
   })
 
-  it('never gives the extension authority to submit a Reddit reply', () => {
-    const content = read('browser-extension/content.js')
-    const manifest = JSON.parse(read('browser-extension/manifest.json')) as {
-      permissions: string[]
-    }
-    expect(content).not.toMatch(/\.click\(\).*submit/i)
-    expect(manifest.permissions).not.toContain('scripting')
-    expect(manifest.permissions).not.toContain('tabs')
-  })
 })

@@ -1,5 +1,5 @@
 import { hasDisclosure, mentionsProduct } from './reply-quality'
-import { redditApiFetchForUser } from './reddit-oauth'
+import { redditApisFetch } from './redditapis-client'
 import { redis } from './redis'
 
 const SUBREDDIT_PATTERN = /^[a-z0-9_]{2,50}$/i
@@ -107,16 +107,16 @@ function matchesAny(text: string, patterns: readonly RegExp[]): boolean {
   return patterns.some(pattern => pattern.test(text))
 }
 
-function cacheKey(userId: string, subreddit: string): string {
-  return `reddit-community-policy:v1:${userId}:${subreddit}`
+function cacheKey(subreddit: string): string {
+  return `reddit-community-policy:v2:${subreddit}`
 }
 
 function policyIsFresh(policy: CachedPolicy): boolean {
   return Date.parse(policy.expiresAt) > Date.now()
 }
 
-async function readCachedPolicy(userId: string, subreddit: string): Promise<CachedPolicy | null> {
-  const key = cacheKey(userId, subreddit)
+async function readCachedPolicy(subreddit: string): Promise<CachedPolicy | null> {
+  const key = cacheKey(subreddit)
   const memoryValue = memoryCache.get(key)
   if (memoryValue && policyIsFresh(memoryValue)) return memoryValue
   if (memoryValue) memoryCache.delete(key)
@@ -136,8 +136,8 @@ async function readCachedPolicy(userId: string, subreddit: string): Promise<Cach
   }
 }
 
-async function writeCachedPolicy(userId: string, policy: CachedPolicy): Promise<void> {
-  const key = cacheKey(userId, policy.subreddit)
+async function writeCachedPolicy(policy: CachedPolicy): Promise<void> {
+  const key = cacheKey(policy.subreddit)
   if (memoryCache.size >= 200) {
     const oldest = memoryCache.keys().next().value
     if (oldest) memoryCache.delete(oldest)
@@ -251,7 +251,7 @@ function decodeRules(payload: unknown): SourceDocument[] {
     const value = asObject(rule)
     if (!value) return []
     const text = [
-      asString(value.short_name),
+      asString(value.short_name) || asString(value.name),
       asString(value.description),
       asString(value.violation_reason),
     ].filter(Boolean).join('\n')
@@ -273,16 +273,31 @@ function decodeSidebar(payload: unknown): { documents: SourceDocument[]; communi
   }
 }
 
-function decodePinnedPromotionThreads(payload: unknown): PromotionThread[] {
+function decodeListingPosts(payload: unknown): JsonObject[] {
   const root = asObject(payload)
   const data = asObject(root?.data)
   const children = Array.isArray(data?.children) ? data.children : []
+  if (children.length > 0) {
+    return children.flatMap(child => {
+      const post = asObject(asObject(child)?.data)
+      return post ? [post] : []
+    })
+  }
+  return Array.isArray(root?.posts)
+    ? root.posts.flatMap(post => {
+        const value = asObject(post)
+        return value ? [value] : []
+      })
+    : []
+}
 
-  return children.flatMap((child) => {
-    const post = asObject(asObject(child)?.data)
-    if (!post || post.stickied !== true) return []
+function decodePinnedPromotionThreads(payload: unknown): PromotionThread[] {
+  const posts = decodeListingPosts(payload)
+
+  return posts.flatMap((post) => {
+    if (post.stickied !== true) return []
     const title = asString(post.title)
-    const body = asString(post.selftext)
+    const body = asString(post.selftext) || asString(post.text)
     if (!PROMOTION_THREAD_TITLE_PATTERN.test(`${title}\n${body}`)) return []
     const permalink = asString(post.permalink)
     const url = permalink.startsWith('/')
@@ -293,13 +308,9 @@ function decodePinnedPromotionThreads(payload: unknown): PromotionThread[] {
 }
 
 function decodePinnedDocuments(payload: unknown): SourceDocument[] {
-  const root = asObject(payload)
-  const data = asObject(root?.data)
-  const children = Array.isArray(data?.children) ? data.children : []
-  return children.flatMap((child) => {
-    const post = asObject(asObject(child)?.data)
-    if (!post || post.stickied !== true) return []
-    const text = [asString(post.title), asString(post.selftext)].filter(Boolean).join('\n')
+  return decodeListingPosts(payload).flatMap((post) => {
+    if (post.stickied !== true) return []
+    const text = [asString(post.title), asString(post.selftext) || asString(post.text)].filter(Boolean).join('\n')
     return text ? [{ source: 'pinned_thread' as const, text }] : []
   })
 }
@@ -308,9 +319,9 @@ type JsonFetchResult =
   | { ok: true; value: unknown }
   | { ok: false; status: number | null; reason: string }
 
-async function fetchRedditJson(userId: string, path: string): Promise<JsonFetchResult> {
+async function fetchRedditJson(path: string): Promise<JsonFetchResult> {
   try {
-    const response = await redditApiFetchForUser(userId, path, {
+    const response = await redditApisFetch(path, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -450,21 +461,16 @@ function unavailablePolicy(
   result: Extract<JsonFetchResult, { ok: false }>,
 ): SubredditCommunityPolicy {
   const denied = result.status === 401 || result.status === 403
-  const connectionMissing = result.reason.includes('Reddit connection not found')
   return makePolicy(
     subreddit,
     'unavailable',
     denied
-      ? 'reddit_read_scope_required'
-      : connectionMissing
-        ? 'reddit_connection_required'
-        : 'reddit_rules_unavailable',
+      ? 'reddit_provider_authentication_failed'
+      : 'reddit_rules_unavailable',
     [],
     null,
     denied
-      ? 'Reddit denied access to these rules. Reconnect Reddit with Read access before automated delivery can be enabled.'
-      : connectionMissing
-        ? 'Connect Reddit with Read access before BuyerWatch can verify community rules or automate delivery.'
+      ? 'The Reddit data provider denied the rules request, so automated Reddit delivery is paused.'
       : `BuyerWatch could not verify r/${subreddit}'s current rules, so automated Reddit delivery is paused.`,
   )
 }
@@ -475,7 +481,7 @@ function unavailablePolicy(
  * review-only; no network failure is ever treated as permission to auto-post.
  */
 export async function getSubredditCommunityPolicy(
-  userId: string,
+  _userId: string,
   target: string,
   options: { forceRefresh?: boolean } = {},
 ): Promise<SubredditCommunityPolicy> {
@@ -492,21 +498,22 @@ export async function getSubredditCommunityPolicy(
   }
 
   if (!options.forceRefresh) {
-    const cached = await readCachedPolicy(userId, subreddit)
+    const cached = await readCachedPolicy(subreddit)
     if (cached) return cached
   }
 
-  const rules = await fetchRedditJson(userId, `/r/${encodeURIComponent(subreddit)}/about/rules?raw_json=1`)
+  const rules = await fetchRedditJson(`/api/reddit/sub/${encodeURIComponent(subreddit)}/rules`)
   if (rules.ok === false) {
     const policy = unavailablePolicy(subreddit, rules)
-    await writeCachedPolicy(userId, policy)
+    await writeCachedPolicy(policy)
     return policy
   }
 
-  // Fetch sequentially so an expiring Reddit access token is refreshed once,
-  // rather than racing three simultaneous refreshes.
-  const about = await fetchRedditJson(userId, `/r/${encodeURIComponent(subreddit)}/about?raw_json=1`)
-  const hot = await fetchRedditJson(userId, `/r/${encodeURIComponent(subreddit)}/hot?limit=10&raw_json=1`)
+  // Fetch sequentially to keep provider usage predictable and fail closed if
+  // either public policy source cannot be inspected.
+  const about = await fetchRedditJson(`/api/reddit/sub/${encodeURIComponent(subreddit)}/about`)
+  const hotParams = new URLSearchParams({ subreddit, sort: 'hot', limit: '10' })
+  const hot = await fetchRedditJson(`/api/reddit/posts?${hotParams.toString()}`)
   const policy = classifySubredditCommunityPolicy({
     subreddit,
     rules: rules.value,
@@ -514,7 +521,7 @@ export async function getSubredditCommunityPolicy(
     hot: hot.ok ? hot.value : null,
     incompleteSources: !about.ok || !hot.ok,
   })
-  await writeCachedPolicy(userId, policy)
+  await writeCachedPolicy(policy)
   return policy
 }
 
