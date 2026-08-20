@@ -38,23 +38,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/buyerwatch-icon.png?v=2',
+        url: '/buyerwatch-icon.png?v=3',
         type: 'image/png',
         sizes: '128x128',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/buyerwatch-icon-dark.png?v=2',
-        type: 'image/png',
-        sizes: '128x128',
-        media: '(prefers-color-scheme: dark)',
       },
     ],
-    shortcut: [
-      { url: '/buyerwatch-icon.png?v=2', media: '(prefers-color-scheme: light)' },
-      { url: '/buyerwatch-icon-dark.png?v=2', media: '(prefers-color-scheme: dark)' },
-    ],
-    apple: [{ url: '/buyerwatch-icon.png', type: 'image/png', sizes: '128x128' }],
+    shortcut: [{ url: '/buyerwatch-icon.png?v=3', type: 'image/png' }],
+    apple: [{ url: '/buyerwatch-icon.png?v=3', type: 'image/png', sizes: '128x128' }],
   },
 };
 
