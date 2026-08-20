@@ -19,5 +19,8 @@ jobs:
           node-version: 22
       - name: Probe production
         env:
-          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL || 'https://buyerwatch.co' }}
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL || 'https://www.buyerwatch.co' }}
+          # Core availability remains a hard gate. Reddit-only staleness is
+          # tolerated only until a Reddit delivery account is connected.
+          ALLOW_REDDIT_ONLY_DEGRADED_READINESS: 'true'
         run: node scripts/smoke-production.mjs

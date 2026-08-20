@@ -137,6 +137,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'missing_webhook_id' }, { status: 400 })
   }
 
+  if (eventType === 'refund.succeeded') {
+    const paymentId = typeof data.payment_id === 'string' ? data.payment_id : null
+    if (!paymentId || !eventAt) {
+      console.error('[billing/webhook] Refund event is missing its payment reference', {
+        eventId,
+        eventType,
+      })
+      return NextResponse.json({ error: 'invalid_refund_event' }, { status: 500 })
+    }
+
+    const { data: result, error } = await getSupabase().rpc(
+      'apply_billing_addon_refund_event',
+      {
+        p_event_id: eventId,
+        p_event_type: eventType,
+        p_payment_id: paymentId,
+        p_event_at: eventAt,
+      },
+    )
+    if (error) {
+      console.error('[billing/webhook] Add-on refund application failed', {
+        eventId,
+        eventType,
+        code: error.code,
+      })
+      return NextResponse.json({ error: 'billing_refund_event_failed' }, { status: 500 })
+    }
+
+    return NextResponse.json({ received: true, result })
+  }
+
   const metadataAddon = normalizeAddonType(metadata.addon_type)
   const productAddon = getAddonTypeFromProductId(productId)
   const addonType = metadata.purchase_type === 'addon'

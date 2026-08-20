@@ -11,38 +11,89 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
-      SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: nenarlpygxtkdxbjqrtb
       BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Require backup credentials
         shell: bash
         run: |
-          test -n "$SUPABASE_DATABASE_URL" || { echo "SUPABASE_DATABASE_URL is not configured"; exit 1; }
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "SUPABASE_ACCESS_TOKEN is not configured"; exit 1; }
           test -n "$BACKUP_ENCRYPTION_PASSWORD" || { echo "BACKUP_ENCRYPTION_PASSWORD is not configured"; exit 1; }
 
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.115.0
+
       - name: Install PostgreSQL client
-        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
 
-      - name: Create, verify, and encrypt logical backup
+      - name: Create portable logical backup
         shell: bash
         run: |
           set -euo pipefail
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-          raw="$RUNNER_TEMP/buyerwatch-$stamp.dump"
-          encrypted="$RUNNER_TEMP/buyerwatch-$stamp.dump.enc"
-          pg_dump "$SUPABASE_DATABASE_URL" --format=custom --compress=9 --no-owner --no-privileges --file="$raw"
-          pg_restore --list "$raw" >/dev/null
+          work="$RUNNER_TEMP/buyerwatch-$stamp"
+          mkdir -p "$work"
+          supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --role-only --file "$work/roles.sql"
+          supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --file "$work/schema.sql"
+          # BuyerWatch owns public application data and Supabase Auth users.
+          # Managed storage/realtime schemas are intentionally not portable and
+          # are not used by this application.
+          supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --data-only --use-copy \
+            --schema public,auth \
+            --file "$work/data.sql"
+          test -s "$work/roles.sql"
+          test -s "$work/schema.sql"
+          test -s "$work/data.sql"
+          echo "BACKUP_WORK=$work" >> "$GITHUB_ENV"
+          echo "BACKUP_NAME=buyerwatch-$stamp" >> "$GITHUB_ENV"
+
+      - name: Prove backup restores cleanly
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase start -x studio,imgproxy,inbucket,storage,edge-runtime,analytics,vector
+          local_db='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+          psql "$local_db" --variable ON_ERROR_STOP=1 \
+            --command 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          psql "$local_db" \
+            --single-transaction \
+            --variable ON_ERROR_STOP=1 \
+            --file "$BACKUP_WORK/roles.sql" \
+            --file "$BACKUP_WORK/schema.sql" \
+            --command 'SET session_replication_role = replica' \
+            --file "$BACKUP_WORK/data.sql"
+          psql "$local_db" --tuples-only --no-align --variable ON_ERROR_STOP=1 \
+            --command "select json_build_object(
+              'profiles', (select count(*) from public.profiles),
+              'keywords', (select count(*) from public.keywords),
+              'threads', (select count(*) from public.monitored_threads)
+            );" > "$BACKUP_WORK/restore-proof.json"
+          test -s "$BACKUP_WORK/restore-proof.json"
+
+      - name: Encrypt verified backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw="$RUNNER_TEMP/$BACKUP_NAME.tar.gz"
+          encrypted="$RUNNER_TEMP/$BACKUP_NAME.tar.gz.enc"
+          tar -C "$BACKUP_WORK" -czf "$raw" roles.sql schema.sql data.sql restore-proof.json
           openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in "$raw" -out "$encrypted" -pass env:BACKUP_ENCRYPTION_PASSWORD
           sha256sum "$encrypted" > "$encrypted.sha256"
           rm -- "$raw"
           echo "BACKUP_FILE=$encrypted" >> "$GITHUB_ENV"
           echo "BACKUP_HASH=$encrypted.sha256" >> "$GITHUB_ENV"
-          echo "BACKUP_NAME=buyerwatch-$stamp" >> "$GITHUB_ENV"
+
+      - name: Stop restore environment
+        if: always()
+        run: supabase stop --no-backup || true
 
       - name: Upload encrypted backup
         uses: actions/upload-artifact@v4

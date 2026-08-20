@@ -212,6 +212,24 @@ describe('database security and billing migration contracts', () => {
     expect(migration).toContain('p_event_at < v_current_updated_at')
   })
 
+  it('revokes refunded add-on credits and blocks refund-before-payment races', () => {
+    const refundMigration = readFileSync(
+      join(process.cwd(), 'supabase/migrations/20260821090000_billing_addon_refund_safety.sql'),
+      'utf8',
+    )
+    const webhookRoute = readFileSync(
+      join(process.cwd(), 'src/app/api/billing/webhook/route.ts'),
+      'utf8',
+    )
+
+    expect(refundMigration).toContain('apply_billing_addon_refund_event')
+    expect(refundMigration).toContain("event_type = 'refund.succeeded'")
+    expect(refundMigration).toContain('and refunded_at is null')
+    expect(refundMigration).toContain("return 'refunded'")
+    expect(webhookRoute).toContain("eventType === 'refund.succeeded'")
+    expect(webhookRoute).toContain("'apply_billing_addon_refund_event'")
+  })
+
   it('derives current entitlements from provider subscription status', () => {
     expect(backendHardeningMigration).toContain('apply_billing_subscription_event_v2')
     expect(backendHardeningMigration).toContain("p_provider_status = 'active'")
