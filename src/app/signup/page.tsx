@@ -132,10 +132,11 @@ function SignupContent() {
             {selectedPlan && <input type="hidden" name="plan" value={selectedPlan} />}
             {selectedPlan && <input type="hidden" name="billing" value={selectedBilling} />}
             <div>
-              <label className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
+              <label htmlFor="signup-email" className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
                 Email address
               </label>
               <input
+                id="signup-email"
                 name="email"
                 type="email"
                 placeholder="name@company.com"
@@ -145,10 +146,11 @@ function SignupContent() {
             </div>
 
             <div>
-              <label className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
+              <label htmlFor="signup-password" className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
                 Password
               </label>
               <input
+                id="signup-password"
                 name="password"
                 type="password"
                 placeholder="Min 6 characters"
