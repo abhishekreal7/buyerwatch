@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown, ArrowUp } from 'lucide-react'
+import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { toast } from 'sonner'
@@ -37,6 +37,7 @@ import {
 import { useConversationSearch } from '@/lib/conversation-search'
 import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
 import { DataLoadError } from '@/components/DataLoadError'
+import { summarizeKeywordPollHealth } from '@/lib/monitoring-health'
 
 interface Thread {
   id: string
@@ -168,8 +169,10 @@ export default function DashboardPage() {
   const [sendingThreadId, setSendingThreadId] = useState<string | null>(null)
   const [checkingNow, setCheckingNow] = useState(false)
   const [pollHealth, setPollHealth] = useState({
-    lastCheckedAt: null as string | null,
-    delayedSources: 0,
+    lastAttemptAt: null as string | null,
+    lastSuccessfulAt: null as string | null,
+    delayedRules: 0,
+    activeRules: 0,
   })
   const [signalUsage, setSignalUsage] = useState({ used: 0, limit: 250 })
   const [draftUsage, setDraftUsage] = useState({ used: 0, limit: 40 })
@@ -361,22 +364,10 @@ export default function DashboardPage() {
     // Load persisted setup progress rather than resetting the checklist per session.
     setKeywordsCount(keywordsCountResult.count ?? 0)
     const keywordHealthRows = keywordHealthResult.data ?? []
-    const lastCheckedAt = keywordHealthRows
-      .map(row => row.last_checked_at)
-      .filter((value): value is string => Boolean(value) && Number.isFinite(Date.parse(value)))
-      .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null
     const staleAfterMs = (
       PLAN_POLL_INTERVAL_MINUTES[normalizedPlan] * 3 + 10
     ) * 60_000
-    setPollHealth({
-      lastCheckedAt,
-      delayedSources: keywordHealthRows.filter((row) => {
-        const lastSuccessAt = Date.parse(row.last_success_at ?? '')
-        return row.last_check_status !== 'success'
-          || !Number.isFinite(lastSuccessAt)
-          || Date.now() - lastSuccessAt > staleAfterMs
-      }).length,
-    })
+    setPollHealth(summarizeKeywordPollHealth(keywordHealthRows, staleAfterMs))
     setHasCopiedOrApproved((feedbackCountResult.count ?? 0) > 0)
 
     // Load threads including dismissed for audit tab
@@ -939,21 +930,26 @@ export default function DashboardPage() {
         action={(
           <div className="flex flex-wrap items-center justify-end gap-2">
             {keywordsCount > 0 && (
-              <div
+              <a
+                href="/keywords"
                 className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11.5px] font-semibold sm:min-h-0 ${
-                  pollHealth.delayedSources > 0
+                  pollHealth.delayedRules > 0
                     ? 'border-amber-200 bg-amber-50 text-amber-800'
                     : 'border-[#DDE2E8] bg-white text-[#667085]'
                 }`}
-                title={pollHealth.delayedSources > 0
-                  ? `${pollHealth.delayedSources} monitoring source${pollHealth.delayedSources === 1 ? '' : 's'} delayed`
-                  : 'The time BuyerWatch last checked an active monitoring source'}
+                title={pollHealth.delayedRules > 0
+                  ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active monitoring rules failed their latest successful-source check. Last attempt ${pollHealth.lastAttemptAt ? formatTimeAgo(pollHealth.lastAttemptAt) : 'not recorded'}. Open Monitoring Rules for details.`
+                  : 'The most recent successful active-source check'}
               >
-                <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                {pollHealth.lastCheckedAt
-                  ? `Last checked ${formatTimeAgo(pollHealth.lastCheckedAt)}`
-                  : 'Waiting for first check'}
-              </div>
+                {pollHealth.delayedRules > 0
+                  ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                  : <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />}
+                {pollHealth.delayedRules > 0
+                  ? `${pollHealth.delayedRules} monitoring rule${pollHealth.delayedRules === 1 ? '' : 's'} failing`
+                  : pollHealth.lastSuccessfulAt
+                    ? `Sources updated ${formatTimeAgo(pollHealth.lastSuccessfulAt)}`
+                    : 'Waiting for first successful check'}
+              </a>
             )}
             <div className="relative">
               <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#667085]" aria-hidden="true" />

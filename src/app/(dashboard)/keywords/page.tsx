@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, MoreHorizontal, Check, X, Pause, Play,
-  Trash2, Target, Rss, Sparkles, ArrowRight
+  Trash2, Target, Rss, Sparkles, ArrowRight, AlertTriangle
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -15,6 +15,7 @@ import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { DataLoadError } from '@/components/DataLoadError'
+import { getKeywordPollIssueLabel, isKeywordPollDelayed } from '@/lib/monitoring-health'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
 
@@ -40,17 +41,6 @@ function relativeCheckTime(value: string | null): string {
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `Checked ${hours}h ago`
   return `Checked ${Math.floor(hours / 24)}d ago`
-}
-
-function isKeywordCheckDelayed(keyword: Keyword, plan: string): boolean {
-  if (!keyword.is_active) return false
-  if (keyword.last_check_status !== 'success') return true
-  const lastSuccessAt = Date.parse(keyword.last_success_at ?? '')
-  if (!Number.isFinite(lastSuccessAt)) return true
-  const staleAfterMs = (
-    PLAN_POLL_INTERVAL_MINUTES[normalizePlan(plan)] * 3 + 10
-  ) * 60_000
-  return Date.now() - lastSuccessAt > staleAfterMs
 }
 
 /* ─── Platform metadata ──────────────────────────────────────────── */
@@ -300,6 +290,12 @@ export default function KeywordsPage() {
   const activeCount = keywords.filter(k => k.is_active).length
   const pausedCount = keywords.filter(k => !k.is_active).length
   const keywordLimit = Number(getPlanLimits(userPlan).keywords)
+  const staleAfterMs = (
+    PLAN_POLL_INTERVAL_MINUTES[normalizePlan(userPlan)] * 3 + 10
+  ) * 60_000
+  const delayedCount = keywords.filter(keyword => (
+    keyword.is_active && isKeywordPollDelayed(keyword, staleAfterMs)
+  )).length
 
   if (loadFailed) {
     return (
@@ -312,6 +308,7 @@ export default function KeywordsPage() {
             onRetry={() => setLoadAttempt(attempt => attempt + 1)}
           />
         </div>
+
       </AppPage>
     )
   }
@@ -343,6 +340,20 @@ export default function KeywordsPage() {
             <span>New Rule</span>
           </motion.button>
         </div>
+
+        {!loading && delayedCount > 0 && (
+          <a
+            href="#monitoring-rules"
+            role="alert"
+            className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-amber-900 transition-colors hover:bg-amber-100/70 sm:px-5"
+          >
+            <AlertTriangle className="mt-0.5 h-4.5 w-4.5 shrink-0" aria-hidden="true" />
+            <p className="text-[13px] leading-5">
+              <span className="font-semibold">{delayedCount} monitoring rule{delayedCount === 1 ? ' is' : 's are'} failing.</span>{' '}
+              BuyerWatch is retrying automatically. Review the affected rows below for their latest source status.
+            </p>
+          </a>
+        )}
 
         {/* ── Downgrade banner ─────────────────────────────────────
             Shown when plan=free and there are paused rules (post-downgrade).
@@ -491,7 +502,7 @@ export default function KeywordsPage() {
         </div>
 
         {/* ── Table Container matching Reference Image Exact Detailing ───────────── */}
-        <div className="w-full bg-white rounded-[20px] border border-[#E6E6E3] p-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+        <div id="monitoring-rules" className="w-full scroll-mt-6 bg-white rounded-[20px] border border-[#E6E6E3] p-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
           
           {/* Header Row Bar */}
           <div className="hidden xl:grid grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 rounded-[16px] bg-[#F5F5F3] border border-[#ECECE9] px-6 py-3.5 mb-1.5 text-[13px] font-medium text-[#8C8C86]">
@@ -550,7 +561,7 @@ export default function KeywordsPage() {
             {filtered.map((kw, index) => {
               const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
               const successRate = getSuccessRate(threadStats.total, threadStats.replied)
-              const sourceDelayed = isKeywordCheckDelayed(kw, userPlan)
+              const sourceDelayed = kw.is_active && isKeywordPollDelayed(kw, staleAfterMs)
 
               return (
                 <div
@@ -581,11 +592,11 @@ export default function KeywordsPage() {
                         sourceDelayed ? 'text-amber-700' : 'text-[#92928C]'
                       }`}
                       title={sourceDelayed
-                        ? `Source delayed (${kw.last_check_error || 'freshness window missed'}); retrying automatically`
+                        ? `${getKeywordPollIssueLabel(kw.last_check_error)}; retrying automatically`
                         : 'Last successful source check'}
                     >
                       {sourceDelayed
-                        ? `Delayed · ${relativeCheckTime(kw.last_checked_at).replace('Checked ', '')}`
+                        ? `${getKeywordPollIssueLabel(kw.last_check_error)} · attempted ${relativeCheckTime(kw.last_checked_at).replace('Checked ', '')}`
                         : relativeCheckTime(kw.last_success_at)}
                     </span>
                   </div>
