@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ExternalLink, LoaderCircle, ShieldAlert, ShieldCheck, ShieldQuestion, type LucideIcon } from 'lucide-react'
+import { ExternalLink, LoaderCircle, ShieldAlert, ShieldCheck, ShieldQuestion, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react'
 
 type CommunityPolicy = {
   subreddit: string
@@ -14,30 +14,37 @@ type CommunityPolicy = {
 
 const STYLE_BY_STATUS: Record<CommunityPolicy['status'], {
   className: string
+  badgeClass: string
   Icon: LucideIcon
 }> = {
   explicitly_allowed: {
-    className: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    className: 'border-emerald-200/80 bg-emerald-50/70 text-emerald-900',
+    badgeClass: 'bg-emerald-100/80 text-emerald-800 border-emerald-300/60',
     Icon: ShieldCheck,
   },
   allowed_without_links: {
-    className: 'border-amber-200 bg-amber-50 text-amber-800',
+    className: 'border-amber-200/80 bg-amber-50/70 text-amber-900',
+    badgeClass: 'bg-amber-100/80 text-amber-800 border-amber-300/60',
     Icon: ShieldAlert,
   },
   promotion_thread_only: {
-    className: 'border-amber-200 bg-amber-50 text-amber-800',
+    className: 'border-amber-200/80 bg-amber-50/70 text-amber-900',
+    badgeClass: 'bg-amber-100/80 text-amber-800 border-amber-300/60',
     Icon: ShieldAlert,
   },
   promotion_prohibited: {
-    className: 'border-rose-200 bg-rose-50 text-rose-800',
+    className: 'border-rose-200/80 bg-rose-50/70 text-rose-900',
+    badgeClass: 'bg-rose-100/80 text-rose-800 border-rose-300/60',
     Icon: ShieldAlert,
   },
   manual_review: {
-    className: 'border-slate-200 bg-slate-50 text-slate-700',
+    className: 'border-slate-200/80 bg-slate-50/70 text-slate-800',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300/60',
     Icon: ShieldQuestion,
   },
   unavailable: {
-    className: 'border-slate-200 bg-slate-50 text-slate-700',
+    className: 'border-slate-200/80 bg-slate-50/70 text-slate-800',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300/60',
     Icon: ShieldQuestion,
   },
 }
@@ -51,6 +58,7 @@ export function RedditCommunityPolicyNotice({
 }) {
   const [policy, setPolicy] = useState<CommunityPolicy | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -93,32 +101,48 @@ export function RedditCommunityPolicyNotice({
     )
   }
 
-  const { className, Icon } = STYLE_BY_STATUS[policy.status]
+  const { className, badgeClass, Icon } = STYLE_BY_STATUS[policy.status]
   if (compact) {
     return (
-      <span title={policy.message} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${className}`}>
+      <span title={policy.message} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
         <Icon className="h-3 w-3" /> {policy.label}
       </span>
     )
   }
 
   return (
-    <aside className={`rounded-xl border px-3.5 py-3 text-[12px] ${className}`} aria-label="Community posting policy">
-      <div className="flex items-start gap-2">
-        <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-        <div className="min-w-0">
-          <p className="font-semibold">r/{policy.subreddit}: {policy.label}</p>
-          <p className="mt-0.5 leading-relaxed opacity-90">{policy.message}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <a
-              href={policy.rulesUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:no-underline"
-            >
-              Open rules <ExternalLink className="h-3 w-3" />
-            </a>
-            {policy.promotionThread && (
+    <aside className={`rounded-xl border px-3.5 py-2.5 text-[12px] transition-all ${className}`} aria-label="Community posting policy">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Icon className="h-4 w-4 shrink-0 opacity-80" />
+          <span className="font-semibold text-[12.5px] truncate">
+            r/{policy.subreddit}: <span className="font-normal opacity-90">{policy.label}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={policy.rulesUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11.5px] font-semibold underline underline-offset-2 hover:opacity-80"
+          >
+            Open rules <ExternalLink className="h-3 w-3" />
+          </a>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(v => !v)}
+            aria-label={isExpanded ? 'Hide policy details' : 'Show policy details'}
+            className="grid h-5 w-5 place-items-center rounded-md hover:bg-black/5 text-current opacity-70 hover:opacity-100"
+          >
+            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+      </div>
+      {isExpanded && (
+        <div className="mt-2 pt-2 border-t border-black/10">
+          <p className="leading-relaxed opacity-90">{policy.message}</p>
+          {policy.promotionThread && (
+            <div className="mt-1.5 flex items-center">
               <a
                 href={policy.promotionThread.url}
                 target="_blank"
@@ -127,10 +151,11 @@ export function RedditCommunityPolicyNotice({
               >
                 {policy.promotionThread.title} <ExternalLink className="h-3 w-3" />
               </a>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </aside>
   )
 }
+
