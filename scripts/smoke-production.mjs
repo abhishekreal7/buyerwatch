@@ -1,5 +1,10 @@
 ﻿const baseUrl = process.env.PRODUCTION_BASE_URL?.replace(/\/$/, '')
 
+import { validateReadinessResponse } from './production-smoke-validators.mjs'
+
+const allowRedditOnlyDegraded =
+  process.env.ALLOW_REDDIT_ONLY_DEGRADED_READINESS === 'true'
+
 if (!baseUrl || !baseUrl.startsWith('https://')) {
   console.error('PRODUCTION_BASE_URL must be an HTTPS origin')
   process.exit(2)
@@ -28,9 +33,11 @@ await check('/api/health/live', async (response) => {
 })
 
 await check('/api/health/ready', async (response) => {
-  if (response.status !== 200) {
-    const body = await response.text()
-    throw new Error(`readiness returned ${response.status}: ${body.slice(0, 300)}`)
+  const result = await validateReadinessResponse(response, {
+    allowRedditOnlyDegraded,
+  })
+  if (result.degraded) {
+    console.warn('WARN readiness is degraded only by unfunded Reddit monitoring')
   }
 })
 

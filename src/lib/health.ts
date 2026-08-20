@@ -19,6 +19,19 @@ export interface ReadinessCheck {
   status: 'ok' | 'error'
   latencyMs: number
   detail?: string
+  code?: string
+  affectedPlatforms?: string[]
+}
+
+class ReadinessError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly affectedPlatforms?: string[],
+  ) {
+    super(message)
+    this.name = 'ReadinessError'
+  }
 }
 
 type KeywordHealthRow = {
@@ -39,9 +52,14 @@ async function timedCheck(
     await withTimeout(operation(), 3_000, label)
     return { status: 'ok', latencyMs: Date.now() - startedAt }
   } catch (error) {
+    const readinessError = error instanceof ReadinessError ? error : null
     return {
       status: 'error',
       latencyMs: Date.now() - startedAt,
+      ...(readinessError?.code ? { code: readinessError.code } : {}),
+      ...(readinessError?.affectedPlatforms
+        ? { affectedPlatforms: readinessError.affectedPlatforms }
+        : {}),
       detail: process.env.NODE_ENV === 'production'
         ? `${label} failed`
         : error instanceof Error
@@ -190,10 +208,10 @@ export async function checkApplicationReadiness() {
 
   const monitoring = await timedCheck('monitoring readiness', async () => {
     if (!hasQStashConfiguration()) {
-      throw new Error('QStash configuration missing')
+      throw new ReadinessError('QStash configuration missing', 'qstash_missing')
     }
     if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error('database configuration missing')
+      throw new ReadinessError('database configuration missing', 'database_missing')
     }
 
     const client = createClient(supabaseUrl, serviceRoleKey, {
@@ -209,7 +227,12 @@ export async function checkApplicationReadiness() {
         .eq('is_active', true)
         .order('id', { ascending: true })
         .range(offset, offset + pageSize - 1)
-      if (error) throw new Error('monitoring freshness query failed')
+      if (error) {
+        throw new ReadinessError(
+          'monitoring freshness query failed',
+          'monitoring_query_failed',
+        )
+      }
       keywordRows.push(...((data ?? []) as KeywordHealthRow[]))
       if ((data?.length ?? 0) < pageSize) break
     }
@@ -230,7 +253,11 @@ export async function checkApplicationReadiness() {
         counts[row.platform] = (counts[row.platform] ?? 0) + 1
         return counts
       }, {})
-      throw new Error(`monitoring heartbeat stale: ${JSON.stringify(byPlatform)}`)
+      throw new ReadinessError(
+        `monitoring heartbeat stale: ${JSON.stringify(byPlatform)}`,
+        'monitoring_stale',
+        Object.keys(byPlatform).sort(),
+      )
     }
   })
 
