@@ -43,8 +43,11 @@ jobs:
           mkdir -p "$work"
           supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --role-only --file "$work/roles.sql"
           supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --file "$work/schema.sql"
+          # BuyerWatch owns public application data and Supabase Auth users.
+          # Managed storage/realtime schemas are intentionally not portable and
+          # are not used by this application.
           supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --data-only --use-copy \
-            --exclude 'storage.*' \
+            --schema public,auth \
             --file "$work/data.sql"
           test -s "$work/roles.sql"
           test -s "$work/schema.sql"
