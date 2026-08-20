@@ -44,8 +44,7 @@ jobs:
           supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --role-only --file "$work/roles.sql"
           supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --file "$work/schema.sql"
           supabase db dump --project-ref "$SUPABASE_PROJECT_REF" --data-only --use-copy \
-            --exclude storage.buckets_vectors \
-            --exclude storage.vector_indexes \
+            --exclude 'storage.*' \
             --file "$work/data.sql"
           test -s "$work/roles.sql"
           test -s "$work/schema.sql"
