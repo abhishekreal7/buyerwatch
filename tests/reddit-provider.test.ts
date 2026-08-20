@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeRedditApisPosts, parseRedditRss } from '../src/lib/reddit'
+import {
+  buildSubredditRssUrl,
+  normalizeRedditApisPosts,
+  parseRedditRss,
+  shouldBackoffRedditRssStatus,
+} from '../src/lib/reddit'
 import {
   parseRedditApisListing,
   parseRedditApisListingPage,
@@ -10,6 +15,20 @@ import {
 } from '../src/lib/redditapis-contract'
 
 describe('Reddit provider contracts', () => {
+  it('uses the canonical query-free newest-post Atom feed', () => {
+    expect(buildSubredditRssUrl('saas')).toBe(
+      'https://www.reddit.com/r/saas/new/.rss',
+    )
+    expect(buildSubredditRssUrl('build_in_public')).not.toContain('?')
+  })
+
+  it('backs off public RSS blocks without treating ordinary misses as throttling', () => {
+    expect(shouldBackoffRedditRssStatus(403)).toBe(true)
+    expect(shouldBackoffRedditRssStatus(429)).toBe(true)
+    expect(shouldBackoffRedditRssStatus(404)).toBe(false)
+    expect(shouldBackoffRedditRssStatus(500)).toBe(false)
+  })
+
   it('normalizes the current redditapis.com listing response shape', () => {
     expect(normalizeRedditApisPosts({
       posts: [{

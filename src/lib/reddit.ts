@@ -10,6 +10,20 @@ const MAX_POST_TITLE_LENGTH = 1_000
 const MAX_AUTHOR_LENGTH = 64
 const REDDIT_POST_ID_PATTERN = /^[a-z0-9]{5,12}$/i
 
+/**
+ * Keep Reddit's public feed URL canonical and query-free. In production,
+ * Reddit has intermittently rate-limited otherwise identical Atom requests
+ * carrying `?limit=...`. The feed already returns a bounded page; callers
+ * apply their requested limit after parsing.
+ */
+export function buildSubredditRssUrl(subreddit: string): string {
+  return `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/new/.rss`
+}
+
+export function shouldBackoffRedditRssStatus(status: number): boolean {
+  return status === 403 || status === 429
+}
+
 function truncate(value: string, maximum: number): string {
   return value.length <= maximum ? value : value.slice(0, maximum)
 }
@@ -286,19 +300,19 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
 
   if (!rssBackoffActive) {
     try {
-      const rssUrl = `https://www.reddit.com/r/${normalizedSubreddit}/new/.rss?limit=${boundedLimit}`
+      const rssUrl = buildSubredditRssUrl(normalizedSubreddit)
       console.log(`[reddit] RSS fetch for r/${normalizedSubreddit}`)
       const rssResponse = await fetchWithTimeout(rssUrl, {
         headers: {
           'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatch/1.0 (support@buyerwatch.co)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
         }
       }, 10_000)
 
       if (rssResponse.ok) {
         const xml = await readResponseText(rssResponse, MAX_REDDIT_SOURCE_BYTES)
-        const posts = parseRedditRss(xml, normalizedSubreddit)
+        const posts = parseRedditRss(xml, normalizedSubreddit).slice(0, boundedLimit)
         if (posts.length > 0) {
           console.log(`[reddit] RSS: ${posts.length} posts from r/${normalizedSubreddit}`)
           if (redisClient) {
@@ -310,8 +324,8 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
           return posts
         }
         console.warn(`[reddit] RSS returned 0 parseable posts for r/${normalizedSubreddit}, falling back`)
-      } else if (rssResponse.status === 429) {
-        console.warn(`[reddit] RSS 429 for r/${normalizedSubreddit} — backing off the public feed`)
+      } else if (shouldBackoffRedditRssStatus(rssResponse.status)) {
+        console.warn(`[reddit] RSS ${rssResponse.status} for r/${normalizedSubreddit} — backing off the public feed`)
         const retryAfterSeconds = Number(rssResponse.headers.get('retry-after'))
         const backoffSeconds = Number.isFinite(retryAfterSeconds)
           ? Math.min(60 * 60, Math.max(5 * 60, Math.ceil(retryAfterSeconds)))
