@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
+const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n')
 
 const dashboard = source('src/app/(dashboard)/dashboard/page.tsx')
 const opportunities = source('src/app/(dashboard)/opportunities/page.tsx')

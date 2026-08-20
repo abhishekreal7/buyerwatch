@@ -121,31 +121,31 @@ describe('QStash monitoring route contract', () => {
   const setup = readFileSync(
     join(process.cwd(), 'scripts/setup-qstash-schedule.mjs'),
     'utf8',
-  )
+  ).replace(/\r\n/g, '\n')
   const monitor = readFileSync(
     join(process.cwd(), 'src/lib/serverless-monitor.ts'),
     'utf8',
-  )
+  ).replace(/\r\n/g, '\n')
   const scoreJob = readFileSync(
     join(process.cwd(), 'src/app/api/jobs/score/route.ts'),
     'utf8',
-  )
+  ).replace(/\r\n/g, '\n')
   const workerScorer = readFileSync(
     join(process.cwd(), 'worker/handlers/score-post.ts'),
     'utf8',
-  )
+  ).replace(/\r\n/g, '\n')
   const reddit = readFileSync(
     join(process.cwd(), 'src/lib/reddit.ts'),
     'utf8',
-  )
+  ).replace(/\r\n/g, '\n')
   const fetchNow = readFileSync(
     join(process.cwd(), 'src/app/api/keywords/fetch-now/route.ts'),
     'utf8',
-  )
+  ).replace(/\r\n/g, '\n')
   const sourceTimeMigration = readFileSync(
     join(process.cwd(), 'supabase/migrations/20260808010000_preserve_source_post_time.sql'),
     'utf8',
-  )
+  ).replace(/\r\n/g, '\n')
 
   it('verifies signed QStash requests and runs direct monitoring', () => {
     expect(route).toContain('verifyQStashRequest')
