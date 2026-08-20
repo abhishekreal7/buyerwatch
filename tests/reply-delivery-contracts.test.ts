@@ -8,7 +8,7 @@ const sendRoute = read('src/app/api/replies/send/route.ts')
 const sendJobRoute = read('src/app/api/jobs/send/route.ts')
 const sendProcessor = read('src/lib/send-reply.ts')
 const dashboard = read('src/app/(dashboard)/dashboard/page.tsx')
-const drafts = read('src/app/(dashboard)/drafts/page.tsx')
+const drafts = read('src/components/ReplyQueueWorkspace.tsx')
 const outbox = read('src/lib/backend-maintenance.ts')
 const manualAuditMigration = read('supabase/migrations/20260802120000_manual_reply_audit.sql')
 
