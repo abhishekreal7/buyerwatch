@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ChevronDown,
   ChevronRight,
@@ -23,6 +23,7 @@ import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { IntentBadge } from '@/components/IntentBadge'
 import { DataLoadError } from '@/components/DataLoadError'
+import { OpportunityStageNav } from '@/components/OpportunityStageNav'
 
 const FILTERS = ['All', 'Buying intent', 'Researching', 'Reddit', 'Bluesky', 'X']
 const PAGE_SIZE = 60
@@ -300,24 +301,15 @@ function DetailPanel({
           </a>
         )}
         <div className="flex-1" />
-        {opportunity.status === 'pending' ? (
-          <button
-            type="button"
-            onClick={() => onDraftReply(opportunity.id)}
-            disabled={draftingId === opportunity.id}
-            className="flex items-center gap-2 rounded-lg bg-[#1C1C1A] px-4 py-2 text-[13px] font-semibold text-white hover:bg-black transition-colors disabled:opacity-50 shadow-sm"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {draftingId === opportunity.id ? 'Drafting…' : 'Generate draft'}
-          </button>
-        ) : (
-          <Link
-            href="/drafts"
-            className="flex items-center gap-2 rounded-lg bg-[#1C1C1A] px-4 py-2 text-[13px] font-semibold text-white hover:bg-black transition-colors shadow-sm"
-          >
-            {opportunity.status === 'drafted' ? 'Review draft' : 'Write reply'}
-          </Link>
-        )}
+        <button
+          type="button"
+          onClick={() => onDraftReply(opportunity.id)}
+          disabled={draftingId === opportunity.id}
+          className="flex items-center gap-2 rounded-lg bg-[#1C1C1A] px-4 py-2 text-[13px] font-semibold text-white hover:bg-black transition-colors disabled:opacity-50 shadow-sm"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {draftingId === opportunity.id ? 'Drafting…' : 'Generate draft'}
+        </button>
       </div>
     </div>
   )
@@ -342,6 +334,7 @@ function EmptyDetail() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function OpportunitiesPage() {
+  const router = useRouter()
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
   const [activeFilter, setActiveFilter] = useState('All')
@@ -354,6 +347,7 @@ export default function OpportunitiesPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
+  const [replyQueueCount, setReplyQueueCount] = useState(0)
   const [draftingId, setDraftingId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -364,12 +358,12 @@ export default function OpportunitiesPage() {
       setLoadFailed(false)
 
       try {
-        const [pageResult, countResult] = await Promise.all([
+        const [pageResult, countResult, replyQueueCountResult] = await Promise.all([
           supabase
             .from('monitored_threads')
             .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, source_created_at, created_at, keywords(term, target)')
             .eq('user_id', userId)
-            .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+            .eq('status', 'pending')
             .not('intent_score', 'is', null)
             .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD)
             .order('source_created_at', { ascending: false, nullsFirst: false })
@@ -379,17 +373,24 @@ export default function OpportunitiesPage() {
             .from('monitored_threads')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', userId)
-            .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+            .eq('status', 'pending')
             .not('intent_score', 'is', null)
             .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD),
+          supabase
+            .from('monitored_threads')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .in('status', ['drafted', 'needs_manual_reply']),
         ])
         if (pageResult.error) throw pageResult.error
         if (countResult.error) throw countResult.error
+        if (replyQueueCountResult.error) throw replyQueueCountResult.error
 
         const data = pageResult.data
         const parsed = parseOpportunities(data ?? [])
         setOpportunities(parsed)
         setTotalCount(countResult.count ?? data?.length ?? 0)
+        setReplyQueueCount(replyQueueCountResult.count ?? 0)
         setHasMore((data?.length ?? 0) === PAGE_SIZE)
         setSelectedId(parsed[0]?.id ?? null)
       } catch (error) {
@@ -412,7 +413,7 @@ export default function OpportunitiesPage() {
         .from('monitored_threads')
         .select('id, platform, author, title, text_content, intent_score, intent_label, score_reasoning, matched_signals, quality_issues, automation_reason, url, status, flag, source_created_at, created_at, keywords(term, target)')
         .eq('user_id', userId)
-        .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+        .eq('status', 'pending')
         .not('intent_score', 'is', null)
         .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD)
         .order('source_created_at', { ascending: false, nullsFirst: false })
@@ -444,10 +445,11 @@ export default function OpportunitiesPage() {
         throw new Error(payload?.message || payload?.error || 'Failed to generate draft')
       }
       clearSupabaseReadCache()
-      setOpportunities(current => current.map(opportunity => (
-        opportunity.id === id ? { ...opportunity, status: 'drafted' } : opportunity
-      )))
-      toast.success('Draft ready for review.')
+      setReplyQueueCount(current => current + 1)
+      setOpportunities(current => current.filter(opportunity => opportunity.id !== id))
+      setTotalCount(current => Math.max(0, current - 1))
+      toast.success('Draft ready. Opening the reply queue.')
+      router.push(`/opportunities/replies?thread=${encodeURIComponent(id)}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to generate draft')
     } finally {
@@ -496,16 +498,19 @@ export default function OpportunitiesPage() {
         {/* ── Top Bar ─────────────────────────────────────────────── */}
         <PageHeader
           title="Opportunities"
+          subtitle="Review qualified conversations and prepare safe replies in one workspace."
           action={(
             <div className="flex items-center gap-2 rounded-full bg-gray-900 px-3 py-1 text-[12px] font-medium text-white shadow-sm ring-1 ring-black/5">
               <span className="relative flex h-2 w-2 items-center justify-center">
                 {opportunities.length > 0 && <span className="absolute inset-0 animate-ping rounded-full bg-[#0A84FF] opacity-40" />}
                 <span className={`h-1.5 w-1.5 rounded-full ${opportunities.length > 0 ? 'bg-[#0A84FF]' : 'bg-white/40'}`} />
               </span>
-              {totalCount} active
+              {totalCount + replyQueueCount} active
             </div>
           )}
         />
+
+        <OpportunityStageNav activeStage="review" reviewCount={totalCount} replyCount={replyQueueCount} />
 
         {/* ── Filter Bar ──────────────────────────────────────────── */}
         <div className="mb-0 flex flex-col gap-3 border-y border-[#E7E7E3] py-3 sm:flex-row sm:items-center sm:justify-between px-0 shrink-0">
@@ -585,9 +590,9 @@ export default function OpportunitiesPage() {
             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">
               <Target className="h-8 w-8" strokeWidth={2.25} />
             </div>
-            <h3 className="mb-2 text-[20px] font-semibold text-text-primary">No active opportunities</h3>
+            <h3 className="mb-2 text-[20px] font-semibold text-text-primary">No leads to review</h3>
             <p className="max-w-sm text-[15px] leading-relaxed text-text-secondary">
-              New qualified conversations will appear here with their source evidence and draft status.
+              New qualified conversations will appear here. Leads move to the reply queue as soon as a draft is prepared.
             </p>
           </div>
         ) : (
@@ -624,7 +629,7 @@ export default function OpportunitiesPage() {
 
               {/* List count footer */}
               <div className="px-4 py-3 text-center">
-                <span className="text-[11px] text-[#8C8C85]">{filtered.length} of {totalCount} opportunities</span>
+                <span className="text-[11px] text-[#8C8C85]">{filtered.length} of {totalCount} leads to review</span>
               </div>
             </div>
 

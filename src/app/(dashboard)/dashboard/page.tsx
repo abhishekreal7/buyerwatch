@@ -1051,7 +1051,7 @@ export default function DashboardPage() {
             </span>
             {stats.draftsReady > 0 ? (
               <a
-                href="/drafts"
+                href="/opportunities/replies"
                 className="text-[11.5px] font-semibold text-[#0A84FF] hover:underline underline-offset-2 transition-colors"
               >
                 Review Now →

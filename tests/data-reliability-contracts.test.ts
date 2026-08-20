@@ -6,7 +6,9 @@ const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 
 const dashboard = source('src/app/(dashboard)/dashboard/page.tsx')
 const opportunities = source('src/app/(dashboard)/opportunities/page.tsx')
-const drafts = source('src/app/(dashboard)/drafts/page.tsx')
+const drafts = source('src/components/ReplyQueueWorkspace.tsx')
+const draftsRedirect = source('src/app/(dashboard)/drafts/page.tsx')
+const opportunityStageNav = source('src/components/OpportunityStageNav.tsx')
 const analytics = source('src/app/(dashboard)/analytics/page.tsx')
 const keywords = source('src/app/(dashboard)/keywords/page.tsx')
 const settings = source('src/app/(dashboard)/settings/page.tsx')
@@ -65,13 +67,26 @@ describe('dashboard data reliability contracts', () => {
     expect(opportunities).toContain('return filtered[0]?.id ?? null')
   })
 
-  it('uses the same scored opportunity and ready-draft definitions in the sidebar', () => {
+  it('uses one active-opportunity definition in the sidebar', () => {
     expect(dashboardLayout).toContain(".not('intent_score', 'is', null)")
     expect(dashboardLayout).toContain(".gte('intent_score', ACTIONABLE_INTENT_THRESHOLD)")
-    expect(dashboardLayout).toContain(".in('status', ['drafted', 'needs_manual_reply'])")
-    expect(dashboardLayout).toContain("item.name === 'Drafts Ready' && draftReadyCount !== null")
+    expect(dashboardLayout).toContain(".in('status', ['pending', 'drafted', 'needs_manual_reply'])")
+    expect(dashboardLayout).not.toContain("name: 'Drafts Ready'")
+    expect(dashboardLayout).toContain("item.name === 'Opportunities' && opportunityCount !== null")
     expect(dashboardLayout).toContain('void loadSidebarData()')
     expect(dashboardLayout).not.toContain('badgeCount = credits.used')
+  })
+
+  it('consolidates lead review and reply preparation into one Opportunities workflow', () => {
+    expect(opportunityStageNav).toContain("href: '/opportunities'")
+    expect(opportunityStageNav).toContain("href: '/opportunities/replies'")
+    expect(opportunityStageNav).toContain("label: 'Review leads'")
+    expect(opportunityStageNav).toContain("label: 'Reply queue'")
+    expect(draftsRedirect).toContain("permanentRedirect('/opportunities/replies')")
+    expect(opportunities).toContain(".eq('status', 'pending')")
+    expect(drafts).toContain(".in('status', ['drafted', 'needs_manual_reply'])")
+    expect(drafts).toContain(".eq('id', initialThreadId)")
+    expect(drafts).toContain('data.some(draft => draft.id === requestedRow.id)')
   })
 
   it('settles network-backed busy states and rolls back optimistic mutations', () => {

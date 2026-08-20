@@ -4,7 +4,6 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  DocumentTextIcon,
   PresentationChartLineIcon,
   PuzzlePieceIcon,
   CubeIcon,
@@ -78,9 +77,9 @@ const MAIN_NAV_ITEMS = [
     icon: CustomDashboardIcon,
   },
   {
-    name: 'Drafts Ready',
-    href: '/drafts',
-    icon: DocumentTextIcon,
+    name: 'Opportunities',
+    href: '/opportunities',
+    icon: CubeIcon,
   },
   {
     name: 'Analytics',
@@ -93,11 +92,6 @@ const MAIN_NAV_ITEMS = [
     icon: PuzzlePieceIcon,
   },
   {
-    name: 'Opportunities',
-    href: '/opportunities',
-    icon: CubeIcon,
-  },
-  {
     name: 'Posted',
     href: '/posted',
     icon: FolderIcon,
@@ -105,7 +99,7 @@ const MAIN_NAV_ITEMS = [
 ]
 
 const MOBILE_NAV_ITEMS = MAIN_NAV_ITEMS.filter((item) =>
-  ['Drafts Ready', 'Analytics', 'Keywords', 'Opportunities'].includes(item.name)
+  ['Opportunities', 'Analytics', 'Keywords'].includes(item.name)
 )
 
 type DashboardLayoutProps = {
@@ -136,7 +130,6 @@ function DashboardShell({
   const [plan, setPlan] = useState<PlanTier>(initialData.plan)
   const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
-  const [draftReadyCount, setDraftReadyCount] = useState<number | null>(null)
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
   const [openingCheckout, setOpeningCheckout] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -163,7 +156,7 @@ function DashboardShell({
     async function loadSidebarData() {
       try {
         const usageMonth = getCurrentUsageMonth()
-        const [profileResult, opportunityCountResult, draftReadyCountResult, keywordCountResult, addonCreditsResult] = await Promise.all([
+        const [profileResult, opportunityCountResult, keywordCountResult, addonCreditsResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('auto_send_enabled, plan, draft_count, draft_month')
@@ -176,11 +169,6 @@ function DashboardShell({
             .in('status', ['pending', 'drafted', 'needs_manual_reply'])
             .not('intent_score', 'is', null)
             .gte('intent_score', ACTIONABLE_INTENT_THRESHOLD),
-          supabase
-            .from('monitored_threads')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .in('status', ['drafted', 'needs_manual_reply']),
           supabase
             .from('keywords')
             .select('id', { count: 'exact', head: true })
@@ -196,7 +184,6 @@ function DashboardShell({
         const sidebarError = [
           profileResult,
           opportunityCountResult,
-          draftReadyCountResult,
           keywordCountResult,
           addonCreditsResult,
         ].find(result => result.error)?.error
@@ -219,7 +206,6 @@ function DashboardShell({
         }
 
         if (!opportunityCountResult.error) setOpportunityCount(opportunityCountResult.count ?? 0)
-        if (!draftReadyCountResult.error) setDraftReadyCount(draftReadyCountResult.count ?? 0)
         if (!keywordCountResult.error) setKeywordCount(keywordCountResult.count ?? 0)
       } catch (error) {
         console.error('[dashboard-layout] Unable to refresh sidebar metrics', error)
@@ -386,9 +372,7 @@ function DashboardShell({
                 const IconComp = item.icon as any
                 // Get count badge data if available
                 let badgeCount: number | undefined = undefined
-                if (item.name === 'Drafts Ready' && draftReadyCount !== null) {
-                  badgeCount = draftReadyCount
-                } else if (item.name === 'Opportunities' && opportunityCount !== null) {
+                if (item.name === 'Opportunities' && opportunityCount !== null) {
                   badgeCount = opportunityCount
                 } else if (item.name === 'Keywords' && keywordCount !== null) {
                   badgeCount = keywordCount
