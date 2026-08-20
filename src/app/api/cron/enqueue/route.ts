@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
-import { fetchWithTimeout } from '@/lib/http'
+import { fetchWithTimeout, withTimeout } from '@/lib/http'
 import { logger } from '@/lib/logger'
-import { hasQStashConfiguration, verifyQStashRequest } from '@/lib/qstash'
+import {
+  ensureMonitoringSchedule,
+  hasQStashConfiguration,
+  verifyQStashRequest,
+} from '@/lib/qstash'
 import { isUuid, readTextBody, RequestInputError } from '@/lib/request'
 import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
 import { runServerlessMonitoring } from '@/lib/serverless-monitor'
@@ -75,6 +79,16 @@ export async function POST(request: Request) {
   if (!await verifyQStashRequest(request, body)) {
     logger.warn('Rejected invalid QStash monitor request')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!body.trim()) {
+    await withTimeout(
+      ensureMonitoringSchedule(),
+      5_000,
+      'QStash schedule self-check',
+    ).catch((error) => {
+      logger.error({ error }, 'Unable to verify the QStash monitoring schedule')
+    })
   }
 
   let forceUserId: string | undefined
