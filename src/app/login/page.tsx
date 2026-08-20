@@ -128,10 +128,11 @@ function LoginContent() {
             {selectedPlan && <input type="hidden" name="plan" value={selectedPlan} />}
             {selectedPlan && <input type="hidden" name="billing" value={selectedBilling} />}
             <div>
-              <label className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
+              <label htmlFor="login-email" className="block text-[12px] font-medium text-[#444444] mb-1.5 ml-0.5">
                 Email address
               </label>
               <input
+                id="login-email"
                 name="email"
                 type="email"
                 placeholder="name@company.com"
@@ -142,7 +143,7 @@ function LoginContent() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5 ml-0.5">
-                <label className="block text-[12px] font-medium text-[#444444]">
+                <label htmlFor="login-password" className="block text-[12px] font-medium text-[#444444]">
                   Password
                 </label>
                 <Link
@@ -153,6 +154,7 @@ function LoginContent() {
                 </Link>
               </div>
               <input
+                id="login-password"
                 name="password"
                 type="password"
                 placeholder="••••••••"
