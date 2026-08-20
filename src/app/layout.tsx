@@ -38,12 +38,12 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/buyerwatch-icon.png?v=3',
-        type: 'image/png',
-        sizes: '128x128',
+        url: '/buyerwatch-favicon.svg?v=4',
+        type: 'image/svg+xml',
+        sizes: 'any',
       },
     ],
-    shortcut: [{ url: '/buyerwatch-icon.png?v=3', type: 'image/png' }],
+    shortcut: [{ url: '/buyerwatch-favicon.svg?v=4', type: 'image/svg+xml' }],
     apple: [{ url: '/buyerwatch-icon.png?v=3', type: 'image/png', sizes: '128x128' }],
   },
 };
