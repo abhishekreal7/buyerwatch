@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { getSendReplyJobId } from '../src/lib/reply-jobs'
 import { isPollingDue } from '../src/lib/plan-limits'
+import { monitoringJobBucket } from '../src/lib/scheduler-jobs'
 
 const migration = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260725_production_hardening.sql'),
@@ -40,6 +41,10 @@ const prePaymentIntegrityMigration = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260806010000_pre_payment_plan_integrity.sql'),
   'utf8',
 )
+const keywordFreshnessMigration = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260820160000_keyword_poll_freshness.sql'),
+  'utf8',
+)
 
 describe('plan and scheduler contracts', () => {
   it('applies explicit polling intervals to every plan', () => {
@@ -49,6 +54,36 @@ describe('plan and scheduler contracts', () => {
     expect(isPollingDue('pro', '2026-07-24T11:54:59.000Z', now)).toBe(true)
     expect(isPollingDue('free', '2026-07-24T10:59:59.000Z', now)).toBe(true)
     expect(isPollingDue('free', '2026-07-24T11:00:01.000Z', now)).toBe(false)
+  })
+
+  it('does not deduplicate five-minute paid polling windows', () => {
+    expect(monitoringJobBucket(new Date('2026-08-20T12:00:00.000Z')))
+      .toBe(monitoringJobBucket(new Date('2026-08-20T12:04:59.000Z')))
+    expect(monitoringJobBucket(new Date('2026-08-20T12:00:00.000Z')))
+      .not.toBe(monitoringJobBucket(new Date('2026-08-20T12:05:00.000Z')))
+  })
+
+  it('tracks source success per keyword and backs failed targets off', () => {
+    expect(keywordFreshnessMigration).toContain('last_success_at timestamptz')
+    expect(keywordFreshnessMigration).toContain("last_check_status in ('never', 'success', 'error')")
+    expect(keywordFreshnessMigration).toContain('record_keyword_poll_success_v1')
+    expect(keywordFreshnessMigration).toContain('record_keyword_poll_failure_v1')
+    expect(keywordFreshnessMigration).toContain('next_poll_at = p_checked_at + make_interval')
+    expect(keywordFreshnessMigration).toContain('least(60, 5 * (2 ^ least(consecutive_failures, 4)))')
+  })
+
+  it('quarantines stale pending work using source time under service-role authorization', () => {
+    expect(keywordFreshnessMigration).toContain('quarantine_stale_pending_threads_v1')
+    expect(keywordFreshnessMigration).toContain('coalesce(source_created_at, created_at) < p_cutoff')
+    const privileged = keywordFreshnessMigration
+      .split(/create or replace function /i)
+      .slice(1)
+      .filter(definition => /security definer/i.test(definition))
+    expect(privileged).toHaveLength(3)
+    for (const definition of privileged) {
+      expect(definition).toMatch(/set search_path = public, pg_temp/i)
+      expect(definition).toContain("auth.role() <> 'service_role'")
+    }
   })
 
   it('keeps reply job identity stable across manual and automatic producers', () => {

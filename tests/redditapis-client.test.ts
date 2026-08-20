@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchRedditApisAccountStatus,
   fetchRedditPostSnapshot,
+  getRedditApisDailyBudgetStatus,
   postRedditApisComment,
   RedditApisRequestError,
 } from '../src/lib/redditapis-client'
+import { redis } from '../src/lib/redis'
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -123,6 +125,58 @@ describe('RedditAPIs client reliability', () => {
     })
   })
 
+  it('requires reconnection when Reddit rejects an expired provider session', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      error: 'Reddit session cookie expired; log in again',
+    }, 403)))
+
+    await expect(postRedditApisComment({
+      postUrl: 'https://www.reddit.com/r/SaaS/comments/abc123/a-title/',
+      text: 'Helpful reply',
+      cookies: { reddit_session: 'session', loid: 'loid' },
+    })).rejects.toMatchObject({
+      code: 'reddit_reconnect_required',
+      retryable: false,
+      deliveryUncertain: false,
+      reauthRequired: true,
+    })
+  })
+
+  it('treats a non-session 403 as a definitive comment rejection', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      error: 'You may not comment in this community',
+    }, 403)))
+
+    await expect(postRedditApisComment({
+      postUrl: 'https://www.reddit.com/r/SaaS/comments/abc123/a-title/',
+      text: 'Helpful reply',
+      cookies: { reddit_session: 'session', loid: 'loid' },
+    })).rejects.toMatchObject({
+      code: 'reddit_comment_rejected',
+      retryable: false,
+      deliveryUncertain: false,
+      reauthRequired: false,
+    })
+  })
+
+  it('does not accept provider proof for a different Reddit post', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      success: true,
+      comment_id: 't1_reply123',
+      permalink: 'https://www.reddit.com/r/SaaS/comments/other1/a-title/reply123/',
+    })))
+
+    await expect(postRedditApisComment({
+      postUrl: 'https://www.reddit.com/r/SaaS/comments/abc123/a-title/',
+      text: 'Helpful reply',
+      cookies: { reddit_session: 'session', loid: 'loid' },
+    })).rejects.toMatchObject({
+      code: 'reddit_delivery_outcome_unknown',
+      retryable: false,
+      deliveryUncertain: true,
+    })
+  })
+
   it('validates provider account balance responses without exposing account details', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
       email: 'private@example.com',
@@ -131,5 +185,97 @@ describe('RedditAPIs client reliability', () => {
     })))
 
     await expect(fetchRedditApisAccountStatus()).resolves.toEqual({ creditsRemaining: 3.25 })
+  })
+
+  it('blocks paid reads before the provider call when the daily budget is exhausted', async () => {
+    vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
+    vi.spyOn(redis, 'eval').mockResolvedValue(-1 as never)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchRedditPostSnapshot(
+      'https://www.reddit.com/r/SaaS/comments/abc123/a-title/',
+    )).rejects.toMatchObject({
+      code: 'reddit_provider_daily_read_budget_exhausted',
+      retryable: false,
+      deliveryUncertain: false,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not classify a preflight write-budget block as uncertain delivery', async () => {
+    vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
+    vi.spyOn(redis, 'eval').mockResolvedValue(-1 as never)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(postRedditApisComment({
+      postUrl: 'https://www.reddit.com/r/SaaS/comments/abc123/a-title/',
+      text: 'Helpful reply',
+      cookies: { reddit_session: 'session', loid: 'loid' },
+    })).rejects.toMatchObject({
+      code: 'reddit_provider_daily_write_budget_exhausted',
+      retryable: false,
+      deliveryUncertain: false,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the free provider account check outside paid request budgets', async () => {
+    vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
+    const budgetSpy = vi.spyOn(redis, 'eval')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      credits_remaining: 2.5,
+    })))
+
+    await expect(fetchRedditApisAccountStatus()).resolves.toEqual({ creditsRemaining: 2.5 })
+    expect(budgetSpy).not.toHaveBeenCalled()
+  })
+
+  it('reports shared daily budget usage without consuming another paid call', async () => {
+    vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_MAX_DAILY_READ_CALLS', '25')
+    vi.stubEnv('REDDITAPIS_MAX_DAILY_WRITE_CALLS', '4')
+    vi.spyOn(redis, 'mget').mockResolvedValue(['7', '2'] as never)
+    const budgetSpy = vi.spyOn(redis, 'eval')
+
+    await expect(getRedditApisDailyBudgetStatus()).resolves.toEqual({
+      read: { used: 7, limit: 25 },
+      write: { used: 2, limit: 4 },
+    })
+    expect(budgetSpy).not.toHaveBeenCalled()
+  })
+
+  it('uses separate account and read circuits so one cannot reset the other', async () => {
+    vi.stubEnv('REDDITAPIS_CIRCUIT_BREAKER_ENABLED', 'true')
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
+    const delSpy = vi.spyOn(redis, 'del').mockResolvedValue(1 as never)
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ credits_remaining: 2.5 }))
+      .mockResolvedValueOnce(jsonResponse({
+        posts: [{
+          id: 'abc123',
+          author: 'prospect',
+          subreddit: 'SaaS',
+          url: 'https://www.reddit.com/r/SaaS/comments/abc123/',
+          created: '2026-08-20T08:00:00.000Z',
+          locked: false,
+          stickied: false,
+          over_18: false,
+        }],
+        after: null,
+      })))
+
+    await fetchRedditApisAccountStatus()
+    await fetchRedditPostSnapshot('https://www.reddit.com/r/SaaS/comments/abc123/a-title/')
+
+    expect(delSpy).toHaveBeenCalledWith(
+      'circuit:redditapis:account:failures:v2',
+      'circuit:redditapis:account:open:v2',
+    )
+    expect(delSpy).toHaveBeenCalledWith(
+      'circuit:redditapis:read:failures:v2',
+      'circuit:redditapis:read:open:v2',
+    )
   })
 })

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { fetchWithTimeout } from '@/lib/http'
 import { logger } from '@/lib/logger'
 import { hasQStashConfiguration, verifyQStashRequest } from '@/lib/qstash'
-import { isUuid } from '@/lib/request'
+import { isUuid, readTextBody, RequestInputError } from '@/lib/request'
 import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
 import { runServerlessMonitoring } from '@/lib/serverless-monitor'
 
@@ -57,7 +57,21 @@ export async function POST(request: Request) {
     )
   }
 
-  const body = await request.text()
+  let body: string
+  try {
+    body = await readTextBody(request, 4_096)
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json(
+        { error: error.message },
+        {
+          status: error.message === 'request_too_large' ? 413 : 400,
+          headers: { 'Upstash-NonRetryable-Error': 'true' },
+        },
+      )
+    }
+    throw error
+  }
   if (!await verifyQStashRequest(request, body)) {
     logger.warn('Rejected invalid QStash monitor request')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

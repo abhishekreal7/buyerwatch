@@ -1,6 +1,7 @@
 import { hasBuyingSignal } from './buying-signal-filter'
+import { evaluateContentFreshness } from './content-freshness'
 import { hasDisqualifyingIntentNoise } from './intent-preflight'
-import { containsConfiguredPhrase } from './phrase-match'
+import { containsConfiguredPhrase, containsConfiguredPhraseOrAlias } from './phrase-match'
 import type { NormalizedPost } from './types'
 
 export type SocialKeywordMapping = {
@@ -50,10 +51,14 @@ export function buildSocialScoreCandidates(
   let skipped = 0
 
   for (const post of posts) {
+    if (!evaluateContentFreshness(post.createdAt).fresh) {
+      skipped += userKeywords.size
+      continue
+    }
     const searchable = `${post.title || ''} ${post.text || ''}`
 
     for (const [userId, keywords] of userKeywords) {
-      const matched = keywords.find(({ term }) => containsConfiguredPhrase(searchable, term))
+      const matched = keywords.find(({ term }) => containsConfiguredPhraseOrAlias(searchable, term))
       const competitorMatch = keywords.find(({ competitors }) =>
         (competitors ?? []).some(competitor =>
           competitor.trim().length > 1

@@ -2,7 +2,7 @@ import path from 'node:path'
 import dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+dotenv.config({ path: path.resolve(process.cwd(), process.env.ENV_FILE || '.env.local') })
 
 const providerKey = process.env.REDDITAPIS_API_KEY?.trim()
 const postingEnabled = process.env.REDDITAPIS_POSTING_ENABLED === 'true'
@@ -34,7 +34,7 @@ async function checkProvider() {
     fail(`RedditAPIs account check failed with HTTP ${response.status}`)
     return
   }
-  if (credits < 0.02) {
+  if (credits < 0.05) {
     fail('RedditAPIs balance is below the minimum needed for one fully gated reply')
     return
   }

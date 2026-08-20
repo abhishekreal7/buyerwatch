@@ -10,7 +10,7 @@ import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
-import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { getPlanLimits, normalizePlan, PLAN_POLL_INTERVAL_MINUTES } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -25,6 +25,32 @@ interface Keyword {
   target: string
   is_active: boolean
   created_at: string
+  last_checked_at: string | null
+  last_success_at: string | null
+  last_check_status: 'never' | 'success' | 'error'
+  last_check_error: string | null
+}
+
+function relativeCheckTime(value: string | null): string {
+  const timestamp = Date.parse(value ?? '')
+  if (!Number.isFinite(timestamp)) return 'Waiting for first check'
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000))
+  if (minutes < 1) return 'Checked just now'
+  if (minutes < 60) return `Checked ${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `Checked ${hours}h ago`
+  return `Checked ${Math.floor(hours / 24)}d ago`
+}
+
+function isKeywordCheckDelayed(keyword: Keyword, plan: string): boolean {
+  if (!keyword.is_active) return false
+  if (keyword.last_check_status !== 'success') return true
+  const lastSuccessAt = Date.parse(keyword.last_success_at ?? '')
+  if (!Number.isFinite(lastSuccessAt)) return true
+  const staleAfterMs = (
+    PLAN_POLL_INTERVAL_MINUTES[normalizePlan(plan)] * 3 + 10
+  ) * 60_000
+  return Date.now() - lastSuccessAt > staleAfterMs
 }
 
 /* ─── Platform metadata ──────────────────────────────────────────── */
@@ -524,6 +550,7 @@ export default function KeywordsPage() {
             {filtered.map((kw, index) => {
               const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
               const successRate = getSuccessRate(threadStats.total, threadStats.replied)
+              const sourceDelayed = isKeywordCheckDelayed(kw, userPlan)
 
               return (
                 <div
@@ -545,9 +572,21 @@ export default function KeywordsPage() {
                   </span>
 
                   {/* Deals / Term column */}
-                  <div className="flex items-center min-w-0 pr-2">
+                  <div className="flex min-w-0 flex-col pr-2">
                     <span className="text-[14px] font-semibold text-[#1C1C1A] tracking-[-0.01em] truncate">
                       {kw.term}
+                    </span>
+                    <span
+                      className={`mt-0.5 truncate text-[11px] font-medium ${
+                        sourceDelayed ? 'text-amber-700' : 'text-[#92928C]'
+                      }`}
+                      title={sourceDelayed
+                        ? `Source delayed (${kw.last_check_error || 'freshness window missed'}); retrying automatically`
+                        : 'Last successful source check'}
+                    >
+                      {sourceDelayed
+                        ? `Delayed · ${relativeCheckTime(kw.last_checked_at).replace('Checked ', '')}`
+                        : relativeCheckTime(kw.last_success_at)}
                     </span>
                   </div>
 

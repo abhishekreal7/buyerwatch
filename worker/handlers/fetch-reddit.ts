@@ -9,6 +9,10 @@ import {
   withProfileCompetitors,
 } from '../../src/lib/reddit-candidates'
 import { fetchSubredditNew } from '../../src/lib/reddit'
+import {
+  recordKeywordPollFailure,
+  recordKeywordPollSuccess,
+} from '../../src/lib/keyword-poll-health'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -20,18 +24,10 @@ export async function redditFetchHandler(job: Job) {
     keywordMappings?: RedditKeywordMapping[]
   }
 
-  if (process.env.REDDIT_API_APPROVED !== 'true') {
-    logger.info(
-      { job: job.id, subreddit: target },
-      'Reddit fetch using public-feed fallbacks; OAuth API approval pending',
-    )
-  }
-
+  let keywordMappings = preloadedMappings
+  let keywordIds = preloadedMappings?.map(({ id }) => id) ?? []
+  let sourceFetchRecorded = false
   try {
-    const posts = await fetchSubredditNew(target)
-    if (!posts || posts.length === 0) return
-
-    let keywordMappings = preloadedMappings
     if (!keywordMappings) {
       const { data, error } = await supabase
         .from('keywords')
@@ -57,6 +53,15 @@ export async function redditFetchHandler(job: Job) {
     }
 
     if (keywordMappings.length === 0) return
+    keywordIds = keywordMappings.map(({ id }) => id)
+
+    const posts = await fetchSubredditNew(target)
+    await recordKeywordPollSuccess(keywordIds)
+    sourceFetchRecorded = true
+    if (!posts || posts.length === 0) {
+      logger.info({ subreddit: target }, `r/${target}: source checked; no posts returned`)
+      return
+    }
 
     const discovery = buildRedditScoreCandidates(posts, keywordMappings)
     for (const candidate of discovery.candidates) {
@@ -76,6 +81,11 @@ export async function redditFetchHandler(job: Job) {
       `r/${target}: ${discovery.candidates.length} enqueued, ${discovery.skipped} skipped`,
     )
   } catch (error) {
+    if (!sourceFetchRecorded) {
+      await recordKeywordPollFailure(keywordIds, error).catch((healthError) => {
+        logger.error({ healthError, target }, 'Failed to record Reddit keyword poll failure')
+      })
+    }
     logger.error({ error }, `Failed to fetch reddit target r/${target}`)
     throw error
   }

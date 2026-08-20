@@ -8,6 +8,12 @@ type StoredRedditSession = {
   cookies: RedditSessionCookies
 }
 
+export type ActiveRedditSession = StoredRedditSession & {
+  accountCreatedAt: string | null
+  linkKarma: number | null
+  commentKarma: number | null
+}
+
 export type RedditConnectionStatus = 'active' | 'reauth_required' | 'error' | 'missing'
 
 export type RedditConnectionSummary = {
@@ -86,11 +92,11 @@ export async function saveRedditApisConnection(input: {
   }
 }
 
-export async function getActiveRedditSession(userId: string): Promise<StoredRedditSession> {
+export async function getActiveRedditSession(userId: string): Promise<ActiveRedditSession> {
   const admin = getServiceRoleClient()
   const { data, error } = await admin
     .from('reddit_connection_secrets')
-    .select('session_ciphertext, status')
+    .select('session_ciphertext, status, account_created_at, link_karma, comment_karma')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -105,7 +111,12 @@ export async function getActiveRedditSession(userId: string): Promise<StoredRedd
   }
 
   try {
-    return validateStoredSession(JSON.parse(decrypt(data.session_ciphertext)) as unknown)
+    return {
+      ...validateStoredSession(JSON.parse(decrypt(data.session_ciphertext)) as unknown),
+      accountCreatedAt: data.account_created_at ?? null,
+      linkKarma: Number.isSafeInteger(data.link_karma) ? data.link_karma : null,
+      commentKarma: Number.isSafeInteger(data.comment_karma) ? data.comment_karma : null,
+    }
   } catch (error) {
     await admin
       .from('reddit_connection_secrets')
@@ -128,6 +139,31 @@ export async function hasActiveRedditConnection(userId: string): Promise<boolean
     .eq('status', 'active')
     .maybeSingle()
   return !error && Boolean(data)
+}
+
+export async function updateRedditConnectionAccountProfile(
+  userId: string,
+  profile: {
+    accountCreatedAt: string | null
+    linkKarma: number | null
+    commentKarma: number | null
+  },
+): Promise<void> {
+  const { data, error } = await getServiceRoleClient()
+    .from('reddit_connection_secrets')
+    .update({
+      account_created_at: profile.accountCreatedAt,
+      link_karma: profile.linkKarma,
+      comment_karma: profile.commentKarma,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .select('connection_id')
+    .maybeSingle()
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_account_profile_save_failed')
+  }
 }
 
 export async function getRedditConnectionSummary(userId: string): Promise<RedditConnectionSummary> {

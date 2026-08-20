@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
       }
 
       const { data, error } = await threadsQuery
+        .order('source_created_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1)
       if (error) throw error

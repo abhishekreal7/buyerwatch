@@ -116,6 +116,7 @@ export default function DraftsPage() {
             .select('*, reply_analytics(draft_text), keywords(term, target)')
             .eq('user_id', userId)
             .in('status', ['drafted', 'needs_manual_reply'])
+            .order('source_created_at', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false })
             .range(0, PAGE_SIZE - 1),
           supabase
@@ -160,6 +161,7 @@ export default function DraftsPage() {
         .select('*, reply_analytics(draft_text), keywords(term, target)')
         .eq('user_id', userId)
         .in('status', ['drafted', 'needs_manual_reply'])
+        .order('source_created_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .range(from, from + PAGE_SIZE - 1)
       if (error) throw error

@@ -20,9 +20,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint || true
-      - run: npm test || true
+      - run: npm run verify
+      - run: npm run build:worker
       - name: Production build
         run: npm run build
         env:
@@ -40,7 +39,18 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ secrets.E2E_USER_EMAIL != '' && secrets.E2E_BASE_URL != '' }}
+    env:
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+      NEXT_PUBLIC_SUPPORT_EMAIL: support@buyerwatch.co
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+      UPSTASH_REDIS_URL: redis://127.0.0.1:6379
+      CRON_SECRET: ci-cron-secret-00000000000000000000
+      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,10 +60,6 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
-        env:
-          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
-          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -80,7 +86,6 @@ jobs:
   worker-image:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Build worker image

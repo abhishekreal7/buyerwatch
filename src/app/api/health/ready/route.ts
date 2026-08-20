@@ -10,6 +10,9 @@ export async function GET() {
       service: 'buyerwatch-web',
       timestamp: new Date().toISOString(),
       checks: result.checks,
+      dependencies: {
+        redditProviderRequired: result.redditProviderRequired,
+      },
     },
     {
       status: result.ready ? 200 : 503,

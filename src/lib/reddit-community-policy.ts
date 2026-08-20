@@ -1,11 +1,10 @@
 import { hasDisclosure, mentionsProduct } from './reply-quality'
-import { redditApisFetch } from './redditapis-client'
+import { redditApisFetchJson } from './redditapis-client'
 import { redis } from './redis'
 
 const SUBREDDIT_PATTERN = /^[a-z0-9_]{2,50}$/i
 const POLICY_CACHE_TTL_SECONDS = 15 * 60
 const POLICY_CACHE_TTL_MS = POLICY_CACHE_TTL_SECONDS * 1_000
-const MAX_RESPONSE_BYTES = 750_000
 const MAX_EVIDENCE_ITEMS = 4
 
 const PROMOTION_TERMS = '(?:self[-\\s]?promo(?:tion)?|promotions?|promotional(?:\\s+(?:content|posts?))?|advertis(?:e|ing|ement)s?|solicit(?:ation|ing)?|marketing|commercial(?:\\s+(?:content|posts?))?|selling)'
@@ -321,14 +320,13 @@ type JsonFetchResult =
 
 async function fetchRedditJson(path: string): Promise<JsonFetchResult> {
   try {
-    const response = await redditApisFetch(path, {
+    const { response, payload } = await redditApisFetchJson(path, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
         'Cache-Control': 'no-cache',
       },
     }, 8_000)
-    const raw = await response.text()
     if (!response.ok) {
       return {
         ok: false,
@@ -336,14 +334,7 @@ async function fetchRedditJson(path: string): Promise<JsonFetchResult> {
         reason: `reddit_http_${response.status}`,
       }
     }
-    if (raw.length > MAX_RESPONSE_BYTES) {
-      return { ok: false, status: response.status, reason: 'reddit_response_too_large' }
-    }
-    try {
-      return { ok: true, value: JSON.parse(raw) }
-    } catch {
-      return { ok: false, status: response.status, reason: 'reddit_invalid_json' }
-    }
+    return { ok: true, value: payload }
   } catch (error) {
     return {
       ok: false,

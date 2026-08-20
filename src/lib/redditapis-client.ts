@@ -1,5 +1,6 @@
 import { getConfiguredSecret } from './env'
 import { fetchWithTimeout } from './http'
+import { redis } from './redis'
 import {
   parseRedditCommentResponse,
   parseRedditApisListingPage,
@@ -14,6 +15,27 @@ import {
 
 const REDDITAPIS_BASE_URL = 'https://api.redditapis.com'
 const MAX_PROVIDER_RESPONSE_BYTES = 256_000
+const PROVIDER_FAILURE_THRESHOLD = 3
+const PROVIDER_OPEN_SECONDS = 5 * 60
+const PROVIDER_BUDGET_KEY_PREFIX = 'budget:redditapis:v1'
+const DEFAULT_DAILY_READ_CALL_LIMIT = 250
+const DEFAULT_DAILY_WRITE_CALL_LIMIT = 10
+const MAX_CONFIGURED_DAILY_CALL_LIMIT = 100_000
+
+// A fully gated automatic reply can require three community-policy reads,
+// five bounded preflight pages, and one comment write. Keep headroom above
+// that worst-case provider cost so a send does not start with insufficient
+// credit and fail halfway through its safety checks.
+export const REDDITAPIS_MINIMUM_OPERATIONAL_CREDITS = 0.05
+
+type RedditApisCircuitScope = 'account' | 'read' | 'write'
+type RedditApisBudgetScope = 'none' | 'read' | 'write'
+
+type RedditApisFetchOptions = {
+  writeOperation?: boolean
+  circuitScope?: RedditApisCircuitScope
+  budgetScope?: RedditApisBudgetScope
+}
 
 export class RedditApisRequestError extends Error {
   constructor(
@@ -34,6 +56,162 @@ function getApiKey(): string {
     throw new RedditApisRequestError('reddit_provider_not_configured', null, false)
   }
   return key
+}
+
+function circuitBreakerEnabled(): boolean {
+  return process.env.NODE_ENV === 'production'
+    || process.env.REDDITAPIS_CIRCUIT_BREAKER_ENABLED === 'true'
+}
+
+function budgetGuardEnabled(): boolean {
+  return process.env.NODE_ENV === 'production'
+    || process.env.REDDITAPIS_BUDGET_GUARD_ENABLED === 'true'
+}
+
+function circuitKey(scope: RedditApisCircuitScope, kind: 'failures' | 'open'): string {
+  return `circuit:redditapis:${scope}:${kind}:v2`
+}
+
+function boundedDailyLimit(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim()
+  if (!raw) return fallback
+  const value = Number(raw)
+  if (!Number.isSafeInteger(value) || value < 0) return fallback
+  return Math.min(value, MAX_CONFIGURED_DAILY_CALL_LIMIT)
+}
+
+function budgetKey(scope: Exclude<RedditApisBudgetScope, 'none'>, now = new Date()): string {
+  return `${PROVIDER_BUDGET_KEY_PREFIX}:${scope}:${now.toISOString().slice(0, 10)}`
+}
+
+function secondsUntilBudgetExpiry(now = new Date()): number {
+  const expiry = new Date(now)
+  expiry.setUTCDate(expiry.getUTCDate() + 2)
+  expiry.setUTCHours(0, 0, 0, 0)
+  return Math.max(60, Math.ceil((expiry.getTime() - now.getTime()) / 1_000))
+}
+
+function resolveCircuitScope(
+  path: string,
+  options: RedditApisFetchOptions,
+): RedditApisCircuitScope {
+  if (options.circuitScope) return options.circuitScope
+  if (path.startsWith('/account/')) return 'account'
+  return options.writeOperation === true ? 'write' : 'read'
+}
+
+function resolveBudgetScope(
+  path: string,
+  init: RequestInit,
+  options: RedditApisFetchOptions,
+): RedditApisBudgetScope {
+  if (options.budgetScope) return options.budgetScope
+  if (path.startsWith('/account/')) return 'none'
+  const method = (init.method ?? 'GET').toUpperCase()
+  return options.writeOperation === true || !['GET', 'HEAD'].includes(method)
+    ? 'write'
+    : 'read'
+}
+
+async function assertProviderCircuitClosed(
+  scope: RedditApisCircuitScope,
+  writeOperation: boolean,
+): Promise<void> {
+  if (!circuitBreakerEnabled()) return
+  try {
+    const openKey = circuitKey(scope, 'open')
+    const openedUntil = Number(await redis.get(openKey))
+    if (Number.isFinite(openedUntil) && openedUntil > Date.now()) {
+      throw new RedditApisRequestError('reddit_provider_circuit_open', 503, true)
+    }
+    if (Number.isFinite(openedUntil) && openedUntil > 0) {
+      await redis.del(openKey)
+    }
+  } catch (error) {
+    if (error instanceof RedditApisRequestError) throw error
+    // A write is not allowed to bypass its safety circuit. Read-only discovery
+    // can still use its own bounded retry/backoff path during a Redis incident.
+    if (writeOperation) {
+      throw new RedditApisRequestError('reddit_provider_safety_unavailable', 503, true)
+    }
+  }
+}
+
+async function consumeProviderBudget(scope: RedditApisBudgetScope): Promise<void> {
+  if (scope === 'none' || !budgetGuardEnabled()) return
+  const limit = scope === 'read'
+    ? boundedDailyLimit('REDDITAPIS_MAX_DAILY_READ_CALLS', DEFAULT_DAILY_READ_CALL_LIMIT)
+    : boundedDailyLimit('REDDITAPIS_MAX_DAILY_WRITE_CALLS', DEFAULT_DAILY_WRITE_CALL_LIMIT)
+  if (limit === 0) {
+    throw new RedditApisRequestError(
+      `reddit_provider_daily_${scope}_budget_exhausted`,
+      429,
+      false,
+    )
+  }
+
+  const script = `
+    local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+    local maximum = tonumber(ARGV[1])
+    if current >= maximum then
+      return -1
+    end
+    local next_value = redis.call('INCR', KEYS[1])
+    if next_value == 1 then
+      redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+    end
+    if next_value > maximum then
+      return -1
+    end
+    return next_value
+  `
+
+  try {
+    const result = Number(await redis.eval(
+      script,
+      1,
+      budgetKey(scope),
+      String(limit),
+      String(secondsUntilBudgetExpiry()),
+    ))
+    if (!Number.isFinite(result) || result < 0) {
+      throw new RedditApisRequestError(
+        `reddit_provider_daily_${scope}_budget_exhausted`,
+        429,
+        false,
+      )
+    }
+  } catch (error) {
+    if (error instanceof RedditApisRequestError) throw error
+    // Paid calls must not bypass the shared cost guard during a Redis outage.
+    throw new RedditApisRequestError(
+      'reddit_provider_budget_guard_unavailable',
+      503,
+      true,
+    )
+  }
+}
+
+async function recordProviderFailure(
+  scope: RedditApisCircuitScope,
+  openImmediately = false,
+): Promise<void> {
+  if (!circuitBreakerEnabled()) return
+  const failureKey = circuitKey(scope, 'failures')
+  const openKey = circuitKey(scope, 'open')
+  const failures = openImmediately
+    ? PROVIDER_FAILURE_THRESHOLD
+    : await redis.incr(failureKey)
+  await redis.expire(failureKey, PROVIDER_OPEN_SECONDS)
+  if (failures >= PROVIDER_FAILURE_THRESHOLD) {
+    const openedUntil = Date.now() + PROVIDER_OPEN_SECONDS * 1_000
+    await redis.set(openKey, String(openedUntil), 'EX', PROVIDER_OPEN_SECONDS)
+  }
+}
+
+async function recordProviderSuccess(scope: RedditApisCircuitScope): Promise<void> {
+  if (!circuitBreakerEnabled()) return
+  await redis.del(circuitKey(scope, 'failures'), circuitKey(scope, 'open'))
 }
 
 function safeProviderPath(path: string): string {
@@ -90,10 +268,16 @@ export async function redditApisFetch(
   path: string,
   init: RequestInit = {},
   timeoutMs = 10_000,
-  options: { writeOperation?: boolean } = {},
+  options: RedditApisFetchOptions = {},
 ): Promise<Response> {
+  const safePath = safeProviderPath(path)
+  const apiKey = getApiKey()
+  const circuitScope = resolveCircuitScope(safePath, options)
+  const budgetScope = resolveBudgetScope(safePath, init, options)
+  await assertProviderCircuitClosed(circuitScope, options.writeOperation === true)
+  await consumeProviderBudget(budgetScope)
   const headers = new Headers(init.headers)
-  headers.set('Authorization', `Bearer ${getApiKey()}`)
+  headers.set('Authorization', `Bearer ${apiKey}`)
   headers.set('Accept', 'application/json')
   headers.set('Cache-Control', 'no-cache')
   if (init.body && !headers.has('Content-Type')) {
@@ -101,13 +285,21 @@ export async function redditApisFetch(
   }
 
   try {
-    return await fetchWithTimeout(
-      `${REDDITAPIS_BASE_URL}${safeProviderPath(path)}`,
+    const response = await fetchWithTimeout(
+      `${REDDITAPIS_BASE_URL}${safePath}`,
       { ...init, headers },
       timeoutMs,
     )
+    if (response.status === 402) {
+      // No balance cannot recover through immediate retries.
+      await recordProviderFailure(circuitScope, true).catch(() => undefined)
+    } else if (response.status === 429 || response.status >= 500) {
+      await recordProviderFailure(circuitScope).catch(() => undefined)
+    }
+    return response
   } catch (error) {
     if (error instanceof RedditApisRequestError) throw error
+    await recordProviderFailure(circuitScope).catch(() => undefined)
     throw new RedditApisRequestError(
       options.writeOperation
         ? 'reddit_delivery_outcome_unknown'
@@ -119,12 +311,75 @@ export async function redditApisFetch(
   }
 }
 
+export async function redditApisFetchJson(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 10_000,
+  options: RedditApisFetchOptions = {},
+): Promise<{ response: Response; payload: unknown }> {
+  const safePath = safeProviderPath(path)
+  const scope = resolveCircuitScope(safePath, options)
+  const response = await redditApisFetch(safePath, init, timeoutMs, options)
+  try {
+    const payload = await readProviderJson(response)
+    if (response.ok) await recordProviderSuccess(scope).catch(() => undefined)
+    return { response, payload }
+  } catch (error) {
+    if (!response.ok) {
+      // The HTTP status is still authoritative when an error body is empty or
+      // malformed. In particular, a 429/401 response proves a comment was not
+      // accepted and must not be escalated to an uncertain delivery.
+      return { response, payload: null }
+    }
+    await recordProviderFailure(scope).catch(() => undefined)
+    throw error
+  }
+}
+
+export async function getRedditApisDailyBudgetStatus(): Promise<{
+  read: { used: number; limit: number }
+  write: { used: number; limit: number }
+}> {
+  const readLimit = boundedDailyLimit(
+    'REDDITAPIS_MAX_DAILY_READ_CALLS',
+    DEFAULT_DAILY_READ_CALL_LIMIT,
+  )
+  const writeLimit = boundedDailyLimit(
+    'REDDITAPIS_MAX_DAILY_WRITE_CALLS',
+    DEFAULT_DAILY_WRITE_CALL_LIMIT,
+  )
+  if (!budgetGuardEnabled()) {
+    return {
+      read: { used: 0, limit: readLimit },
+      write: { used: 0, limit: writeLimit },
+    }
+  }
+
+  try {
+    const [rawRead, rawWrite] = await redis.mget(budgetKey('read'), budgetKey('write'))
+    const normalizeUsage = (value: string | null) => {
+      const parsed = Number(value)
+      return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0
+    }
+    return {
+      read: { used: normalizeUsage(rawRead), limit: readLimit },
+      write: { used: normalizeUsage(rawWrite), limit: writeLimit },
+    }
+  } catch {
+    throw new RedditApisRequestError(
+      'reddit_provider_budget_guard_unavailable',
+      503,
+      true,
+    )
+  }
+}
+
 export async function loginRedditAccount(input: {
   username: string
   password: string
   totpSecret?: string
 }): Promise<RedditLoginResult> {
-  const response = await redditApisFetch('/api/reddit/login', {
+  const { response, payload } = await redditApisFetchJson('/api/reddit/login', {
     method: 'POST',
     body: JSON.stringify({
       username: input.username,
@@ -132,8 +387,7 @@ export async function loginRedditAccount(input: {
       method: 'browser',
       ...(input.totpSecret ? { totp_secret: input.totpSecret } : {}),
     }),
-  }, 45_000)
-  const payload = await readProviderJson(response)
+  }, 45_000, { circuitScope: 'account', budgetScope: 'write' })
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -160,10 +414,9 @@ export async function fetchRedditAccountProfile(username: string): Promise<{
   linkKarma: number | null
   commentKarma: number | null
 }> {
-  const response = await redditApisFetch(`/api/reddit/user/${encodeURIComponent(username)}`, {
+  const { response, payload } = await redditApisFetchJson(`/api/reddit/user/${encodeURIComponent(username)}`, {
     method: 'GET',
   })
-  const payload = await readProviderJson(response)
   if (!response.ok || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new RedditApisRequestError(
       response.status >= 500 ? 'reddit_provider_temporarily_unavailable' : 'reddit_profile_unavailable',
@@ -207,11 +460,10 @@ export async function fetchRedditPostSnapshot(postUrl: string): Promise<RedditAp
       limit: '100',
       ...(after ? { after } : {}),
     })
-    const response = await redditApisFetch(`/api/reddit/posts?${params.toString()}`, {
+    const { response, payload } = await redditApisFetchJson(`/api/reddit/posts?${params.toString()}`, {
       method: 'GET',
     })
     lastStatus = response.status
-    const payload = await readProviderJson(response)
     if (!response.ok) {
       throw new RedditApisRequestError(
         response.status === 429 || response.status >= 500
@@ -232,11 +484,46 @@ export async function fetchRedditPostSnapshot(postUrl: string): Promise<RedditAp
   throw new RedditApisRequestError('reddit_post_not_found_during_preflight', lastStatus, false)
 }
 
+export async function fetchRedditApisDiscoveryPayload(
+  subreddit: string,
+  limit: number,
+): Promise<unknown> {
+  const normalizedSubreddit = subreddit.trim().toLocaleLowerCase()
+  if (!/^[a-z0-9_]{2,50}$/.test(normalizedSubreddit)) {
+    throw new RedditApisRequestError('reddit_subreddit_invalid', null, false)
+  }
+  const params = new URLSearchParams({
+    subreddit: normalizedSubreddit,
+    sort: 'new',
+    limit: String(Math.min(100, Math.max(1, Math.floor(limit)))),
+  })
+  const { response, payload } = await redditApisFetchJson(`/api/reddit/posts?${params.toString()}`, {
+    method: 'GET',
+  })
+  if (!response.ok) {
+    if (response.status === 402) {
+      throw new RedditApisRequestError('reddit_provider_balance_unavailable', 402, false)
+    }
+    throw new RedditApisRequestError(
+      response.status === 429 || response.status >= 500
+        ? 'reddit_provider_temporarily_unavailable'
+        : 'reddit_discovery_rejected',
+      response.status,
+      response.status === 429 || response.status >= 500,
+    )
+  }
+  return payload
+}
+
 export async function fetchRedditApisAccountStatus(timeoutMs = 2_500): Promise<{
   creditsRemaining: number
 }> {
-  const response = await redditApisFetch('/account/me', { method: 'GET' }, timeoutMs)
-  const payload = await readProviderJson(response)
+  const { response, payload } = await redditApisFetchJson(
+    '/account/me',
+    { method: 'GET' },
+    timeoutMs,
+    { circuitScope: 'account', budgetScope: 'none' },
+  )
   if (!response.ok) {
     throw new RedditApisRequestError(
       response.status === 429 || response.status >= 500
@@ -266,28 +553,33 @@ export async function postRedditApisComment(input: {
     throw new RedditApisRequestError('reddit_post_url_invalid', null, false)
   }
 
-  const response = await redditApisFetch('/api/reddit/v2/comment', {
+  const { response, payload } = await redditApisFetchJson('/api/reddit/v2/comment', {
     method: 'POST',
     body: JSON.stringify({
       post_url: target.canonicalUrl,
       text: input.text,
       ...input.cookies,
     }),
-  }, 45_000, { writeOperation: true })
-  let payload: unknown
-  try {
-    payload = await readProviderJson(response)
-  } catch {
+  }, 45_000, { writeOperation: true, circuitScope: 'write', budgetScope: 'write' }).catch((error) => {
     // Once a write request has reached the provider, an unreadable response
     // cannot prove that Reddit rejected it. Never retry this state: place the
     // send in reconciliation so a user action cannot create a duplicate.
+    if (error instanceof RedditApisRequestError && (
+      error.code === 'reddit_provider_daily_write_budget_exhausted'
+      || error.code === 'reddit_provider_budget_guard_unavailable'
+      || error.code === 'reddit_provider_circuit_open'
+      || error.code === 'reddit_provider_not_configured'
+      || error.code === 'reddit_provider_safety_unavailable'
+    )) {
+      throw error
+    }
     throw new RedditApisRequestError(
       'reddit_delivery_outcome_unknown',
-      response.status,
+      error instanceof RedditApisRequestError ? error.status : null,
       false,
       true,
     )
-  }
+  })
 
   if (!response.ok) {
     const reauthRequired = providerMessageSignalsExpiredSession(payload)
@@ -297,8 +589,17 @@ export async function postRedditApisComment(input: {
     if (response.status === 429) {
       throw new RedditApisRequestError('reddit_rate_limited', 429, true)
     }
-    if (response.status === 401 || response.status === 403) {
-      throw new RedditApisRequestError('reddit_provider_authentication_failed', response.status, false)
+    if (response.status === 401 || (response.status === 403 && reauthRequired)) {
+      throw new RedditApisRequestError(
+        'reddit_reconnect_required',
+        response.status,
+        false,
+        false,
+        true,
+      )
+    }
+    if (response.status === 403) {
+      throw new RedditApisRequestError('reddit_comment_rejected', 403, false)
     }
     if (response.status >= 500) {
       throw new RedditApisRequestError(
@@ -319,7 +620,16 @@ export async function postRedditApisComment(input: {
   }
 
   try {
-    return parseRedditCommentResponse(payload)
+    const result = parseRedditCommentResponse(payload)
+    const resultTarget = parseRedditPostTarget(result.permalink)
+    if (
+      !resultTarget
+      || resultTarget.postId !== target.postId
+      || resultTarget.subreddit.toLowerCase() !== target.subreddit.toLowerCase()
+    ) {
+      throw new Error('comment_target_mismatch')
+    }
+    return result
   } catch {
     const reauthRequired = providerMessageSignalsExpiredSession(payload)
     throw new RedditApisRequestError(

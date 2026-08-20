@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const port = Number(process.env.E2E_PORT ?? 3100)
-const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`
+const configuredBaseURL = process.env.E2E_BASE_URL?.trim()
+const baseURL = configuredBaseURL || `http://127.0.0.1:${port}`
 
 export default defineConfig({
   testDir: './e2e',
@@ -30,7 +31,7 @@ export default defineConfig({
       },
     },
   ],
-  webServer: process.env.E2E_BASE_URL
+  webServer: configuredBaseURL
     ? undefined
     : {
         command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`,

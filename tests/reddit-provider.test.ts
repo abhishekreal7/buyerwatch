@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeRedditApisPosts } from '../src/lib/reddit'
+import { normalizeRedditApisPosts, parseRedditRss } from '../src/lib/reddit'
 import {
   parseRedditApisListing,
   parseRedditApisListingPage,
@@ -27,7 +27,7 @@ describe('Reddit provider contracts', () => {
       author: 'buyer-account',
       title: 'Need a better invoicing workflow',
       text: 'Need a better invoicing workflow\n\nOur current process takes hours every week.',
-      url: 'https://reddit.com/r/SaaS/comments/abc123/need_help/',
+      url: 'https://www.reddit.com/r/SaaS/comments/abc123/',
       createdAt: '2026-08-08T08:30:00.000Z',
       sourceTarget: 'SaaS',
     }])
@@ -36,6 +36,40 @@ describe('Reddit provider contracts', () => {
   it('rejects malformed provider posts instead of inventing timestamps or URLs', () => {
     expect(normalizeRedditApisPosts({ posts: [{ id: 'abc123' }] }, 'SaaS')).toEqual([])
     expect(normalizeRedditApisPosts({ data: { children: [] } }, 'SaaS')).toEqual([])
+    expect(normalizeRedditApisPosts({ posts: [{
+      id: 'abc123',
+      title: 'External link post',
+      author: 'buyer-account',
+      url: 'https://example.com/not-a-reddit-post',
+      created: '2026-08-08T08:30:00.000Z',
+    }] }, 'SaaS')).toEqual([])
+  })
+
+  it('uses the canonical Reddit permalink instead of a link-post destination', () => {
+    expect(normalizeRedditApisPosts({ posts: [{
+      id: 'abc123',
+      title: 'Need a workflow recommendation',
+      author: 'buyer-account',
+      permalink: '/r/SaaS/comments/abc123/need_help/',
+      url: 'https://vendor.example/landing-page',
+      created: '2026-08-08T08:30:00.000Z',
+    }] }, 'SaaS')[0]?.url).toBe('https://www.reddit.com/r/SaaS/comments/abc123/')
+  })
+
+  it('drops RSS entries with invalid timestamps instead of making them look fresh', () => {
+    const xml = `
+      <feed>
+        <entry>
+          <id>t3_abc123</id>
+          <author><name>/u/buyer-account</name></author>
+          <title>Need help choosing a CRM</title>
+          <link href="https://www.reddit.com/r/SaaS/comments/abc123/need_help/" />
+          <published>not-a-timestamp</published>
+          <content type="html">Looking for recommendations</content>
+        </entry>
+      </feed>
+    `
+    expect(parseRedditRss(xml, 'saas')).toEqual([])
   })
 
   it('accepts only canonical Reddit post targets', () => {

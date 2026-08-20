@@ -118,6 +118,15 @@ the service-role-only `reddit_connection_secrets` table. A session failure marks
 the connection `reauth_required`, cancels queued Reddit auto-sends, and requires
 the customer to reconnect before delivery resumes.
 
+RedditAPIs is an independent provider, not a Reddit authorization grant. Keep
+the shared daily read/write ceilings enabled, review provider spend and failure
+codes daily during beta, and stop Reddit delivery if account warnings or
+community removals increase. Automatic sends remain freshness-, account-,
+community-policy-, duplication-, confidence-, and rate-limit-gated.
+The conservative defaults are 250 paid reads, 10 paid writes, and a 15-minute
+paid discovery cache per UTC day; lower them immediately if the beta budget is
+smaller than the corresponding provider maximum.
+
 ## Low-cost production topology
 
 - Vercel serves only the Next.js web application.

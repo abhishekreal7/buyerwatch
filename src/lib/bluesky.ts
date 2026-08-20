@@ -55,6 +55,12 @@ export async function searchBlueskyPosts(query: string, limit: number = 25): Pro
   let payload: BlueskySearchResponse | null = null
   let failureStatus = 503
   for (const host of APPVIEW_HOSTS) {
+    const hostBackoffKey = `backoff:bluesky-appview:${new URL(host).hostname}`
+    try {
+      if (await redis.get(hostBackoffKey)) continue
+    } catch {
+      // Source fetching remains available during a cache incident.
+    }
     const url = new URL('/xrpc/app.bsky.feed.searchPosts', host)
     url.searchParams.set('q', normalizedQuery)
     url.searchParams.set('limit', String(boundedLimit))
@@ -72,6 +78,14 @@ export async function searchBlueskyPosts(query: string, limit: number = 25): Pro
     }
 
     failureStatus = response.status
+    if ([401, 403, 404].includes(response.status) || response.status >= 500) {
+      await redis.set(
+        hostBackoffKey,
+        String(response.status),
+        'EX',
+        response.status >= 500 ? 120 : 15 * 60,
+      ).catch(() => {})
+    }
     // The cached public hostname can be unavailable in some regions. The
     // canonical AppView is an official fallback; rate limits are not bypassed.
     if (![401, 403, 404].includes(response.status) && response.status < 500) break

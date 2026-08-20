@@ -33,6 +33,7 @@ import {
   toCommunityPolicyAudit,
   type RedditReplyPolicyDecision,
 } from '../../src/lib/reddit-community-policy'
+import { evaluateContentFreshness } from '../../src/lib/content-freshness'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -91,6 +92,25 @@ export async function processScorePost(
     if (existingError) throw existingError
     if (existing && existing.status !== 'pending') {
       if (enqueueFollowUpJobs) await dispatchPendingOutbox(1, existing.id)
+      return
+    }
+
+    const freshness = evaluateContentFreshness(post.createdAt)
+    if (freshness.fresh === false) {
+      if (existing?.id) {
+        const { error: staleDeleteError } = await supabase
+          .from('monitored_threads')
+          .delete()
+          .eq('id', existing.id)
+          .eq('status', 'pending')
+        if (staleDeleteError) throw staleDeleteError
+      }
+      logger.info({
+        userId,
+        platform: post.platform,
+        externalId: post.externalId,
+        reason: freshness.reason,
+      }, 'Dropped stale source post before scoring')
       return
     }
     const hasScoringCheckpoint = Boolean(

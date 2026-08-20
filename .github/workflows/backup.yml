@@ -1,0 +1,55 @@
+name: Encrypted production backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '35 1 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+      BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
+    steps:
+      - name: Require backup credentials
+        shell: bash
+        run: |
+          test -n "$SUPABASE_DATABASE_URL" || { echo "SUPABASE_DATABASE_URL is not configured"; exit 1; }
+          test -n "$BACKUP_ENCRYPTION_PASSWORD" || { echo "BACKUP_ENCRYPTION_PASSWORD is not configured"; exit 1; }
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Create, verify, and encrypt logical backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          raw="$RUNNER_TEMP/buyerwatch-$stamp.dump"
+          encrypted="$RUNNER_TEMP/buyerwatch-$stamp.dump.enc"
+          pg_dump "$SUPABASE_DATABASE_URL" --format=custom --compress=9 --no-owner --no-privileges --file="$raw"
+          pg_restore --list "$raw" >/dev/null
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in "$raw" -out "$encrypted" -pass env:BACKUP_ENCRYPTION_PASSWORD
+          sha256sum "$encrypted" > "$encrypted.sha256"
+          rm -- "$raw"
+          echo "BACKUP_FILE=$encrypted" >> "$GITHUB_ENV"
+          echo "BACKUP_HASH=$encrypted.sha256" >> "$GITHUB_ENV"
+          echo "BACKUP_NAME=buyerwatch-$stamp" >> "$GITHUB_ENV"
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_NAME }}
+          path: |
+            ${{ env.BACKUP_FILE }}
+            ${{ env.BACKUP_HASH }}
+          if-no-files-found: error
+          retention-days: 30

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readResponseText } from '../src/lib/http'
 import { isTrustedSameOriginMutation } from '../src/lib/request'
 
 describe('same-origin mutation protection', () => {
@@ -37,5 +38,22 @@ describe('same-origin mutation protection', () => {
       'https://buyerwatch.co/api/replies/send',
       { method: 'POST' },
     ))).toBe(false)
+  })
+})
+
+describe('bounded response reader', () => {
+  it('reads a bounded response body', async () => {
+    await expect(readResponseText(new Response('buyer intent'), 32)).resolves.toBe('buyer intent')
+  })
+
+  it('rejects oversized streamed responses even without Content-Length', async () => {
+    const response = new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('12345'))
+        controller.enqueue(new TextEncoder().encode('67890'))
+        controller.close()
+      },
+    }))
+    await expect(readResponseText(response, 8)).rejects.toThrow('response_too_large')
   })
 })

@@ -12,6 +12,7 @@ import {
   fetchRedditApisAccountStatus,
   fetchRedditAccountProfile,
   loginRedditAccount,
+  REDDITAPIS_MINIMUM_OPERATIONAL_CREDITS,
   RedditApisRequestError,
 } from '@/lib/redditapis-client'
 import { normalizeRedditUsername } from '@/lib/redditapis-contract'
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     const providerAccount = await fetchRedditApisAccountStatus()
-    if (providerAccount.creditsRemaining < 0.012) {
+    if (providerAccount.creditsRemaining < REDDITAPIS_MINIMUM_OPERATIONAL_CREDITS) {
       throw new RedditApisRequestError('reddit_provider_balance_unavailable', 402, false)
     }
 

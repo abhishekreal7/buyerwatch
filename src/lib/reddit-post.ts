@@ -1,5 +1,7 @@
 import { hasRedditPostingProvider } from './env'
+import { AUTO_REPLY_MAX_AGE_MS, evaluateContentFreshness } from './content-freshness'
 import {
+  fetchRedditAccountProfile,
   fetchRedditPostSnapshot,
   postRedditApisComment,
   RedditApisRequestError,
@@ -11,6 +13,7 @@ import {
   markRedditConnectionReauthRequired,
   recordRedditConnectionFailure,
   RedditConnectionStateError,
+  updateRedditConnectionAccountProfile,
 } from './reddit-session'
 
 export class PlatformPostError extends Error {
@@ -52,6 +55,11 @@ function providerError(error: RedditApisRequestError): PlatformPostError {
   })
 }
 
+function boundedIntegerEnvironment(name: string, fallback: number, minimum: number, maximum: number) {
+  const parsed = Number(process.env[name])
+  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback
+}
+
 export async function postRedditReply(input: {
   userId: string
   threadExternalId: string
@@ -75,6 +83,45 @@ export async function postRedditReply(input: {
   } catch (error) {
     if (error instanceof RedditConnectionStateError) throw connectionError(error)
     throw error
+  }
+
+  if (input.triggerType === 'auto') {
+    const minimumAgeDays = boundedIntegerEnvironment('REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS', 30, 7, 365)
+    const minimumKarma = boundedIntegerEnvironment('REDDIT_AUTO_MIN_COMBINED_KARMA', 50, 0, 100_000)
+    let safetyProfile = {
+      accountCreatedAt: session.accountCreatedAt,
+      linkKarma: session.linkKarma,
+      commentKarma: session.commentKarma,
+    }
+    if (
+      !safetyProfile.accountCreatedAt
+      || safetyProfile.linkKarma === null
+      || safetyProfile.commentKarma === null
+    ) {
+      try {
+        const refreshed = await fetchRedditAccountProfile(session.username)
+        safetyProfile = {
+          accountCreatedAt: refreshed.createdAt,
+          linkKarma: refreshed.linkKarma,
+          commentKarma: refreshed.commentKarma,
+        }
+        await updateRedditConnectionAccountProfile(input.userId, safetyProfile)
+      } catch {
+        throw new PlatformPostError('reddit', 'reddit_account_safety_profile_unavailable', false)
+      }
+    }
+
+    const accountCreatedAt = Date.parse(safetyProfile.accountCreatedAt ?? '')
+    if (!Number.isFinite(accountCreatedAt)) {
+      throw new PlatformPostError('reddit', 'reddit_account_age_unverified', false)
+    }
+    if (Date.now() - accountCreatedAt < minimumAgeDays * 24 * 60 * 60_000) {
+      throw new PlatformPostError('reddit', 'reddit_account_too_new_for_automation', false)
+    }
+    const combinedKarma = (safetyProfile.linkKarma ?? 0) + (safetyProfile.commentKarma ?? 0)
+    if (safetyProfile.linkKarma === null || safetyProfile.commentKarma === null || combinedKarma < minimumKarma) {
+      throw new PlatformPostError('reddit', 'reddit_account_karma_below_automation_minimum', false)
+    }
   }
 
   let post: Awaited<ReturnType<typeof fetchRedditPostSnapshot>>
@@ -104,11 +151,17 @@ export async function postRedditReply(input: {
     throw new PlatformPostError('reddit', 'reddit_nsfw_post_requires_review', false)
   }
   if (input.triggerType === 'auto') {
-    if (!post.createdAt) {
-      throw new PlatformPostError('reddit', 'reddit_post_age_unverified', false)
-    }
-    if (Date.now() - Date.parse(post.createdAt) > 24 * 60 * 60_000) {
-      throw new PlatformPostError('reddit', 'reddit_post_outside_reply_window', false)
+    const freshness = evaluateContentFreshness(post.createdAt, {
+      maxAgeMs: AUTO_REPLY_MAX_AGE_MS,
+    })
+    if (freshness.fresh === false) {
+      throw new PlatformPostError(
+        'reddit',
+        freshness.reason === 'source_too_old'
+          ? 'reddit_post_outside_reply_window'
+          : 'reddit_post_age_unverified',
+        false,
+      )
     }
   }
 

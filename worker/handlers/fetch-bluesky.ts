@@ -3,6 +3,10 @@ import { Job } from 'bullmq'
 import { searchBlueskyPosts } from '../../src/lib/bluesky'
 import { scorePostQueue } from '../../src/lib/queues'
 import {
+  recordKeywordPollFailure,
+  recordKeywordPollSuccess,
+} from '../../src/lib/keyword-poll-health'
+import {
   buildSocialScoreCandidates,
   type SocialKeywordMapping,
   withProfileCompetitors,
@@ -20,13 +24,11 @@ export async function blueskyFetchHandler(job: Job) {
     keywordMappings?: SocialKeywordMapping[]
   }
 
+  // Find all users watching this specific Bluesky query.
+  let keywordMappings = preloadedMappings
+  let keywordIds = preloadedMappings?.map(({ id }) => id) ?? []
+  let sourceFetchRecorded = false
   try {
-    const posts = await searchBlueskyPosts(target)
-    
-    if (!posts || posts.length === 0) return
-
-    // Find all users watching this specific bluesky query
-    let keywordMappings = preloadedMappings
     if (!keywordMappings) {
       const { data, error } = await supabase
         .from('keywords')
@@ -53,6 +55,15 @@ export async function blueskyFetchHandler(job: Job) {
     }
 
     if (keywordMappings.length === 0) return
+    keywordIds = keywordMappings.map(({ id }) => id)
+
+    const posts = await searchBlueskyPosts(target)
+    await recordKeywordPollSuccess(keywordIds)
+    sourceFetchRecorded = true
+    if (!posts || posts.length === 0) {
+      logger.info({ query: target }, 'Bluesky source checked; no posts returned')
+      return
+    }
 
     const discovery = buildSocialScoreCandidates(posts, keywordMappings)
     for (const candidate of discovery.candidates) {
@@ -70,6 +81,11 @@ export async function blueskyFetchHandler(job: Job) {
       users: discovery.users,
     }, `Bluesky query ${target}: ${discovery.candidates.length} enqueued`)
   } catch (error) {
+    if (!sourceFetchRecorded) {
+      await recordKeywordPollFailure(keywordIds, error).catch((healthError) => {
+        logger.error({ healthError, target }, 'Failed to record Bluesky keyword poll failure')
+      })
+    }
     logger.error({ error }, `Failed to fetch bluesky target: ${target}:`)
     throw error
   }

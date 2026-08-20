@@ -30,8 +30,8 @@ describe('dashboard KPI date ranges', () => {
     const dashboard = source('src/app/(dashboard)/dashboard/page.tsx')
 
     expect(dashboard).toContain('aria-label="KPI date range"')
-    expect(dashboard).toContain("threadsFoundCountQuery = threadsFoundCountQuery.gte('created_at', periodStart)")
-    expect(dashboard).toContain("highIntentCountQuery = highIntentCountQuery.gte('created_at', periodStart)")
+    expect(dashboard).toContain("threadsFoundCountQuery = threadsFoundCountQuery.gte('source_created_at', periodStart)")
+    expect(dashboard).toContain("highIntentCountQuery = highIntentCountQuery.gte('source_created_at', periodStart)")
     expect(dashboard).toContain("repliesSentCountQuery = repliesSentCountQuery.gte('sent_at', periodStart)")
     expect(dashboard).toContain('Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>')
   })

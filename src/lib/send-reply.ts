@@ -22,6 +22,8 @@ import {
   toCommunityPolicyAudit,
   type RedditReplyPolicyDecision,
 } from './reddit-community-policy'
+import { AUTO_REPLY_MAX_AGE_MS, evaluateContentFreshness } from './content-freshness'
+import { areRepliesNearDuplicate } from './reply-similarity'
 
 export type SendReplyData = {
   userId: string
@@ -80,13 +82,15 @@ export async function processSendReply(
   const supabase = getSupabase()
 
   let maxPerDay: number | undefined
+  let autoSendThreshold = 85
   let businessProfile: { business_name: string; business_url: string | null } | null = null
   let redditPolicyDecision: RedditReplyPolicyDecision | null = null
   let redditPostUrl: string | null = null
+  let sendCommunity: string | undefined
   if (triggerType === 'auto') {
     const { data: automationProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, auto_send_enabled, auto_send_daily_limit, auto_send_platforms, auto_send_communities, business_name, business_url')
+      .select('plan, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, business_name, business_url')
       .eq('id', userId)
       .single()
     if (profileError || !automationProfile) {
@@ -128,6 +132,7 @@ export async function processSendReply(
     }
 
     maxPerDay = Number(automationProfile.auto_send_daily_limit) || 3
+    autoSendThreshold = Number(automationProfile.auto_send_threshold) || 85
     businessProfile = {
       business_name: automationProfile.business_name,
       business_url: automationProfile.business_url,
@@ -149,7 +154,7 @@ export async function processSendReply(
 
     const { data: policyThread, error: policyThreadError } = await supabase
       .from('monitored_threads')
-      .select('url')
+      .select('url, intent_score, source_created_at, created_at')
       .eq('id', threadId)
       .eq('user_id', userId)
       .single()
@@ -159,6 +164,46 @@ export async function processSendReply(
     redditPostUrl = policyThread.url
 
     const subreddit = extractSubredditFromRedditUrl(policyThread.url) || data.sourceTarget
+    sendCommunity = subreddit || undefined
+
+    if (triggerType === 'auto') {
+      if (!Number.isFinite(Number(policyThread.intent_score)) || Number(policyThread.intent_score) < autoSendThreshold) {
+        const reason = 'intent_score_below_current_auto_send_threshold'
+        await cancelQueuedAutoSend(supabase, threadId, reason)
+        return { skipped: true, reason }
+      }
+
+      const freshness = evaluateContentFreshness(
+        policyThread.source_created_at || policyThread.created_at,
+        { maxAgeMs: AUTO_REPLY_MAX_AGE_MS },
+      )
+      if (freshness.fresh === false) {
+        const reason = freshness.reason === 'source_too_old'
+          ? 'source_post_outside_auto_reply_window'
+          : 'source_post_time_unverified'
+        await cancelQueuedAutoSend(supabase, threadId, reason)
+        return { skipped: true, reason }
+      }
+
+      const { data: recentReplies, error: recentRepliesError } = await supabase
+        .from('reply_analytics')
+        .select('draft_text, edited_text')
+        .eq('user_id', userId)
+        .eq('was_sent', true)
+        .order('sent_at', { ascending: false })
+        .limit(25)
+      if (recentRepliesError) {
+        throw new Error(`Unable to run duplicate reply safety check: ${recentRepliesError.message}`)
+      }
+      if ((recentReplies ?? []).some(reply =>
+        areRepliesNearDuplicate(text, reply.edited_text || reply.draft_text || ''),
+      )) {
+        const reason = 'near_duplicate_reply_requires_review'
+        await cancelQueuedAutoSend(supabase, threadId, reason)
+        return { skipped: true, reason }
+      }
+    }
+
     const communityPolicy = await getSubredditCommunityPolicy(userId, subreddit ?? '', {
       // This is the final gate immediately before provider delivery. It must
       // not rely on a stale decision made while the draft was created.
@@ -196,7 +241,16 @@ export async function processSendReply(
     }
   }
 
-  const reservation = await reserveSendSlot(userId, platform, { maxPerDay })
+  const reservation = await reserveSendSlot(userId, platform, {
+    maxPerDay,
+    ...(triggerType === 'auto' && platform === 'reddit'
+      ? {
+          minimumGapSeconds: 30 * 60,
+          community: sendCommunity,
+          communityGapSeconds: 12 * 60 * 60,
+        }
+      : {}),
+  })
   if ('reason' in reservation) {
     throw new PlatformPostError(
       platform,
@@ -263,7 +317,7 @@ export async function processSendReply(
     externalSendSucceeded = true
     externalPermalink = result.permalink
 
-    await recordSuccessfulSend(userId, platform, reservation.token)
+    await recordSuccessfulSend(userId, platform, reservation.token, { community: sendCommunity })
 
     const { data: finalized, error: finalizeError } = await supabase.rpc(
       'finalize_successful_send',
@@ -303,11 +357,15 @@ export async function processSendReply(
   } catch (error) {
     const deliveryUncertain = error instanceof PlatformPostError && error.deliveryUncertain
     if (externalSendSucceeded || deliveryUncertain) {
-      if (externalSendSucceeded) {
-        await recordSuccessfulSend(userId, platform, reservation.token).catch(() => undefined)
-      } else {
-        await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
-      }
+      // A timed-out write may still have reached Reddit. Consume the rate-limit
+      // slot pessimistically so an uncertain outcome cannot be followed by a
+      // burst while reconciliation determines what actually happened.
+      await recordSuccessfulSend(
+        userId,
+        platform,
+        reservation.token,
+        { community: sendCommunity },
+      ).catch(() => undefined)
       await supabase.rpc('mark_send_reconciliation', {
         p_thread_id: threadId,
         p_user_id: userId,

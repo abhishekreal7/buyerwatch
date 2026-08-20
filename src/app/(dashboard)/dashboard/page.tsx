@@ -9,7 +9,7 @@ import { UpgradeModal } from '@/components/UpgradeModal'
 import { GettingStartedChecklist } from '@/components/GettingStartedChecklist'
 import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
-import { normalizePlan, type PlanTier } from '@/lib/plan-limits'
+import { PLAN_POLL_INTERVAL_MINUTES, normalizePlan, type PlanTier } from '@/lib/plan-limits'
 import {
   BILLING_ADDONS,
   getCurrentUsageMonth,
@@ -167,6 +167,10 @@ export default function DashboardPage() {
   const [highIntentThreshold, setHighIntentThreshold] = useState(DEFAULT_HIGH_INTENT_THRESHOLD)
   const [sendingThreadId, setSendingThreadId] = useState<string | null>(null)
   const [checkingNow, setCheckingNow] = useState(false)
+  const [pollHealth, setPollHealth] = useState({
+    lastCheckedAt: null as string | null,
+    delayedSources: 0,
+  })
   const [signalUsage, setSignalUsage] = useState({ used: 0, limit: 250 })
   const [draftUsage, setDraftUsage] = useState({ used: 0, limit: 40 })
   const [openingAddonCheckout, setOpeningAddonCheckout] = useState<BillingAddonType | null>(null)
@@ -223,6 +227,11 @@ export default function DashboardPage() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId),
       supabase
+        .from('keywords')
+        .select('last_checked_at, last_success_at, last_check_status')
+        .eq('user_id', userId)
+        .eq('is_active', true),
+      supabase
         .from('draft_feedback')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
@@ -233,6 +242,7 @@ export default function DashboardPage() {
         .eq('user_id', userId)
         .in('status', ['pending', 'drafted', 'needs_manual_reply'])
         .not('intent_score', 'is', null)
+        .order('source_created_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(60),
       supabase
@@ -241,6 +251,7 @@ export default function DashboardPage() {
         .eq('user_id', userId)
         .eq('status', 'dismissed')
         .not('intent_score', 'is', null)
+        .order('source_created_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(60),
     ])
@@ -253,6 +264,7 @@ export default function DashboardPage() {
     const [
       addonCreditsResult,
       keywordsCountResult,
+      keywordHealthResult,
       feedbackCountResult,
       activeThreadsResult,
       dismissedThreadsResult,
@@ -261,6 +273,7 @@ export default function DashboardPage() {
       profileResult,
       addonCreditsResult,
       keywordsCountResult,
+      keywordHealthResult,
       feedbackCountResult,
       activeThreadsResult,
       dismissedThreadsResult,
@@ -285,8 +298,8 @@ export default function DashboardPage() {
       .eq('was_sent', true)
 
     if (periodStart) {
-      threadsFoundCountQuery = threadsFoundCountQuery.gte('created_at', periodStart)
-      highIntentCountQuery = highIntentCountQuery.gte('created_at', periodStart)
+      threadsFoundCountQuery = threadsFoundCountQuery.gte('source_created_at', periodStart)
+      highIntentCountQuery = highIntentCountQuery.gte('source_created_at', periodStart)
       repliesSentCountQuery = repliesSentCountQuery.gte('sent_at', periodStart)
     }
 
@@ -317,7 +330,7 @@ export default function DashboardPage() {
         .eq('user_id', userId)
         .not('intent_score', 'is', null)
         .gte('intent_score', effectiveHighIntentThreshold)
-        .gte('created_at', todayIso),
+        .gte('source_created_at', todayIso),
     ])
     const metricsQueryError = [
       threadsFoundCountResult,
@@ -347,6 +360,23 @@ export default function DashboardPage() {
 
     // Load persisted setup progress rather than resetting the checklist per session.
     setKeywordsCount(keywordsCountResult.count ?? 0)
+    const keywordHealthRows = keywordHealthResult.data ?? []
+    const lastCheckedAt = keywordHealthRows
+      .map(row => row.last_checked_at)
+      .filter((value): value is string => Boolean(value) && Number.isFinite(Date.parse(value)))
+      .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null
+    const staleAfterMs = (
+      PLAN_POLL_INTERVAL_MINUTES[normalizedPlan] * 3 + 10
+    ) * 60_000
+    setPollHealth({
+      lastCheckedAt,
+      delayedSources: keywordHealthRows.filter((row) => {
+        const lastSuccessAt = Date.parse(row.last_success_at ?? '')
+        return row.last_check_status !== 'success'
+          || !Number.isFinite(lastSuccessAt)
+          || Date.now() - lastSuccessAt > staleAfterMs
+      }).length,
+    })
     setHasCopiedOrApproved((feedbackCountResult.count ?? 0) > 0)
 
     // Load threads including dismissed for audit tab
@@ -354,7 +384,8 @@ export default function DashboardPage() {
       ...(activeThreadsResult.data ?? []),
       ...(dismissedThreadsResult.data ?? []),
     ].sort((left, right) => (
-      Date.parse(right.created_at) - Date.parse(left.created_at)
+      Date.parse(right.source_created_at || right.created_at)
+      - Date.parse(left.source_created_at || left.created_at)
     ))
 
     const parsed = (threadData || []).map(mapThread)
@@ -907,6 +938,23 @@ export default function DashboardPage() {
         title="Overview"
         action={(
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {keywordsCount > 0 && (
+              <div
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11.5px] font-semibold sm:min-h-0 ${
+                  pollHealth.delayedSources > 0
+                    ? 'border-amber-200 bg-amber-50 text-amber-800'
+                    : 'border-[#DDE2E8] bg-white text-[#667085]'
+                }`}
+                title={pollHealth.delayedSources > 0
+                  ? `${pollHealth.delayedSources} monitoring source${pollHealth.delayedSources === 1 ? '' : 's'} delayed`
+                  : 'The time BuyerWatch last checked an active monitoring source'}
+              >
+                <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                {pollHealth.lastCheckedAt
+                  ? `Last checked ${formatTimeAgo(pollHealth.lastCheckedAt)}`
+                  : 'Waiting for first check'}
+              </div>
+            )}
             <div className="relative">
               <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#667085]" aria-hidden="true" />
               <select

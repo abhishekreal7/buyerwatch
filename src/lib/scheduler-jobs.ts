@@ -12,7 +12,6 @@ import {
   normalizePlan,
 } from './plan-limits'
 import { createUnsubscribeUrl } from './email-preferences'
-import { redis } from './redis'
 
 type KeywordRow = {
   id: string
@@ -20,6 +19,8 @@ type KeywordRow = {
   target: string
   term: string
   user_id: string
+  last_success_at?: string | null
+  next_poll_at?: string | null
   profiles:
     | { plan?: string; last_polled_at?: string | null }
     | Array<{ plan?: string; last_polled_at?: string | null }>
@@ -33,8 +34,10 @@ function getSupabaseAdmin(): SupabaseClient {
   )
 }
 
-function jobBucket(now: Date): string {
-  return `${now.toISOString().slice(0, 14)}${Math.floor(now.getUTCMinutes() / 15)}`
+export function monitoringJobBucket(now: Date): string {
+  // The fastest paid cadence is five minutes. A 15-minute job-id bucket would
+  // silently deduplicate two out of every three Pro/Growth polling jobs.
+  return `${now.toISOString().slice(0, 14)}${Math.floor(now.getUTCMinutes() / 5)}`
 }
 
 function targetId(platform: string, target: string, bucket: string): string {
@@ -43,14 +46,6 @@ function targetId(platform: string, target: string, bucket: string): string {
     .digest('hex')
     .slice(0, 20)
   return `${platform}-${digest}-${bucket}`
-}
-
-function chunks<T>(values: T[], size: number): T[][] {
-  const result: T[][] = []
-  for (let index = 0; index < values.length; index += size) {
-    result.push(values.slice(index, index + size))
-  }
-  return result
 }
 
 export async function enqueueDueMonitoring(now = new Date()): Promise<{
@@ -64,7 +59,7 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
       .from('keywords')
-      .select('id, platform, target, term, user_id, profiles!inner(plan, last_polled_at)')
+      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, last_polled_at)')
       .eq('is_active', true)
       .order('id', { ascending: true })
       .range(offset, offset + pageSize - 1)
@@ -74,8 +69,6 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
   }
 
   const xEnabled = process.env.ENABLE_X_DISCOVERY === 'true'
-  const pollKeys = rows.map((keyword) => `poll:keyword:${keyword.id}`)
-  const lastPolledValues = pollKeys.length > 0 ? await redis.mget(...pollKeys) : []
   const dueUsers = new Set<string>()
   const jobs = new Map<string, {
     platform: KeywordRow['platform']
@@ -83,14 +76,16 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
     mappings: Array<{ id: string; user_id: string; term: string }>
   }>()
 
-  for (const [index, keyword] of rows.entries()) {
+  for (const keyword of rows) {
     const profile = Array.isArray(keyword.profiles)
       ? keyword.profiles[0]
       : keyword.profiles
     const plan = normalizePlan(profile?.plan)
+    const nextPollAt = Date.parse(keyword.next_poll_at ?? '')
+    if (Number.isFinite(nextPollAt) && nextPollAt > now.getTime()) continue
     if (!isPollingDue(
       plan,
-      lastPolledValues[index] || profile?.last_polled_at,
+      keyword.last_success_at,
       now.getTime(),
     )) continue
     if (keyword.platform === 'threads') continue
@@ -119,8 +114,7 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
     jobs.set(key, job)
   }
 
-  const bucket = jobBucket(now)
-  const enqueuedKeywordIds: string[] = []
+  const bucket = monitoringJobBucket(now)
   for (const job of jobs.values()) {
     const queue =
       job.platform === 'reddit'
@@ -134,28 +128,11 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
       { target: job.target, keywordMappings: job.mappings },
       { jobId: targetId(job.platform, job.target, bucket) },
     )
-    enqueuedKeywordIds.push(...job.mappings.map(({ id }) => id))
   }
 
-  if (enqueuedKeywordIds.length > 0) {
-    const pipeline = redis.pipeline()
-    const timestamp = now.toISOString()
-    for (const keywordId of new Set(enqueuedKeywordIds)) {
-      pipeline.set(`poll:keyword:${keywordId}`, timestamp, 'EX', 7 * 24 * 60 * 60)
-    }
-    await pipeline.exec()
-  }
-
-  const userIds = [...dueUsers]
-  for (const userIdChunk of chunks(userIds, 200)) {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ last_polled_at: now.toISOString() })
-      .in('id', userIdChunk)
-    if (error) throw error
-  }
-
-  return { jobs: jobs.size, usersPolled: userIds.length }
+  // A queued job is not a successful source poll. Fetch handlers advance the
+  // per-keyword and profile heartbeat only after the source responds.
+  return { jobs: jobs.size, usersPolled: dueUsers.size }
 }
 
 function isoWeekKey(date: Date): string {

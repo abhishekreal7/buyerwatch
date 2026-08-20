@@ -13,6 +13,7 @@ if (!token) {
 }
 
 const destination = `${appUrl}/api/cron/enqueue`
+const failureCallback = `${appUrl}/api/cron/failure`
 const client = new Client({ token })
 const result = await client.schedules.create({
   destination,
@@ -21,12 +22,14 @@ const result = await client.schedules.create({
   method: 'POST',
   retries: 2,
   timeout: '4m',
+  failureCallback,
   label: 'buyerwatch-reddit-monitor',
 })
 const schedule = await client.schedules.get(result.scheduleId)
 if (
   schedule.destination !== destination
   || schedule.cron !== '*/5 * * * *'
+  || schedule.failureCallback !== failureCallback
   || schedule.isPaused
 ) {
   throw new Error('QStash created the schedule but verification failed.')
@@ -34,4 +37,5 @@ if (
 
 console.log(`QStash schedule ready: ${result.scheduleId}`)
 console.log(`Destination: ${destination}`)
+console.log(`Failure callback: ${failureCallback}`)
 console.log('Frequency: every 5 minutes (UTC)')

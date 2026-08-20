@@ -5,17 +5,29 @@ import { withTimeout } from './http'
 import { PLAN_POLL_INTERVAL_MINUTES, normalizePlan } from './plan-limits'
 import { hasQStashConfiguration } from './qstash'
 import { redis } from './redis'
-import { fetchRedditApisAccountStatus } from './redditapis-client'
+import {
+  fetchRedditApisAccountStatus,
+  getRedditApisDailyBudgetStatus,
+  REDDITAPIS_MINIMUM_OPERATIONAL_CREDITS,
+} from './redditapis-client'
 
 const REDDIT_PROVIDER_HEALTH_KEY = 'health:redditapis:v1'
 const REDDIT_PROVIDER_HEALTH_LOCK_KEY = 'lock:health:redditapis:v1'
 const REDDIT_PROVIDER_HEALTH_TTL_SECONDS = 300
-const MINIMUM_REDDIT_PROVIDER_CREDITS = 0.02
 
 export interface ReadinessCheck {
   status: 'ok' | 'error'
   latencyMs: number
   detail?: string
+}
+
+type KeywordHealthRow = {
+  id: string
+  platform: string
+  last_success_at: string | null
+  last_check_status: string
+  consecutive_failures: number
+  profiles: { plan?: string } | Array<{ plan?: string }>
 }
 
 async function timedCheck(
@@ -92,9 +104,17 @@ async function checkRedditProviderReadiness(): Promise<ReadinessCheck> {
     async (): Promise<ProviderHealthSnapshot> => {
       let snapshot: ProviderHealthSnapshot
       try {
-        const account = await fetchRedditApisAccountStatus()
+        const [account, budget] = await Promise.all([
+          fetchRedditApisAccountStatus(),
+          getRedditApisDailyBudgetStatus(),
+        ])
         snapshot = {
-          status: account.creditsRemaining >= MINIMUM_REDDIT_PROVIDER_CREDITS ? 'ok' : 'error',
+          status:
+            account.creditsRemaining >= REDDITAPIS_MINIMUM_OPERATIONAL_CREDITS
+            && budget.read.used < budget.read.limit
+            && budget.write.used < budget.write.limit
+              ? 'ok'
+              : 'error',
           checkedAt: new Date().toISOString(),
         }
       } catch {
@@ -125,12 +145,13 @@ export async function checkApplicationReadiness() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
+  let redditProviderRequired = false
   const database = await timedCheck('database readiness', async () => {
     if (!supabaseUrl || !serviceRoleKey) throw new Error('database configuration missing')
     const client = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     })
-    const [profiles, threads, ingestion, spend, redditConnections] = await Promise.all([
+    const [profiles, threads, ingestion, spend, redditConnections, keywords, activeRedditConnections] = await Promise.all([
       client.from('profiles').select('id, signal_count, signal_month', { head: true }).limit(1),
       client
         .from('monitored_threads')
@@ -139,10 +160,27 @@ export async function checkApplicationReadiness() {
       client.from('ingestion_events').select('id, processed_at', { head: true }).limit(1),
       client.from('ai_spend_reservations').select('id, status', { head: true }).limit(1),
       client.from('reddit_connection_secrets').select('connection_id, status', { head: true }).limit(1),
+      client
+        .from('keywords')
+        .select('id, last_checked_at, last_success_at, last_check_status, last_check_error, consecutive_failures, next_poll_at', { head: true })
+        .limit(1),
+      client
+        .from('reddit_connection_secrets')
+        .select('connection_id', { count: 'exact', head: true })
+        .eq('status', 'active'),
     ])
-    if (profiles.error || threads.error || ingestion.error || spend.error || redditConnections.error) {
+    if (
+      profiles.error
+      || threads.error
+      || ingestion.error
+      || spend.error
+      || redditConnections.error
+      || keywords.error
+      || activeRedditConnections.error
+    ) {
       throw new Error('database schema is behind required migrations')
     }
+    redditProviderRequired = (activeRedditConnections.count ?? 0) > 0
   })
 
   const cache = await timedCheck('redis readiness', async () => {
@@ -161,26 +199,38 @@ export async function checkApplicationReadiness() {
     const client = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     })
-    const { data, error } = await client
-      .from('keywords')
-      .select('user_id, profiles!inner(plan, last_polled_at)')
-      .in('platform', ['reddit', 'bluesky'])
-      .eq('is_active', true)
-      .limit(500)
-    if (error) throw new Error('monitoring freshness query failed')
+    const keywordRows: KeywordHealthRow[] = []
+    const pageSize = 500
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await client
+        .from('keywords')
+        .select('id, platform, last_success_at, last_check_status, consecutive_failures, profiles!inner(plan)')
+        .in('platform', ['reddit', 'bluesky'])
+        .eq('is_active', true)
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+      if (error) throw new Error('monitoring freshness query failed')
+      keywordRows.push(...((data ?? []) as KeywordHealthRow[]))
+      if ((data?.length ?? 0) < pageSize) break
+    }
 
     const now = Date.now()
-    const checkedUsers = new Set<string>()
-    for (const row of data ?? []) {
-      if (checkedUsers.has(row.user_id)) continue
-      checkedUsers.add(row.user_id)
+    const staleKeywords: KeywordHealthRow[] = []
+    for (const row of keywordRows) {
       const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
-      const lastPolledAt = Date.parse(profile?.last_polled_at ?? '')
+      const lastPolledAt = Date.parse(row.last_success_at ?? '')
       const interval = PLAN_POLL_INTERVAL_MINUTES[normalizePlan(profile?.plan)]
       const staleAfterMs = (interval * 3 + 10) * 60_000
       if (!Number.isFinite(lastPolledAt) || now - lastPolledAt > staleAfterMs) {
-        throw new Error('monitoring heartbeat stale')
+        staleKeywords.push(row)
       }
+    }
+    if (staleKeywords.length > 0) {
+      const byPlatform = staleKeywords.reduce<Record<string, number>>((counts, row) => {
+        counts[row.platform] = (counts[row.platform] ?? 0) + 1
+        return counts
+      }, {})
+      throw new Error(`monitoring heartbeat stale: ${JSON.stringify(byPlatform)}`)
     }
   })
 
@@ -193,7 +243,8 @@ export async function checkApplicationReadiness() {
       database.status === 'ok'
       && cache.status === 'ok'
       && monitoring.status === 'ok'
-      && redditProvider.status === 'ok',
+      && (!redditProviderRequired || redditProvider.status === 'ok'),
     checks: { database, cache, monitoring, redditProvider },
+    redditProviderRequired,
   }
 }

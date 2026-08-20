@@ -18,12 +18,19 @@ import {
 import { withScoreLock } from './score-lock'
 import { processScorePost } from '../../worker/handlers/score-post'
 import { isRedditDirectPostingConfigured } from './reddit-post'
+import {
+  recordKeywordPollFailure,
+  recordKeywordPollSuccess,
+} from './keyword-poll-health'
+import { DISCOVERY_MAX_AGE_MS } from './content-freshness'
 
 type MonitorPlatform = 'reddit' | 'bluesky'
 
 type KeywordRow = SocialKeywordMapping & {
   platform: MonitorPlatform
   target: string
+  last_success_at?: string | null
+  next_poll_at?: string | null
   profiles:
     | { plan?: string; last_polled_at?: string | null; competitors?: string[] | null }
     | Array<{ plan?: string; last_polled_at?: string | null; competitors?: string[] | null }>
@@ -79,7 +86,7 @@ async function loadDueSocialWork(
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
       .from('keywords')
-      .select('id, platform, target, term, user_id, profiles!inner(plan, last_polled_at, competitors)')
+      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, last_polled_at, competitors)')
       .in('platform', ['reddit', 'bluesky'])
       .eq('is_active', true)
       .order('id', { ascending: true })
@@ -94,18 +101,17 @@ async function loadDueSocialWork(
     (!forceUserId || row.user_id === forceUserId)
     && (!forcePlatform || row.platform === forcePlatform),
   )
-  const pollKeys = relevantRows.map((row) => `poll:keyword:${row.id}`)
-  const lastPolledValues = pollKeys.length > 0 ? await redis.mget(...pollKeys) : []
-
   const dueUsers = new Set<string>()
   const targets = new Map<string, TargetWork>()
-  for (const [index, row] of relevantRows.entries()) {
+  for (const row of relevantRows) {
     const profile = profileFor(row)
+    const nextPollAt = Date.parse(row.next_poll_at ?? '')
+    if (!forced && Number.isFinite(nextPollAt) && nextPollAt > now.getTime()) continue
     if (
       !forced
       && !isPollingDue(
         normalizePlan(profile?.plan),
-        lastPolledValues[index] || profile?.last_polled_at,
+        row.last_success_at,
         now.getTime(),
       )
     ) {
@@ -149,6 +155,7 @@ async function loadPendingSocialCheckpoints(
     .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, source_created_at, created_at, keywords!inner(target)')
     .in('platform', ['reddit', 'bluesky'])
     .eq('status', 'pending')
+    .gte('source_created_at', new Date(Date.now() - DISCOVERY_MAX_AGE_MS).toISOString())
     .order('created_at', { ascending: true })
     .limit(25)
   if (forceUserId) query = query.eq('user_id', forceUserId)
@@ -245,34 +252,6 @@ async function persistPendingCandidates(
   if (error) throw error
 }
 
-async function markUsersPolled(userIds: string[], now: Date): Promise<void> {
-  if (userIds.length === 0) return
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  )
-  const { error } = await supabase
-    .from('profiles')
-    .update({ last_polled_at: now.toISOString() })
-    .in('id', userIds)
-  if (error) throw error
-}
-
-async function markKeywordsPolled(work: TargetWork[], now: Date): Promise<void> {
-  const keywordIds = [...new Set(
-    work.flatMap(({ mappings }) => mappings.map(({ id }) => id)),
-  )]
-  if (keywordIds.length === 0) return
-
-  const pipeline = redis.pipeline()
-  const timestamp = now.toISOString()
-  for (const keywordId of keywordIds) {
-    pipeline.set(`poll:keyword:${keywordId}`, timestamp, 'EX', 7 * 24 * 60 * 60)
-  }
-  await pipeline.exec()
-}
-
 async function runLockedMonitor(
   now: Date,
   forceUserId?: string,
@@ -282,6 +261,19 @@ async function runLockedMonitor(
   // Keep the serverless scheduler capable of recovering delivery work when
   // the always-on worker is unavailable.
   await recoverStaleSends(now)
+
+  const maintenanceClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  )
+  const { error: staleCheckpointError } = await maintenanceClient.rpc(
+    'quarantine_stale_pending_threads_v1',
+    { p_cutoff: new Date(now.getTime() - DISCOVERY_MAX_AGE_MS).toISOString() },
+  )
+  if (staleCheckpointError) {
+    throw new Error(`Unable to quarantine stale discovery checkpoints: ${staleCheckpointError.message}`)
+  }
 
   const maxScores = positiveInteger(
     process.env.SERVERLESS_MONITOR_MAX_SCORES,
@@ -308,6 +300,7 @@ async function runLockedMonitor(
   }
   const discovered: SocialScoreCandidate[] = []
   const completedWork: TargetWork[] = []
+  const failedWork: Array<{ target: TargetWork; error: unknown }> = []
 
   for (let index = 0; index < work.length; index += 6) {
     const batch = work.slice(index, index + 6)
@@ -323,6 +316,7 @@ async function runLockedMonitor(
         completedWork.push(target)
         discovered.push(...result.value)
       } else {
+        failedWork.push({ target, error: result.reason })
         logger.warn({
           error: result.reason,
           platform: target.platform,
@@ -332,8 +326,20 @@ async function runLockedMonitor(
     }
   }
   if (work.length > 0 && completedWork.length === 0) {
+    await Promise.all(failedWork.map(({ target, error }) =>
+      recordKeywordPollFailure(target.mappings.map(({ id }) => id), error, now),
+    ))
     throw new Error('All due social target fetches failed')
   }
+
+  await Promise.all([
+    ...completedWork.map(target =>
+      recordKeywordPollSuccess(target.mappings.map(({ id }) => id), now),
+    ),
+    ...failedWork.map(({ target, error }) =>
+      recordKeywordPollFailure(target.mappings.map(({ id }) => id), error, now),
+    ),
+  ])
 
   const discoveredCandidates = await removePersistedCandidates(discovered)
   discoveredCandidates.sort((left, right) =>
@@ -378,11 +384,6 @@ async function runLockedMonitor(
   const usersPolled = [...new Set(
     completedWork.flatMap(({ mappings }) => mappings.map(({ user_id }) => user_id)),
   )]
-  await Promise.all([
-    markKeywordsPolled(completedWork, now),
-    markUsersPolled(usersPolled, now),
-  ])
-
   return {
     status: 'completed',
     targetsFetched: completedWork.length,

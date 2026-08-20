@@ -42,6 +42,11 @@ function stubProductionCore() {
     'REDDITAPIS_API_KEY',
     'REDDITAPIS_FALLBACK_ENABLED',
     'REDDITAPIS_POSTING_ENABLED',
+    'REDDITAPIS_MAX_DAILY_READ_CALLS',
+    'REDDITAPIS_MAX_DAILY_WRITE_CALLS',
+    'REDDITAPIS_DISCOVERY_CACHE_SECONDS',
+    'REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS',
+    'REDDIT_AUTO_MIN_COMBINED_KARMA',
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
   ]) {
@@ -205,5 +210,19 @@ describe('production capability configuration', () => {
 
     vi.stubEnv('REDDITAPIS_POSTING_ENABLED', 'true')
     expect(getProviderCapabilities().redditPosting).toBe(true)
+  })
+
+  it('rejects unsafe or malformed Reddit provider limits', () => {
+    stubProductionCore()
+    vi.stubEnv('REDDITAPIS_MAX_DAILY_READ_CALLS', '-1')
+    expect(() => validateAppEnvironment()).toThrow(/REDDITAPIS_MAX_DAILY_READ_CALLS/)
+
+    vi.stubEnv('REDDITAPIS_MAX_DAILY_READ_CALLS', '500')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_CACHE_SECONDS', '60')
+    expect(() => validateAppEnvironment()).toThrow(/REDDITAPIS_DISCOVERY_CACHE_SECONDS/)
+
+    vi.stubEnv('REDDITAPIS_DISCOVERY_CACHE_SECONDS', '600')
+    vi.stubEnv('REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS', '1')
+    expect(() => validateAppEnvironment()).toThrow(/REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS/)
   })
 })

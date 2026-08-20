@@ -53,6 +53,19 @@ function assertCompleteOptionalGroup(names: readonly string[], label: string): v
   }
 }
 
+function assertOptionalInteger(
+  name: string,
+  minimum: number,
+  maximum: number,
+): void {
+  const raw = process.env[name]?.trim()
+  if (!raw) return
+  const value = Number(raw)
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer from ${minimum} through ${maximum}`)
+  }
+}
+
 export function getConfiguredSecret(value: string | undefined): string {
   const trimmed = value?.trim() ?? ''
   if (
@@ -78,13 +91,8 @@ export interface ProviderCapabilities {
 }
 
 export function hasRedditDiscoveryProvider(): boolean {
-  const proxyConfigured = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
+  return process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
     && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
-  const approvedOauthConfigured = process.env.REDDIT_API_APPROVED === 'true'
-    && Boolean(getConfiguredSecret(process.env.REDDIT_CLIENT_ID))
-    && Boolean(getConfiguredSecret(process.env.REDDIT_CLIENT_SECRET))
-
-  return proxyConfigured || approvedOauthConfigured
 }
 
 /** Reddit writes require both the provider key and an explicit kill switch. */
@@ -159,6 +167,11 @@ function validateOptionalProviders(): void {
   ) {
     throw new Error('RedditAPIs posting is enabled but REDDITAPIS_API_KEY is missing')
   }
+  assertOptionalInteger('REDDITAPIS_MAX_DAILY_READ_CALLS', 0, 100_000)
+  assertOptionalInteger('REDDITAPIS_MAX_DAILY_WRITE_CALLS', 0, 100_000)
+  assertOptionalInteger('REDDITAPIS_DISCOVERY_CACHE_SECONDS', 300, 1_800)
+  assertOptionalInteger('REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS', 7, 365)
+  assertOptionalInteger('REDDIT_AUTO_MIN_COMBINED_KARMA', 0, 100_000)
   assertCompleteOptionalGroup([
     'BLUESKY_HANDLE',
     'BLUESKY_APP_PASSWORD',
@@ -201,7 +214,7 @@ export function validateWorkerEnvironment(): void {
   }
   if (!hasRedditDiscoveryProvider()) {
     throw new Error(
-      'BuyerWatch worker requires an enabled Reddit proxy or approved Reddit OAuth discovery credentials',
+      'BuyerWatch worker requires an enabled Reddit proxy (RedditAPIs discovery fallback)',
     )
   }
 }

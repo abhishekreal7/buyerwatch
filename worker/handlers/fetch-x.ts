@@ -4,6 +4,10 @@ import { fetchXPosts } from '../../src/lib/x'
 import { scorePostQueue } from '../../src/lib/queues'
 import { X_DAILY_SPEND_LIMIT_CENTS } from '../../src/lib/plan-limits'
 import {
+  recordKeywordPollFailure,
+  recordKeywordPollSuccess,
+} from '../../src/lib/keyword-poll-health'
+import {
   buildSocialScoreCandidates,
   type SocialKeywordMapping,
   withProfileCompetitors,
@@ -21,6 +25,8 @@ export async function xFetchHandler(job: Job) {
     keywordMappings?: SocialKeywordMapping[]
   }
 
+  let keywordIds = preloadedMappings?.map(({ id }) => id) ?? []
+  let sourceFetchRecorded = false
   try {
     // Find all users watching this specific X target
     let keywordMappings = preloadedMappings
@@ -51,6 +57,7 @@ export async function xFetchHandler(job: Job) {
     }
 
     if (!keywordMappings || keywordMappings.length === 0) return
+    keywordIds = keywordMappings.map(({ id }) => id)
 
     // Reserve paid X search capacity before making the provider request. One
     // reservation per customer covers this shared target fetch, not every post.
@@ -69,6 +76,8 @@ export async function xFetchHandler(job: Job) {
     }
 
     const posts = await fetchXPosts(target)
+    await recordKeywordPollSuccess(keywordMappings.map(({ id }) => id))
+    sourceFetchRecorded = true
     if (!posts || posts.length === 0) return
 
     const discovery = buildSocialScoreCandidates(posts, keywordMappings)
@@ -87,6 +96,11 @@ export async function xFetchHandler(job: Job) {
       users: discovery.users,
     }, `X target ${target}: ${discovery.candidates.length} enqueued`)
   } catch (error) {
+    if (!sourceFetchRecorded) {
+      await recordKeywordPollFailure(keywordIds, error).catch((healthError) => {
+        logger.error({ healthError, target }, 'Failed to record X keyword poll failure')
+      })
+    }
     logger.error({ error }, `Failed to fetch X target ${target}:`)
     throw error
   }

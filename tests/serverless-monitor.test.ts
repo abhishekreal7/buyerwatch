@@ -12,7 +12,7 @@ function post(overrides: Partial<NormalizedPost> = {}): NormalizedPost {
     title: 'How do I find customers?',
     text: 'I need a practical way to find customers for my product.',
     url: 'https://reddit.com/r/Entrepreneur/comments/post-1',
-    createdAt: '2026-08-01T12:00:00.000Z',
+    createdAt: new Date().toISOString(),
     sourceTarget: 'entrepreneur',
     ...overrides,
   }
@@ -83,11 +83,39 @@ describe('serverless social candidate selection', () => {
     expect(result.candidates).toHaveLength(1)
     expect(result.candidates[0]).toMatchObject({ keywordId: 'keyword-1' })
   })
+
+  it('rejects stale source posts before scoring or persistence', () => {
+    const result = buildRedditScoreCandidates([
+      post({ createdAt: new Date(Date.now() - 72 * 60 * 60_000).toISOString() }),
+    ], [
+      { id: 'keyword-1', user_id: 'user-1', term: 'find customers' },
+    ])
+
+    expect(result.candidates).toHaveLength(0)
+    expect(result.skipped).toBe(1)
+  })
+
+  it('uses controlled keyword aliases without removing the buying-signal gate', () => {
+    const result = buildRedditScoreCandidates([
+      post({
+        title: 'How can I get customers for my B2B product?',
+        text: 'We need a tool before Friday and are comparing options.',
+      }),
+    ], [
+      { id: 'keyword-1', user_id: 'user-1', term: 'lead generation' },
+    ])
+
+    expect(result.candidates).toHaveLength(1)
+  })
 })
 
 describe('QStash monitoring route contract', () => {
   const route = readFileSync(
     join(process.cwd(), 'src/app/api/cron/enqueue/route.ts'),
+    'utf8',
+  )
+  const failureRoute = readFileSync(
+    join(process.cwd(), 'src/app/api/cron/failure/route.ts'),
     'utf8',
   )
   const setup = readFileSync(
@@ -121,6 +149,7 @@ describe('QStash monitoring route contract', () => {
 
   it('verifies signed QStash requests and runs direct monitoring', () => {
     expect(route).toContain('verifyQStashRequest')
+    expect(route).toContain('readTextBody(request, 4_096)')
     expect(route).toContain('runServerlessMonitoring')
     expect(route).not.toContain('enqueueDueMonitoring')
   })
@@ -129,6 +158,16 @@ describe('QStash monitoring route contract', () => {
     expect(setup).toContain("cron: '*/5 * * * *'")
     expect(setup).toContain('retries: 2')
     expect(setup).toContain("scheduleId: 'buyerwatch-reddit-monitor'")
+    expect(setup).toContain('failureCallback,')
+    expect(setup).toContain('schedule.failureCallback !== failureCallback')
+  })
+
+  it('authenticates, deduplicates, and alerts after scheduler retries are exhausted', () => {
+    expect(failureRoute).toContain('verifyQStashRequest')
+    expect(failureRoute).toContain('readTextBody(request, MAX_CALLBACK_BYTES)')
+    expect(failureRoute).toContain("'NX'")
+    expect(failureRoute).toContain('new Resend(apiKey).emails.send')
+    expect(failureRoute).not.toContain('sourceBody')
   })
 
   it('recovers durable checkpoints before fetching newly discovered candidates', () => {
@@ -158,7 +197,8 @@ describe('QStash monitoring route contract', () => {
     expect(monitor).toContain(".in('platform', ['reddit', 'bluesky'])")
     expect(monitor).toContain('searchBlueskyPosts(target.target, 25)')
     expect(monitor).toContain('platform: post.platform')
-    expect(monitor).toContain('markKeywordsPolled(completedWork, now)')
+    expect(monitor).toContain('recordKeywordPollSuccess')
+    expect(monitor).toContain('recordKeywordPollFailure')
   })
 
   it('keeps the paid Reddit proxy strictly opt-in', () => {
