@@ -146,26 +146,26 @@ export const LeadDiscoveryWidget = () => {
           <AreaChart accessibilityLayer data={leadDiscoveryData} margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorDiscovered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8A8A84" stopOpacity={0.055} />
-                <stop offset="88%" stopColor="#8A8A84" stopOpacity={0} />
+                <stop offset="5%" stopColor="#171717" stopOpacity={0.05} />
+                <stop offset="95%" stopColor="#171717" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorQualified" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.13} />
-                <stop offset="88%" stopColor="#0A84FF" stopOpacity={0} />
+                <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.12} />
+                <stop offset="95%" stopColor="#0A84FF" stopOpacity={0} />
               </linearGradient>
             </defs>
 
             <CartesianGrid
               vertical={false}
-              stroke="#ECECE8"
-              strokeDasharray="2 5"
+              stroke="rgba(20,18,16,0.045)"
+              strokeDasharray="3 6"
             />
             <XAxis
               dataKey="date"
               tickFormatter={(value) => (value.includes(' 1,') ? value.slice(0, 3) : '')}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: '#A0A09A', fontSize: 10.5, fontWeight: 500, fontFamily: 'var(--font-inter), sans-serif' }}
+              tick={{ fill: 'rgba(20,18,16,0.38)', fontSize: 11, fontWeight: 500, fontFamily: 'var(--font-inter), sans-serif' }}
               interval={0}
               tickMargin={9}
             />
@@ -174,33 +174,36 @@ export const LeadDiscoveryWidget = () => {
               ticks={[0, 500, 1000]}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: '#A0A09A', fontSize: 10.5, fontWeight: 500, fontFamily: 'var(--font-inter), sans-serif' }}
+              tick={{ fill: 'rgba(20,18,16,0.28)', fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-inter), sans-serif' }}
               tickFormatter={(value) => (value === 1000 ? '1k' : String(value))}
               width={31}
             />
             <Tooltip
               content={<LeadDiscoveryTooltip />}
               labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
-              cursor={{ stroke: '#D3D3CE', strokeWidth: 1, strokeDasharray: '3 4' }}
+              cursor={{ stroke: 'rgba(10,132,255,0.16)', strokeWidth: 1 }}
+              wrapperStyle={{ outline: 'none' }}
             />
 
             <Area
-              type="monotoneX"
+              type="linear"
               dataKey="discovered"
-              stroke="#777771"
+              stroke="#171717"
               strokeWidth={1.75}
+              fillOpacity={1}
               fill="url(#colorDiscovered)"
               dot={false}
-              activeDot={{ r: 3.5, fill: '#777771', stroke: '#FFFFFF', strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2 }}
             />
             <Area
-              type="monotoneX"
+              type="linear"
               dataKey="qualified"
               stroke="#0A84FF"
-              strokeWidth={2}
+              strokeWidth={2.5}
+              fillOpacity={1}
               fill="url(#colorQualified)"
               dot={false}
-              activeDot={{ r: 3.5, fill: '#0A84FF', stroke: '#FFFFFF', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>

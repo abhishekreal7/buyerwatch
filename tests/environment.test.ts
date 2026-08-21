@@ -40,6 +40,7 @@ function stubProductionCore() {
     'REDDIT_CLIENT_ID',
     'REDDIT_CLIENT_SECRET',
     'REDDITAPIS_API_KEY',
+    'REDDITAPIS_DISCOVERY_ENABLED',
     'REDDITAPIS_FALLBACK_ENABLED',
     'REDDITAPIS_POSTING_ENABLED',
     'REDDITAPIS_MAX_DAILY_READ_CALLS',
@@ -162,7 +163,7 @@ describe('production capability configuration', () => {
     expect(getProviderCapabilities().redditDiscovery).toBe(false)
   })
 
-  it('requires a production Reddit provider for the worker', () => {
+  it('requires a production Reddit discovery provider for the worker', () => {
     stubProductionCore()
     vi.stubEnv('ADMIN_SECRET', 'a'.repeat(32))
     vi.stubEnv('REDDITAPIS_API_KEY', '')
@@ -170,20 +171,20 @@ describe('production capability configuration', () => {
     vi.stubEnv('REDDIT_CLIENT_SECRET', '')
     vi.stubEnv('REDDIT_API_APPROVED', 'false')
 
-    expect(() => validateWorkerEnvironment()).toThrow(/requires an enabled Reddit proxy/)
+    expect(() => validateWorkerEnvironment()).toThrow(/requires enabled RedditAPIs discovery/)
   })
 
-  it('does not enable a paid Reddit proxy from its key alone', () => {
+  it('does not enable managed Reddit discovery from its key alone', () => {
     stubProductionCore()
     vi.stubEnv('ADMIN_SECRET', 'a'.repeat(32))
     vi.stubEnv('REDDITAPIS_API_KEY', 'proxy-key')
     vi.stubEnv('REDDITAPIS_FALLBACK_ENABLED', 'false')
 
-    expect(() => validateWorkerEnvironment()).toThrow(/requires an enabled Reddit proxy/)
+    expect(() => validateWorkerEnvironment()).toThrow(/requires enabled RedditAPIs discovery/)
     expect(getProviderCapabilities().redditDiscovery).toBe(false)
   })
 
-  it('accepts the configured Reddit proxy for the production worker', () => {
+  it('accepts managed Reddit discovery for the production worker', () => {
     stubProductionCore()
     vi.stubEnv('ADMIN_SECRET', 'a'.repeat(32))
     vi.stubEnv('REDDITAPIS_API_KEY', 'proxy-key')
@@ -191,6 +192,25 @@ describe('production capability configuration', () => {
 
     expect(() => validateWorkerEnvironment()).not.toThrow()
     expect(getProviderCapabilities().redditDiscovery).toBe(true)
+  })
+
+  it('prefers the explicit discovery switch over the deprecated fallback alias', () => {
+    stubProductionCore()
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_FALLBACK_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'false')
+
+    expect(getProviderCapabilities().redditDiscovery).toBe(false)
+
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    expect(getProviderCapabilities().redditDiscovery).toBe(true)
+  })
+
+  it('rejects malformed discovery switches', () => {
+    stubProductionCore()
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'yes')
+
+    expect(() => validateAppEnvironment()).toThrow(/REDDITAPIS_DISCOVERY_ENABLED must be true or false/)
   })
 
   it('never treats a discovery proxy key as customer-authorized Reddit posting', () => {

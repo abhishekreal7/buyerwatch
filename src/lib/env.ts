@@ -91,8 +91,15 @@ export interface ProviderCapabilities {
 }
 
 export function hasRedditDiscoveryProvider(): boolean {
-  return process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
-    && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
+  // REDDITAPIS_FALLBACK_ENABLED was the original name while RSS was the
+  // primary path. Keep it as a compatibility alias for already-deployed
+  // environments, but let the explicit discovery switch take precedence.
+  const configured = process.env.REDDITAPIS_DISCOVERY_ENABLED?.trim()
+  const enabled = configured === 'true' || configured === 'false'
+    ? configured === 'true'
+    : process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
+
+  return enabled && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
 }
 
 /** Reddit writes require both the provider key and an explicit kill switch. */
@@ -167,6 +174,8 @@ function validateOptionalProviders(): void {
   ) {
     throw new Error('RedditAPIs posting is enabled but REDDITAPIS_API_KEY is missing')
   }
+  assertOptionalBoolean('REDDITAPIS_DISCOVERY_ENABLED')
+  assertOptionalBoolean('REDDITAPIS_FALLBACK_ENABLED')
   assertOptionalInteger('REDDITAPIS_MAX_DAILY_READ_CALLS', 0, 100_000)
   assertOptionalInteger('REDDITAPIS_MAX_DAILY_WRITE_CALLS', 0, 100_000)
   assertOptionalInteger('REDDITAPIS_DISCOVERY_CACHE_SECONDS', 300, 1_800)
@@ -182,6 +191,13 @@ function validateOptionalProviders(): void {
     'X_ACCESS_TOKEN',
     'X_ACCESS_SECRET',
   ], 'X')
+}
+
+function assertOptionalBoolean(name: string): void {
+  const raw = process.env[name]?.trim()
+  if (raw && raw !== 'true' && raw !== 'false') {
+    throw new Error(`${name} must be true or false`)
+  }
 }
 
 export function validateAppEnvironment(): void {
@@ -214,7 +230,7 @@ export function validateWorkerEnvironment(): void {
   }
   if (!hasRedditDiscoveryProvider()) {
     throw new Error(
-      'BuyerWatch worker requires an enabled Reddit proxy (RedditAPIs discovery fallback)',
+      'BuyerWatch worker requires enabled RedditAPIs discovery',
     )
   }
 }
