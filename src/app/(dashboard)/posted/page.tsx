@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   CheckCircle2,
   Clock,
@@ -8,6 +8,9 @@ import {
   MessageCircle,
   MessageSquare,
   TrendingUp,
+  Search,
+  MousePointerClick,
+  Sparkles,
 } from 'lucide-react'
 import { AppPage } from '@/components/AppPage'
 import { useDashboardSession } from '@/components/DashboardContext'
@@ -18,7 +21,7 @@ import { IntentBadge } from '@/components/IntentBadge'
 import { DataLoadError } from '@/components/DataLoadError'
 import { toast } from 'sonner'
 
-const PAGE_SIZE = 40
+const PAGE_SIZE = 30
 
 interface PostedReply {
   id: string
@@ -112,166 +115,111 @@ function parsePostedThreads(data: any[]): PostedReply[] {
   })
 }
 
-// ─── Left Panel: Compact Posted Row ──────────────────────────────────────────
+// ─── Chronological Feed Item Card ─────────────────────────────────────────────
 
-function PostedRow({
-  item,
-  isActive,
-  onClick,
-}: {
-  item: PostedReply
-  isActive: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left px-3.5 py-3 transition-colors ${
-        isActive
-          ? 'bg-white shadow-2xs relative z-10 border-l-[3px] border-gray-900'
-          : 'hover:bg-gray-100/60 border-l-[3px] border-transparent'
-      }`}
-    >
-      {/* Top meta row */}
-      <div className="flex items-center justify-between text-[11px] mb-1">
-        <div className="flex items-center gap-1.5 font-medium text-gray-700">
-          <PlatformIcon platform={item.platform} />
-          <span>{item.sourceLabel}</span>
-          <span className="text-gray-300">·</span>
-          <span className="text-gray-400 font-normal">{item.discoveredAt}</span>
-        </div>
-
-        <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-          <CheckCircle2 className="h-2.5 w-2.5" />
-          Posted
-        </span>
-      </div>
-
-      {/* Title */}
-      <p className={`text-[12.5px] leading-snug line-clamp-1 ${
-        isActive ? 'font-semibold text-gray-900' : 'text-gray-800'
-      }`}>
-        {item.title}
-      </p>
-
-      {(item.convertedAt || item.clickedAt) && (
-        <div className="flex items-center gap-1.5 text-[10.5px] font-medium mt-1">
-          {item.convertedAt && (
-            <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">Converted</span>
-          )}
-          {item.clickedAt && !item.convertedAt && (
-            <span className="text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded">Clicked</span>
-          )}
-        </div>
-      )}
-    </button>
-  )
-}
-
-// ─── Right Panel: Thread + Reply View ────────────────────────────────────────
-
-function DetailPanel({ item }: { item: PostedReply }) {
+function PostedConversationCard({ item }: { item: PostedReply }) {
   const hasConversion = Boolean(item.convertedAt)
   const hasClick = Boolean(item.clickedAt)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-white">
-
-      {/* Header */}
-      <div className="shrink-0 px-6 py-3.5 border-b border-gray-200 flex items-center justify-between gap-3 bg-white">
+    <article className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6 shadow-xs space-y-4 transition-all">
+      {/* Top Meta Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
         <div className="flex items-center gap-2.5 min-w-0">
           <PlatformIcon platform={item.platform} size="md" />
           <div className="min-w-0">
-            <h3 className="truncate text-[14.5px] font-bold text-gray-900">{item.sourceLabel}</h3>
-            {item.authorLabel && (
-              <span className="block text-[11.5px] font-medium text-gray-500">{item.authorLabel}</span>
-            )}
+            <div className="flex items-center gap-2">
+              <h3 className="text-[14.5px] font-bold text-gray-900 truncate">{item.sourceLabel}</h3>
+              {item.authorLabel && (
+                <span className="text-[12px] text-gray-500 font-medium">{item.authorLabel}</span>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+
+        <div className="flex items-center gap-2 flex-wrap">
           {item.matchedKeyword && (
             <span className="rounded-md bg-blue-50 border border-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
               {item.matchedKeyword}
             </span>
           )}
           <IntentBadge score={item.score} />
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            <CheckCircle2 className="h-3 w-3" />
+            Posted
+          </span>
         </div>
       </div>
 
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5" style={{ scrollbarWidth: 'thin' }}>
-
-        {/* Attribution stats row */}
-        {(hasConversion || hasClick || item.revenueUsd > 0) && (
-          <div className="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
-            <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
-            <div className="flex items-center gap-3 text-[12.5px] font-semibold flex-wrap">
-              {hasConversion && <span className="text-emerald-700">Converted</span>}
-              {hasClick && !hasConversion && <span className="text-blue-700">Link clicked</span>}
-              {item.revenueUsd > 0 && (
-                <span className="text-gray-900">${item.revenueUsd.toFixed(2)} attributed</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Original thread — PRESERVED AS IN IMAGE 2 */}
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original thread</p>
-          <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
-            <div className="flex items-center gap-2 mb-2 text-[11px] font-medium text-[#8C8C85]">
-              <PlatformIcon platform={item.platform} />
-              <span>{item.sourceLabel}</span>
-              <span className="opacity-40">·</span>
-              <Clock className="h-3 w-3" />
-              <span>{item.discoveredAt}</span>
-            </div>
-            {item.title && (
-              <h4 className="text-[14.5px] font-semibold text-[#1C1C1A] leading-snug mb-1.5">{item.title}</h4>
-            )}
-            {item.body && item.body !== item.title && (
-              <p className="text-[13px] leading-relaxed text-[#4A4A45]">{item.body}</p>
-            )}
-            {item.threadUrl && (
-              <a
-                href={item.threadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0A84FF] hover:underline"
-              >
-                View on {item.platform} <ExternalLink className="h-3 w-3" />
-              </a>
+      {/* Attribution Stats (if any) */}
+      {(hasConversion || hasClick || item.revenueUsd > 0) && (
+        <div className="flex items-center gap-3 rounded-lg bg-emerald-50 border border-emerald-100 px-3.5 py-2.5">
+          <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
+          <div className="flex items-center gap-3 text-[12px] font-semibold flex-wrap">
+            {hasConversion && <span className="text-emerald-700">✓ Customer Converted</span>}
+            {hasClick && !hasConversion && <span className="text-blue-700">✓ Link Clicked</span>}
+            {item.revenueUsd > 0 && (
+              <span className="text-gray-900">${item.revenueUsd.toFixed(2)} attributed revenue</span>
             )}
           </div>
         </div>
+      )}
 
-        {/* Your reply — PRESERVED AS IN IMAGE 2 */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply</p>
-            <span className="text-[11px] text-[#8C8C85]">Sent {item.sentAt}</span>
+      {/* Original Thread — PRESERVED EXACTLY AS IN 2ND IMAGE */}
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original thread</p>
+        <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
+          <div className="flex items-center gap-2 mb-2 text-[11px] font-medium text-[#8C8C85]">
+            <PlatformIcon platform={item.platform} />
+            <span>{item.sourceLabel}</span>
+            <span className="opacity-40">·</span>
+            <Clock className="h-3 w-3" />
+            <span>{item.discoveredAt}</span>
           </div>
-          <div className="rounded-[16px] border border-emerald-200 bg-[#F2FCF7] px-4 py-3.5">
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
-                <MessageSquare className="h-3 w-3 text-emerald-600" strokeWidth={2.3} />
-              </span>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#3A6B50]">BuyerWatch reply</span>
-            </div>
-            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#1C1C1A]">{item.reply}</p>
-          </div>
+          {item.title && (
+            <h4 className="text-[14.5px] font-semibold text-[#1C1C1A] leading-snug mb-1.5">{item.title}</h4>
+          )}
+          {item.body && item.body !== item.title && (
+            <p className="text-[13px] leading-relaxed text-[#4A4A45]">{item.body}</p>
+          )}
+          {item.threadUrl && (
+            <a
+              href={item.threadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0A84FF] hover:underline"
+            >
+              View on {item.platform} <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
         </div>
       </div>
 
-      {/* Footer actions */}
-      <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-end gap-2.5">
+      {/* Your Reply — PRESERVED EXACTLY AS IN 2ND IMAGE */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply</p>
+          <span className="text-[11px] text-[#8C8C85]">Sent {item.sentAt}</span>
+        </div>
+        <div className="rounded-[16px] border border-emerald-200 bg-[#F2FCF7] px-4 py-3.5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
+              <MessageSquare className="h-3 w-3 text-emerald-600" strokeWidth={2.3} />
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#3A6B50]">BuyerWatch reply</span>
+          </div>
+          <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#1C1C1A]">{item.reply}</p>
+        </div>
+      </div>
+
+      {/* Footer Actions */}
+      <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
         {item.threadUrl && (
           <a
             href={item.threadUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-8.5 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
+            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
           >
             <ExternalLink className="h-3.5 w-3.5 text-gray-400" />
             View conversation
@@ -282,32 +230,14 @@ function DetailPanel({ item }: { item: PostedReply }) {
             href={item.replyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-8.5 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-[12.5px] font-medium text-white hover:bg-emerald-700 transition-colors shadow-xs"
+            className="h-8 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-[12px] font-medium text-white hover:bg-emerald-700 transition-colors shadow-xs"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             View live reply
           </a>
         )}
       </div>
-    </div>
-  )
-}
-
-// ─── Empty Right Panel ────────────────────────────────────────────────────────
-
-function EmptyDetail({ loading }: { loading?: boolean }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-8 bg-white">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-50 text-gray-400">
-        <CheckCircle2 className="h-7 w-7 text-emerald-600/80" strokeWidth={1.75} />
-      </div>
-      <p className="text-[14px] font-semibold text-gray-900 mb-1">
-        {loading ? 'Loading replies…' : 'No replies posted yet'}
-      </p>
-      <p className="text-[13px] text-gray-500 max-w-[260px] leading-relaxed">
-        {loading ? '' : 'Once you approve or auto-send a reply, the full conversation thread will appear here.'}
-      </p>
-    </div>
+    </article>
   )
 }
 
@@ -315,13 +245,14 @@ function EmptyDetail({ loading }: { loading?: boolean }) {
 
 export default function PostedPage() {
   const [posted, setPosted] = useState<PostedReply[]>([])
-  const [selected, setSelected] = useState<PostedReply | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const [loadFailed, setLoadFailed] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'reddit' | 'bluesky'>('all')
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
 
@@ -353,7 +284,6 @@ export default function PostedPage() {
 
         const parsed = parsePostedThreads(pageResult.data ?? [])
         setPosted(parsed)
-        setSelected(parsed[0] ?? null)
         setTotalCount(countResult.count ?? pageResult.data?.length ?? 0)
         setHasMore((pageResult.data?.length ?? 0) === PAGE_SIZE)
       } catch (error) {
@@ -393,9 +323,29 @@ export default function PostedPage() {
     }
   }
 
+  // Filtered list
+  const filtered = useMemo(() => {
+    return posted.filter(item => {
+      if (platformFilter !== 'all' && item.platform.toLowerCase() !== platformFilter) return false
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase().trim()
+      return (
+        item.title?.toLowerCase().includes(q) ||
+        item.body?.toLowerCase().includes(q) ||
+        item.sourceLabel?.toLowerCase().includes(q) ||
+        item.authorLabel?.toLowerCase().includes(q) ||
+        item.matchedKeyword?.toLowerCase().includes(q) ||
+        item.reply?.toLowerCase().includes(q)
+      )
+    })
+  }, [posted, searchQuery, platformFilter])
+
+  const totalClicks = useMemo(() => posted.filter(p => Boolean(p.clickedAt)).length, [posted])
+  const totalConversions = useMemo(() => posted.filter(p => Boolean(p.convertedAt)).length, [posted])
+
   return (
     <AppPage>
-      <div className="flex w-full flex-col">
+      <div className="flex w-full flex-col max-w-4xl mx-auto pb-12">
         {/* Header */}
         <PageHeader
           title="Posted Replies"
@@ -416,60 +366,112 @@ export default function PostedPage() {
             className="flex-1"
           />
         ) : (
-          <div className="flex flex-col lg:flex-row h-[calc(100vh-210px)] min-h-[600px] rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
-
-            {/* LEFT: Compact Posted List */}
-            <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 bg-[#FAFAFA] lg:w-[340px] lg:min-w-[340px] lg:max-w-[340px] shrink-0 overflow-hidden">
-              <div className="shrink-0 px-3.5 py-3 border-b border-gray-200 bg-[#FAFAFA]">
-                <span className="text-[13px] font-semibold text-gray-900">
-                  Posted replies <span className="text-gray-400 font-normal text-xs">({totalCount})</span>
-                </span>
+          <div className="space-y-6 mt-1">
+            {/* Top Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-medium text-gray-500">Total Replies Sent</span>
+                  <Sparkles className="h-4 w-4 text-emerald-600" />
+                </div>
+                <p className="mt-2 text-2xl font-bold text-gray-900 tabular-nums">
+                  {loading ? '…' : totalCount}
+                </p>
               </div>
 
-              <div className="flex-1 overflow-y-auto divide-y divide-gray-100" style={{ scrollbarWidth: 'thin' }}>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-3.5 space-y-2 animate-pulse">
-                      <div className="h-3.5 bg-gray-200 rounded w-1/3" />
-                      <div className="h-4 bg-gray-100 rounded w-3/4" />
-                    </div>
-                  ))
-                ) : posted.length === 0 ? (
-                  <div className="flex items-center justify-center h-40 text-[13px] text-gray-400">
-                    No posted replies yet
-                  </div>
-                ) : (
-                  posted.map(item => (
-                    <PostedRow
-                      key={item.id}
-                      item={item}
-                      isActive={selected?.id === item.id}
-                      onClick={() => setSelected(item)}
-                    />
-                  ))
-                )}
+              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-medium text-gray-500">Tracked Link Clicks</span>
+                  <MousePointerClick className="h-4 w-4 text-blue-600" />
+                </div>
+                <p className="mt-2 text-2xl font-bold text-gray-900 tabular-nums">
+                  {loading ? '…' : totalClicks}
+                </p>
+              </div>
 
-                {!loading && hasMore && (
-                  <div className="flex justify-center p-3">
-                    <button
-                      type="button"
-                      onClick={loadMorePosted}
-                      disabled={loadingMore}
-                      className="rounded border border-gray-200 bg-white px-3 py-1 text-[11.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      {loadingMore ? 'Loading…' : 'Load more'}
-                    </button>
-                  </div>
-                )}
+              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-medium text-gray-500">Attributed Conversions</span>
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </div>
+                <p className="mt-2 text-2xl font-bold text-gray-900 tabular-nums">
+                  {loading ? '…' : totalConversions}
+                </p>
               </div>
             </div>
 
-            {/* RIGHT: Thread + Reply Detail */}
-            <div className="flex-1 overflow-hidden bg-white">
-              {selected ? (
-                <DetailPanel item={selected} />
+            {/* Filter / Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-200 shadow-xs">
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search replies, keywords, subreddits..."
+                  className="h-8.5 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-[12.5px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                {(['all', 'reddit', 'bluesky'] as const).map((platform) => (
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => setPlatformFilter(platform)}
+                    className={`h-8 px-3 rounded-lg text-[12px] font-medium transition-colors ${
+                      platformFilter === platform
+                        ? 'bg-gray-900 text-white shadow-xs'
+                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    {platform === 'all' ? 'All Channels' : platform === 'reddit' ? 'Reddit' : 'Bluesky'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Feed Stream */}
+            <div className="space-y-4">
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-64 rounded-xl border border-gray-200 bg-white p-6 animate-pulse space-y-4">
+                    <div className="h-4 bg-gray-200 rounded w-1/4" />
+                    <div className="h-20 bg-gray-100 rounded" />
+                    <div className="h-20 bg-gray-100 rounded" />
+                  </div>
+                ))
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white p-12 text-center">
+                  <div className="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 mb-3">
+                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <p className="text-[15px] font-semibold text-gray-900 mb-1">
+                    {searchQuery || platformFilter !== 'all' ? 'No matching replies' : 'No posted replies yet'}
+                  </p>
+                  <p className="text-[13px] text-gray-500 max-w-sm">
+                    {searchQuery || platformFilter !== 'all'
+                      ? 'Try adjusting your search query or filter to view results.'
+                      : 'Once you approve or publish a reply from your opportunities, the full thread and delivery audit will appear here.'}
+                  </p>
+                </div>
               ) : (
-                <EmptyDetail loading={loading} />
+                filtered.map((item) => (
+                  <PostedConversationCard key={item.id} item={item} />
+                ))
+              )}
+
+              {!loading && hasMore && (
+                <div className="flex justify-center pt-4">
+                  <button
+                    type="button"
+                    onClick={loadMorePosted}
+                    disabled={loadingMore}
+                    className="rounded-lg border border-gray-200 bg-white px-5 py-2 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 shadow-2xs transition-colors"
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more replies'}
+                  </button>
+                </div>
               )}
             </div>
           </div>
