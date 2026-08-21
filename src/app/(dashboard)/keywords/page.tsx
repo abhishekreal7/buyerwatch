@@ -16,7 +16,6 @@ import { fetchAllPages } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { DataLoadError } from '@/components/DataLoadError'
 import { getKeywordPollIssueLabel, isKeywordPollDelayed } from '@/lib/monitoring-health'
-import { trackEvent } from '@/lib/analytics'
 
 type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
 
@@ -91,10 +90,10 @@ function FilterPill({ label, active, onClick, icon }: { label: string; active: b
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[12.5px] transition-all duration-150 cursor-pointer ${
+      className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] transition-all duration-150 cursor-pointer sm:min-h-0 ${
         active
-          ? 'bg-gray-900 text-white font-semibold shadow-xs'
-          : 'text-[#4F5865] hover:text-gray-900 hover:bg-black/[0.04] font-medium'
+          ? 'bg-text-primary text-white font-semibold shadow-sm'
+          : 'text-text-secondary hover:text-text-primary hover:bg-black/[0.04] font-medium'
       }`}
     >
       {icon}
@@ -235,12 +234,6 @@ export default function KeywordsPage() {
 
       toast.success('Rule created')
       toast.info('Searching network for past 24 hours of data...')
-      trackEvent('keyword_created', {
-        keyword_id: data.id,
-        platform: newPlatform,
-        target: newTarget.trim(),
-        term: newTerm.trim(),
-      })
 
       // Trigger Instant Aha Moment
       fetch('/api/keywords/fetch-now', {
@@ -278,7 +271,6 @@ export default function KeywordsPage() {
       const { error } = await supabase.from('keywords').delete().eq('id', id)
       if (error) throw error
       clearSupabaseReadCache()
-      trackEvent('keyword_deleted', { keyword_id: id, platform: removed?.platform, target: removed?.target })
       toast.success('Rule deleted')
     } catch (error) {
       console.error('[keywords] Unable to delete monitoring rule', error)

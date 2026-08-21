@@ -38,7 +38,6 @@ import { useConversationSearch } from '@/lib/conversation-search'
 import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
 import { DataLoadError } from '@/components/DataLoadError'
 import { summarizeKeywordPollHealth } from '@/lib/monitoring-health'
-import { trackEvent } from '@/lib/analytics'
 
 interface Thread {
   id: string
@@ -640,12 +639,6 @@ export default function DashboardPage() {
       toast.info('Posting reply...')
       await waitForReplyDelivery(thread.id)
       clearSupabaseReadCache()
-      trackEvent('reply_posted', {
-        thread_id: thread.id,
-        platform: thread.platform,
-        target: thread.target,
-        is_edited: thread.originalDraft !== thread.draft,
-      })
       setThreads(prev => prev.filter(item => item.id !== thread.id))
       setSelectedThread(current => current?.id === thread.id
         ? threads.find(item => item.id !== thread.id) || null
@@ -666,11 +659,6 @@ export default function DashboardPage() {
     if (!selectedThread?.draft) return
     try {
       await navigator.clipboard.writeText(selectedThread.draft)
-      trackEvent('reply_copied', {
-        thread_id: selectedThread.id,
-        platform: selectedThread.platform,
-        target: selectedThread.target,
-      })
       toast.success('Copied to clipboard')
     } catch {
       toast.error('Could not copy the draft')
@@ -700,11 +688,6 @@ export default function DashboardPage() {
     try {
       const { error } = await supabase.rpc('dismiss_thread', { p_thread_id: dismissed.id })
       if (error) throw error
-      trackEvent('reply_dismissed', {
-        thread_id: dismissed.id,
-        platform: dismissed.platform,
-        target: dismissed.target,
-      })
     } catch (error) {
       console.error('[dashboard] Unable to dismiss conversation', error)
       toast.error('Could not dismiss this conversation. Nothing was changed.')
@@ -778,11 +761,6 @@ export default function DashboardPage() {
       })
       if (!response.ok) throw new Error('mark_posted_failed')
       clearSupabaseReadCache()
-      trackEvent('reply_marked_posted', {
-        thread_id: thread.id,
-        platform: thread.platform,
-        target: thread.target,
-      })
       setThreads(prev => prev.filter(item => item.id !== thread.id))
       setSelectedThread(threads.find(item => item.id !== thread.id) || null)
       setEditingDraft(null)
@@ -847,11 +825,6 @@ export default function DashboardPage() {
 
       const { draft } = await res.json()
       clearSupabaseReadCache()
-      trackEvent(isFirstDraft ? 'reply_draft_generated' : 'reply_regenerated', {
-        thread_id: threadToDraft.id,
-        platform: threadToDraft.platform,
-        target: threadToDraft.target,
-      })
 
       if (!isFirstDraft) {
         fetch('/api/feedback', {
@@ -1407,21 +1380,21 @@ export default function DashboardPage() {
                         <div>
                           <div className={`${isLowRelevance ? 'mb-2.5' : 'mb-3'} flex flex-wrap items-start justify-between gap-2`}>
                             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text-secondary">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F4F5F7]">
                                 {thread.platform === 'reddit' ? (
                                   <>
-                                    <RedditIcon className="h-4 w-4 text-[#FF4500]" />
-                                    <span className="font-medium text-[#4F5865] text-[12.5px]">Reddit</span>
+                                    <RedditIcon className="h-[18px] w-[18px] text-[#FF4500]" />
+                                    <span className="font-medium text-text-secondary text-[13px] tracking-tight">Reddit</span>
                                   </>
                                 ) : thread.platform === 'x' ? (
                                   <>
-                                    <XIcon className="h-4 w-4 text-[#0F1419]" />
-                                    <span className="font-medium text-[#4F5865] text-[12.5px]">X</span>
+                                    <XIcon className="h-[18px] w-[18px] text-[#0F1419]" />
+                                    <span className="font-medium text-text-secondary text-[13px] tracking-tight">X</span>
                                   </>
                                 ) : (
                                   <>
-                                    <BlueskyIcon className="h-4 w-4 text-[#1185FE]" />
-                                    <span className="font-medium text-[#4F5865] text-[12.5px]">Bluesky</span>
+                                    <BlueskyIcon className="h-[18px] w-[18px] text-[#1185FE]" />
+                                    <span className="font-medium text-text-secondary text-[13px] tracking-tight">Bluesky</span>
                                   </>
                                 )}
                               </div>
@@ -1541,9 +1514,9 @@ export default function DashboardPage() {
                                     Done
                                   </button>
                                 </div>
-                                <div className="rounded-[20px] rounded-br-md border border-gray-200 bg-white shadow-sm">
+                                <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
                                   <textarea
-                                    className="min-h-[190px] w-full resize-none rounded-[20px] rounded-br-md bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white"
+                                    className="min-h-[190px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
                                     value={thread.draft || ''}
                                     placeholder="Write your reply..."
                                     onChange={(event) => {
@@ -1724,9 +1697,9 @@ export default function DashboardPage() {
                                     Done
                                   </button>
                                 </div>
-                                <div className="rounded-[20px] rounded-br-md border border-gray-200 bg-white shadow-sm">
+                                <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
                                   <textarea
-                                    className="min-h-[220px] w-full resize-none rounded-[20px] rounded-br-md bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white"
+                                    className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
                                     value={thread.draft || ''}
                                     placeholder="Write your reply..."
                                     onChange={(event) => {
@@ -1956,9 +1929,9 @@ export default function DashboardPage() {
                               Done
                             </button>
                           </div>
-                          <div className="rounded-[20px] rounded-br-md border border-gray-200 bg-white shadow-sm">
+                          <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
                             <textarea
-                              className="min-h-[220px] w-full resize-none rounded-[20px] rounded-br-md bg-white p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white"
+                              className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
                               value={selectedThread.draft || ''}
                               placeholder="Write your reply..."
                               onChange={(e) => {

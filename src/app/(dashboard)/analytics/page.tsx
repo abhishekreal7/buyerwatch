@@ -429,7 +429,7 @@ export default function AnalyticsPage() {
     <AppPage>
       <div className="w-full max-w-[1200px] pb-12">
         <div className="mb-6">
-          <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Analytics</h1>
+          <h1 className="page-title">Analytics</h1>
         </div>
 
         <div className="flex flex-col gap-6">
@@ -689,22 +689,22 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-xs">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Replies Clicked</p>
-                <p className="text-[28px] font-bold text-gray-900 tabular-nums leading-none">{data.attributionStats?.clicks || 0}</p>
-                <p className="text-[12px] text-gray-400 mt-1.5">Replies with a verified click</p>
+              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Replies Clicked</p>
+                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{data.attributionStats?.clicks || 0}</p>
+                <p className="text-xs text-gray-500 mt-1.5 font-medium">Tracked replies with at least one verified click</p>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-xs">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Conversions</p>
-                <p className="text-[28px] font-bold text-gray-900 tabular-nums leading-none">{data.attributionStats?.conversions || 0}</p>
-                <p className="text-[12px] text-gray-400 mt-1.5">Attributed signups / payments</p>
+              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
+                <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-wider mb-1">Conversions</p>
+                <p className="text-3xl font-extrabold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
+                <p className="text-xs text-gray-600 mt-1.5 font-medium">Attributed signups / payments</p>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-xs">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Attributed Revenue</p>
-                <p className="text-[28px] font-bold text-gray-900 tabular-nums leading-none">
+              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
+                <p className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-wider mb-1">Attributed Revenue</p>
+                <p className="text-3xl font-extrabold text-emerald-600 tracking-tight">
                   {'$' + (data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-[12px] text-gray-400 mt-1.5">Total revenue generated</p>
+                <p className="text-xs text-gray-600 mt-1.5 font-medium">Total revenue generated</p>
               </div>
             </div>
           </div>
