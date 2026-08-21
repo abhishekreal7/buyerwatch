@@ -1,7 +1,25 @@
 'use client'
 
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react'
+import { useCallback, useDeferredValue, useEffect, useState } from 'react'
+import {
+  Search,
+  Target,
+  MessageCircle,
+  ExternalLink,
+  X,
+  RefreshCcw,
+  Copy,
+  FileText,
+  Sparkles,
+  Globe,
+  CalendarDays,
+  ChevronDown,
+  ArrowUp,
+  AlertTriangle,
+  Send,
+  Edit3,
+  Check,
+} from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { toast } from 'sonner'
@@ -54,9 +72,9 @@ interface Thread {
   originalDraft: string
   url: string | null
   flag?: string
-  reasoning?: string         // Feature 1: Signal Trace
-  googleRanked?: boolean     // Feature 5: Thread Consequence Score
-  createdAt: string          // Feature 4: Approval-First window countdown
+  reasoning?: string
+  googleRanked?: boolean
+  createdAt: string
   status: string
   reviewedAt: string | null
 }
@@ -79,7 +97,6 @@ function formatTimeAgo(dateString: string) {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-/** Feature 4: Returns hours remaining before the 24h Reddit relevance window closes, or null if expired */
 function getWindowHoursLeft(createdAt: string): number | null {
   const WINDOW_HOURS = 24
   const created = new Date(createdAt)
@@ -96,6 +113,15 @@ function getDeliveryActionLabel(platform: string) {
   }
   if (platform === 'bluesky') return 'Post through Bluesky'
   return 'Review delivery'
+}
+
+function PlatformIcon({ platform, className }: { platform: string; className?: string }) {
+  const cls = className || 'h-4 w-4 shrink-0'
+  const norm = platform.toLowerCase()
+  if (norm === 'reddit') return <RedditIcon className={`${cls} text-[#FF4500]`} />
+  if (norm === 'bluesky') return <BlueskyIcon className={`${cls} text-[#1185FE]`} />
+  if (norm === 'x') return <XIcon className={`${cls} text-[#0F1419]`} />
+  return <MessageCircle className={`${cls} text-gray-500`} />
 }
 
 function mapThread(thread: any): Thread {
@@ -131,13 +157,63 @@ function mapThread(thread: any): Thread {
   }
 }
 
+// ─── Stat Card Component (Clean, Unified) ──────────────────────────────────────
+
+function MetricCard({
+  label,
+  value,
+  period,
+  badge,
+  actionLink,
+  icon: Icon,
+  loading,
+}: {
+  label: string
+  value: number | string
+  period?: string
+  badge?: React.ReactNode
+  actionLink?: { label: string; href: string }
+  icon: React.ElementType
+  loading: boolean
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-xs flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 mb-1">
+          <p className="text-[11.5px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+        </div>
+        <div className="flex items-baseline gap-2.5">
+          <p className="text-[26px] font-bold text-gray-900 tabular-nums leading-none">
+            {loading ? <span className="text-gray-300">—</span> : value}
+          </p>
+          {badge}
+        </div>
+        {period && (
+          <p className="text-[11px] text-gray-400 mt-1.5 font-medium">{period}</p>
+        )}
+        {actionLink && (
+          <a
+            href={actionLink.href}
+            className="inline-block text-[11.5px] font-semibold text-[#0A84FF] hover:underline mt-1.5"
+          >
+            {actionLink.label}
+          </a>
+        )}
+      </div>
+      <div className="h-10 w-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+        <Icon className="h-5 w-5 text-gray-400" />
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
-  const showLegacyReview = process.env.NEXT_PUBLIC_BUYERWATCH_LEGACY_REVIEW === '1'
   const [threads, setThreads] = useState<Thread[]>([])
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
-  const hasLoadedDataRef = useRef(false)
   const [totalSent, setTotalSent] = useState(0)
   const [plan, setPlan] = useState<PlanTier>('free')
   const [regenerating, setRegenerating] = useState(false)
@@ -145,14 +221,12 @@ export default function DashboardPage() {
   const [filterPreferenceReady, setFilterPreferenceReady] = useState(false)
   const [metricsPeriod, setMetricsPeriod] = useState<DashboardMetricPeriod>('7d')
   const [metricsLoading, setMetricsLoading] = useState(true)
-  const metricsPeriodRef = useRef<DashboardMetricPeriod>('7d')
   const [showLowRelevance, setShowLowRelevance] = useState(false)
   const { conversationSearch: searchQuery } = useConversationSearch()
   const deferredSearchQuery = useDeferredValue(searchQuery)
-  const searchQueryRef = useRef('')
   const [searchLoading, setSearchLoading] = useState(false)
-  const [communityHealth, setCommunityHealth] = useState<Record<string, { rejection_rate: number; total_engagements: number }>>({}) // Feature 3
-  const [editingDraft, setEditingDraft] = useState<string | null>(null) // Feature 4: inline draft edit
+  const [communityHealth, setCommunityHealth] = useState<Record<string, { rejection_rate: number; total_engagements: number }>>({})
+  const [editingDraft, setEditingDraft] = useState<string | null>(null)
   const [stats, setStats] = useState({
     threadsFound: 0,
     highIntent: 0,
@@ -186,7 +260,7 @@ export default function DashboardPage() {
       const savedFilterTab = window.localStorage.getItem(DASHBOARD_FILTER_STORAGE_KEY)
       if (isFilterTab(savedFilterTab)) setFilterTab(savedFilterTab)
     } catch {
-      // A blocked storage API should never prevent the dashboard from loading.
+      // Ignored
     } finally {
       setFilterPreferenceReady(true)
     }
@@ -194,231 +268,220 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!filterPreferenceReady) return
-
     try {
       window.localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, filterTab)
     } catch {
-      // Keeping the active tab in memory is enough when storage is unavailable.
+      // Ignored
     }
   }, [filterPreferenceReady, filterTab])
+
   const loadData = useCallback(async () => {
-    const requestedMetricsPeriod = metricsPeriod
-    const periodStart = getDashboardMetricPeriodStart(requestedMetricsPeriod)
-    const isInitialLoad = !hasLoadedDataRef.current
-    if (isInitialLoad) {
-      setLoading(true)
-      setLoadFailed(false)
-    }
-
+    const periodStart = getDashboardMetricPeriodStart(metricsPeriod)
     try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayIso = today.toISOString()
-    const usageMonth = getCurrentUsageMonth()
-    const profileResultPromise = supabase
-      .from('profiles')
-      .select('plan, auto_send_enabled, signal_count, signal_month, draft_count, draft_month, high_intent_threshold')
-      .eq('id', userId)
-      .single()
-    const independentResultsPromise = Promise.all([
-      supabase
-        .from('billing_addon_credits')
-        .select('addon_type, credits')
-        .eq('user_id', userId)
-        .eq('usage_month', usageMonth),
-      supabase
-        .from('keywords')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId),
-      supabase
-        .from('keywords')
-        .select('last_checked_at, last_success_at, last_check_status')
-        .eq('user_id', userId)
-        .eq('is_active', true),
-      supabase
-        .from('draft_feedback')
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const todayIso = today.toISOString()
+      const usageMonth = getCurrentUsageMonth()
+      const profileResultPromise = supabase
+        .from('profiles')
+        .select('plan, auto_send_enabled, signal_count, signal_month, draft_count, draft_month, high_intent_threshold')
+        .eq('id', userId)
+        .single()
+      const independentResultsPromise = Promise.all([
+        supabase
+          .from('billing_addon_credits')
+          .select('addon_type, credits')
+          .eq('user_id', userId)
+          .eq('usage_month', usageMonth),
+        supabase
+          .from('keywords')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId),
+        supabase
+          .from('keywords')
+          .select('last_checked_at, last_success_at, last_check_status')
+          .eq('user_id', userId)
+          .eq('is_active', true),
+        supabase
+          .from('draft_feedback')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .in('action_type', ['COPIED', 'APPROVED', 'EDITED_APPROVED', 'AUTO_SENT']),
+        supabase
+          .from('monitored_threads')
+          .select('*, reply_analytics(draft_text), keywords(term, target)')
+          .eq('user_id', userId)
+          .in('status', ['pending', 'drafted', 'needs_manual_reply'])
+          .not('intent_score', 'is', null)
+          .order('source_created_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(60),
+        supabase
+          .from('monitored_threads')
+          .select('*, reply_analytics(draft_text), keywords(term, target)')
+          .eq('user_id', userId)
+          .eq('status', 'dismissed')
+          .not('intent_score', 'is', null)
+          .order('source_created_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(60),
+      ])
+
+      const profileResult = await profileResultPromise
+      const profile = profileResult.data
+      const effectiveHighIntentThreshold = normalizeHighIntentThreshold(
+        profile?.high_intent_threshold,
+      )
+      const [
+        addonCreditsResult,
+        keywordsCountResult,
+        keywordHealthResult,
+        feedbackCountResult,
+        activeThreadsResult,
+        dismissedThreadsResult,
+      ] = await independentResultsPromise
+      const initialQueryError = [
+        profileResult,
+        addonCreditsResult,
+        keywordsCountResult,
+        keywordHealthResult,
+        feedbackCountResult,
+        activeThreadsResult,
+        dismissedThreadsResult,
+      ].find(result => result.error)?.error
+      if (initialQueryError) throw initialQueryError
+
+      let threadsFoundCountQuery = supabase
+        .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .in('action_type', ['COPIED', 'APPROVED', 'EDITED_APPROVED', 'AUTO_SENT']),
-      supabase
-        .from('monitored_threads')
-        .select('*, reply_analytics(draft_text), keywords(term, target)')
-        .eq('user_id', userId)
-        .in('status', ['pending', 'drafted', 'needs_manual_reply'])
         .not('intent_score', 'is', null)
-        .order('source_created_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false })
-        .limit(60),
-      supabase
-        .from('monitored_threads')
-        .select('*, reply_analytics(draft_text), keywords(term, target)')
-        .eq('user_id', userId)
-        .eq('status', 'dismissed')
-        .not('intent_score', 'is', null)
-        .order('source_created_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false })
-        .limit(60),
-    ])
-
-    const profileResult = await profileResultPromise
-    const profile = profileResult.data
-    const effectiveHighIntentThreshold = normalizeHighIntentThreshold(
-      profile?.high_intent_threshold,
-    )
-    const [
-      addonCreditsResult,
-      keywordsCountResult,
-      keywordHealthResult,
-      feedbackCountResult,
-      activeThreadsResult,
-      dismissedThreadsResult,
-    ] = await independentResultsPromise
-    const initialQueryError = [
-      profileResult,
-      addonCreditsResult,
-      keywordsCountResult,
-      keywordHealthResult,
-      feedbackCountResult,
-      activeThreadsResult,
-      dismissedThreadsResult,
-    ].find(result => result.error)?.error
-    if (initialQueryError) throw initialQueryError
-
-    let threadsFoundCountQuery = supabase
-      .from('monitored_threads')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .not('intent_score', 'is', null)
-    let highIntentCountQuery = supabase
-      .from('monitored_threads')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .not('intent_score', 'is', null)
-      .gte('intent_score', effectiveHighIntentThreshold)
-    let repliesSentCountQuery = supabase
-      .from('reply_analytics')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('was_sent', true)
-
-    if (periodStart) {
-      threadsFoundCountQuery = threadsFoundCountQuery.gte('source_created_at', periodStart)
-      highIntentCountQuery = highIntentCountQuery.gte('source_created_at', periodStart)
-      repliesSentCountQuery = repliesSentCountQuery.gte('sent_at', periodStart)
-    }
-
-    const [
-      threadsFoundCountResult,
-      highIntentCountResult,
-      draftsCountResult,
-      repliesSentCountResult,
-      totalPostedCountResult,
-      highIntentTodayCountResult,
-    ] = await Promise.all([
-      threadsFoundCountQuery,
-      highIntentCountQuery,
-      supabase
-        .from('monitored_threads')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .in('status', ['drafted', 'needs_manual_reply']),
-      repliesSentCountQuery,
-      supabase
-        .from('reply_analytics')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('was_sent', true),
-      supabase
+      let highIntentCountQuery = supabase
         .from('monitored_threads')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .not('intent_score', 'is', null)
         .gte('intent_score', effectiveHighIntentThreshold)
-        .gte('source_created_at', todayIso),
-    ])
-    const metricsQueryError = [
-      threadsFoundCountResult,
-      highIntentCountResult,
-      draftsCountResult,
-      repliesSentCountResult,
-      totalPostedCountResult,
-      highIntentTodayCountResult,
-    ].find(result => result.error)?.error
-    if (metricsQueryError) throw metricsQueryError
+      let repliesSentCountQuery = supabase
+        .from('reply_analytics')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('was_sent', true)
 
-    const normalizedPlan = normalizePlan(profile?.plan)
-    const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
-    const effectiveLimits = getPlanLimitsWithAddons(normalizedPlan, addonCredits)
-    setPlan(normalizedPlan)
-    setKeywordsMax(effectiveLimits.keywords)
-    setSignalUsage({
-      used: profile?.signal_month === usageMonth ? Math.max(profile.signal_count ?? 0, 0) : 0,
-      limit: effectiveLimits.threadsPerMonth,
-    })
-    setDraftUsage({
-      used: profile?.draft_month === usageMonth ? Math.max(profile.draft_count ?? 0, 0) : 0,
-      limit: effectiveLimits.aiDraftsPerMonth,
-    })
-    setAutoSendEnabled(profile?.auto_send_enabled ?? false)
-    setHighIntentThreshold(effectiveHighIntentThreshold)
-
-    // Load persisted setup progress rather than resetting the checklist per session.
-    setKeywordsCount(keywordsCountResult.count ?? 0)
-    const keywordHealthRows = keywordHealthResult.data ?? []
-    const staleAfterMs = (
-      PLAN_POLL_INTERVAL_MINUTES[normalizedPlan] * 3 + 10
-    ) * 60_000
-    setPollHealth(summarizeKeywordPollHealth(keywordHealthRows, staleAfterMs))
-    setHasCopiedOrApproved((feedbackCountResult.count ?? 0) > 0)
-
-    // Load threads including dismissed for audit tab
-    const threadData = [
-      ...(activeThreadsResult.data ?? []),
-      ...(dismissedThreadsResult.data ?? []),
-    ].sort((left, right) => (
-      Date.parse(right.source_created_at || right.created_at)
-      - Date.parse(left.source_created_at || left.created_at)
-    ))
-
-    const parsed = (threadData || []).map(mapThread)
-
-    if (!searchQueryRef.current) setThreads(parsed)
-    setHasInspectedLead(parsed.some(thread => Boolean(thread.reviewedAt)))
-    const activeParsed = parsed.filter(t => t.status !== 'dismissed')
-    const requestedThreadId = new URLSearchParams(window.location.search).get('thread')
-    const requestedThread = requestedThreadId
-      ? parsed.find(thread => thread.id === requestedThreadId)
-      : null
-    if (requestedThread) {
-      setFilterTab(requestedThread.status === 'dismissed' ? 'dismissed' : 'all')
-      setSelectedThread(requestedThread)
-      setHasInspectedLead(true)
-    } else if (!searchQueryRef.current) {
-      setSelectedThread(current => {
-        const refreshedSelection = current
-          ? parsed.find(thread => thread.id === current.id)
-          : null
-        return refreshedSelection ?? activeParsed[0] ?? null
-      })
-    }
-
-    // Feature 3: Load community health for all unique targets
-    const targets = [...new Set((threadData || []).map((t: any) => (t.keywords as any)?.target).filter(Boolean))]
-    if (targets.length > 0) {
-      const { data: healthData } = await supabase
-        .from('community_trust_metrics')
-        .select('target_community, rejection_rate, total_engagements')
-        .in('target_community', targets)
-      if (healthData) {
-        const healthMap: Record<string, { rejection_rate: number; total_engagements: number }> = {}
-        healthData.forEach((h: any) => { healthMap[h.target_community] = { rejection_rate: Number(h.rejection_rate), total_engagements: h.total_engagements } })
-        setCommunityHealth(healthMap)
+      if (periodStart) {
+        threadsFoundCountQuery = threadsFoundCountQuery.gte('source_created_at', periodStart)
+        highIntentCountQuery = highIntentCountQuery.gte('source_created_at', periodStart)
+        repliesSentCountQuery = repliesSentCountQuery.gte('sent_at', periodStart)
       }
-    }
 
-    const totalPosted = totalPostedCountResult.count ?? 0
-    setTotalSent(totalPosted)
-    if (metricsPeriodRef.current === requestedMetricsPeriod) {
+      const [
+        threadsFoundCountResult,
+        highIntentCountResult,
+        draftsCountResult,
+        repliesSentCountResult,
+        totalPostedCountResult,
+        highIntentTodayCountResult,
+      ] = await Promise.all([
+        threadsFoundCountQuery,
+        highIntentCountQuery,
+        supabase
+          .from('monitored_threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .in('status', ['drafted', 'needs_manual_reply']),
+        repliesSentCountQuery,
+        supabase
+          .from('reply_analytics')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('was_sent', true),
+        supabase
+          .from('monitored_threads')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .not('intent_score', 'is', null)
+          .gte('intent_score', effectiveHighIntentThreshold)
+          .gte('source_created_at', todayIso),
+      ])
+      const metricsQueryError = [
+        threadsFoundCountResult,
+        highIntentCountResult,
+        draftsCountResult,
+        repliesSentCountResult,
+        totalPostedCountResult,
+        highIntentTodayCountResult,
+      ].find(result => result.error)?.error
+      if (metricsQueryError) throw metricsQueryError
+
+      const normalizedPlan = normalizePlan(profile?.plan)
+      const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
+      const effectiveLimits = getPlanLimitsWithAddons(normalizedPlan, addonCredits)
+      setPlan(normalizedPlan)
+      setKeywordsMax(effectiveLimits.keywords)
+      setSignalUsage({
+        used: profile?.signal_month === usageMonth ? Math.max(profile.signal_count ?? 0, 0) : 0,
+        limit: effectiveLimits.threadsPerMonth,
+      })
+      setDraftUsage({
+        used: profile?.draft_month === usageMonth ? Math.max(profile.draft_count ?? 0, 0) : 0,
+        limit: effectiveLimits.aiDraftsPerMonth,
+      })
+      setAutoSendEnabled(profile?.auto_send_enabled ?? false)
+      setHighIntentThreshold(effectiveHighIntentThreshold)
+
+      setKeywordsCount(keywordsCountResult.count ?? 0)
+      const keywordHealthRows = keywordHealthResult.data ?? []
+      const staleAfterMs = (
+        PLAN_POLL_INTERVAL_MINUTES[normalizedPlan] * 3 + 10
+      ) * 60_000
+      setPollHealth(summarizeKeywordPollHealth(keywordHealthRows, staleAfterMs))
+      setHasCopiedOrApproved((feedbackCountResult.count ?? 0) > 0)
+
+      const threadData = [
+        ...(activeThreadsResult.data ?? []),
+        ...(dismissedThreadsResult.data ?? []),
+      ].sort((left, right) => (
+        Date.parse(right.source_created_at || right.created_at)
+        - Date.parse(left.source_created_at || left.created_at)
+      ))
+
+      const parsed = (threadData || []).map(mapThread)
+
+      setThreads(parsed)
+      setHasInspectedLead(parsed.some(thread => Boolean(thread.reviewedAt)))
+      const activeParsed = parsed.filter(t => t.status !== 'dismissed')
+      const requestedThreadId = new URLSearchParams(window.location.search).get('thread')
+      const requestedThread = requestedThreadId
+        ? parsed.find(thread => thread.id === requestedThreadId)
+        : null
+      if (requestedThread) {
+        setFilterTab(requestedThread.status === 'dismissed' ? 'dismissed' : 'all')
+        setSelectedThread(requestedThread)
+        setHasInspectedLead(true)
+      } else {
+        setSelectedThread(current => {
+          const refreshedSelection = current
+            ? parsed.find(thread => thread.id === current.id)
+            : null
+          return refreshedSelection ?? activeParsed[0] ?? null
+        })
+      }
+
+      const targets = [...new Set((threadData || []).map((t: any) => (t.keywords as any)?.target).filter(Boolean))]
+      if (targets.length > 0) {
+        const { data: healthData } = await supabase
+          .from('community_trust_metrics')
+          .select('target_community, rejection_rate, total_engagements')
+          .in('target_community', targets)
+        if (healthData) {
+          const healthMap: Record<string, { rejection_rate: number; total_engagements: number }> = {}
+          healthData.forEach((h: any) => { healthMap[h.target_community] = { rejection_rate: Number(h.rejection_rate), total_engagements: h.total_engagements } })
+          setCommunityHealth(healthMap)
+        }
+      }
+
+      const totalPosted = totalPostedCountResult.count ?? 0
+      setTotalSent(totalPosted)
       setStats({
         threadsFound: threadsFoundCountResult.count ?? 0,
         highIntent: highIntentCountResult.count ?? 0,
@@ -427,19 +490,14 @@ export default function DashboardPage() {
         repliesSent: repliesSentCountResult.count ?? 0,
       })
       setMetricsLoading(false)
-    }
-
-    hasLoadedDataRef.current = true
-    setLoadFailed(false)
+      setLoadFailed(false)
     } catch (error) {
       console.error('[dashboard] Failed to load dashboard data', error)
-      if (!hasLoadedDataRef.current) {
-        setLoadFailed(true)
-        toast.error('Failed to load dashboard data')
-      }
+      setLoadFailed(true)
+      toast.error('Failed to load dashboard data')
     } finally {
-      if (metricsPeriodRef.current === requestedMetricsPeriod) setMetricsLoading(false)
-      if (isInitialLoad) setLoading(false)
+      setMetricsLoading(false)
+      setLoading(false)
     }
   }, [metricsPeriod, supabase, userId])
 
@@ -449,12 +507,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const normalizedQuery = deferredSearchQuery.trim()
-    const previousQuery = searchQueryRef.current
-    searchQueryRef.current = normalizedQuery
 
     if (!normalizedQuery) {
       setSearchLoading(false)
-      if (previousQuery) void loadData()
       return
     }
 
@@ -489,7 +544,7 @@ export default function DashboardPage() {
       controller.abort()
       window.clearTimeout(timeout)
     }
-  }, [deferredSearchQuery, filterTab, highIntentThreshold, loadData])
+  }, [deferredSearchQuery, filterTab, highIntentThreshold])
 
   useEffect(() => {
     let refreshTimer: number | undefined
@@ -533,40 +588,6 @@ export default function DashboardPage() {
     }
   }, [loadData, supabase, userId])
 
-  useEffect(() => {
-    const handleAutoSendChanged = (event: Event) => {
-      setAutoSendEnabled(Boolean((event as CustomEvent<boolean>).detail))
-    }
-    window.addEventListener('buyerwatch:auto-send-changed', handleAutoSendChanged)
-    return () => window.removeEventListener('buyerwatch:auto-send-changed', handleAutoSendChanged)
-  }, [])
-
-  useEffect(() => {
-    const handleOpenThread = (event: Event) => {
-      const threadId = (event as CustomEvent<string>).detail
-      const thread = threads.find(item => item.id === threadId)
-      if (!thread) return
-      setFilterTab(thread.status === 'dismissed' ? 'dismissed' : 'all')
-      setSelectedThread(thread)
-      setHasInspectedLead(true)
-    }
-
-    window.addEventListener('buyerwatch:open-thread', handleOpenThread)
-    return () => window.removeEventListener('buyerwatch:open-thread', handleOpenThread)
-  }, [threads])
-
-  useEffect(() => {
-    const requestedThreadId = new URLSearchParams(window.location.search).get('thread')
-    if (!requestedThreadId || selectedThread?.id !== requestedThreadId) return
-
-    const frame = window.requestAnimationFrame(() => {
-      const card = document.getElementById(`conversation-${requestedThreadId}`)
-      card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      card?.focus({ preventScroll: true })
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [selectedThread])
-
   const handleInspectThread = async (thread: Thread) => {
     setSelectedThread(thread)
     setHasInspectedLead(true)
@@ -589,9 +610,9 @@ export default function DashboardPage() {
     }
   }
 
-  const handleApproveAndSend = async () => {
-    if (!selectedThread || !selectedThread.draft || sendingThreadId) return
-    const thread = selectedThread
+  const handleApproveAndSend = async (threadToApprove?: Thread) => {
+    const thread = threadToApprove || selectedThread
+    if (!thread || !thread.draft || sendingThreadId) return
     setSendingThreadId(thread.id)
     try {
       const res = await fetch('/api/replies/send', {
@@ -662,14 +683,15 @@ export default function DashboardPage() {
     }
   }
 
-  const handleCopyDraft = async () => {
-    if (!selectedThread?.draft) return
+  const handleCopyDraft = async (threadToCopy?: Thread) => {
+    const thread = threadToCopy || selectedThread
+    if (!thread?.draft) return
     try {
-      await navigator.clipboard.writeText(selectedThread.draft)
+      await navigator.clipboard.writeText(thread.draft)
       trackEvent('reply_copied', {
-        thread_id: selectedThread.id,
-        platform: selectedThread.platform,
-        target: selectedThread.target,
+        thread_id: thread.id,
+        platform: thread.platform,
+        target: thread.target,
       })
       toast.success('Copied to clipboard')
     } catch {
@@ -681,27 +703,29 @@ export default function DashboardPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        threadId: selectedThread.id,
-        originalDraft: selectedThread.originalDraft,
-        finalDraft: selectedThread.draft,
+        threadId: thread.id,
+        originalDraft: thread.originalDraft,
+        finalDraft: thread.draft,
         actionType: 'COPIED',
-        platform: selectedThread.platform,
-        targetCommunity: selectedThread.target,
-        keywordCluster: selectedThread.matchedKeyword,
+        platform: thread.platform,
+        targetCommunity: thread.target,
+        keywordCluster: thread.matchedKeyword,
       }),
     }).catch(() => null)
     if (response?.ok) setHasCopiedOrApproved(true)
   }
 
-  const handleDismiss = async (threadToDismiss?: Thread) => {
-    const dismissed = threadToDismiss ?? selectedThread
+  const handleDismiss = useCallback(async (threadIdToDismiss?: string) => {
+    const targetId = threadIdToDismiss ?? selectedThread?.id
+    if (!targetId) return
+    const dismissed = threads.find(t => t.id === targetId)
     if (!dismissed || dismissed.status === 'dismissed') return
 
     try {
-      const { error } = await supabase.rpc('dismiss_thread', { p_thread_id: dismissed.id })
+      const { error } = await supabase.rpc('dismiss_thread', { p_thread_id: targetId })
       if (error) throw error
       trackEvent('reply_dismissed', {
-        thread_id: dismissed.id,
+        thread_id: targetId,
         platform: dismissed.platform,
         target: dismissed.target,
       })
@@ -712,11 +736,11 @@ export default function DashboardPage() {
     }
 
     setThreads(prev => prev.map(thread => (
-      thread.id === dismissed.id ? { ...thread, status: 'dismissed' } : thread
+      thread.id === targetId ? { ...thread, status: 'dismissed' } : thread
     )))
-    if (selectedThread?.id === dismissed.id) {
+    if (selectedThread?.id === targetId) {
       setSelectedThread(
-        threads.find(thread => thread.id !== dismissed.id && thread.status !== 'dismissed') || null,
+        threads.find(thread => thread.id !== targetId && thread.status !== 'dismissed') || null,
       )
     }
     setEditingDraft(null)
@@ -729,7 +753,7 @@ export default function DashboardPage() {
 
     void loadData()
     toast.success('Moved to Dismissed')
-  }
+  }, [loadData, selectedThread, supabase, threads])
 
   const handleCheckNow = async () => {
     if (checkingNow) return
@@ -767,9 +791,9 @@ export default function DashboardPage() {
     }
   }
 
-  const handleMarkAsPosted = async () => {
-    if (!selectedThread) return
-    const thread = selectedThread
+  const handleMarkAsPosted = async (threadToMark?: Thread) => {
+    const thread = threadToMark || selectedThread
+    if (!thread) return
     try {
       const response = await fetch('/api/replies/mark-posted', {
         method: 'POST',
@@ -884,20 +908,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleRegenerate = async () => {
-    if (!selectedThread) return
-    await generateReplyForThread(selectedThread)
-  }
-
-  const handleReplyBubbleClick = (thread: Thread) => {
-    void handleInspectThread(thread)
-    if (thread.draft) {
-      setEditingDraft(thread.id)
-      return
-    }
-    void generateReplyForThread(thread)
-  }
-
   const normalizedSearch = deferredSearchQuery.trim().toLowerCase()
   const searchableThreads = normalizedSearch
     ? threads.filter(thread => [
@@ -919,11 +929,26 @@ export default function DashboardPage() {
   const metricPeriodLabel = getDashboardMetricPeriodLabel(metricsPeriod)
   const metricsAreLoading = loading || metricsLoading
 
-  useEffect(() => {
-    if (selectedThread && !filtered.some(t => t.id === selectedThread.id)) {
-      setSelectedThread(null)
-    }
-  }, [filterTab, deferredSearchQuery, highIntentThreshold, threads])
+  const dismissedCount = threads.filter(t => t.status === 'dismissed').length
+  const highIntentCount = threads.filter(t => t.status !== 'dismissed' && t.score !== null && t.score >= highIntentThreshold).length
+  const lowRelevanceThreads = filterTab === 'all'
+    ? filtered.filter(thread => isLowRelevanceScore(thread.score))
+    : []
+  const primaryThreads = filterTab === 'all'
+    ? filtered.filter(thread => !isLowRelevanceScore(thread.score))
+    : filtered
+  const lowRelevanceExpanded = showLowRelevance || Boolean(normalizedSearch)
+  const feedItems = [
+    ...primaryThreads.map(thread => ({
+      kind: 'thread' as const,
+      thread,
+      isLowRelevance: isLowRelevanceScore(thread.score),
+    })),
+    ...(lowRelevanceThreads.length > 0 ? [{ kind: 'low-toggle' as const }] : []),
+    ...(lowRelevanceExpanded
+      ? lowRelevanceThreads.map(thread => ({ kind: 'thread' as const, thread, isLowRelevance: true }))
+      : []),
+  ]
 
   if (loadFailed) {
     return (
@@ -939,9 +964,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="w-full space-y-6">
-
-      {/* Post-upgrade modal — shown once per plan tier per browser, via localStorage */}
+    <div className="w-full space-y-6 max-w-5xl mx-auto pb-16">
+      {/* Post-upgrade modal */}
       {!loading && userId && (
         <UpgradeModal
           userId={userId}
@@ -951,7 +975,7 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* ElevenLabs-style Page Title Header & Top Action Row */}
+      {/* Header & Actions */}
       <PageHeader
         title="Overview"
         action={(
@@ -959,222 +983,162 @@ export default function DashboardPage() {
             {keywordsCount > 0 && (
               <a
                 href="/keywords"
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11.5px] font-semibold sm:min-h-0 ${
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium transition-colors shadow-2xs ${
                   pollHealth.delayedRules > 0
                     ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-[#DDE2E8] bg-white text-[#667085]'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                 }`}
                 title={pollHealth.delayedRules > 0
-                  ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active monitoring rules failed their latest successful-source check. Last attempt ${pollHealth.lastAttemptAt ? formatTimeAgo(pollHealth.lastAttemptAt) : 'not recorded'}. Open Monitoring Rules for details.`
-                  : 'The most recent successful active-source check'}
+                  ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active rules delayed. Open Keywords for details.`
+                  : 'Recent active source status'}
               >
                 {pollHealth.delayedRules > 0
-                  ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                  : <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />}
+                  ? <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  : <RefreshCcw className="h-3.5 w-3.5 text-gray-400" />}
                 {pollHealth.delayedRules > 0
-                  ? `${pollHealth.delayedRules} monitoring rule${pollHealth.delayedRules === 1 ? '' : 's'} failing`
+                  ? `${pollHealth.delayedRules} failing`
                   : pollHealth.lastSuccessfulAt
-                    ? `Sources updated ${formatTimeAgo(pollHealth.lastSuccessfulAt)}`
-                    : 'Waiting for first successful check'}
+                    ? `Checked ${formatTimeAgo(pollHealth.lastSuccessfulAt)}`
+                    : 'Monitoring active'}
               </a>
             )}
+
             <div className="relative">
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#667085]" aria-hidden="true" />
+              <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
               <select
                 aria-label="KPI date range"
                 value={metricsPeriod}
                 onChange={(event) => {
                   const nextPeriod = event.target.value
                   if (!isDashboardMetricPeriod(nextPeriod) || nextPeriod === metricsPeriod) return
-                  metricsPeriodRef.current = nextPeriod
                   setMetricsLoading(true)
                   setMetricsPeriod(nextPeriod)
                 }}
-                className="min-h-11 appearance-none rounded-xl border border-[#DDE2E8] bg-white py-2 pl-8 pr-8 text-xs font-semibold text-[#344054] shadow-xs outline-none transition-colors hover:border-[#C7D0DB] focus:border-[#0A84FF] focus:ring-2 focus:ring-[#0A84FF]/15 sm:min-h-0"
+                className="h-8 appearance-none rounded-lg border border-gray-200 bg-white pl-8 pr-7 text-[12px] font-medium text-gray-700 shadow-2xs outline-none transition-colors hover:border-gray-300 focus:border-gray-400 cursor-pointer"
               >
                 {DASHBOARD_METRIC_PERIODS.map((period) => (
                   <option key={period} value={period}>{getDashboardMetricPeriodLabel(period)}</option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#667085]" aria-hidden="true" />
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             </div>
+
             <GettingStartedChecklist
               keywordsCount={keywordsCount}
               hasInspectedLead={hasInspectedLead}
               hasCopiedOrApproved={hasCopiedOrApproved}
               autoSendEnabled={autoSendEnabled}
             />
+
             {keywordsCount > 0 && (
               <a
                 href="/keywords"
-                className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl bg-gray-900 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-gray-800 sm:min-h-0"
+                className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-gray-900 px-3 text-[12px] font-medium text-white shadow-xs transition-colors hover:bg-gray-800"
               >
-                <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
-                + Add Keyword
+                <Target className="w-3.5 h-3.5" />
+                Add Keyword
               </a>
             )}
           </div>
         )}
       />
 
-      {/* ElevenLabs Style 4 Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Conversations Found */}
-        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Conversations Found</span>
-            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
-              <MessageCircle className="w-4 h-4" strokeWidth={2} />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {metricsAreLoading ? '—' : stats.threadsFound}
-            </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
-          </div>
-        </div>
-
-        {/* Metric 2: High Intent */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
-            <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
-              <Sparkles className="w-4 h-4" strokeWidth={2} />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {metricsAreLoading ? '—' : stats.highIntent}
-            </span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
-              stats.highIntentToday > 0
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-[#F1F2F3] text-[#667085]'
-            }`}>
-              {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-3 w-3" strokeWidth={2.25} />}
-              {metricsAreLoading
-                ? 'Updating'
-                : stats.highIntentToday > 0
-                  ? `${stats.highIntentToday} new today`
-                  : 'No new today'}
-            </span>
-          </div>
-        </div>
-
-        {/* Metric 3: Drafts Ready */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">
-              Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>
-            </span>
-            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
-              <FileText className="w-4 h-4" strokeWidth={2} />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {metricsAreLoading ? '—' : stats.draftsReady}
-            </span>
-            {stats.draftsReady > 0 ? (
-              <a
-                href="/opportunities/replies"
-                className="text-[11.5px] font-semibold text-[#0A84FF] hover:underline underline-offset-2 transition-colors"
-              >
-                Review Now →
-              </a>
-            ) : (
-              <span className="text-[11.5px] font-medium text-[#667085]">Up to date</span>
-            )}
-          </div>
-        </div>
-
-        {/* Metric 4: Replies sent in the selected period */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
-            <div className="w-8 h-8 rounded-xl text-[#FF5101] flex items-center justify-center shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M8.5 12L11 14.5L15.5 9.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
-              {metricsAreLoading ? '—' : stats.repliesSent}
-            </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
-          </div>
-        </div>
+      {/* 4 Metric Cards Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <MetricCard
+          label="Found"
+          value={stats.threadsFound}
+          period={metricPeriodLabel}
+          icon={MessageCircle}
+          loading={metricsAreLoading}
+        />
+        <MetricCard
+          label="High Intent"
+          value={stats.highIntent}
+          badge={
+            stats.highIntentToday > 0 ? (
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10.5px] font-semibold text-emerald-700">
+                <ArrowUp className="h-3 w-3" />+{stats.highIntentToday} today
+              </span>
+            ) : undefined
+          }
+          period={stats.highIntentToday === 0 ? metricPeriodLabel : undefined}
+          icon={Sparkles}
+          loading={metricsAreLoading}
+        />
+        <MetricCard
+          label="Drafts Ready"
+          value={stats.draftsReady}
+          actionLink={stats.draftsReady > 0 ? { label: 'Review →', href: '/opportunities/replies' } : undefined}
+          period={stats.draftsReady === 0 ? 'All reviewed' : undefined}
+          icon={FileText}
+          loading={metricsAreLoading}
+        />
+        <MetricCard
+          label="Replies Sent"
+          value={stats.repliesSent}
+          period={metricPeriodLabel}
+          icon={Send}
+          loading={metricsAreLoading}
+        />
       </div>
 
-      {/* ── Upgrade banner (Placement B) ────────────────────────────── */}
+      {/* Upgrade Banner */}
       {!loading && plan === 'free' && keywordsCount >= keywordsMax && stats.highIntent > 0 && !bannerDismissed && (
-        <div className="flex flex-col items-start gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/80 px-4 py-3.5 shadow-2xs sm:flex-row sm:items-center sm:px-5">
-          <Sparkles className="w-5 h-5 text-amber-500 shrink-0" strokeWidth={1.75} />
+        <div className="flex flex-col items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 shadow-2xs sm:flex-row sm:items-center sm:px-5">
+          <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
           <p className="flex-1 text-xs text-amber-900 leading-relaxed">
-            <span className="font-semibold">{stats.highIntent} high-intent conversation{stats.highIntent !== 1 ? 's' : ''} found</span>{' '}
-            in {metricPeriodLabel.toLowerCase()} across your {keywordsMax} Starter keyword{keywordsMax !== 1 ? 's' : ''}. Upgrade to Professional for 10 total topics.
+            <span className="font-semibold">{stats.highIntent} high-intent lead{stats.highIntent !== 1 ? 's' : ''} found</span>{' '}
+            in {metricPeriodLabel.toLowerCase()} across your {keywordsMax} active topic{keywordsMax !== 1 ? 's' : ''}. Upgrade to Pro for unlimited keywords.
           </p>
           <div className="flex shrink-0 items-center gap-2">
             <a
               href="/pricing"
-              className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-gray-800 sm:min-h-0"
+              className="inline-flex h-7 items-center rounded-lg bg-gray-900 px-3 text-xs font-medium text-white transition-colors hover:bg-gray-800"
             >
               Upgrade
             </a>
             <button
               onClick={() => setBannerDismissed(true)}
-              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-amber-600 transition-colors hover:bg-amber-100"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-amber-700 transition-colors hover:bg-amber-100"
               aria-label="Dismiss upgrade suggestion"
             >
-              <X className="w-3.5 h-3.5" strokeWidth={2} />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       )}
 
+      {/* Limit Notice Cards */}
       {!loading && (signalLimitReached || draftLimitReached) && (
         <div className="grid gap-3 md:grid-cols-2">
           {signalLimitReached && (
-            <div className="flex flex-col items-start gap-3 rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)] sm:flex-row sm:items-center sm:px-5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFF0EA] text-[#FF5101]">
-                <Globe className="h-4 w-4" strokeWidth={2} />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-950">Signal limit reached</p>
-                <p className="mt-0.5 text-xs text-[#667085]">
-                  {signalUsage.used}/{signalUsage.limit} Starter signals used this month.
-                </p>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3.5 shadow-xs">
+              <div>
+                <p className="text-xs font-semibold text-gray-900">Signal limit reached</p>
+                <p className="text-[11.5px] text-gray-500">{signalUsage.used}/{signalUsage.limit} signals used this month</p>
               </div>
               <button
                 type="button"
                 onClick={() => void handleBuyAddon('signals')}
                 disabled={Boolean(openingAddonCheckout)}
-                className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-4 text-xs font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
+                className="h-7 px-3 rounded-lg bg-gray-900 text-white text-xs font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {openingAddonCheckout === 'signals' ? 'Opening...' : BILLING_ADDONS.signals.ctaLabel}
               </button>
             </div>
           )}
-
           {draftLimitReached && (
-            <div className="flex flex-col items-start gap-3 rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)] sm:flex-row sm:items-center sm:px-5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF4FF] text-[#0A84FF]">
-                <FileText className="h-4 w-4" strokeWidth={2} />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-950">Draft limit reached</p>
-                <p className="mt-0.5 text-xs text-[#667085]">
-                  {draftUsage.used}/{draftUsage.limit} Starter drafts used this month.
-                </p>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3.5 shadow-xs">
+              <div>
+                <p className="text-xs font-semibold text-gray-900">Draft limit reached</p>
+                <p className="text-[11.5px] text-gray-500">{draftUsage.used}/{draftUsage.limit} drafts used this month</p>
               </div>
               <button
                 type="button"
                 onClick={() => void handleBuyAddon('drafts')}
                 disabled={Boolean(openingAddonCheckout)}
-                className="inline-flex min-h-10 items-center rounded-xl bg-[#0A84FF] px-4 text-xs font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-60"
+                className="h-7 px-3 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {openingAddonCheckout === 'drafts' ? 'Opening...' : BILLING_ADDONS.drafts.ctaLabel}
               </button>
@@ -1183,885 +1147,400 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Filtered threads calculation */}
-      {(() => {
-        const dismissedCount = threads.filter(t => t.status === 'dismissed').length
-        const activeScoredCount = threads.filter(t => t.status !== 'dismissed' && t.score !== null).length
-        const highIntentCount = threads.filter(t => t.status !== 'dismissed' && t.score !== null && t.score >= highIntentThreshold).length
-        const lowRelevanceThreads = filterTab === 'all'
-          ? filtered.filter(thread => isLowRelevanceScore(thread.score))
-          : []
-        const primaryThreads = filterTab === 'all'
-          ? filtered.filter(thread => !isLowRelevanceScore(thread.score))
-          : filtered
-        const lowRelevanceExpanded = showLowRelevance || Boolean(normalizedSearch)
-        const feedItems = [
-          ...primaryThreads.map(thread => ({
-            kind: 'thread' as const,
-            thread,
-            isLowRelevance: isLowRelevanceScore(thread.score),
-          })),
-          ...(lowRelevanceThreads.length > 0 ? [{ kind: 'low-toggle' as const }] : []),
-          ...(lowRelevanceExpanded
-            ? lowRelevanceThreads.map(thread => ({ kind: 'thread' as const, thread, isLowRelevance: true }))
-            : []),
-        ]
-        const feedCountLabel = searchLoading
-          ? 'Searching all conversations...'
-          : filterTab === 'high-intent'
-            ? `${filtered.length} high-intent ${filtered.length === 1 ? 'opportunity' : 'opportunities'}`
-            : filterTab === 'all'
-              ? `${filtered.length} scored ${filtered.length === 1 ? 'conversation' : 'conversations'}`
-              : `${filtered.length} dismissed ${filtered.length === 1 ? 'conversation' : 'conversations'}`
-
-        return (
-          <>
-            {/* Keep one interactive surface instead of nesting controls in a card. */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] pb-4">
-              <div role="tablist" aria-label="Conversation filters" className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-[#F1F2F3] p-1 no-scrollbar">
+      {/* Filter Tabs & Feed Counts */}
+      <div className="space-y-4">
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3">
+              <div role="tablist" aria-label="Conversation filters" className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setFilterTab('all')
-                    setShowLowRelevance(false)
-                  }}
-                  role="tab"
-                  aria-selected={filterTab === 'all'}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'all' ? 'bg-white text-gray-950 shadow-xs' : 'text-[#4F5865] hover:text-gray-950'}`}
+                  onClick={() => { setFilterTab('all'); setShowLowRelevance(false) }}
+                  className={`h-8 px-3 rounded-lg text-[12px] font-medium transition-colors cursor-pointer ${
+                    filterTab === 'all'
+                      ? 'bg-gray-900 text-white shadow-xs'
+                      : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 shadow-2xs'
+                  }`}
                 >
                   All Conversations
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setFilterTab('high-intent')
-                    setShowLowRelevance(false)
-                  }}
-                  role="tab"
-                  aria-selected={filterTab === 'high-intent'}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'high-intent' ? 'bg-white text-gray-950 shadow-xs' : 'text-[#4F5865] hover:text-gray-950'}`}
+                  onClick={() => { setFilterTab('high-intent'); setShowLowRelevance(false) }}
+                  className={`h-8 px-3 rounded-lg text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    filterTab === 'high-intent'
+                      ? 'bg-gray-900 text-white shadow-xs'
+                      : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 shadow-2xs'
+                  }`}
                 >
                   <span>High Intent (≥{highIntentThreshold}%)</span>
                   {highIntentCount > 0 && (
-                    <span className="ml-1.5 rounded-full bg-[#EAF4FF] px-1.5 py-0.5 text-[10px] font-bold text-[#0A84FF]">
+                    <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                      filterTab === 'high-intent' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700 border border-blue-100'
+                    }`}>
                       {highIntentCount}
                     </span>
                   )}
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setFilterTab('dismissed')
-                    setShowLowRelevance(false)
-                  }}
-                  role="tab"
-                  aria-selected={filterTab === 'dismissed'}
-                  className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer sm:min-h-0 ${filterTab === 'dismissed' ? 'bg-white text-gray-950 shadow-xs' : 'text-[#4F5865] hover:text-gray-950'}`}
+                  onClick={() => { setFilterTab('dismissed'); setShowLowRelevance(false) }}
+                  className={`h-8 px-3 rounded-lg text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    filterTab === 'dismissed'
+                      ? 'bg-gray-900 text-white shadow-xs'
+                      : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 shadow-2xs'
+                  }`}
                 >
                   <span>Dismissed</span>
                   {dismissedCount > 0 && (
-                    <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-700">
+                    <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                      filterTab === 'dismissed' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}>
                       {dismissedCount}
                     </span>
                   )}
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#4F5865] pr-1">
-                <span>{feedCountLabel}</span>
+              <div className="text-[12px] font-medium text-gray-400">
+                {searchLoading
+                  ? 'Searching...'
+                  : `${filtered.length} ${filtered.length === 1 ? 'conversation' : 'conversations'}`}
               </div>
             </div>
 
-            {/* Main opportunity feed */}
-            <div>
-              <div className="w-full space-y-4">
-                {loading && (
-                  <div className="flex min-h-56 items-center justify-center py-12 text-xs font-medium text-[#667085]">
-                    Loading opportunities...
+            {/* Conversation Feed */}
+            <div className="space-y-3.5">
+              {loading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="rounded-xl border border-gray-200 bg-white p-5 animate-pulse space-y-3">
+                      <div className="flex justify-between">
+                        <div className="h-4 bg-gray-200 rounded w-1/4" />
+                        <div className="h-4 bg-gray-100 rounded w-16" />
+                      </div>
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-100 rounded w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white p-14 text-center">
+                  <div className="h-12 w-12 rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
+                    <Search className="h-6 w-6 text-gray-300" />
                   </div>
-                )}
-
-                {!loading && !searchLoading && filtered.length === 0 && normalizedSearch && (
-                  <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
-                      <Search className="w-5 h-5" strokeWidth={1.8} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900">No matching conversations</h3>
-                      <p className="text-xs text-[#667085] mt-1">Try a different word, community, platform, or matched keyword.</p>
-                    </div>
-                  </div>
-                )}
-
-                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount === 0 && (
-                  /* ── No keywords yet — onboarding CTA ── */
-                  <div className="flex min-h-64 flex-col items-center justify-center gap-4 px-6 py-14 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
-                      <Search className="w-5 h-5" strokeWidth={1.8} />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900 tracking-tight">Your signal radar is idle</h3>
-                      <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                        Add your first keyword to start scanning Reddit &amp; social communities for prospective buyers.
-                      </p>
-                    </div>
-                    <a
-                      href="/keywords"
-                      className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-2"
-                    >
-                      <Target className="w-3.5 h-3.5" strokeWidth={2} />
-                      Add first keyword
-                    </a>
-                  </div>
-                )}
-
-                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount > 0 && filterTab === 'high-intent' && activeScoredCount > 0 && (
-                  <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF4FF] text-[#0A84FF]">
-                      <Sparkles className="h-5 w-5" strokeWidth={1.8} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900">No high-intent conversations yet</h3>
-                      <p className="mt-1 text-xs text-[#667085]">
-                        {activeScoredCount} scored {activeScoredCount === 1 ? 'conversation is' : 'conversations are'} available to review while BuyerWatch keeps monitoring.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFilterTab('all')}
-                      className="mt-1 inline-flex min-h-10 items-center rounded-xl border border-[#C7D7FE] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#0A84FF] transition-colors hover:bg-[#F5F9FF]"
-                    >
-                      View all scored conversations
-                    </button>
-                  </div>
-                )}
-
-                {!loading && !searchLoading && filtered.length === 0 && !normalizedSearch && keywordsCount > 0 && !(filterTab === 'high-intent' && activeScoredCount > 0) && (
-                  /* Borderless empty state keeps the feed visually quiet. */
-                  <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F3F5] text-[#667085]">
-                      <Search className="w-5 h-5" strokeWidth={1.8} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900">No conversations yet</h3>
-                      <p className="text-xs text-[#667085] mt-1">Monitoring {keywordsCount} active topic{keywordsCount > 1 ? 's' : ''}</p>
-                    </div>
+                  <p className="text-[14.5px] font-semibold text-gray-900 mb-1">
+                    {normalizedSearch ? 'No matching conversations' : 'No conversations in this view'}
+                  </p>
+                  <p className="text-[13px] text-gray-400 max-w-xs leading-relaxed mb-3">
+                    {normalizedSearch
+                      ? 'Try different keywords, communities, or platform filters.'
+                      : keywordsCount === 0
+                        ? 'Add keywords to start discovering buyer conversations.'
+                        : `Monitoring ${keywordsCount} active topic${keywordsCount > 1 ? 's' : ''}. New leads will appear here.`}
+                  </p>
+                  {keywordsCount > 0 && !normalizedSearch && (
                     <button
                       type="button"
                       onClick={() => void handleCheckNow()}
                       disabled={checkingNow}
-                      className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#F1F2F3] px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-[#E8EAEC] disabled:cursor-wait disabled:opacity-60"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-[12px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer shadow-2xs"
                     >
-                      <RefreshCcw className={`h-3.5 w-3.5 text-gray-400 ${checkingNow ? 'animate-spin' : ''}`} />
+                      <RefreshCcw className={`h-3.5 w-3.5 ${checkingNow ? 'animate-spin' : ''}`} />
                       {checkingNow ? 'Checking...' : 'Check now'}
                     </button>
-                  </div>
-                )}
-                {feedItems.map((item) => {
+                  )}
+                </div>
+              ) : (
+                feedItems.map((item) => {
                   if (item.kind === 'low-toggle') {
                     return (
-                      <section
+                      <div
                         key="low-relevance-toggle"
-                        data-testid="low-relevance-toggle"
-                        aria-label="Low-relevance conversations"
-                        className="rounded-xl border border-dashed border-[#D8DDE5] bg-[#FAFBFC] px-3.5 py-2.5"
+                        className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-2.5 flex items-center justify-between text-xs"
                       >
-                        {normalizedSearch ? (
-                          <div className="flex items-center justify-between gap-3 text-xs">
-                            <span className="font-semibold text-[#667085]">Low-relevance matches</span>
-                            <span className="text-[#98A2B3]">Shown for your search</span>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setShowLowRelevance(current => !current)}
-                            aria-expanded={showLowRelevance}
-                            className="flex min-h-9 w-full items-center justify-between gap-3 rounded-lg text-left text-xs font-semibold text-[#667085] transition-colors hover:text-[#344054] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25"
-                          >
-                            <span>
-                              {showLowRelevance ? 'Hide' : 'Show'} {lowRelevanceThreads.length} low-relevance {lowRelevanceThreads.length === 1 ? 'result' : 'results'}
-                            </span>
-                            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${showLowRelevance ? 'rotate-180' : ''}`} aria-hidden="true" />
-                          </button>
-                        )}
-                      </section>
+                        <button
+                          type="button"
+                          onClick={() => setShowLowRelevance(curr => !curr)}
+                          className="flex items-center gap-2 font-medium text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                        >
+                          <span>{showLowRelevance ? 'Hide' : 'Show'} {lowRelevanceThreads.length} low-relevance match{lowRelevanceThreads.length === 1 ? '' : 'es'}</span>
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showLowRelevance ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
                     )
                   }
 
                   const { thread, isLowRelevance } = item
                   const isReddit = thread.platform === 'reddit'
+                  const isEditingThisDraft = editingDraft === thread.id
+                  const hoursLeft = getWindowHoursLeft(thread.createdAt)
 
                   return (
-                    <div key={thread.id} className="space-y-2.5 pb-1">
-                      <article
-                        id={`conversation-${thread.id}`}
-                        data-testid={isLowRelevance ? 'low-relevance-thread' : undefined}
-                        tabIndex={-1}
-                        aria-label={`Review opportunity${thread.title ? `: ${thread.title}` : ''}`}
-                        className={`rounded-2xl border transition-colors focus:outline-none focus-visible:border-[#0A84FF]/45 focus-visible:ring-2 focus-visible:ring-[#0A84FF]/15 ${
-                          isLowRelevance
-                            ? 'border-[#E5E7EB] bg-[#FCFCFD] p-4 shadow-none hover:border-[#D0D5DD]'
-                            : 'border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.025)] hover:border-black/15'
-                        }`}
-                      >
-                        <div>
-                          <div className={`${isLowRelevance ? 'mb-2.5' : 'mb-3'} flex flex-wrap items-start justify-between gap-2`}>
-                            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text-secondary">
-                              <div className="flex items-center gap-1.5">
-                                {thread.platform === 'reddit' ? (
-                                  <>
-                                    <RedditIcon className="h-4 w-4 text-[#FF4500]" />
-                                    <span className="font-medium text-[#4F5865] text-[12.5px]">Reddit</span>
-                                  </>
-                                ) : thread.platform === 'x' ? (
-                                  <>
-                                    <XIcon className="h-4 w-4 text-[#0F1419]" />
-                                    <span className="font-medium text-[#4F5865] text-[12.5px]">X</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <BlueskyIcon className="h-4 w-4 text-[#1185FE]" />
-                                    <span className="font-medium text-[#4F5865] text-[12.5px]">Bluesky</span>
-                                  </>
-                                )}
-                              </div>
-                              <span>·</span>
-                              <span className="font-medium text-text-primary">{isReddit ? `r/${thread.target}` : `"${thread.target}"`}</span>
-                              {/* Feature 3: Community Health Badge — Fix 6.2: Sample size gate */}
-                              {communityHealth[thread.target] && (() => {
-                                const h = communityHealth[thread.target]
-                                if (h.total_engagements < 3) {
-                                  return (
-                                    <span title="Gathering data (under 3 posts)" className="relative group cursor-help">
-                                      <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-44 text-center text-[11px] bg-gray-900 text-white px-2 py-1 rounded-md shadow-lg z-50 leading-snug">Gathering community health data</span>
-                                    </span>
-                                  )
-                                }
-                                const isSafe = h.rejection_rate < 0.05
-                                const isModerate = h.rejection_rate >= 0.05 && h.rejection_rate < 0.2
-                                const color = isSafe ? 'bg-emerald-400' : isModerate ? 'bg-amber-400' : 'bg-red-400'
-                                const label = isSafe ? 'Safe community' : isModerate ? 'Moderate — post carefully' : 'High rejection rate'
-                                return (
-                                  <span title={label} className="relative group cursor-help">
-                                    <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
-                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-40 text-center text-[11px] bg-gray-900 text-white px-2 py-1 rounded-md shadow-lg z-50 leading-snug">{label}</span>
-                                  </span>
-                                )
-                              })()}
-                              <span className="ml-1 text-xs">{thread.timeAgo}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              {getSafeThreadUrl(thread) && (
-                                <a
-                                  href={getSafeThreadUrl(thread) ?? undefined}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(event) => event.stopPropagation()}
-                                  className="inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-semibold text-[#4F5865] transition-colors hover:bg-[#F1F2F3] hover:text-[#0A84FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
-                                  aria-label={`Open ${thread.platform === 'reddit' ? 'Reddit' : 'Bluesky'} post in a new tab`}
-                                  title={`Open on ${thread.platform === 'reddit' ? 'Reddit' : 'Bluesky'}`}
-                                >
-                                  Open post
-                                  <ExternalLink className="h-3 w-3" strokeWidth={1.9} />
-                                </a>
-                              )}
-                              {/* Feature 5: Google Ranked badge */}
-                              {thread.googleRanked && (
-                                <span className="flex items-center gap-1 rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
-                                  <Globe className="w-3 h-3" />
-                                  Google Ranked
-                                </span>
-                              )}
-                              {thread.status !== 'dismissed' && (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDismiss(thread)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30"
-                                  aria-label={`Dismiss ${thread.title || 'conversation'}`}
-                                  title="Move to Dismissed"
-                                >
-                                  <X className="h-3.5 w-3.5" strokeWidth={1.8} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                    <article
+                      key={thread.id}
+                      id={`conversation-${thread.id}`}
+                      className={`rounded-xl border bg-white shadow-xs overflow-hidden transition-colors ${
+                        isLowRelevance ? 'border-gray-200 opacity-80' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {/* Card Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100 bg-gray-50/30">
+                        <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                          <PlatformIcon platform={thread.platform} />
+                          <span className="font-bold text-gray-900">
+                            {isReddit ? `r/${thread.target}` : thread.target}
+                          </span>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-gray-400 font-medium">{thread.timeAgo}</span>
 
-                          {thread.title && (
-                            <h3 className={`mb-2 leading-snug ${isLowRelevance ? 'text-[14px] font-semibold text-[#344054]' : 'text-[15px] font-bold text-text-primary'}`}>
-                              {thread.title}
-                            </h3>
-                          )}
-                          <p className={`line-clamp-2 leading-relaxed ${isLowRelevance ? 'mb-3 text-[13px] text-[#667085]' : 'mb-4 text-[14px] text-text-secondary'}`}>{thread.content}</p>
-
-                          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                            <div className="flex min-w-0 flex-wrap items-center gap-3">
-                              {thread.flag === 'COMPETITOR_RISK' ? (
-                                <span className="px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1.5 bg-red-100 text-red-700 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.2)]">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                  Competitor Risk
-                                </span>
-                              ) : (
-                                <IntentBadge score={thread.score} label={thread.label} />
-                              )}
-                              {thread.matchedKeyword && (
-                                <span className={`text-xs font-medium tracking-wide ${isLowRelevance ? 'text-[#98A2B3]' : 'text-text-tertiary'}`}>Matched: &quot;{thread.matchedKeyword}&quot;</span>
-                              )}
-                              {isReddit && selectedThread?.id === thread.id && (
-                                <RedditCommunityPolicyNotice subreddit={thread.target} compact />
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              {/* Feature 4: Closing Soon badge */}
-                              {(() => {
-                                const hoursLeft = getWindowHoursLeft(thread.createdAt)
-                                if (hoursLeft !== null && hoursLeft <= 6) {
-                                  return (
-                                    <span className="text-xs bg-amber-50 text-amber-600 font-semibold px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                      Closes in {hoursLeft}h
-                                    </span>
-                                  )
-                                }
-                                return null
-                              })()}
-                            </div>
-                          </div>
-
-                          <div className={`${isLowRelevance ? 'mt-3 pt-3' : 'mt-4 pt-4'} flex justify-end border-t border-black/[0.05] sm:pl-8`}>
-                            {editingDraft === thread.id ? (
-                              <div className="w-full max-w-[92%] sm:max-w-[68%]">
-                                <div className="mb-2 flex items-center justify-between px-1">
-                                  <span className="text-[11px] font-semibold text-gray-500">Your reply</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditingDraft(null)}
-                                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
-                                  >
-                                    Done
-                                  </button>
-                                </div>
-                                <div className="rounded-[20px] rounded-br-md border border-gray-200 bg-white shadow-sm">
-                                  <textarea
-                                    className="min-h-[190px] w-full resize-none rounded-[20px] rounded-br-md bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white"
-                                    value={thread.draft || ''}
-                                    placeholder="Write your reply..."
-                                    onChange={(event) => {
-                                      const updated = event.target.value
-                                      setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, draft: updated } : item))
-                                      setSelectedThread(prev => prev?.id === thread.id ? { ...prev, draft: updated } : prev)
-                                    }}
-                                    autoFocus
-                                    spellCheck
-                                  />
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1">
-                                  <span className="text-[10.5px] tabular-nums text-gray-400">
-                                    {(thread.draft || '').length} characters
-                                  </span>
-                                  <div className="flex flex-wrap items-center justify-end gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleDismiss()}
-                                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                                      title="Dismiss thread"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleRegenerate}
-                                      disabled={regenerating}
-                                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
-                                      title="Rewrite reply"
-                                    >
-                                      <RefreshCcw className={`h-3.5 w-3.5 ${regenerating ? 'animate-spin' : ''}`} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleCopyDraft}
-                                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
-                                    >
-                                      <Copy className="h-3.5 w-3.5" />
-                                      Copy
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleMarkAsPosted}
-                                      className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
-                                    >
-                                      Mark posted
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleApproveAndSend}
-                                      disabled={sendingThreadId === thread.id}
-                                      className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-black"
-                                    >
-                                      <CheckCircle className="h-3.5 w-3.5" />
-                                      {sendingThreadId === thread.id
-                                        ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                                        : getDeliveryActionLabel(thread.platform)}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleReplyBubbleClick(thread)}
-                                disabled={regenerating}
-                                data-testid={isLowRelevance ? 'low-relevance-reply' : undefined}
-                                className={`group w-fit max-w-[82%] text-left transition-[transform,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-75 sm:max-w-[46%] ${
-                                  isLowRelevance
-                                    ? thread.draft
-                                      ? 'rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-[#475467] shadow-none hover:border-[#98A2B3] hover:bg-[#F8FAFC]'
-                                      : 'inline-flex items-center gap-2 rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-[#475467] shadow-none hover:border-[#98A2B3] hover:bg-[#F8FAFC]'
-                                    : 'rounded-[17px] rounded-br-[5px] bg-[#0A84FF] px-4 py-3 text-white shadow-[0_3px_12px_rgba(10,132,255,0.12)] hover:-translate-y-px hover:shadow-[0_5px_16px_rgba(10,132,255,0.16)] disabled:hover:translate-y-0'
-                                }`}
-                                aria-label={thread.draft
-                                  ? 'Open full drafted reply'
-                                  : isLowRelevance
-                                    ? 'Generate a reply despite low relevance'
-                                    : 'Generate a drafted reply'}
-                              >
-                                {thread.draft ? (
-                                  <p className={`line-clamp-2 whitespace-pre-line text-[12.5px] leading-relaxed ${isLowRelevance ? 'text-[#344054]' : 'text-white'}`}>
-                                    {thread.draft}
-                                  </p>
-                                ) : (
-                                  <span className={`flex items-center gap-2 text-[12.5px] font-semibold leading-relaxed ${isLowRelevance ? 'text-[#475467]' : 'text-white'}`}>
-                                    <MessageCircle className={`h-3.5 w-3.5 ${isLowRelevance ? 'text-[#667085]' : 'text-white/75'}`} strokeWidth={2} />
-                                    {regenerating && selectedThread?.id === thread.id
-                                      ? 'Preparing reply...'
-                                      : isLowRelevance
-                                        ? 'Generate reply anyway'
-                                        : 'Generate reply'}
-                                  </span>
-                                )}
-                                {thread.draft && (
-                                  <span className={`mt-1.5 block text-right text-[9.5px] font-medium ${isLowRelevance ? 'text-[#98A2B3] group-hover:text-[#667085]' : 'text-white/65 group-hover:text-white/90'}`}>
-                                    Open full reply
-                                  </span>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </article>
-
-                      {showLegacyReview && (
-                        <div
-                          onClick={(event) => event.stopPropagation()}
-                          onKeyDown={(event) => event.stopPropagation()}
-                        >
-                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex min-w-0 items-center gap-2 text-[12px] font-medium text-gray-400">
-                              {thread.platform === 'reddit' ? (
-                                <RedditIcon className="h-[18px] w-[18px] shrink-0 text-[#FF4500]" />
-                              ) : thread.platform === 'x' ? (
-                                <XIcon className="h-[18px] w-[18px] shrink-0 text-[#0F1419]" />
-                              ) : (
-                                <BlueskyIcon className="h-[18px] w-[18px] shrink-0 text-[#1185FE]" />
-                              )}
-                              <span className="font-semibold text-gray-700">
-                                {isReddit ? `r/${thread.target}` : thread.target}
+                          {/* Community Health */}
+                          {communityHealth[thread.target] && (() => {
+                            const h = communityHealth[thread.target]
+                            if (h.total_engagements < 3) return null
+                            const isSafe = h.rejection_rate < 0.05
+                            const isModerate = h.rejection_rate >= 0.05 && h.rejection_rate < 0.2
+                            return (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold border ${
+                                isSafe
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                  : isModerate
+                                    ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                    : 'bg-red-50 text-red-700 border-red-100'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isSafe ? 'bg-emerald-500' : isModerate ? 'bg-amber-500' : 'bg-red-500'}`} />
+                                {isSafe ? 'Safe' : isModerate ? 'Moderate' : 'Strict'}
                               </span>
-                              <span aria-hidden="true">&middot;</span>
-                              <span>{thread.timeAgo}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {getSafeThreadUrl(thread) && (
-                                <a
-                                  href={getSafeThreadUrl(thread) ?? undefined}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
-                                >
-                                  Open post <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingDraft(null)
-                                  setSelectedThread(null)
-                                }}
-                                className="grid h-8 w-8 place-items-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-                                aria-label="Close conversation"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
+                            )
+                          })()}
 
-                          <div className="min-h-[250px] space-y-7 border-y border-black/[0.05] py-5 sm:px-2 sm:py-6">
-                            <div className="flex justify-start">
-                              <div className="w-fit max-w-[88%] rounded-[18px] rounded-bl-md border border-black/[0.04] bg-[#F1F1EF] px-3.5 py-3 sm:max-w-[68%]">
-                                {thread.title && (
-                                  <h3 className="mb-1 line-clamp-1 text-[13px] font-semibold leading-snug text-gray-900">
-                                    {thread.title}
-                                  </h3>
-                                )}
-                                <p className="line-clamp-2 text-[12.5px] leading-relaxed text-gray-600">
-                                  {thread.content}
-                                </p>
-                                <p className="mt-1.5 text-right text-[10px] font-medium text-gray-400">
-                                  {thread.timeAgo}
-                                </p>
-                              </div>
-                            </div>
+                          {/* Google Ranked */}
+                          {thread.googleRanked && (
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-blue-700">
+                              <Globe className="w-3 h-3" />
+                              Ranked on Google
+                            </span>
+                          )}
 
-                            {editingDraft === thread.id ? (
-                              <div className="ml-auto w-full max-w-[92%] sm:max-w-[76%]">
-                                <div className="mb-2 flex items-center justify-between px-1">
-                                  <span className="text-[11px] font-semibold text-gray-500">Your reply</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditingDraft(null)}
-                                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
-                                  >
-                                    Done
-                                  </button>
-                                </div>
-                                <div className="rounded-[20px] rounded-br-md border border-gray-200 bg-white shadow-sm">
-                                  <textarea
-                                    className="min-h-[220px] w-full resize-none rounded-[20px] rounded-br-md bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white"
-                                    value={thread.draft || ''}
-                                    placeholder="Write your reply..."
-                                    onChange={(event) => {
-                                      const updated = event.target.value
-                                      setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, draft: updated } : item))
-                                      setSelectedThread(prev => prev?.id === thread.id ? { ...prev, draft: updated } : prev)
-                                    }}
-                                    autoFocus
-                                    spellCheck
-                                  />
-                                </div>
-                                <p className="mt-1.5 px-1 text-right text-[10.5px] tabular-nums text-gray-400">
-                                  {(thread.draft || '').length} characters
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => thread.draft ? setEditingDraft(thread.id) : void handleRegenerate()}
-                                  disabled={regenerating}
-                                  className="group w-fit max-w-[84%] rounded-[20px] rounded-br-md bg-[#0A84FF] px-4 py-3 text-left text-white shadow-[0_4px_18px_rgba(10,132,255,0.16)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-75 sm:max-w-[64%]"
-                                  aria-label={thread.draft ? 'Open full drafted reply' : 'Generate a drafted reply'}
-                                >
-                                  {thread.draft ? (
-                                    <p className="line-clamp-3 whitespace-pre-line text-[13px] leading-relaxed text-white">
-                                      {thread.draft}
-                                    </p>
-                                  ) : (
-                                    <p className="text-[13px] font-semibold leading-relaxed text-white">
-                                      {regenerating ? 'Preparing reply...' : 'Generate reply'}
-                                    </p>
-                                  )}
-                                  <div className="mt-2 flex items-center justify-end gap-2 text-[10px] font-medium text-white/65">
-                                    <span>{thread.draft ? 'Draft' : 'Not generated'}</span>
-                                    <span aria-hidden="true">&middot;</span>
-                                    <span className="group-hover:text-white/90">
-                                      {thread.draft ? 'Open full reply' : 'Create preview'}
-                                    </span>
-                                  </div>
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          {/* Closing Soon */}
+                          {hoursLeft !== null && hoursLeft <= 6 && (
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10.5px] font-semibold text-amber-700">
+                              Closes in {hoursLeft}h
+                            </span>
+                          )}
+                        </div>
 
-                          <div className="mt-4 flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                          <IntentBadge score={thread.score} label={thread.label} />
+                          {getSafeThreadUrl(thread) && (
+                            <a
+                              href={getSafeThreadUrl(thread) ?? undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11.5px] font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                              title="Open original thread"
+                            >
+                              <span>Open post</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                          {thread.status !== 'dismissed' && (
                             <button
                               type="button"
-                              onClick={handleApproveAndSend}
-                              disabled={!thread.draft || sendingThreadId === thread.id}
-                              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 py-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-black disabled:border disabled:border-gray-200/60 disabled:bg-gray-100 disabled:text-gray-400"
+                              onClick={() => void handleDismiss(thread.id)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                              title="Dismiss"
                             >
-                              <CheckCircle className="h-4 w-4" />
-                              {sendingThreadId === thread.id
-                                ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                                : getDeliveryActionLabel(thread.platform)}
+                              <X className="h-3.5 w-3.5" />
                             </button>
-                            <div className="flex flex-wrap items-center justify-between gap-3">
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Body */}
+                      <div className="px-5 py-4">
+                        {thread.title && (
+                          <h3 className="text-[14.5px] font-bold text-gray-900 leading-snug mb-1.5">
+                            {thread.title}
+                          </h3>
+                        )}
+                        <p className="text-[13px] leading-relaxed text-gray-600 line-clamp-3">
+                          {thread.content}
+                        </p>
+
+                        {/* Metadata row */}
+                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-gray-100">
+                          {thread.matchedKeyword && (
+                            <span className="rounded-md bg-blue-50 border border-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                              Matched keyword: {thread.matchedKeyword}
+                            </span>
+                          )}
+                          {isReddit && selectedThread?.id === thread.id && (
+                            <RedditCommunityPolicyNotice subreddit={thread.target} compact />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Integrated Action / Draft Area */}
+                      <div className="border-t border-gray-100 bg-gray-50/50 px-5 py-3.5">
+                        {isEditingThisDraft ? (
+                          /* Inline Draft Editor */
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11.5px] font-semibold text-gray-700">Edit Your Reply</span>
+                              <button
+                                type="button"
+                                onClick={() => setEditingDraft(null)}
+                                className="h-6 px-2 rounded text-[11.5px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                              >
+                                Done
+                              </button>
+                            </div>
+                            <textarea
+                              className="w-full min-h-[140px] rounded-xl border border-gray-200 bg-white p-3.5 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-gray-900/5 transition-all"
+                              value={thread.draft || ''}
+                              placeholder="Write your reply..."
+                              onChange={(e) => {
+                                const updated = e.target.value
+                                setThreads(prev => prev.map(item => item.id === thread.id ? { ...item, draft: updated } : item))
+                                setSelectedThread(prev => prev?.id === thread.id ? { ...prev, draft: updated } : prev)
+                              }}
+                              autoFocus
+                              spellCheck
+                            />
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-[11px] text-gray-400 tabular-nums font-medium">
+                                {(thread.draft || '').length} characters
+                              </span>
                               <div className="flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => void handleDismiss()}
-                                  className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                                  title="Dismiss thread"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleRegenerate}
+                                  onClick={() => void generateReplyForThread(thread)}
                                   disabled={regenerating}
-                                  className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
-                                  title={thread.draft ? 'Rewrite reply' : 'Generate reply'}
+                                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
+                                  title="Rewrite reply"
                                 >
-                                  <RefreshCcw className={`h-4 w-4 ${regenerating ? 'animate-spin' : ''}`} />
+                                  <RefreshCcw className={`h-3.5 w-3.5 ${regenerating ? 'animate-spin' : ''}`} />
+                                  Rewrite
                                 </button>
-                              </div>
-                              <div className="flex items-center gap-2">
                                 <button
                                   type="button"
-                                  onClick={handleCopyDraft}
-                                  disabled={!thread.draft}
-                                  className="flex items-center gap-1.5 rounded-xl border border-gray-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-40"
+                                  onClick={() => void handleCopyDraft(thread)}
+                                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
                                 >
                                   <Copy className="h-3.5 w-3.5 text-gray-400" />
                                   Copy
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={handleMarkAsPosted}
-                                  className="rounded-xl border border-gray-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                                  onClick={() => void handleMarkAsPosted(thread)}
+                                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
                                 >
-                                  Mark as Posted
+                                  Mark posted
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleApproveAndSend(thread)}
+                                  disabled={sendingThreadId === thread.id}
+                                  className="h-8 px-3.5 rounded-lg bg-gray-900 text-white text-[12px] font-medium hover:bg-gray-800 transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  {sendingThreadId === thread.id
+                                    ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                                    : getDeliveryActionLabel(thread.platform)}
                                 </button>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-
-                {signalLimitReached && (
-                  <div className="rounded-2xl p-6 bg-surface border border-black/5 shadow-sm text-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-white/90 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center">
-                      <div className="bg-black/5 p-3 rounded-full mb-3">
-                        <Lock className="w-5 h-5 text-gray-700" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        Starter signal limit reached
-                      </h3>
-                      <p className="text-[13px] text-gray-500 mb-4 max-w-[260px]">
-                        Add 100 more monitored signals for this month without changing plans.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void handleBuyAddon('signals')}
-                        disabled={Boolean(openingAddonCheckout)}
-                        className="px-5 py-2 rounded-lg bg-[#0A84FF] hover:bg-blue-600 text-white text-[13px] font-medium transition-colors shadow-[0_0_20px_rgba(10,132,255,0.2)] disabled:opacity-60"
-                      >
-                        {openingAddonCheckout === 'signals' ? 'Opening...' : BILLING_ADDONS.signals.ctaLabel}
-                      </button>
-                    </div>
-
-                    {/* Dummy blurred content behind */}
-                    <div className="opacity-20 blur-[3px] select-none pointer-events-none">
-                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-3" />
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                      <div className="h-4 bg-gray-200 rounded w-2/3" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Retained temporarily for checkpoint compatibility; the inline conversation is the active review surface. */}
-              {selectedThread && (
-                <div className="hidden" aria-hidden="true">
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-30 bg-black/20 backdrop-blur-[1px] xl:hidden"
-                    onClick={() => setSelectedThread(null)}
-                    aria-label="Close review panel"
-                  />
-                  <div className="fixed inset-x-3 bottom-[76px] top-[72px] z-40 flex w-auto shrink-0 flex-col overflow-hidden rounded-3xl border border-black/[0.08] bg-white shadow-xl transition-all xl:sticky xl:inset-auto xl:top-[80px] xl:z-auto xl:max-h-[calc(100vh-96px)] xl:w-[46%] xl:max-w-[520px] xl:shadow-lg">
-                    {/* Panel Header */}
-                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-white px-4 py-4 sm:px-6">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        {selectedThread.platform === 'reddit' ? (
-                          <RedditIcon className="h-5 w-5 shrink-0 text-[#FF4500]" />
-                        ) : selectedThread.platform === 'x' ? (
-                          <XIcon className="h-5 w-5 shrink-0 text-[#0F1419]" />
-                        ) : (
-                          <BlueskyIcon className="h-5 w-5 shrink-0 text-[#1185FE]" />
-                        )}
-                        <div className="min-w-0">
-                          <h2 className="truncate text-sm font-semibold tracking-tight text-gray-900">Conversation</h2>
-                          <span className="block truncate text-[11px] font-medium text-gray-400">
-                            {selectedThread.platform === 'reddit' ? `r/${selectedThread.target}` : selectedThread.target}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {getSafeThreadUrl(selectedThread) ? (
-                          <a
-                            href={getSafeThreadUrl(selectedThread) ?? undefined}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50 hover:text-blue-700"
-                          >
-                            Open post <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : (
-                          <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
-                            Open post <ExternalLink className="h-3 w-3" />
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedThread(null)}
-                          className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 xl:hidden"
-                          aria-label="Close review panel"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Staggered conversation body */}
-                    <div className="flex-1 space-y-5 overflow-y-visible px-4 py-5 sm:px-6 xl:overflow-y-auto">
-                      <div className="flex justify-start">
-                        <div className="w-fit max-w-[82%] rounded-[18px] rounded-bl-md border border-black/[0.04] bg-[#F1F1EF] px-3.5 py-3">
-                          <div className="mb-2 flex items-center gap-2 text-[10.5px] font-medium text-gray-400">
-                            {selectedThread.platform === 'reddit' ? (
-                              <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
-                            ) : selectedThread.platform === 'x' ? (
-                              <XIcon className="h-3.5 w-3.5 text-[#0F1419]" />
-                            ) : (
-                              <BlueskyIcon className="h-3.5 w-3.5 text-[#1185FE]" />
-                            )}
-                            <span>{selectedThread.platform === 'reddit' ? `r/${selectedThread.target}` : selectedThread.target}</span>
+                        ) : thread.draft ? (
+                          /* Existing Draft Preview */
+                          <div className="space-y-3">
+                            <div className="rounded-xl border border-emerald-200 bg-[#F2FCF7] p-3.5">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-[#3A6B50]">
+                                  BuyerWatch Draft
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handleInspectThread(thread)
+                                    setEditingDraft(thread.id)
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-[#3A6B50] hover:underline cursor-pointer"
+                                >
+                                  <Edit3 className="h-3 w-3" />
+                                  Edit
+                                </button>
+                              </div>
+                              <p className="text-[13px] leading-relaxed text-[#1C1C1A] whitespace-pre-wrap">
+                                {thread.draft}
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => void generateReplyForThread(thread)}
+                                disabled={regenerating}
+                                className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
+                                title="Rewrite draft"
+                              >
+                                <RefreshCcw className={`h-3.5 w-3.5 ${regenerating ? 'animate-spin' : ''}`} />
+                                Rewrite
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleCopyDraft(thread)}
+                                className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
+                              >
+                                <Copy className="h-3.5 w-3.5 text-gray-400" />
+                                Copy
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleMarkAsPosted(thread)}
+                                className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+                              >
+                                Mark posted
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleApproveAndSend(thread)}
+                                disabled={sendingThreadId === thread.id}
+                                className="h-8 px-3.5 rounded-lg bg-gray-900 text-white text-[12px] font-medium hover:bg-gray-800 transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                {sendingThreadId === thread.id
+                                  ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                                  : getDeliveryActionLabel(thread.platform)}
+                              </button>
+                            </div>
                           </div>
-                          {selectedThread.title && (
-                            <h3 className="mb-1 line-clamp-1 text-[13px] font-semibold leading-snug text-gray-900">
-                              {selectedThread.title}
-                            </h3>
-                          )}
-                          <p className="line-clamp-2 text-[12.5px] font-normal leading-relaxed text-gray-600">
-                            {selectedThread.content}
-                          </p>
-                          <p className="mt-1.5 text-right text-[10px] font-medium text-gray-400">
-                            {selectedThread.timeAgo}
-                          </p>
-                        </div>
-                      </div>
-
-                      {editingDraft === selectedThread.id ? (
-                        <div className="ml-auto w-full max-w-[92%]">
-                          <div className="mb-2 flex items-center justify-between px-1">
-                            <span className="text-[11px] font-semibold text-gray-500">Your reply</span>
+                        ) : (
+                          /* No Draft Yet */
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[12px] text-gray-400 font-medium">
+                              {isLowRelevance ? 'Low relevance match' : 'No draft created yet'}
+                            </span>
                             <button
                               type="button"
-                              onClick={() => setEditingDraft(null)}
-                              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#0A84FF] transition-colors hover:bg-blue-50"
+                              onClick={() => void generateReplyForThread(thread)}
+                              disabled={regenerating}
+                              className="h-8 px-3.5 rounded-lg bg-gray-900 text-white text-[12px] font-medium hover:bg-gray-800 transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
                             >
-                              Done
+                              <Sparkles className="h-3.5 w-3.5 text-blue-300" />
+                              {regenerating && selectedThread?.id === thread.id
+                                ? 'Generating...'
+                                : 'Generate reply'}
                             </button>
                           </div>
-                          <div className="rounded-[20px] rounded-br-md border border-gray-200 bg-white shadow-sm">
-                            <textarea
-                              className="min-h-[220px] w-full resize-none rounded-[20px] rounded-br-md bg-white p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white"
-                              value={selectedThread.draft || ''}
-                              placeholder="Write your reply..."
-                              onChange={(e) => {
-                                const updated = e.target.value
-                                setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, draft: updated } : t))
-                                setSelectedThread(prev => prev ? { ...prev, draft: updated } : null)
-                              }}
-                              autoFocus
-                              spellCheck
-                            />
-                          </div>
-                          <p className="mt-1.5 px-1 text-right text-[10.5px] tabular-nums text-gray-400">
-                            {(selectedThread.draft || '').length} characters
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => selectedThread.draft ? setEditingDraft(selectedThread.id) : void handleRegenerate()}
-                            disabled={regenerating}
-                            className="group w-fit max-w-[84%] rounded-[20px] rounded-br-md bg-[#0A84FF] px-4 py-3 text-left text-white shadow-[0_4px_18px_rgba(10,132,255,0.16)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 focus-visible:ring-offset-2 disabled:cursor-wait disabled:hover:translate-y-0 disabled:opacity-75"
-                            aria-label={selectedThread.draft ? 'Open full drafted reply' : 'Generate a drafted reply'}
-                          >
-                            {selectedThread.draft ? (
-                              <p className="line-clamp-4 whitespace-pre-line text-[13px] leading-relaxed text-white">
-                                {selectedThread.draft}
-                              </p>
-                            ) : (
-                              <p className="text-[13px] font-semibold leading-relaxed text-white">
-                                {regenerating ? 'Preparing reply...' : 'Generate reply'}
-                              </p>
-                            )}
-                            <div className="mt-2 flex items-center justify-end gap-2 text-[10px] font-medium text-white/65">
-                              <span>{selectedThread.draft ? 'Draft' : 'Not generated'}</span>
-                              <span aria-hidden="true">&middot;</span>
-                              <span className="group-hover:text-white/90">
-                                {selectedThread.draft ? 'Open full reply' : 'Create preview'}
-                              </span>
-                            </div>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Panel Footer & Action Bar */}
-                    <div className="p-5 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
-                      <button
-                        onClick={handleApproveAndSend}
-                        disabled={!selectedThread.draft || sendingThreadId === selectedThread.id}
-                        className="w-full py-3 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold text-xs disabled:bg-gray-100 disabled:text-gray-400 disabled:border disabled:border-gray-200/60 shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
-                      >
-                        <CheckCircle className="w-4 h-4 text-white" />
-                        {sendingThreadId === selectedThread.id
-                          ? (selectedThread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
-                          : getDeliveryActionLabel(selectedThread.platform)}
-                      </button>
-
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => void handleDismiss()}
-                            className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all cursor-pointer"
-                            title="Dismiss thread"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={handleRegenerate}
-                            disabled={regenerating}
-                            className="p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all disabled:opacity-40 cursor-pointer"
-                            title={selectedThread.draft ? 'Rewrite reply' : 'Generate reply'}
-                          >
-                            <RefreshCcw className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={handleCopyDraft}
-                            className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                          >
-                            <Copy className="w-3.5 h-3.5 text-gray-400" />
-                            Copy
-                          </button>
-                          <button
-                            onClick={handleMarkAsPosted}
-                            className="px-3 py-1.5 rounded-xl border border-gray-200/80 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all cursor-pointer shadow-2xs"
-                          >
-                            Mark as Posted
-                          </button>
-                        </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                </div>
+                    </article>
+                  )
+                })
               )}
             </div>
-          </>
-        )
-      })()}
-
-      {/* Floating Bottom-Left Onboarding Checklist Widget */}
-    </div>
+          </div>
+        </div>
   )
 }
