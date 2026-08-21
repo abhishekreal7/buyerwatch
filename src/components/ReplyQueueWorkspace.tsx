@@ -24,13 +24,13 @@ import { ACTIONABLE_INTENT_THRESHOLD, getIntentDisplayLabel, type IntentLabel } 
 import { evaluateReplyQuality } from '@/lib/reply-quality'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
-import { IntentBadge } from '@/components/IntentBadge'
 import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
 import { copyAndOpenRedditReply } from '@/lib/reddit-handoff-client'
 import { BILLING_ADDONS } from '@/lib/billing-addons'
 import { RedditCommunityPolicyNotice } from '@/components/RedditCommunityPolicyNotice'
 import { DataLoadError } from '@/components/DataLoadError'
 import { OpportunityStageNav } from '@/components/OpportunityStageNav'
+import { trackEvent } from '@/lib/analytics'
 
 const PAGE_SIZE = 40
 
@@ -357,6 +357,12 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
 
       toast.info('Posting reply...')
       await waitForReplyDelivery(threadIdToSend)
+      trackEvent('reply_posted', {
+        thread_id: threadIdToSend,
+        platform: platformToSend,
+        target: selected.target,
+        is_edited: originalReplyText !== replyTextToSend,
+      })
       setDrafts(prev => prev.filter(d => d.id !== threadIdToSend))
       setTotalCount(current => Math.max(0, current - 1))
       const nextSelected = drafts.find(d => d.id !== threadIdToSend) || null
@@ -378,6 +384,11 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
     try {
       const { error } = await supabase.rpc('dismiss_thread', { p_thread_id: threadIdToDismiss })
       if (error) throw error
+      trackEvent('reply_dismissed', {
+        thread_id: threadIdToDismiss,
+        platform: selected.platform,
+        target: selected.target,
+      })
     } catch (error) {
       console.error('[drafts] Unable to dismiss draft', error)
       toast.error('Could not dismiss this draft. Nothing was removed.')
@@ -434,6 +445,11 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
       }
       const { draft: newDraft } = await res.json()
       clearSupabaseReadCache()
+      trackEvent('reply_regenerated', {
+        thread_id: selected.id,
+        platform: selected.platform,
+        target: selected.target,
+      })
       setDraftContent(newDraft)
       setDrafts(prev => prev.map(d => d.id === selected.id ? { ...d, draft: newDraft } : d))
       setSelected((prev: any) => prev ? { ...prev, draft: newDraft } : prev)
@@ -449,6 +465,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
   const handleBuyDraftAddon = async () => {
     if (openingDraftAddon) return
     setOpeningDraftAddon(true)
+    trackEvent('checkout_initiated', { addon: 'drafts', source: 'reply_workspace' })
     try {
       const idempotencyKey = crypto.randomUUID()
       const response = await fetch('/api/billing/checkout', {
@@ -541,14 +558,18 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row h-[calc(100vh-210px)] min-h-[600px] rounded-2xl border border-black/[0.08] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] overflow-hidden">
+        <div className="flex flex-col lg:flex-row h-[calc(100vh-210px)] min-h-[600px] rounded-2xl border border-[#E5E7EB] bg-[#F7F6F3] shadow-[0_4px_24px_rgba(0,0,0,0.03)] overflow-hidden">
 
-          <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-black/[0.07] bg-[#FAFAF9]/80 lg:w-[380px] lg:min-w-[380px] lg:max-w-[380px] shrink-0 overflow-hidden">
-            <div className="shrink-0 px-4 py-3 border-b border-black/[0.06] bg-white/70 backdrop-blur-xs flex items-center justify-between gap-3">
-              <p className="text-[13px] font-medium text-[#6B6B66]">
-                <span className="tabular-nums font-bold text-[#1C1C1A]">{searchQuery.trim() ? filteredDrafts.length : totalCount}</span>
-                {' '}replies to prepare
-              </p>
+          {/* ── LEFT PANEL: Live Context / Signals ── */}
+          <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-[#E5E7EB] bg-[#F7F6F3] lg:w-[380px] lg:min-w-[380px] lg:max-w-[380px] shrink-0 overflow-hidden">
+            <div className="shrink-0 px-4 py-3 border-b border-[#E5E7EB] bg-[#F7F6F3] flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[13px] font-bold text-[#111827] leading-tight">Live context</h3>
+                <p className="text-[11px] text-[#6B7280]">
+                  <span className="tabular-nums font-semibold text-[#111827]">{searchQuery.trim() ? filteredDrafts.length : totalCount}</span>
+                  {' '}signals referenced for reply generation
+                </p>
+              </div>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8C8C85] pointer-events-none" strokeWidth={2} />
                 <input
@@ -557,15 +578,15 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   onChange={(e) => setSearchQuery(e.target.value)}
                   aria-label="Search drafts"
                   placeholder="Search..."
-                  className="h-8 w-36 rounded-lg border border-black/[0.1] bg-white pl-8 pr-2 text-[12px] text-[#1C1C1A] placeholder-[#8C8C85] focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15 transition-all"
+                  className="h-8 w-32 rounded-lg border border-[#D1D5DB] bg-white pl-8 pr-2 text-[12px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15 transition-all"
                 />
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2.5" style={{ scrollbarWidth: 'thin' }}>
               {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-[96px] animate-pulse bg-white/80 border border-black/[0.04] rounded-xl p-3.5 space-y-2">
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-[105px] animate-pulse bg-white border border-[#E5E7EB] rounded-xl p-3.5 space-y-2">
                     <div className="h-4 bg-gray-200 rounded-md w-3/4" />
                     <div className="h-3 bg-gray-100 rounded-md w-full" />
                     <div className="h-3 bg-gray-100 rounded-md w-1/2" />
@@ -582,45 +603,61 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
               ) : (
                 filteredDrafts.map(d => {
                   const isSelected = selected?.id === d.id
+                  const accentColor = d.score >= 80 ? 'bg-[#10B981]' : d.score >= 65 ? 'bg-[#3B82F6]' : 'bg-[#F59E0B]'
+
                   return (
                     <button
                       key={d.id}
                       type="button"
                       onClick={() => handleSelect(d)}
-                      className={`w-full text-left rounded-xl p-3.5 transition-all duration-150 relative group ${
+                      className={`w-full text-left rounded-xl p-3.5 transition-all duration-150 relative group bg-white border ${
                         isSelected
-                          ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-black/[0.08] border-l-[3.5px] border-l-[#FF4500]'
-                          : 'bg-white/60 hover:bg-white hover:shadow-xs ring-1 ring-black/[0.04] border-l-[3.5px] border-l-transparent'
+                          ? 'border-[#0A84FF] shadow-[0_2px_12px_rgba(10,132,255,0.12)] ring-1 ring-[#0A84FF]'
+                          : 'border-[#E5E7EB] hover:border-[#D1D5DB] hover:shadow-xs'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <h4 className={`text-[13px] font-bold leading-snug line-clamp-1 transition-colors ${
-                          isSelected ? 'text-[#1C1C1A]' : 'text-[#2C2C28] group-hover:text-black'
+                      {/* Left accent bar (Neurix card style) */}
+                      <span className={`absolute left-0 top-2.5 bottom-2.5 w-[3.5px] rounded-r-full ${accentColor}`} />
+
+                      <div className="pl-1.5">
+                        {/* Top row: Platform & Status pill */}
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#111827]">
+                            <PlatformIcon platform={d.platform} />
+                            <span className="truncate max-w-[130px]">
+                              {d.platform === 'reddit' ? `r/${d.community}` : d.community}
+                            </span>
+                          </div>
+
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            d.score >= 80
+                              ? 'bg-[#ECFDF5] text-[#059669] ring-1 ring-[#10B981]/20'
+                              : 'bg-[#FEF3C7] text-[#92400E] ring-1 ring-[#F59E0B]/20'
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${d.score >= 80 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'} animate-pulse`} />
+                            Live
+                          </span>
+                        </div>
+
+                        {/* Title */}
+                        <h4 className={`text-[12.5px] font-bold leading-snug line-clamp-1 mb-1 transition-colors ${
+                          isSelected ? 'text-[#111827]' : 'text-[#374151] group-hover:text-black'
                         }`}>
                           {d.title || d.matchedKeyword || 'Draft reply'}
                         </h4>
-                        <IntentBadge score={d.score} label={d.label} className="shrink-0 text-[10px]" />
-                      </div>
 
-                      <p className="text-[12px] text-[#6B6B66] line-clamp-2 leading-relaxed mb-2.5">
-                        {d.content}
-                      </p>
+                        {/* Snippet / Context */}
+                        <p className="text-[11.5px] text-[#6B7280] line-clamp-2 leading-relaxed mb-2">
+                          {d.content}
+                        </p>
 
-                      <div className="flex items-center gap-1.5 text-[11px] text-[#8C8C85]">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-black/[0.03] px-1.5 py-0.5 font-medium text-[#4A4A45]">
-                          <PlatformIcon platform={d.platform} />
-                          <span className="truncate max-w-[85px]">
-                            {d.platform === 'reddit' ? `r/${d.community}` : d.community}
+                        {/* Bottom meta row */}
+                        <div className="flex items-center justify-between text-[10.5px] text-[#9CA3AF]">
+                          <span>Updated {d.timeAgo}</span>
+                          <span className="font-semibold text-[#4B5563]">
+                            Intent: <strong className="text-[#111827]">{d.score}%</strong>
                           </span>
-                        </span>
-                        <span className="opacity-40">·</span>
-                        <span className="tabular-nums font-medium">{d.timeAgo}</span>
-                        {d.draft && (
-                          <span className="ml-auto inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md ring-1 ring-emerald-600/20">
-                            <Sparkles className="h-2.5 w-2.5" />
-                            Draft ready
-                          </span>
-                        )}
+                        </div>
                       </div>
                     </button>
                   )
@@ -633,7 +670,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                     type="button"
                     onClick={loadMoreDrafts}
                     disabled={loadingMore}
-                    className="rounded-full border border-black/[0.08] bg-white px-4 py-1.5 text-[11.5px] font-semibold text-[#1C1C1A] shadow-xs hover:bg-black/[0.025] disabled:opacity-50 transition-colors"
+                    className="rounded-full border border-[#D1D5DB] bg-white px-4 py-1.5 text-[11.5px] font-semibold text-[#111827] shadow-xs hover:bg-black/[0.025] disabled:opacity-50 transition-colors"
                   >
                     {loadingMore ? 'Loading…' : 'Load more'}
                   </button>
@@ -642,24 +679,21 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
             </div>
           </div>
 
+          {/* ── RIGHT PANEL: Conversation / Reply Studio ── */}
           {selected ? (
             <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
-              <div className="shrink-0 flex items-center justify-between gap-4 border-b border-black/[0.06] bg-white px-6 py-3.5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#F5F5F3] shadow-xs">
-                    <PlatformIcon platform={selected.platform} size="md" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="truncate text-[14.5px] font-bold text-[#1C1C1A]">
-                        {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
-                      </h3>
-                      <IntentBadge score={selected.score} label={selected.label} className="text-[10.5px]" />
-                    </div>
-                    <span className="block truncate text-[11.5px] font-medium text-[#8C8C85]">
-                      by <span className="text-[#4A4A45] font-semibold">{selected.target}</span> · {selected.timeAgo}
+              {/* Header */}
+              <div className="shrink-0 flex items-center justify-between gap-4 border-b border-[#E5E7EB] bg-white px-6 py-3.5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[15px] font-bold text-[#111827]">Conversation</h3>
+                    <span className="rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-2.5 py-0.5 text-[11px] font-semibold text-[#374151]">
+                      {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
                     </span>
                   </div>
+                  <p className="text-[11.5px] text-[#6B7280] mt-0.5">
+                    Model answers use the sources and intent signals on the left
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
@@ -668,7 +702,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                       href={selected.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-black/[0.08] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#0A84FF] hover:bg-blue-50/60 transition-colors shadow-2xs"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#D1D5DB] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#0A84FF] hover:bg-blue-50/60 transition-colors shadow-2xs"
                     >
                       Open post <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
                     </a>
@@ -676,7 +710,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   <button
                     type="button"
                     onClick={handleDismiss}
-                    className="grid h-8 w-8 place-items-center rounded-lg border border-black/[0.08] bg-white text-[#8C8C85] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors shadow-2xs"
+                    className="grid h-8 w-8 place-items-center rounded-lg border border-[#D1D5DB] bg-white text-[#6B7280] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors shadow-2xs"
                     title="Dismiss opportunity"
                   >
                     <X className="h-4 w-4" strokeWidth={2} />
@@ -684,17 +718,19 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                 </div>
               </div>
 
+              {/* Scrollable conversation body */}
               <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4" style={{ scrollbarWidth: 'thin' }}>
-                <div className="rounded-2xl border border-black/[0.07] bg-[#FAFAF8] p-4 shadow-xs transition-all">
+                {/* 1. Original User Post (Neurix user prompt style) */}
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#F7F7F5] p-4 shadow-2xs transition-all">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold text-[#8C8C85] uppercase tracking-wider">
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider">
                       <PlatformIcon platform={selected.platform} />
-                      <span>Original Post</span>
+                      <span>Original Post · by {selected.target} · {selected.timeAgo}</span>
                     </div>
                     <button
                       type="button"
                       onClick={handleCopyPost}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-[#8C8C85] hover:text-[#1C1C1A] transition-colors"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6B7280] hover:text-[#111827] transition-colors"
                       title="Copy original post text"
                     >
                       {copiedPost ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
@@ -703,12 +739,12 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   </div>
 
                   {selected.title && (
-                    <h4 className="text-[14.5px] font-bold text-[#1C1C1A] leading-snug mb-2">
+                    <h4 className="text-[14px] font-bold text-[#111827] leading-snug mb-2">
                       {selected.title}
                     </h4>
                   )}
 
-                  <div className="text-[13px] leading-relaxed text-[#3D3D39] whitespace-pre-line">
+                  <div className="text-[13px] leading-relaxed text-[#374151] whitespace-pre-line">
                     <p className={!isPostExpanded && (selected.content?.length > 280) ? 'line-clamp-4' : ''}>
                       {selected.content}
                     </p>
@@ -728,15 +764,16 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   </div>
 
                   {selected.matchedKeyword && (
-                    <div className="mt-3 pt-2.5 border-t border-black/[0.05] flex items-center gap-1.5 text-[11.5px] text-[#8C8C85]">
+                    <div className="mt-3 pt-2.5 border-t border-black/[0.06] flex items-center gap-1.5 text-[11.5px] text-[#6B7280]">
                       <span>Matched rule:</span>
-                      <span className="font-semibold text-[#4A4A45] bg-white px-2 py-0.5 rounded-md border border-black/[0.06]">
+                      <span className="font-semibold text-[#111827] bg-white px-2 py-0.5 rounded-md border border-[#E5E7EB]">
                         &ldquo;{selected.matchedKeyword}&rdquo;
                       </span>
                     </div>
                   )}
                 </div>
 
+                {/* 2. Policy Notice */}
                 {selected.platform === 'reddit' && (
                   <RedditCommunityPolicyNotice subreddit={selected.community} />
                 )}
@@ -748,13 +785,14 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-b from-white to-blue-50/20 p-4 shadow-xs space-y-3">
+                {/* 3. AI Generated Reply Draft (Neurix AI response style) */}
+                <div className="rounded-2xl border border-[#E0E2DB] bg-white p-4 sm:p-5 shadow-xs space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-100 text-[#0A84FF]">
+                      <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-50 text-[#0A84FF]">
                         <Sparkles className="h-3.5 w-3.5" />
                       </span>
-                      <p className="text-[12.5px] font-bold text-[#1C1C1A]">
+                      <p className="text-[13px] font-bold text-[#111827]">
                         {draftContent ? 'AI Generated Reply Draft' : 'Custom Reply Draft'}
                       </p>
                     </div>
@@ -764,7 +802,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         type="button"
                         onClick={handleRegenerate}
                         disabled={isRegenerating || isSending}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-black/[0.08] bg-white px-2.5 py-1 text-[11.5px] font-bold text-[#4A4A45] hover:bg-gray-50 hover:text-black transition-all disabled:opacity-40 shadow-2xs"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#D1D5DB] bg-white px-2.5 py-1 text-[11.5px] font-bold text-[#4B5563] hover:bg-gray-50 hover:text-black transition-all disabled:opacity-40 shadow-2xs"
                       >
                         <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin text-[#0A84FF]' : ''}`} />
                         {isRegenerating
@@ -779,12 +817,12 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                       value={draftContent}
                       onChange={e => setDraftContent(e.target.value)}
                       aria-label="Reply draft"
-                      className="w-full rounded-xl border border-black/[0.1] bg-white p-3.5 text-[13.5px] leading-relaxed text-[#1C1C1A] resize-none focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20 transition-all font-sans"
+                      className="w-full rounded-xl border border-[#D1D5DB] bg-white p-3.5 text-[13.5px] leading-relaxed text-[#111827] resize-none focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20 transition-all font-sans"
                       rows={5}
                       spellCheck
                       placeholder="Write a reply here, or use Generate reply when AI drafting is available."
                     />
-                    <div className="mt-1 flex items-center justify-between text-[11px] text-[#8C8C85]">
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-[#6B7280]">
                       <span className="font-medium">
                         {draftContent ? 'Personalize or edit before copying to Reddit' : 'No draft generated yet'}
                       </span>
@@ -805,7 +843,8 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                 </div>
               </div>
 
-              <div className="shrink-0 border-t border-black/[0.06] bg-white/95 backdrop-blur-sm px-6 py-4 space-y-2.5">
+              {/* Action Bar */}
+              <div className="shrink-0 border-t border-[#E5E7EB] bg-white/95 backdrop-blur-sm px-6 py-4 space-y-2.5">
                 {(() => {
                   const isReddit = selected?.platform === 'reddit'
                   const isMarkAsPosted = manualPostReadyId === selected?.id
@@ -819,7 +858,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         disabled={isDisabled}
                         className={`flex-1 flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 text-[13.5px] font-bold transition-all shadow-sm ${
                           isDisabled
-                            ? 'cursor-not-allowed border border-black/[0.06] bg-[#F2F2EF] text-[#AEAEAD]'
+                            ? 'cursor-not-allowed border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF]'
                             : isMarkAsPosted
                             ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/20'
                             : isReddit
@@ -844,17 +883,17 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         type="button"
                         onClick={handleCopy}
                         disabled={!draftContent}
-                        className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-black/[0.1] bg-white px-4 text-[13px] font-bold text-[#3D3D39] hover:bg-gray-50 active:scale-[0.99] transition-all disabled:opacity-40 shadow-2xs"
+                        className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[13px] font-bold text-[#374151] hover:bg-gray-50 active:scale-[0.99] transition-all disabled:opacity-40 shadow-2xs"
                         title="Copy draft to clipboard"
                       >
-                        {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4 text-[#6B6B66]" />}
+                        {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4 text-[#6B7280]" />}
                         <span>{copied ? 'Copied!' : 'Copy text'}</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={handleDismiss}
-                        className="grid h-12 w-12 place-items-center rounded-xl border border-black/[0.1] bg-white text-[#6B6B66] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-[0.98] transition-all shadow-2xs"
+                        className="grid h-12 w-12 place-items-center rounded-xl border border-[#D1D5DB] bg-white text-[#6B7280] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-[0.98] transition-all shadow-2xs"
                         title="Dismiss lead"
                       >
                         <X className="h-4 w-4" strokeWidth={2} />
@@ -863,7 +902,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   )
                 })()}
 
-                <p className="text-center text-[11px] text-[#8C8C85]">
+                <p className="text-center text-[11px] text-[#6B7280]">
                   {selected?.platform === 'reddit'
                     ? 'Clicking "Copy & Open Reddit" copies your draft to your clipboard and opens the thread in a new tab.'
                     : 'Review the draft and publish directly to the connected platform.'}
