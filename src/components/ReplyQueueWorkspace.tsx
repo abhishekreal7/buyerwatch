@@ -11,8 +11,6 @@ import {
   ExternalLink,
   Search,
   MessageCircle,
-  ChevronDown,
-  ChevronUp,
   Sparkles,
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
@@ -558,119 +556,92 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row h-[calc(100vh-210px)] min-h-[600px] rounded-2xl border border-[#E5E7EB] bg-[#F7F6F3] shadow-[0_4px_24px_rgba(0,0,0,0.03)] overflow-hidden">
+        <div className="flex flex-col lg:flex-row h-[calc(100vh-210px)] min-h-[600px] rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
 
-          {/* ── LEFT PANEL: Live Context / Signals ── */}
-          <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-[#E5E7EB] bg-[#F7F6F3] lg:w-[380px] lg:min-w-[380px] lg:max-w-[380px] shrink-0 overflow-hidden">
-            <div className="shrink-0 px-4 py-3 border-b border-[#E5E7EB] bg-[#F7F6F3] flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-[13px] font-bold text-[#111827] leading-tight">Live context</h3>
-                <p className="text-[11px] text-[#6B7280]">
-                  <span className="tabular-nums font-semibold text-[#111827]">{searchQuery.trim() ? filteredDrafts.length : totalCount}</span>
-                  {' '}signals referenced for reply generation
-                </p>
-              </div>
+          {/* ── LEFT PANEL: Clean Inbox List ── */}
+          <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 bg-[#FAFAFA] lg:w-[340px] lg:min-w-[340px] lg:max-w-[340px] shrink-0 overflow-hidden">
+            <div className="shrink-0 px-3.5 py-3 border-b border-gray-200 bg-[#FAFAFA] flex items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold text-gray-900">
+                Replies <span className="text-gray-400 font-normal text-xs">({searchQuery.trim() ? filteredDrafts.length : totalCount})</span>
+              </span>
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8C8C85] pointer-events-none" strokeWidth={2} />
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   aria-label="Search drafts"
-                  placeholder="Search..."
-                  className="h-8 w-32 rounded-lg border border-[#D1D5DB] bg-white pl-8 pr-2 text-[12px] text-[#111827] placeholder-[#9CA3AF] focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/15 transition-all"
+                  placeholder="Filter..."
+                  className="h-7 w-28 rounded-md border border-gray-200 bg-white pl-7 pr-2 text-[12px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none transition-colors"
                 />
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-2.5" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-100" style={{ scrollbarWidth: 'thin' }}>
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-[105px] animate-pulse bg-white border border-[#E5E7EB] rounded-xl p-3.5 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded-md w-3/4" />
-                    <div className="h-3 bg-gray-100 rounded-md w-full" />
-                    <div className="h-3 bg-gray-100 rounded-md w-1/2" />
+                  <div key={i} className="p-3.5 space-y-2 animate-pulse">
+                    <div className="h-3.5 bg-gray-200 rounded w-1/3" />
+                    <div className="h-4 bg-gray-100 rounded w-3/4" />
                   </div>
                 ))
               ) : filteredDrafts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center p-4">
-                  <div className="h-10 w-10 rounded-full bg-black/[0.04] grid place-items-center mb-2 text-[#8C8C85]">
-                    <Search className="h-4 w-4" />
-                  </div>
-                  <p className="text-[13px] font-semibold text-[#4A4A45]">No matching replies</p>
-                  <p className="text-[11.5px] text-[#8C8C85] mt-0.5">Try searching with a different keyword</p>
+                  <p className="text-[13px] font-medium text-gray-500">No replies in queue</p>
                 </div>
               ) : (
                 filteredDrafts.map(d => {
                   const isSelected = selected?.id === d.id
-                  const accentColor = d.score >= 80 ? 'bg-[#10B981]' : d.score >= 65 ? 'bg-[#3B82F6]' : 'bg-[#F59E0B]'
 
                   return (
                     <button
                       key={d.id}
                       type="button"
                       onClick={() => handleSelect(d)}
-                      className={`w-full text-left rounded-xl p-3.5 transition-all duration-150 relative group bg-white border ${
+                      className={`w-full text-left px-3.5 py-3 transition-colors ${
                         isSelected
-                          ? 'border-[#0A84FF] shadow-[0_2px_12px_rgba(10,132,255,0.12)] ring-1 ring-[#0A84FF]'
-                          : 'border-[#E5E7EB] hover:border-[#D1D5DB] hover:shadow-xs'
+                          ? 'bg-white shadow-2xs relative z-10 border-l-[3px] border-gray-900'
+                          : 'hover:bg-gray-100/60 border-l-[3px] border-transparent'
                       }`}
                     >
-                      {/* Left accent bar (Neurix card style) */}
-                      <span className={`absolute left-0 top-2.5 bottom-2.5 w-[3.5px] rounded-r-full ${accentColor}`} />
+                      {/* Top meta row */}
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <div className="flex items-center gap-1.5 font-medium text-gray-700">
+                          <PlatformIcon platform={d.platform} />
+                          <span>{d.platform === 'reddit' ? `r/${d.community}` : d.community}</span>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-gray-400 font-normal">{d.timeAgo}</span>
+                        </div>
 
-                      <div className="pl-1.5">
-                        {/* Top row: Platform & Status pill */}
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#111827]">
-                            <PlatformIcon platform={d.platform} />
-                            <span className="truncate max-w-[130px]">
-                              {d.platform === 'reddit' ? `r/${d.community}` : d.community}
-                            </span>
-                          </div>
-
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        {d.score > 0 && (
+                          <span className={`text-[10.5px] font-semibold px-1.5 py-0.2 rounded ${
                             d.score >= 80
-                              ? 'bg-[#ECFDF5] text-[#059669] ring-1 ring-[#10B981]/20'
-                              : 'bg-[#FEF3C7] text-[#92400E] ring-1 ring-[#F59E0B]/20'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-gray-100 text-gray-600'
                           }`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${d.score >= 80 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'} animate-pulse`} />
-                            Live
+                            {d.score}%
                           </span>
-                        </div>
-
-                        {/* Title */}
-                        <h4 className={`text-[12.5px] font-bold leading-snug line-clamp-1 mb-1 transition-colors ${
-                          isSelected ? 'text-[#111827]' : 'text-[#374151] group-hover:text-black'
-                        }`}>
-                          {d.title || d.matchedKeyword || 'Draft reply'}
-                        </h4>
-
-                        {/* Snippet / Context */}
-                        <p className="text-[11.5px] text-[#6B7280] line-clamp-2 leading-relaxed mb-2">
-                          {d.content}
-                        </p>
-
-                        {/* Bottom meta row */}
-                        <div className="flex items-center justify-between text-[10.5px] text-[#9CA3AF]">
-                          <span>Updated {d.timeAgo}</span>
-                          <span className="font-semibold text-[#4B5563]">
-                            Intent: <strong className="text-[#111827]">{d.score}%</strong>
-                          </span>
-                        </div>
+                        )}
                       </div>
+
+                      {/* Title */}
+                      <p className={`text-[12.5px] leading-snug line-clamp-1 ${
+                        isSelected ? 'font-semibold text-gray-900' : 'text-gray-800'
+                      }`}>
+                        {d.title || d.matchedKeyword || 'Draft reply'}
+                      </p>
                     </button>
                   )
                 })
               )}
 
               {!loading && hasMore && (
-                <div className="flex justify-center py-3">
+                <div className="flex justify-center p-3">
                   <button
                     type="button"
                     onClick={loadMoreDrafts}
                     disabled={loadingMore}
-                    className="rounded-full border border-[#D1D5DB] bg-white px-4 py-1.5 text-[11.5px] font-semibold text-[#111827] shadow-xs hover:bg-black/[0.025] disabled:opacity-50 transition-colors"
+                    className="rounded border border-gray-200 bg-white px-3 py-1 text-[11.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   >
                     {loadingMore ? 'Loading…' : 'Load more'}
                   </button>
@@ -679,59 +650,56 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
             </div>
           </div>
 
-          {/* ── RIGHT PANEL: Conversation / Reply Studio ── */}
+          {/* ── RIGHT PANEL: Clean Detail Workspace ── */}
           {selected ? (
             <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
               {/* Header */}
-              <div className="shrink-0 flex items-center justify-between gap-4 border-b border-[#E5E7EB] bg-white px-6 py-3.5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-[15px] font-bold text-[#111827]">Conversation</h3>
-                    <span className="rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-2.5 py-0.5 text-[11px] font-semibold text-[#374151]">
-                      {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
-                    </span>
-                  </div>
-                  <p className="text-[11.5px] text-[#6B7280] mt-0.5">
-                    Model answers use the sources and intent signals on the left
-                  </p>
+              <div className="shrink-0 flex items-center justify-between gap-4 border-b border-gray-200 px-6 py-3">
+                <div className="flex items-center gap-2">
+                  <PlatformIcon platform={selected.platform} size="md" />
+                  <span className="text-[14px] font-semibold text-gray-900">
+                    {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-[12px] text-gray-500">
+                    by <strong className="font-medium text-gray-700">{selected.target}</strong> · {selected.timeAgo}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2">
                   {selected.url && (
                     <a
                       href={selected.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#D1D5DB] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#0A84FF] hover:bg-blue-50/60 transition-colors shadow-2xs"
+                      className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                      Open post <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
+                      Open post <ExternalLink className="h-3 w-3 text-gray-400" />
                     </a>
                   )}
                   <button
                     type="button"
                     onClick={handleDismiss}
-                    className="grid h-8 w-8 place-items-center rounded-lg border border-[#D1D5DB] bg-white text-[#6B7280] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors shadow-2xs"
-                    title="Dismiss opportunity"
+                    className="grid h-7 w-7 place-items-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                    title="Dismiss"
                   >
-                    <X className="h-4 w-4" strokeWidth={2} />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
 
-              {/* Scrollable conversation body */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4" style={{ scrollbarWidth: 'thin' }}>
-                {/* 1. Original User Post (Neurix user prompt style) */}
-                <div className="rounded-2xl border border-[#E5E7EB] bg-[#F7F7F5] p-4 shadow-2xs transition-all">
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5" style={{ scrollbarWidth: 'thin' }}>
+                {/* Original Post */}
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider">
-                      <PlatformIcon platform={selected.platform} />
-                      <span>Original Post · by {selected.target} · {selected.timeAgo}</span>
-                    </div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      Post
+                    </span>
                     <button
                       type="button"
                       onClick={handleCopyPost}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6B7280] hover:text-[#111827] transition-colors"
-                      title="Copy original post text"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 hover:text-gray-900"
                     >
                       {copiedPost ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
                       <span>{copiedPost ? 'Copied' : 'Copy'}</span>
@@ -739,12 +707,12 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   </div>
 
                   {selected.title && (
-                    <h4 className="text-[14px] font-bold text-[#111827] leading-snug mb-2">
+                    <h4 className="text-[14px] font-bold text-gray-900 mb-2">
                       {selected.title}
                     </h4>
                   )}
 
-                  <div className="text-[13px] leading-relaxed text-[#374151] whitespace-pre-line">
+                  <div className="text-[13px] leading-relaxed text-gray-700 whitespace-pre-line">
                     <p className={!isPostExpanded && (selected.content?.length > 280) ? 'line-clamp-4' : ''}>
                       {selected.content}
                     </p>
@@ -752,89 +720,71 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                       <button
                         type="button"
                         onClick={() => setIsPostExpanded(v => !v)}
-                        className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-[#0A84FF] hover:underline"
+                        className="mt-1.5 text-[12px] font-semibold text-blue-600 hover:underline"
                       >
-                        {isPostExpanded ? (
-                          <>Show less <ChevronUp className="h-3 w-3" /></>
-                        ) : (
-                          <>Show full post <ChevronDown className="h-3 w-3" /></>
-                        )}
+                        {isPostExpanded ? 'Show less' : 'Show full post'}
                       </button>
                     )}
                   </div>
 
                   {selected.matchedKeyword && (
-                    <div className="mt-3 pt-2.5 border-t border-black/[0.06] flex items-center gap-1.5 text-[11.5px] text-[#6B7280]">
-                      <span>Matched rule:</span>
-                      <span className="font-semibold text-[#111827] bg-white px-2 py-0.5 rounded-md border border-[#E5E7EB]">
-                        &ldquo;{selected.matchedKeyword}&rdquo;
-                      </span>
+                    <div className="mt-3 pt-2 border-t border-gray-200/60 text-[11px] text-gray-500">
+                      Matched keyword: <strong className="text-gray-700 font-medium">&ldquo;{selected.matchedKeyword}&rdquo;</strong>
                     </div>
                   )}
                 </div>
 
-                {/* 2. Policy Notice */}
+                {/* Subreddit Policy Check if Reddit */}
                 {selected.platform === 'reddit' && (
                   <RedditCommunityPolicyNotice subreddit={selected.community} />
                 )}
 
                 {!draftContent && MANUAL_DRAFT_REASON_LABELS[selected.automationReason] && (
-                  <div role="status" className="flex items-start gap-2.5 rounded-xl border border-amber-200/90 bg-amber-50/80 px-3.5 py-2.5 text-[12px] font-medium leading-relaxed text-amber-900 shadow-2xs">
+                  <div role="status" className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
                     <span>{MANUAL_DRAFT_REASON_LABELS[selected.automationReason]}</span>
                   </div>
                 )}
 
-                {/* 3. AI Generated Reply Draft (Neurix AI response style) */}
-                <div className="rounded-2xl border border-[#E0E2DB] bg-white p-4 sm:p-5 shadow-xs space-y-3">
+                {/* AI Draft Reply Area */}
+                <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-50 text-[#0A84FF]">
-                        <Sparkles className="h-3.5 w-3.5" />
-                      </span>
-                      <p className="text-[13px] font-bold text-[#111827]">
-                        {draftContent ? 'AI Generated Reply Draft' : 'Custom Reply Draft'}
-                      </p>
-                    </div>
+                    <span className="text-[12px] font-semibold text-gray-700 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+                      Draft reply
+                    </span>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleRegenerate}
-                        disabled={isRegenerating || isSending}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#D1D5DB] bg-white px-2.5 py-1 text-[11.5px] font-bold text-[#4B5563] hover:bg-gray-50 hover:text-black transition-all disabled:opacity-40 shadow-2xs"
-                      >
-                        <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin text-[#0A84FF]' : ''}`} />
-                        {isRegenerating
-                          ? (draftContent ? 'Regenerating…' : 'Generating…')
-                          : (draftContent ? 'Regenerate' : 'Generate reply')}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRegenerate}
+                      disabled={isRegenerating || isSending}
+                      className="inline-flex items-center gap-1 text-[11.5px] font-medium text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-40"
+                    >
+                      <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin text-blue-600' : ''}`} />
+                      {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+                    </button>
                   </div>
 
-                  <div className="relative">
-                    <textarea
-                      value={draftContent}
-                      onChange={e => setDraftContent(e.target.value)}
-                      aria-label="Reply draft"
-                      className="w-full rounded-xl border border-[#D1D5DB] bg-white p-3.5 text-[13.5px] leading-relaxed text-[#111827] resize-none focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20 transition-all font-sans"
-                      rows={5}
-                      spellCheck
-                      placeholder="Write a reply here, or use Generate reply when AI drafting is available."
-                    />
-                    <div className="mt-1 flex items-center justify-between text-[11px] text-[#6B7280]">
-                      <span className="font-medium">
-                        {draftContent ? 'Personalize or edit before copying to Reddit' : 'No draft generated yet'}
-                      </span>
-                      <span className="tabular-nums font-semibold">{draftContent.length} chars</span>
-                    </div>
+                  <textarea
+                    value={draftContent}
+                    onChange={e => setDraftContent(e.target.value)}
+                    aria-label="Reply draft"
+                    className="w-full rounded-lg border border-gray-200 bg-white p-3 text-[13px] leading-relaxed text-gray-900 resize-none focus:border-gray-400 focus:outline-none transition-colors"
+                    rows={5}
+                    spellCheck
+                    placeholder="Write or edit reply..."
+                  />
+
+                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                    <span>Edit draft before posting</span>
+                    <span>{draftContent.length} chars</span>
                   </div>
 
                   {draftContent && currentQuality?.blocksAutomation && (
-                    <div className="space-y-1.5 pt-1">
+                    <div className="space-y-1 pt-1">
                       {currentQuality.issues.map(issue => (
-                        <div key={issue.code} className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] font-medium text-amber-900">
-                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                        <div key={issue.code} className="flex items-start gap-1.5 text-[11.5px] text-amber-800 bg-amber-50 p-2 rounded-md">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" />
                           <span>{issue.message}</span>
                         </div>
                       ))}
@@ -843,33 +793,33 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                 </div>
               </div>
 
-              {/* Action Bar */}
-              <div className="shrink-0 border-t border-[#E5E7EB] bg-white/95 backdrop-blur-sm px-6 py-4 space-y-2.5">
+              {/* Bottom Action Footer */}
+              <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3.5">
                 {(() => {
                   const isReddit = selected?.platform === 'reddit'
                   const isMarkAsPosted = manualPostReadyId === selected?.id
                   const isDisabled = !draftContent || isSending || currentQuality?.blocksAutomation
 
                   return (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <button
                         type="button"
                         onClick={handleApproveAndSend}
                         disabled={isDisabled}
-                        className={`flex-1 flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 text-[13.5px] font-bold transition-all shadow-sm ${
+                        className={`flex-1 flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition-colors ${
                           isDisabled
-                            ? 'cursor-not-allowed border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF]'
+                            ? 'cursor-not-allowed bg-gray-100 text-gray-400'
                             : isMarkAsPosted
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/20'
+                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                             : isReddit
-                            ? 'bg-[#FF4500] text-white hover:bg-[#E03D00] active:scale-[0.99] shadow-[#FF4500]/25'
-                            : 'bg-[#0085FF] text-white hover:bg-[#006FD6] active:scale-[0.99] shadow-blue-500/25'
+                            ? 'bg-[#FF4500] text-white hover:bg-[#E03D00]'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                       >
                         {isSending ? (
-                          <><RefreshCcw className="h-4 w-4 animate-spin" /> {isReddit ? 'Preparing...' : 'Posting...'}</>
+                          <><RefreshCcw className="h-4 w-4 animate-spin" /> Preparing...</>
                         ) : (
-                          <><CheckCircle className="h-4 w-4" strokeWidth={2.25} /> {
+                          <><CheckCircle className="h-4 w-4" /> {
                             isMarkAsPosted
                               ? 'Mark as Posted'
                               : isReddit
@@ -883,42 +833,35 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         type="button"
                         onClick={handleCopy}
                         disabled={!draftContent}
-                        className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#D1D5DB] bg-white px-4 text-[13px] font-bold text-[#374151] hover:bg-gray-50 active:scale-[0.99] transition-all disabled:opacity-40 shadow-2xs"
-                        title="Copy draft to clipboard"
+                        className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40"
                       >
-                        {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4 text-[#6B7280]" />}
-                        <span>{copied ? 'Copied!' : 'Copy text'}</span>
+                        {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-gray-400" />}
+                        <span>{copied ? 'Copied' : 'Copy'}</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={handleDismiss}
-                        className="grid h-12 w-12 place-items-center rounded-xl border border-[#D1D5DB] bg-white text-[#6B7280] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-[0.98] transition-all shadow-2xs"
-                        title="Dismiss lead"
+                        className="grid h-10 w-10 place-items-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                        title="Dismiss"
                       >
-                        <X className="h-4 w-4" strokeWidth={2} />
+                        <X className="h-4 w-4" />
                       </button>
                     </div>
                   )
                 })()}
-
-                <p className="text-center text-[11px] text-[#6B7280]">
-                  {selected?.platform === 'reddit'
-                    ? 'Clicking "Copy & Open Reddit" copies your draft to your clipboard and opens the thread in a new tab.'
-                    : 'Review the draft and publish directly to the connected platform.'}
-                </p>
               </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-white">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F5F5F3] shadow-inner text-[#8C8C85]">
-                <CheckCircle className="h-8 w-8 text-emerald-600/80" strokeWidth={1.75} />
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-50 text-gray-400">
+                <CheckCircle className="h-7 w-7 text-emerald-600/80" strokeWidth={1.75} />
               </div>
-              <p className="text-[16px] font-bold text-[#1C1C1A] mb-1">
+              <p className="text-[15px] font-semibold text-gray-900 mb-1">
                 {loading ? 'Loading reply queue…' : 'Reply queue is clear'}
               </p>
-              <p className="text-[13px] text-[#8C8C85] max-w-[280px] leading-relaxed">
-                {loading ? '' : 'Generate a draft from Review leads, and it will appear here ready for final tuning and delivery.'}
+              <p className="text-[13px] text-gray-500 max-w-[280px] leading-relaxed">
+                {loading ? '' : 'Generate a draft from Review leads to begin editing and publishing.'}
               </p>
             </div>
           )}
