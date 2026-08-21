@@ -1,6 +1,7 @@
 ﻿import { NormalizedPost } from './types'
 import { fetchWithTimeout, readResponseText } from './http'
 import { redis } from './redis'
+import { hasRedditDiscoveryProvider } from './env'
 import { fetchRedditApisDiscoveryPayload } from './redditapis-client'
 import { parseRedditPostTarget } from './redditapis-contract'
 
@@ -258,13 +259,14 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   }
   const numericLimit = Number.isFinite(limit) ? Math.floor(limit) : 25
   const boundedLimit = Math.min(100, Math.max(1, numericLimit))
-  const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim()
-  const paidFallbackEnabled = process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
   const forceLive = process.env.REDDITAPIS_FORCE_LIVE === 'true'
+  const providerDiscoveryEnabled = hasRedditDiscoveryProvider()
+    && (process.env.NODE_ENV !== 'development' || forceLive)
 
   // ── Redis cache key ────────────────────────────────────────────────
-  // Prevents hammering the same subreddit RSS endpoint within a 5-min window.
-  // The cache stores the serialised NormalizedPost[] array.
+  // Each upstream has an independent cache. When the paid provider is enabled,
+  // its cache is authoritative: a successful RSS response must never mask a
+  // later provider result just because it arrived first.
   let redisClient: import('ioredis').default | null = null
   const cacheKey = `rss:r:v2:${normalizedSubreddit}:${boundedLimit}`
   const providerCacheKey = `redditapis:r:v2:${normalizedSubreddit}:${boundedLimit}`
@@ -277,20 +279,52 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
 
   try {
     redisClient = redis
-    const cached = await redis.get(cacheKey)
+    const preferredCacheKey = providerDiscoveryEnabled ? providerCacheKey : cacheKey
+    const cached = await redis.get(preferredCacheKey)
     if (cached) {
       const posts = parseCachedRedditPosts(cached, normalizedSubreddit, boundedLimit)
       if (posts) {
-        console.log(`[reddit] Cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`)
+        console.log(
+          `[reddit] ${providerDiscoveryEnabled ? 'RedditAPIs' : 'RSS'} cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`,
+        )
         return posts
       }
-      await redis.del(cacheKey).catch(() => undefined)
+      await redis.del(preferredCacheKey).catch(() => undefined)
     }
   } catch (cacheErr) {
     console.warn(`[reddit] Redis cache unavailable, continuing without cache:`, cacheErr)
   }
 
-  // ── PRIMARY: Reddit public RSS feed (free, no auth, no per-call cost) ──────
+  // ── PRIMARY: RedditAPIs discovery (when explicitly enabled) ────────────────
+  // RSS is useful as a free best-effort feed, but it is not reliable enough to
+  // be the production source of truth once the managed provider is configured.
+  let providerFailure: unknown
+  if (providerDiscoveryEnabled) {
+    try {
+      console.log(`[reddit] RedditAPIs primary discovery for r/${normalizedSubreddit}`)
+      const payload = await fetchRedditApisDiscoveryPayload(normalizedSubreddit, boundedLimit)
+      const normalized = normalizeRedditApisPosts(payload, normalizedSubreddit)
+      if (redisClient) {
+        // Cache empty responses too. A quiet subreddit must not consume another
+        // paid read on every scheduler tick.
+        await redisClient.set(
+          providerCacheKey,
+          JSON.stringify(normalized),
+          'EX',
+          PROVIDER_CACHE_TTL,
+        ).catch(() => {})
+      }
+      return normalized
+    } catch (providerError) {
+      providerFailure = providerError
+      console.warn(
+        `[reddit] RedditAPIs primary discovery failed for r/${normalizedSubreddit}; trying RSS fallback:`,
+        providerError,
+      )
+    }
+  }
+
+  // ── FALLBACK: Reddit public RSS feed ──────────────────────────────────────
   let rssBackoffActive = false
   try {
     rssBackoffActive = Boolean(await redis.get(rssBackoffKey))
@@ -323,7 +357,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
           }
           return posts
         }
-        console.warn(`[reddit] RSS returned 0 parseable posts for r/${normalizedSubreddit}, falling back`)
+        console.warn(`[reddit] RSS returned 0 parseable posts for r/${normalizedSubreddit}`)
       } else if (shouldBackoffRedditRssStatus(rssResponse.status)) {
         console.warn(`[reddit] RSS ${rssResponse.status} for r/${normalizedSubreddit} — backing off the public feed`)
         const retryAfterSeconds = Number(rssResponse.headers.get('retry-after'))
@@ -332,62 +366,15 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
           : 15 * 60
         await redis.set(rssBackoffKey, '1', 'EX', backoffSeconds).catch(() => {})
       } else {
-        console.warn(`[reddit] RSS ${rssResponse.status} for r/${normalizedSubreddit}, falling back`)
+        console.warn(`[reddit] RSS ${rssResponse.status} for r/${normalizedSubreddit}`)
       }
     } catch (rssErr) {
       console.warn(`[reddit] RSS failed for r/${normalizedSubreddit}:`, rssErr)
     }
   }
 
-  // ── FALLBACK 1: redditapis.com proxy ($0.002/call) ─────────────────────────
-  let providerFailure: unknown
-  if (
-    paidFallbackEnabled
-    && redditApisKey
-    && !redditApisKey.includes('TODO')
-    && (process.env.NODE_ENV !== 'development' || forceLive)
-  ) {
-    try {
-      try {
-        const cachedProviderResult = await redis.get(providerCacheKey)
-        if (cachedProviderResult !== null) {
-          const posts = parseCachedRedditPosts(
-            cachedProviderResult,
-            normalizedSubreddit,
-            boundedLimit,
-          )
-          if (posts) {
-            console.log(`[reddit] RedditAPIs cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`)
-            return posts
-          }
-          await redis.del(providerCacheKey).catch(() => undefined)
-        }
-      } catch (cacheError) {
-        console.warn('[reddit] RedditAPIs fallback cache unavailable:', cacheError)
-      }
-
-      console.log(`[reddit] Falling back to redditapis.com proxy for r/${normalizedSubreddit}`)
-      const payload = await fetchRedditApisDiscoveryPayload(normalizedSubreddit, boundedLimit)
-      const normalized = normalizeRedditApisPosts(payload, normalizedSubreddit)
-      if (redisClient) {
-        // Cache empty responses too. Otherwise a quiet subreddit would incur a
-        // paid request on every scheduler tick despite having no new content.
-        await redisClient.set(
-          providerCacheKey,
-          JSON.stringify(normalized),
-          'EX',
-          PROVIDER_CACHE_TTL,
-        ).catch(() => {})
-      }
-      return normalized
-    } catch (proxyErr) {
-      providerFailure = proxyErr
-      console.warn(`[reddit] redditapis.com fallback failed for r/${normalizedSubreddit}:`, proxyErr)
-    }
-  }
-
-  // ── FALLBACK 2: Public .json endpoint (development only) ──────────────────
-  if (process.env.NODE_ENV !== 'production' && !paidFallbackEnabled) {
+  // ── Development-only fallback: public .json endpoint ──────────────────────
+  if (process.env.NODE_ENV !== 'production' && !providerDiscoveryEnabled) {
     try {
       console.log(`[reddit] Attempting public JSON feed for r/${normalizedSubreddit}`)
       const url = `https://www.reddit.com/r/${normalizedSubreddit}/new.json?limit=${boundedLimit}`

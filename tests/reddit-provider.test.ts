@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildSubredditRssUrl,
+  fetchSubredditNew,
   normalizeRedditApisPosts,
   parseRedditRss,
   shouldBackoffRedditRssStatus,
@@ -13,6 +14,20 @@ import {
   parseRedditPostTarget,
   RedditApisContractError,
 } from '../src/lib/redditapis-contract'
+import { redis } from '../src/lib/redis'
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 describe('Reddit provider contracts', () => {
   it('uses the canonical query-free newest-post Atom feed', () => {
@@ -27,6 +42,64 @@ describe('Reddit provider contracts', () => {
     expect(shouldBackoffRedditRssStatus(429)).toBe(true)
     expect(shouldBackoffRedditRssStatus(404)).toBe(false)
     expect(shouldBackoffRedditRssStatus(500)).toBe(false)
+  })
+
+  it('uses the managed provider before RSS when discovery is explicitly enabled', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_FORCE_LIVE', 'true')
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
+    vi.spyOn(redis, 'set').mockResolvedValue('OK' as never)
+
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      posts: [{
+        id: 'abc123',
+        title: 'Need a better invoicing workflow',
+        text: 'Our current process takes hours every week.',
+        author: 'buyer-account',
+        permalink: '/r/SaaS/comments/abc123/need_help/',
+        created: '2026-08-20T08:30:00.000Z',
+      }],
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSubredditNew('SaaS')).resolves.toHaveLength(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      'https://api.redditapis.com/api/reddit/posts?',
+    )
+    expect(fetchMock.mock.calls).toHaveLength(1)
+  })
+
+  it('uses RSS only after an enabled provider fails', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_FORCE_LIVE', 'true')
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
+    vi.spyOn(redis, 'set').mockResolvedValue('OK' as never)
+    vi.spyOn(redis, 'del').mockResolvedValue(1 as never)
+
+    const rss = `
+      <feed>
+        <entry>
+          <id>t3_abc123</id>
+          <author><name>/u/buyer-account</name></author>
+          <title>Need help choosing a CRM</title>
+          <link href="https://www.reddit.com/r/SaaS/comments/abc123/need_help/" />
+          <published>2026-08-20T08:30:00+00:00</published>
+          <content type="html">Looking for recommendations</content>
+        </entry>
+      </feed>
+    `
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ error: 'temporary failure' }, 503))
+      .mockResolvedValueOnce(new Response(rss, {
+        headers: { 'Content-Type': 'application/atom+xml' },
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSubredditNew('SaaS')).resolves.toHaveLength(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('https://api.redditapis.com/')
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('https://www.reddit.com/r/saas/new/.rss')
   })
 
   it('normalizes the current redditapis.com listing response shape', () => {

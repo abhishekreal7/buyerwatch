@@ -201,9 +201,12 @@ describe('QStash monitoring route contract', () => {
     expect(monitor).toContain('recordKeywordPollFailure')
   })
 
-  it('keeps the paid Reddit proxy strictly opt-in', () => {
-    expect(reddit).toContain("REDDITAPIS_FALLBACK_ENABLED === 'true'")
-    expect(reddit).toContain('paidFallbackEnabled\n    && redditApisKey')
+  it('keeps managed Reddit discovery strictly opt-in and provider-first', () => {
+    expect(reddit).toContain('hasRedditDiscoveryProvider')
+    expect(reddit).toContain('RedditAPIs primary discovery')
+    expect(reddit.indexOf('RedditAPIs primary discovery')).toBeLessThan(
+      reddit.indexOf('FALLBACK: Reddit public RSS feed'),
+    )
   })
 
   it('dispatches manual fetches for the exact selected social target', () => {
