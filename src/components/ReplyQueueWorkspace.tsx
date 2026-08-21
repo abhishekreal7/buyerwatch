@@ -794,46 +794,33 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
               </div>
 
               {/* Bottom Action Footer */}
-              <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3.5">
+              <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-between gap-4">
+                <div className="text-[12px] text-gray-400 font-normal">
+                  {selected?.platform === 'reddit'
+                    ? 'Copies draft & opens thread in new tab'
+                    : 'Publishes directly to connected account'}
+                </div>
+
                 {(() => {
                   const isReddit = selected?.platform === 'reddit'
                   const isMarkAsPosted = manualPostReadyId === selected?.id
                   const isDisabled = !draftContent || isSending || currentQuality?.blocksAutomation
 
                   return (
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleApproveAndSend}
-                        disabled={isDisabled}
-                        className={`flex-1 flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition-colors ${
-                          isDisabled
-                            ? 'cursor-not-allowed bg-gray-100 text-gray-400'
-                            : isMarkAsPosted
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                            : isReddit
-                            ? 'bg-[#FF4500] text-white hover:bg-[#E03D00]'
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
+                        onClick={handleDismiss}
+                        className="h-8.5 px-3 text-[12.5px] font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                       >
-                        {isSending ? (
-                          <><RefreshCcw className="h-4 w-4 animate-spin" /> Preparing...</>
-                        ) : (
-                          <><CheckCircle className="h-4 w-4" /> {
-                            isMarkAsPosted
-                              ? 'Mark as Posted'
-                              : isReddit
-                                ? 'Copy & Open Reddit'
-                                : 'Post through Bluesky'
-                          }</>
-                        )}
+                        Dismiss
                       </button>
 
                       <button
                         type="button"
                         onClick={handleCopy}
                         disabled={!draftContent}
-                        className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40"
+                        className="h-8.5 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 transition-colors shadow-2xs"
                       >
                         {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-gray-400" />}
                         <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -841,11 +828,27 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
 
                       <button
                         type="button"
-                        onClick={handleDismiss}
-                        className="grid h-10 w-10 place-items-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-                        title="Dismiss"
+                        onClick={handleApproveAndSend}
+                        disabled={isDisabled}
+                        className={`h-8.5 px-4 inline-flex items-center gap-1.5 rounded-md text-[12.5px] font-medium transition-colors shadow-xs ${
+                          isDisabled
+                            ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none'
+                            : isMarkAsPosted
+                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                            : isReddit
+                            ? 'bg-[#FF4500] text-white hover:bg-[#E03D00]'
+                            : 'bg-gray-900 text-white hover:bg-black'
+                        }`}
                       >
-                        <X className="h-4 w-4" />
+                        {isSending ? (
+                          <><RefreshCcw className="h-3.5 w-3.5 animate-spin" /> Preparing...</>
+                        ) : isMarkAsPosted ? (
+                          <><CheckCircle className="h-3.5 w-3.5" /> Mark as Posted</>
+                        ) : isReddit ? (
+                          <><RedditIcon className="h-3.5 w-3.5" /> Copy &amp; Open Reddit</>
+                        ) : (
+                          <><CheckCircle className="h-3.5 w-3.5" /> Post to Bluesky</>
+                        )}
                       </button>
                     </div>
                   )
