@@ -1,7 +1,6 @@
 'use client'
 import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'framer-motion'
-import Image from 'next/image'
 import { RadialGauge } from '@/components/RadialGauge'
 import Link from 'next/link'
 import {
@@ -38,11 +37,10 @@ import {
   BeforeAfterTransformation,
   CoreFeatureBento,
 } from '@/components/landing/PremiumFeatureSections'
+import { DeviceShowcase } from '@/components/landing/DeviceShowcase'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
 import { Reveal } from '@/components/Reveal'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
-
-
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 const fadeUp = {
   hidden: { opacity: 1, y: 14 },
@@ -301,34 +299,9 @@ export default function LandingPage() {
               </p>
             </motion.div>
 
-            <motion.figure
-              variants={fadeUp}
-              className="relative mx-auto w-full max-w-[950px] overflow-hidden rounded-[18px] border border-[#C9D0D9] bg-white shadow-[0_28px_80px_rgba(28,39,54,0.18),0_3px_8px_rgba(28,39,54,0.10)] sm:rounded-[22px]"
-            >
-              <div className="bg-white">
-                <div className="flex h-9 items-center border-b border-black/[0.08] bg-[#F5F6F7] px-3 sm:h-10 sm:px-4">
-                  <div className="flex shrink-0 items-center gap-1.5" aria-hidden="true">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
-                  </div>
-                  <div className="mx-auto flex min-w-0 max-w-[340px] items-center gap-2 rounded-md border border-black/[0.07] bg-white px-3 py-1 text-[10px] font-medium text-[#667085] shadow-[0_1px_1px_rgba(0,0,0,0.03)] sm:text-[11px]">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22C55E]" />
-                    <span className="truncate">buyerwatch.co/dashboard</span>
-                  </div>
-                  <span className="w-[39px] shrink-0" aria-hidden="true" />
-                </div>
-                <Image
-                  src="/buyerwatch-dashboard-showcase-v8.png"
-                  alt="BuyerWatch dashboard showing multiple high-intent buyer conversations"
-                  width={1917}
-                  height={1176}
-                  sizes="(max-width: 768px) 100vw, 950px"
-                  unoptimized
-                  className="block h-auto w-full"
-                />
-              </div>
-            </motion.figure>
+            <motion.div variants={fadeUp} className="w-full">
+              <DeviceShowcase />
+            </motion.div>
           </div>
         </Section>
 

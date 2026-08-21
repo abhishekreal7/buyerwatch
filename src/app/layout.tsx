@@ -37,7 +37,6 @@ export const metadata: Metadata = {
   description: "Advanced signal intelligence and reply automation.",
   icons: {
     icon: [
-      {
       { url: '/buyerwatch-favicon.svg?v=5', type: 'image/svg+xml', sizes: 'any' },
     ],
     shortcut: [{ url: '/buyerwatch-favicon.svg?v=5', type: 'image/svg+xml' }],
