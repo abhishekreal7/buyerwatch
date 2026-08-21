@@ -37,11 +37,14 @@ import {
   BeforeAfterTransformation,
   CoreFeatureBento,
 } from '@/components/landing/PremiumFeatureSections'
-import { DeviceShowcase } from '@/components/landing/DeviceShowcase'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
 import { Reveal } from '@/components/Reveal'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
+
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+// ANIMATION VARIANTS
+// ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+
 const fadeUp = {
   hidden: { opacity: 1, y: 14 },
   show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as any } }
@@ -53,6 +56,7 @@ const staggerContainer = {
 
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 // Section wrapper that triggers whileInView
+// ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 
 function Section({ children, className = '', delay = 0, id }: { children: React.ReactNode; className?: string; delay?: number; id?: string }) {
   const ref = useRef(null)
@@ -280,27 +284,6 @@ export default function LandingPage() {
                   Acquire buyers organically
                 </span>
               </div>
-            </motion.div>
-          </div>
-        </Section>
-
-        {/* ━ ━ ━ ━  section separator: DASHBOARD PROOF ━ ━ ━ ━  */}
-        <Section className="border-y border-white/[0.08] bg-[#0A0A0E] py-20 sm:py-24 lg:py-[112px]">
-          <div className="mx-auto max-w-[1180px] px-6">
-            <motion.div variants={fadeUp} className="mx-auto mb-11 max-w-[650px] text-center sm:mb-14">
-              <SectionBadge color="#62B4FF" text="See it in action" tone="dark" />
-              <h2
-                style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 54px)', letterSpacing: '-0.045em', lineHeight: 1.05, color: '#FFFFFF', marginBottom: '14px' }}
-              >
-                See which conversations deserve your time.
-              </h2>
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: '16px', color: '#9CA3AF', lineHeight: 1.65 }}>
-                A focused workspace for buyer intent, reply readiness, and the policy signals that keep automation under control.
-              </p>
-            </motion.div>
-
-            <motion.div variants={fadeUp} className="w-full">
-              <DeviceShowcase />
             </motion.div>
           </div>
         </Section>
