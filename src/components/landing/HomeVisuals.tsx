@@ -6,10 +6,17 @@ import { FaReddit } from 'react-icons/fa6'
 
 const fadeUp = { hidden: { opacity: 0, y: 28 }, visible: { opacity: 1, y: 0 } }
 
-export const SectionBadge = ({ color, text }: { color: string; text: string }) => (
-  <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-surface border border-black/[0.08] rounded-full px-4 py-[6px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] mb-5">
+export const SectionBadge = ({ color, text, tone = 'light' }: { color: string; text: string; tone?: 'light' | 'dark' }) => (
+  <motion.div
+    variants={fadeUp}
+    className={`inline-flex items-center gap-2 rounded-full px-4 py-[6px] mb-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] ${
+      tone === 'dark'
+        ? 'border border-white/15 bg-white/8'
+        : 'bg-surface border border-black/[0.08]'
+    }`}
+  >
     <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-    <span className="text-[13px] font-[500] text-[#0A0A0A] tracking-[-0.01em]">{text}</span>
+    <span className={`text-[13px] font-[500] tracking-[-0.01em] ${tone === 'dark' ? 'text-white/90' : 'text-[#0A0A0A]'}`}>{text}</span>
   </motion.div>
 )
 
