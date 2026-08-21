@@ -1,12 +1,11 @@
 'use client'
 
 import React from 'react'
-import { motion } from 'framer-motion'
 import Image from 'next/image'
 
 export function DeviceShowcase() {
   return (
-    <div className="relative mx-auto w-full max-w-[1100px] select-none pt-4 pb-8 sm:pb-12">
+    <div className="relative mx-auto w-full max-w-[1020px] select-none pt-2 pb-6 sm:pb-10">
       {/* Ambient background glow */}
       <div
         className="pointer-events-none absolute -top-12 left-1/2 -z-10 h-[450px] w-[85%] -translate-x-1/2 rounded-full bg-gradient-to-b from-[#0A84FF]/14 via-[#0A84FF]/3 to-transparent blur-[120px]"
@@ -15,9 +14,9 @@ export function DeviceShowcase() {
 
       <div className="relative mx-auto w-full">
         {/* ═══════════════════════════════════════════════
-            1. MACBOOK PRO (Centerpiece Background)
+            MACBOOK PRO (Standalone Centerpiece)
             ═══════════════════════════════════════════════ */}
-        <div className="relative mx-auto w-full max-w-[680px] md:max-w-[760px] lg:max-w-[830px]">
+        <div className="relative mx-auto w-full max-w-[760px] md:max-w-[860px] lg:max-w-[960px]">
           {/* Display Lid Outer Bezel */}
           <div className="relative rounded-t-[16px] border-[1.5px] border-[#383B46] bg-[#0E0F14] p-[5px] shadow-[0_30px_90px_rgba(0,0,0,0.7)] ring-1 ring-white/10 sm:rounded-t-[24px] sm:p-[8px] md:p-[11px]">
             {/* Screen Inner Display */}
@@ -54,7 +53,7 @@ export function DeviceShowcase() {
                   alt="BuyerWatch desktop dashboard"
                   width={1917}
                   height={1176}
-                  sizes="(max-width: 1024px) 100vw, 830px"
+                  sizes="(max-width: 1024px) 100vw, 960px"
                   priority
                   unoptimized
                   className="block h-auto w-full"
@@ -75,90 +74,6 @@ export function DeviceShowcase() {
             <div className="mx-auto h-[12px] w-[94%] bg-black/40 blur-[14px]" />
           </div>
         </div>
-
-        {/* ═══════════════════════════════════════════════
-            2. iPHONE 16 PRO (Slender Vertical 9:19.5 Phone)
-            ═══════════════════════════════════════════════ */}
-        <motion.div
-          initial={{ opacity: 0, y: 28, x: -10 }}
-          whileInView={{ opacity: 1, y: 0, x: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.55, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute -left-2 bottom-[-8px] z-30
-            w-[115px] h-[250px]
-            sm:left-[1%] sm:bottom-[-12px] sm:w-[140px] sm:h-[305px]
-            md:left-[2%] md:bottom-[-16px] md:w-[155px] md:h-[335px]
-            lg:left-[3%] lg:bottom-[-18px] lg:w-[170px] lg:h-[370px]"
-        >
-          {/* Titanium Phone Frame */}
-          <div className="relative h-full w-full rounded-[24px] border-[2px] border-[#3C3E4B] bg-[#16171D] p-[4px]
-            shadow-[-18px_22px_45px_rgba(0,0,0,0.7),-3px_5px_14px_rgba(0,0,0,0.3)]
-            ring-1 ring-white/[0.18]
-            sm:rounded-[32px] sm:border-[2.5px] sm:p-[5px]
-            lg:rounded-[36px] lg:p-[6px]">
-            {/* Side Buttons */}
-            <div className="absolute -left-[3px] top-[48px] h-[12px] w-[1.5px] rounded-l-sm bg-[#3A3C44] sm:top-[58px] sm:h-[16px]" />
-            <div className="absolute -left-[3px] top-[68px] h-[20px] w-[1.5px] rounded-l-sm bg-[#3A3C44] sm:top-[82px] sm:h-[26px]" />
-            <div className="absolute -left-[3px] top-[95px] h-[20px] w-[1.5px] rounded-l-sm bg-[#3A3C44] sm:top-[115px] sm:h-[26px]" />
-            <div className="absolute -right-[3px] top-[65px] h-[28px] w-[1.5px] rounded-r-sm bg-[#3A3C44] sm:top-[78px] sm:h-[36px]" />
-
-            {/* Phone Screen Container */}
-            <div className="relative h-full w-full overflow-hidden rounded-[20px] bg-white sm:rounded-[26px] lg:rounded-[30px]">
-              {/* Dynamic Island */}
-              <div className="absolute top-[4px] left-1/2 -translate-x-1/2 z-20 flex h-[9px] w-[38px] items-center justify-center rounded-full bg-black sm:top-[5px] sm:h-[12px] sm:w-[50px]" />
-
-              {/* Real BuyerWatch Phone Screen */}
-              <Image
-                src="/buyerwatch-phone-real.png"
-                alt="BuyerWatch mobile app"
-                width={580}
-                height={1030}
-                priority
-                unoptimized
-                className="block h-full w-full object-cover object-top"
-              />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* ═══════════════════════════════════════════════
-            3. iPAD PRO (Wide Portrait 3:4 Tablet)
-            ═══════════════════════════════════════════════ */}
-        <motion.div
-          initial={{ opacity: 0, y: 28, x: 10 }}
-          whileInView={{ opacity: 1, y: 0, x: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.55, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute -right-2 bottom-[-8px] z-30
-            w-[185px] h-[245px]
-            sm:right-[1%] sm:bottom-[-12px] sm:w-[235px] sm:h-[310px]
-            md:right-[2%] md:bottom-[-16px] md:w-[265px] md:h-[350px]
-            lg:right-[3%] lg:bottom-[-18px] lg:w-[295px] lg:h-[390px]"
-        >
-          {/* Space Black iPad Frame */}
-          <div className="relative h-full w-full rounded-[16px] border-[2px] border-[#3C3E4B] bg-[#16171D] p-[5px]
-            shadow-[18px_22px_45px_rgba(0,0,0,0.7),3px_5px_14px_rgba(0,0,0,0.3)]
-            ring-1 ring-white/[0.18]
-            sm:rounded-[22px] sm:border-[2.5px] sm:p-[6px]
-            lg:rounded-[26px] lg:p-[7px]">
-            {/* Front Camera Dot */}
-            <div className="absolute top-[3px] left-1/2 -translate-x-1/2 z-20 h-[4px] w-[4px] rounded-full bg-[#2A2B32] ring-1 ring-white/10 sm:h-[5px] sm:w-[5px]" />
-
-            {/* iPad Screen Container */}
-            <div className="relative h-full w-full overflow-hidden rounded-[11px] bg-white sm:rounded-[15px] lg:rounded-[18px]">
-              {/* Real BuyerWatch iPad Screen */}
-              <Image
-                src="/buyerwatch-ipad-real.png"
-                alt="BuyerWatch tablet app"
-                width={985}
-                height={1085}
-                priority
-                unoptimized
-                className="block h-full w-full object-cover object-top"
-              />
-            </div>
-          </div>
-        </motion.div>
       </div>
     </div>
   )
