@@ -127,47 +127,44 @@ function PostedRow({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left px-4 py-3.5 border-b border-[#F0F0ED] transition-colors duration-100 group ${
+      className={`w-full text-left px-3.5 py-3 transition-colors ${
         isActive
-          ? 'bg-[#F0FAF5] border-l-2 border-l-emerald-500'
-          : 'bg-white border-l-2 border-l-transparent hover:bg-[#FAFAF8]'
+          ? 'bg-white shadow-2xs relative z-10 border-l-[3px] border-gray-900'
+          : 'hover:bg-gray-100/60 border-l-[3px] border-transparent'
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <h4 className={`text-[13.5px] font-semibold leading-snug line-clamp-1 transition-colors ${
-          isActive ? 'text-[#1C1C1A]' : 'text-[#1C1C1A] group-hover:text-emerald-700'
-        }`}>
-          {item.title}
-        </h4>
-        {/* Posted badge */}
-        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#EAF8F1] px-2 py-0.5 text-[10.5px] font-semibold text-[#087A52]">
-          <CheckCircle2 className="h-3 w-3" strokeWidth={2.5} />
+      {/* Top meta row */}
+      <div className="flex items-center justify-between text-[11px] mb-1">
+        <div className="flex items-center gap-1.5 font-medium text-gray-700">
+          <PlatformIcon platform={item.platform} />
+          <span>{item.sourceLabel}</span>
+          <span className="text-gray-300">·</span>
+          <span className="text-gray-400 font-normal">{item.discoveredAt}</span>
+        </div>
+
+        <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+          <CheckCircle2 className="h-2.5 w-2.5" />
           Posted
         </span>
       </div>
 
-      <p className="text-[12px] text-[#6B6B66] line-clamp-2 leading-relaxed mb-2">
-        {item.body || item.reply}
+      {/* Title */}
+      <p className={`text-[12.5px] leading-snug line-clamp-1 ${
+        isActive ? 'font-semibold text-gray-900' : 'text-gray-800'
+      }`}>
+        {item.title}
       </p>
 
-      <div className="flex items-center gap-2 text-[11px] text-[#8C8C85] flex-wrap">
-        <PlatformIcon platform={item.platform} />
-        <span className="font-medium text-[#4A4A45] truncate max-w-[90px]">{item.sourceLabel}</span>
-        <span className="opacity-40">·</span>
-        <span>{item.discoveredAt}</span>
-        {item.convertedAt && (
-          <>
-            <span className="opacity-40">·</span>
-            <span className="text-emerald-600 font-semibold">Converted</span>
-          </>
-        )}
-        {item.clickedAt && !item.convertedAt && (
-          <>
-            <span className="opacity-40">·</span>
-            <span className="text-[#0876B9] font-semibold">Clicked</span>
-          </>
-        )}
-      </div>
+      {(item.convertedAt || item.clickedAt) && (
+        <div className="flex items-center gap-1.5 text-[10.5px] font-medium mt-1">
+          {item.convertedAt && (
+            <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">Converted</span>
+          )}
+          {item.clickedAt && !item.convertedAt && (
+            <span className="text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded">Clicked</span>
+          )}
+        </div>
+      )}
     </button>
   )
 }
@@ -179,22 +176,22 @@ function DetailPanel({ item }: { item: PostedReply }) {
   const hasClick = Boolean(item.clickedAt)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-white">
 
       {/* Header */}
-      <div className="shrink-0 px-6 py-4 border-b border-[#EDEDEA] flex items-center justify-between gap-3">
+      <div className="shrink-0 px-6 py-3.5 border-b border-gray-200 flex items-center justify-between gap-3 bg-white">
         <div className="flex items-center gap-2.5 min-w-0">
           <PlatformIcon platform={item.platform} size="md" />
           <div className="min-w-0">
-            <h3 className="truncate text-[15px] font-semibold text-[#1C1C1A]">{item.sourceLabel}</h3>
+            <h3 className="truncate text-[14.5px] font-bold text-gray-900">{item.sourceLabel}</h3>
             {item.authorLabel && (
-              <span className="block text-[11px] font-medium text-[#8C8C85]">{item.authorLabel}</span>
+              <span className="block text-[11.5px] font-medium text-gray-500">{item.authorLabel}</span>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {item.matchedKeyword && (
-            <span className="rounded-md bg-[#EAF5FF] px-2 py-1 text-[11px] font-semibold text-[#0876B9]">
+            <span className="rounded-md bg-blue-50 border border-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
               {item.matchedKeyword}
             </span>
           )}
@@ -203,23 +200,23 @@ function DetailPanel({ item }: { item: PostedReply }) {
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5" style={{ scrollbarWidth: 'thin' }}>
 
         {/* Attribution stats row */}
         {(hasConversion || hasClick || item.revenueUsd > 0) && (
-          <div className="flex items-center gap-3 rounded-xl bg-[#F0FAF5] border border-emerald-100 px-4 py-3">
+          <div className="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
             <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
             <div className="flex items-center gap-3 text-[12.5px] font-semibold flex-wrap">
               {hasConversion && <span className="text-emerald-700">Converted</span>}
-              {hasClick && !hasConversion && <span className="text-[#0876B9]">Link clicked</span>}
+              {hasClick && !hasConversion && <span className="text-blue-700">Link clicked</span>}
               {item.revenueUsd > 0 && (
-                <span className="text-[#1C1C1A]">${item.revenueUsd.toFixed(2)} attributed</span>
+                <span className="text-gray-900">${item.revenueUsd.toFixed(2)} attributed</span>
               )}
             </div>
           </div>
         )}
 
-        {/* Original thread */}
+        {/* Original thread — PRESERVED AS IN IMAGE 2 */}
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original thread</p>
           <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
@@ -249,7 +246,7 @@ function DetailPanel({ item }: { item: PostedReply }) {
           </div>
         </div>
 
-        {/* Your reply */}
+        {/* Your reply — PRESERVED AS IN IMAGE 2 */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply</p>
@@ -268,15 +265,15 @@ function DetailPanel({ item }: { item: PostedReply }) {
       </div>
 
       {/* Footer actions */}
-      <div className="shrink-0 border-t border-[#EDEDEA] bg-white px-6 py-4 flex items-center gap-3">
+      <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-end gap-2.5">
         {item.threadUrl && (
           <a
             href={item.threadUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-[#DEDEDA] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#4A4A45] hover:bg-[#F7F7F4] transition-colors"
+            className="h-8.5 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
           >
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className="h-3.5 w-3.5 text-gray-400" />
             View conversation
           </a>
         )}
@@ -285,7 +282,7 @@ function DetailPanel({ item }: { item: PostedReply }) {
             href={item.replyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-[#F0FAF5] px-3.5 py-2 text-[13px] font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
+            className="h-8.5 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-[12.5px] font-medium text-white hover:bg-emerald-700 transition-colors shadow-xs"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             View live reply
@@ -300,14 +297,14 @@ function DetailPanel({ item }: { item: PostedReply }) {
 
 function EmptyDetail({ loading }: { loading?: boolean }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F2F2EF]">
-        <CheckCircle2 className="h-7 w-7 text-[#8C8C85]" strokeWidth={1.75} />
+    <div className="flex-1 flex flex-col items-center justify-center text-center px-8 bg-white">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-50 text-gray-400">
+        <CheckCircle2 className="h-7 w-7 text-emerald-600/80" strokeWidth={1.75} />
       </div>
-      <p className="text-[14px] font-semibold text-[#4A4A45] mb-1">
+      <p className="text-[14px] font-semibold text-gray-900 mb-1">
         {loading ? 'Loading replies…' : 'No replies posted yet'}
       </p>
-      <p className="text-[13px] text-[#8C8C85] max-w-[260px] leading-relaxed">
+      <p className="text-[13px] text-gray-500 max-w-[260px] leading-relaxed">
         {loading ? '' : 'Once you approve or auto-send a reply, the full conversation thread will appear here.'}
       </p>
     </div>
@@ -398,14 +395,13 @@ export default function PostedPage() {
 
   return (
     <AppPage>
-      <div className="flex w-full flex-col" style={{ height: 'calc(100vh - 56px)' }}>
-
+      <div className="flex w-full flex-col">
         {/* Header */}
         <PageHeader
           title="Posted Replies"
           action={
             !loading && totalCount > 0 ? (
-              <span className="rounded-full border border-black/[0.07] bg-white px-3.5 py-2 text-[12px] font-semibold tabular-nums text-[#4A4A45]">
+              <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[12px] font-semibold tabular-nums text-gray-700 shadow-2xs">
                 {totalCount} {totalCount === 1 ? 'reply' : 'replies'}
               </span>
             ) : undefined
@@ -420,23 +416,26 @@ export default function PostedPage() {
             className="flex-1"
           />
         ) : (
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-col lg:flex-row h-[calc(100vh-210px)] min-h-[600px] rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
 
             {/* LEFT: Compact Posted List */}
-            <div className="flex flex-col border-r border-[#E7E7E3] overflow-hidden" style={{ width: '380px', minWidth: '380px', flexShrink: 0 }}>
-              <div className="shrink-0 px-4 py-3 border-b border-[#EDEDEA]">
-                <p className="text-[13px] font-medium text-[#6B6B66]">
-                  <span className="tabular-nums font-bold text-[#1C1C1A]">{totalCount}</span> posted {totalCount === 1 ? 'reply' : 'replies'}
-                </p>
+            <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 bg-[#FAFAFA] lg:w-[340px] lg:min-w-[340px] lg:max-w-[340px] shrink-0 overflow-hidden">
+              <div className="shrink-0 px-3.5 py-3 border-b border-gray-200 bg-[#FAFAFA]">
+                <span className="text-[13px] font-semibold text-gray-900">
+                  Posted replies <span className="text-gray-400 font-normal text-xs">({totalCount})</span>
+                </span>
               </div>
 
-              <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+              <div className="flex-1 overflow-y-auto divide-y divide-gray-100" style={{ scrollbarWidth: 'thin' }}>
                 {loading ? (
-                  Array.from({ length: 7 }).map((_, i) => (
-                    <div key={i} className="h-[88px] animate-pulse bg-[#F5F5F3] border-b border-[#F0F0ED] mx-3 my-2 rounded-lg" />
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="p-3.5 space-y-2 animate-pulse">
+                      <div className="h-3.5 bg-gray-200 rounded w-1/3" />
+                      <div className="h-4 bg-gray-100 rounded w-3/4" />
+                    </div>
                   ))
                 ) : posted.length === 0 ? (
-                  <div className="flex items-center justify-center h-40 text-[13px] text-[#8C8C85]">
+                  <div className="flex items-center justify-center h-40 text-[13px] text-gray-400">
                     No posted replies yet
                   </div>
                 ) : (
@@ -451,12 +450,12 @@ export default function PostedPage() {
                 )}
 
                 {!loading && hasMore && (
-                  <div className="flex justify-center py-4">
+                  <div className="flex justify-center p-3">
                     <button
                       type="button"
                       onClick={loadMorePosted}
                       disabled={loadingMore}
-                      className="rounded-full border border-black/[0.08] bg-white px-5 py-2 text-[12px] font-semibold text-[#1C1C1A] hover:bg-black/[0.025] disabled:opacity-50"
+                      className="rounded border border-gray-200 bg-white px-3 py-1 text-[11.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                     >
                       {loadingMore ? 'Loading…' : 'Load more'}
                     </button>
