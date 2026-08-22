@@ -24,7 +24,17 @@ type StoredBrowserRelaySession = {
   connectorId: string
 }
 
-type StoredRedditSession = StoredRedditApisSession | StoredSprinklrSession | StoredBrowserRelaySession
+type StoredMcpAgentSession = {
+  version: 4
+  provider: 'mcp_agent'
+  username: string
+  clientId: string
+}
+
+type StoredRedditSession = StoredRedditApisSession
+  | StoredSprinklrSession
+  | StoredBrowserRelaySession
+  | StoredMcpAgentSession
 
 export type ActiveRedditSession = StoredRedditSession & {
   accountCreatedAt: string | null
@@ -35,7 +45,7 @@ export type ActiveRedditSession = StoredRedditSession & {
 export type RedditConnectionStatus = 'active' | 'reauth_required' | 'error' | 'missing'
 
 export type RedditConnectionSummary = {
-  provider: 'redditapis' | 'sprinklr' | 'browser_relay' | null
+  provider: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | null
   username: string | null
   status: RedditConnectionStatus
   lastVerifiedAt: string | null
@@ -70,6 +80,20 @@ function validateStoredSession(value: unknown, expectedProvider: unknown): Store
     throw new RedditConnectionStateError('reddit_session_invalid')
   }
   const candidate = value as Record<string, unknown>
+  if (candidate.version === 4) {
+    const username = typeof candidate.username === 'string'
+      ? candidate.username.trim().replace(/^u\//i, '')
+      : ''
+    const clientId = typeof candidate.clientId === 'string' ? candidate.clientId.trim() : ''
+    if (
+      expectedProvider !== 'mcp_agent'
+      || candidate.provider !== 'mcp_agent'
+      || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+      || !clientId
+      || clientId.length > 120
+    ) throw new RedditConnectionStateError('reddit_session_invalid')
+    return { version: 4, provider: 'mcp_agent', username, clientId }
+  }
   if (candidate.version === 3) {
     const username = typeof candidate.username === 'string'
       ? candidate.username.trim().replace(/^u\//i, '')
@@ -194,6 +218,28 @@ export async function saveBrowserRelayRedditConnection(input: {
   }
 }
 
+export async function saveMcpAgentRedditConnection(input: {
+  userId: string
+  username: string
+  clientId: string
+}): Promise<void> {
+  const stored: StoredMcpAgentSession = {
+    version: 4,
+    provider: 'mcp_agent',
+    username: input.username,
+    clientId: input.clientId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc('save_mcp_agent_reddit_connection_v1', {
+    p_user_id: input.userId,
+    p_username: input.username,
+    p_session_ciphertext: sessionCiphertext,
+  })
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
 export async function getActiveRedditSession(userId: string): Promise<ActiveRedditSession> {
   const admin = getServiceRoleClient()
   const { data, error } = await admin
@@ -240,10 +286,11 @@ export async function hasActiveRedditConnection(userId: string): Promise<boolean
     .eq('user_id', userId)
     .eq('status', 'active')
     .maybeSingle()
-  // Browser relay currently establishes identity only; server-side automatic
-  // delivery must not treat it as a direct posting session.
+  // Local browser and MCP agents establish identity and perform delivery on
+  // the user's device. Server-side automatic delivery must not mistake either
+  // mapping for provider credentials.
   if (error || !data) return false
-  return data.provider !== 'browser_relay'
+  return data.provider !== 'browser_relay' && data.provider !== 'mcp_agent'
 }
 
 export async function updateRedditConnectionAccountProfile(
@@ -311,6 +358,7 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
     provider: secret?.provider === 'redditapis'
       || secret?.provider === 'sprinklr'
       || secret?.provider === 'browser_relay'
+      || secret?.provider === 'mcp_agent'
       ? secret.provider
       : null,
     username: connection.external_username,
