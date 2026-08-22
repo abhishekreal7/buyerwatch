@@ -53,7 +53,7 @@ export default function PrivacyPage() {
               2. Reddit Account Connection
             </h2>
             <p>
-              To establish a server-side Reddit session, your Reddit username, password, and optional two-factor setup secret are sent once through BuyerWatch&apos;s encrypted HTTPS endpoint to RedditAPIs, an independent third-party provider that is not affiliated with Reddit. RedditAPIs returns session cookies used for posting. BuyerWatch encrypts those cookies at rest and does not save the password or two-factor secret submitted during connection.
+              Reddit connections can use a user-authorized MCP agent, the BuyerWatch Chrome connector, an organization&apos;s Sprinklr integration, or the legacy RedditAPIs connection path. The MCP agent and Chrome connector verify the username already signed in to Reddit without BuyerWatch reading or transmitting the Reddit password or cookies. BuyerWatch stores only a hash of each MCP access key, and the key can be revoked from Settings. With Sprinklr, Reddit authorization is managed in Sprinklr and BuyerWatch stores only an encrypted account mapping. With RedditAPIs, your Reddit username, password, and optional two-factor setup secret are sent once through BuyerWatch&apos;s encrypted HTTPS endpoint to establish a session; BuyerWatch encrypts the returned session cookies at rest and does not save the submitted password or two-factor secret. RedditAPIs is an independent third party and is not affiliated with Reddit.
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li>Connection credentials are held only in request memory for the login attempt and are not written to BuyerWatch&apos;s database or application logs.</li>

@@ -3,6 +3,7 @@ import {
   fetchRedditApisAccountStatus,
   fetchRedditPostSnapshot,
   getRedditApisDailyBudgetStatus,
+  loginRedditAccount,
   postRedditApisComment,
   RedditApisRequestError,
 } from '../src/lib/redditapis-client'
@@ -185,6 +186,85 @@ describe('RedditAPIs client reliability', () => {
     })))
 
     await expect(fetchRedditApisAccountStatus()).resolves.toEqual({ creditsRemaining: 3.25 })
+  })
+
+  it('uses the provider HTTP login flow once for comment-session cookies', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      success: true,
+      username: 'Fluid-Mix4114',
+      cookies: {
+        reddit_session: 'session',
+        loid: 'loid',
+      },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).resolves.toMatchObject({
+      username: 'Fluid-Mix4114',
+      cookies: { reddit_session: 'session', loid: 'loid' },
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const request = fetchMock.mock.calls[0]
+    expect(String(request[0])).toContain('/api/reddit/login')
+    expect(JSON.parse(String(request[1]?.body))).toMatchObject({
+      username: 'Fluid-Mix4114',
+      method: 'http',
+    })
+  })
+
+  it('retries one transient provider login failure and then accepts the session', async () => {
+    vi.stubEnv('REDDITAPIS_LOGIN_RETRY_DELAY_MS', '0')
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ error: 'upstream proxy failed' }, 502))
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        username: 'Fluid-Mix4114',
+        cookies: {
+          reddit_session: 'session',
+          loid: 'loid',
+        },
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).resolves.toMatchObject({ username: 'Fluid-Mix4114' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not spend a retry when the provider rate-limits login', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'slow down' }, 429))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).rejects.toMatchObject({
+      code: 'reddit_provider_rate_limited',
+      status: 429,
+      retryable: true,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry rejected Reddit credentials', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'bad credentials' }, 401))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).rejects.toMatchObject({
+      code: 'reddit_credentials_or_2fa_rejected',
+      status: 401,
+      retryable: false,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('blocks paid reads before the provider call when the daily budget is exhausted', async () => {

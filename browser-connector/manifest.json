@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "BuyerWatch Reddit Connector",
+  "description": "Connect BuyerWatch to the Reddit account already signed in to Chrome.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "109",
+  "incognito": "not_allowed",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtFhrw6DsLtjSfYEx7nTBzRLVk2z3R7PFRk/sGpH+w4CKrVCTeh+MGQPhnewCvSZnF6+Uzu+QlmFX22UdGlop7chtciFXyN2Mrv1LFxXra5X/NdjhbDsCF9hlXQfY0mNWiCCo+DhzW+fc7uD2pG5eV0mZlbYVoVq0mx8mfq+0ifcSO92zKCoIi8GbxHyAP9BV/N6Ij677Mq44VKU8h3TLtYjcM+l2ifwFNoY4yBRtb3kKX0+/Hmi4Ho+GbIA6zrmgsPm8rPkWOALogYmm5BRDyLXBGnEAdyX4ubKjQHkixrW6EUfKTkji/e8tznJY8YFTMMOJoDEncxOSfsYC5fQJcwIDAQAB",
+  "permissions": [
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://reddit.com/*",
+    "https://*.reddit.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "externally_connectable": {
+    "matches": [
+      "https://buyerwatch.co/*",
+      "https://www.buyerwatch.co/*"
+    ],
+    "accepts_tls_channel_id": false
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://reddit.com/*",
+        "https://*.reddit.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "BuyerWatch Reddit Connector",
+    "default_popup": "popup.html"
+  }
+}

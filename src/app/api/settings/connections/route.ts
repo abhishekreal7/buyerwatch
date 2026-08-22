@@ -3,7 +3,11 @@ import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
-import { hasRedditDiscoveryProvider, hasRedditPostingProvider } from '@/lib/env'
+import {
+  getRedditPostingProviderKind,
+  hasRedditDiscoveryProvider,
+  hasRedditPostingProvider,
+} from '@/lib/env'
 import { getRedditConnectionSummary } from '@/lib/reddit-session'
 
 export async function GET() {
@@ -29,6 +33,7 @@ export async function GET() {
         account_created_at: redditSummary.accountCreatedAt,
         link_karma: redditSummary.linkKarma,
         comment_karma: redditSummary.commentKarma,
+        provider: redditSummary.provider,
       }
     : { ...connection, status: 'active' })
 
@@ -38,7 +43,8 @@ export async function GET() {
       blueskyDirectPosting: true,
       redditDirectPosting: hasRedditPostingProvider(),
       redditScheduledDiscovery: hasRedditDiscoveryProvider(),
-      redditConnectionProvider: 'redditapis',
+      redditConnectionProvider: getRedditPostingProviderKind(),
+      redditBrowserConnection: true,
     },
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

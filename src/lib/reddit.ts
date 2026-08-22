@@ -1,9 +1,10 @@
 ﻿import { NormalizedPost } from './types'
 import { fetchWithTimeout, readResponseText } from './http'
 import { redis } from './redis'
-import { hasRedditDiscoveryProvider } from './env'
+import { getRedditDiscoveryProviderKind, hasRedditDiscoveryProvider } from './env'
 import { fetchRedditApisDiscoveryPayload } from './redditapis-client'
 import { parseRedditPostTarget } from './redditapis-contract'
+import { fetchSprinklrRedditPosts } from './sprinklr-client'
 
 const MAX_REDDIT_SOURCE_BYTES = 1_000_000
 const MAX_POST_TEXT_LENGTH = 100_000
@@ -259,9 +260,14 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   }
   const numericLimit = Number.isFinite(limit) ? Math.floor(limit) : 25
   const boundedLimit = Math.min(100, Math.max(1, numericLimit))
-  const forceLive = process.env.REDDITAPIS_FORCE_LIVE === 'true'
-  const providerDiscoveryEnabled = hasRedditDiscoveryProvider()
+  const forceLive = process.env.REDDIT_PROVIDER_FORCE_LIVE === 'true'
+    || process.env.REDDITAPIS_FORCE_LIVE === 'true'
+  const configuredProvider = getRedditDiscoveryProviderKind()
+  const providerKind = configuredProvider
     && (process.env.NODE_ENV !== 'development' || forceLive)
+    ? configuredProvider
+    : null
+  const providerDiscoveryEnabled = hasRedditDiscoveryProvider() && providerKind !== null
 
   // ── Redis cache key ────────────────────────────────────────────────
   // Each upstream has an independent cache. When the paid provider is enabled,
@@ -269,13 +275,17 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
   // later provider result just because it arrived first.
   let redisClient: import('ioredis').default | null = null
   const cacheKey = `rss:r:v2:${normalizedSubreddit}:${boundedLimit}`
-  const providerCacheKey = `redditapis:r:v2:${normalizedSubreddit}:${boundedLimit}`
+  const providerCacheKey = `${providerKind ?? 'none'}:r:v3:${normalizedSubreddit}:${boundedLimit}`
   const rssBackoffKey = `backoff:rss:r:${normalizedSubreddit}`
   const CACHE_TTL = 300 // 5 minutes
-  const providerCacheSecondsRaw = Number(process.env.REDDITAPIS_DISCOVERY_CACHE_SECONDS)
+  const providerCacheSecondsRaw = Number(providerKind === 'sprinklr'
+    ? process.env.SPRINKLR_DISCOVERY_CACHE_SECONDS
+    : process.env.REDDITAPIS_DISCOVERY_CACHE_SECONDS)
   const PROVIDER_CACHE_TTL = Number.isSafeInteger(providerCacheSecondsRaw)
-    ? Math.min(30 * 60, Math.max(5 * 60, providerCacheSecondsRaw))
-    : 15 * 60
+    ? providerKind === 'sprinklr'
+      ? Math.min(15 * 60, Math.max(60, providerCacheSecondsRaw))
+      : Math.min(30 * 60, Math.max(5 * 60, providerCacheSecondsRaw))
+    : providerKind === 'sprinklr' ? 2 * 60 : 15 * 60
 
   try {
     redisClient = redis
@@ -285,7 +295,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
       const posts = parseCachedRedditPosts(cached, normalizedSubreddit, boundedLimit)
       if (posts) {
         console.log(
-          `[reddit] ${providerDiscoveryEnabled ? 'RedditAPIs' : 'RSS'} cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`,
+          `[reddit] ${providerKind ?? 'RSS'} cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`,
         )
         return posts
       }
@@ -295,15 +305,21 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     console.warn(`[reddit] Redis cache unavailable, continuing without cache:`, cacheErr)
   }
 
-  // ── PRIMARY: RedditAPIs discovery (when explicitly enabled) ────────────────
+  // ── PRIMARY: managed discovery provider (when explicitly enabled) ─────────
+  // This generalizes the previous RedditAPIs primary discovery contract while
+  // preserving its provider-first behavior for existing deployments.
   // RSS is useful as a free best-effort feed, but it is not reliable enough to
   // be the production source of truth once the managed provider is configured.
   let providerFailure: unknown
   if (providerDiscoveryEnabled) {
     try {
-      console.log(`[reddit] RedditAPIs primary discovery for r/${normalizedSubreddit}`)
-      const payload = await fetchRedditApisDiscoveryPayload(normalizedSubreddit, boundedLimit)
-      const normalized = normalizeRedditApisPosts(payload, normalizedSubreddit)
+      console.log(`[reddit] ${providerKind} primary discovery for r/${normalizedSubreddit}`)
+      const normalized = providerKind === 'sprinklr'
+        ? await fetchSprinklrRedditPosts(normalizedSubreddit, boundedLimit)
+        : normalizeRedditApisPosts(
+            await fetchRedditApisDiscoveryPayload(normalizedSubreddit, boundedLimit),
+            normalizedSubreddit,
+          )
       if (redisClient) {
         // Cache empty responses too. A quiet subreddit must not consume another
         // paid read on every scheduler tick.
@@ -318,7 +334,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     } catch (providerError) {
       providerFailure = providerError
       console.warn(
-        `[reddit] RedditAPIs primary discovery failed for r/${normalizedSubreddit}; trying RSS fallback:`,
+        `[reddit] ${providerKind} primary discovery failed for r/${normalizedSubreddit}; trying RSS fallback:`,
         providerError,
       )
     }

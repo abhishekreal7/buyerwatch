@@ -1,9 +1,9 @@
-import { randomUUID } from 'node:crypto'
 import DodoPayments from 'dodopayments'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { logger } from './logger'
 import { publishQStashJson } from './qstash'
 import { getDodoEnvironment, getDodoPlanFromProductId } from './dodo'
+export { withRedisLock } from './redis-lock'
 
 type OutboxPayload = {
   userId: string
@@ -11,7 +11,8 @@ type OutboxPayload = {
   threadId: string
   text: string
   platform: 'reddit' | 'bluesky'
-  triggerType: 'auto'
+  triggerType: 'manual' | 'auto'
+  sourceTarget?: string
 }
 
 function getSupabaseAdmin(): SupabaseClient {
@@ -51,6 +52,9 @@ export async function dispatchPendingOutbox(
         .update({
           status: 'dispatched',
           dispatched_at: new Date().toISOString(),
+          qstash_message_id: messageId,
+          completed_at: null,
+          permalink: null,
           attempts: entry.attempts + 1,
           last_error: null,
         })
@@ -176,34 +180,4 @@ export async function reconcileBillingSubscriptions(limit = 100): Promise<number
     }
   }
   return reconciled
-}
-
-export async function withRedisLock<T>(
-  redis: {
-    set(
-      key: string,
-      value: string,
-      mode: 'PX',
-      duration: number,
-      condition: 'NX',
-    ): Promise<'OK' | null>
-    eval(script: string, keys: number, ...args: Array<string | number>): Promise<unknown>
-  },
-  key: string,
-  ttlMs: number,
-  operation: () => Promise<T>,
-): Promise<T | null> {
-  const token = randomUUID()
-  const acquired = await redis.set(key, token, 'PX', ttlMs, 'NX')
-  if (acquired !== 'OK') return null
-  try {
-    return await operation()
-  } finally {
-    await redis.eval(
-      `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0`,
-      1,
-      key,
-      token,
-    ).catch(() => undefined)
-  }
 }

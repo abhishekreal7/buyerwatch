@@ -2,11 +2,47 @@ import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt } from './encryption'
 import { parseRedditLoginResponse, type RedditLoginResult, type RedditSessionCookies } from './redditapis-contract'
 
-type StoredRedditSession = {
+type StoredRedditApisSession = {
   version: 1
+  provider: 'redditapis'
   username: string
   cookies: RedditSessionCookies
 }
+
+type StoredSprinklrSession = {
+  version: 2
+  provider: 'sprinklr'
+  username: string
+  accountId: number
+  channelId: string
+}
+
+type StoredBrowserRelaySession = {
+  version: 3
+  provider: 'browser_relay'
+  username: string
+  connectorId: string
+}
+
+type StoredMcpAgentSession = {
+  version: 4
+  provider: 'mcp_agent'
+  username: string
+  clientId: string
+}
+
+type StoredHyperbrowserSession = {
+  version: 5
+  provider: 'hyperbrowser'
+  username: string
+  profileId: string
+}
+
+type StoredRedditSession = StoredRedditApisSession
+  | StoredSprinklrSession
+  | StoredBrowserRelaySession
+  | StoredMcpAgentSession
+  | StoredHyperbrowserSession
 
 export type ActiveRedditSession = StoredRedditSession & {
   accountCreatedAt: string | null
@@ -17,6 +53,7 @@ export type ActiveRedditSession = StoredRedditSession & {
 export type RedditConnectionStatus = 'active' | 'reauth_required' | 'error' | 'missing'
 
 export type RedditConnectionSummary = {
+  provider: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | 'hyperbrowser' | null
   username: string | null
   status: RedditConnectionStatus
   lastVerifiedAt: string | null
@@ -46,12 +83,69 @@ function getServiceRoleClient() {
   )
 }
 
-function validateStoredSession(value: unknown): StoredRedditSession {
+function validateStoredSession(value: unknown, expectedProvider: unknown): StoredRedditSession {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new RedditConnectionStateError('reddit_session_invalid')
   }
   const candidate = value as Record<string, unknown>
-  if (candidate.version !== 1) {
+  if (candidate.version === 5) {
+    const username = typeof candidate.username === 'string'
+      ? candidate.username.trim().replace(/^u\//i, '')
+      : ''
+    const profileId = typeof candidate.profileId === 'string' ? candidate.profileId.trim() : ''
+    if (
+      expectedProvider !== 'hyperbrowser'
+      || candidate.provider !== 'hyperbrowser'
+      || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)
+    ) throw new RedditConnectionStateError('reddit_session_invalid')
+    return { version: 5, provider: 'hyperbrowser', username, profileId }
+  }
+  if (candidate.version === 4) {
+    const username = typeof candidate.username === 'string'
+      ? candidate.username.trim().replace(/^u\//i, '')
+      : ''
+    const clientId = typeof candidate.clientId === 'string' ? candidate.clientId.trim() : ''
+    if (
+      expectedProvider !== 'mcp_agent'
+      || candidate.provider !== 'mcp_agent'
+      || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+      || !clientId
+      || clientId.length > 120
+    ) throw new RedditConnectionStateError('reddit_session_invalid')
+    return { version: 4, provider: 'mcp_agent', username, clientId }
+  }
+  if (candidate.version === 3) {
+    const username = typeof candidate.username === 'string'
+      ? candidate.username.trim().replace(/^u\//i, '')
+      : ''
+    const connectorId = typeof candidate.connectorId === 'string' ? candidate.connectorId.trim() : ''
+    if (
+      expectedProvider !== 'browser_relay'
+      || candidate.provider !== 'browser_relay'
+      || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+      || !/^[a-p]{32}$/.test(connectorId)
+    ) throw new RedditConnectionStateError('reddit_session_invalid')
+    return { version: 3, provider: 'browser_relay', username, connectorId }
+  }
+  if (candidate.version === 2) {
+    const username = typeof candidate.username === 'string'
+      ? candidate.username.trim().replace(/^u\//i, '')
+      : ''
+    const accountId = Number(candidate.accountId)
+    const channelId = typeof candidate.channelId === 'string' ? candidate.channelId.trim() : ''
+    if (
+      expectedProvider !== 'sprinklr'
+      || candidate.provider !== 'sprinklr'
+      || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+      || !Number.isSafeInteger(accountId)
+      || accountId <= 0
+      || !channelId
+      || channelId.length > 200
+    ) throw new RedditConnectionStateError('reddit_session_invalid')
+    return { version: 2, provider: 'sprinklr', username, accountId, channelId }
+  }
+  if (candidate.version !== 1 || expectedProvider !== 'redditapis') {
     throw new RedditConnectionStateError('reddit_session_version_unsupported')
   }
   try {
@@ -60,7 +154,7 @@ function validateStoredSession(value: unknown): StoredRedditSession {
       username: candidate.username,
       cookies: candidate.cookies,
     })
-    return { version: 1, username: parsed.username, cookies: parsed.cookies }
+    return { version: 1, provider: 'redditapis', username: parsed.username, cookies: parsed.cookies }
   } catch {
     throw new RedditConnectionStateError('reddit_session_invalid')
   }
@@ -73,8 +167,9 @@ export async function saveRedditApisConnection(input: {
   linkKarma?: number | null
   commentKarma?: number | null
 }): Promise<void> {
-  const stored: StoredRedditSession = {
+  const stored: StoredRedditApisSession = {
     version: 1,
+    provider: 'redditapis',
     username: input.login.username,
     cookies: input.login.cookies,
   }
@@ -92,11 +187,113 @@ export async function saveRedditApisConnection(input: {
   }
 }
 
+export async function saveSprinklrRedditConnection(input: {
+  userId: string
+  username: string
+  accountId: number
+  channelId: string
+  accountCreatedAt?: string | null
+  linkKarma?: number | null
+  commentKarma?: number | null
+}): Promise<void> {
+  const stored: StoredSprinklrSession = {
+    version: 2,
+    provider: 'sprinklr',
+    username: input.username,
+    accountId: input.accountId,
+    channelId: input.channelId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc('save_sprinklr_reddit_connection_v1', {
+    p_user_id: input.userId,
+    p_username: input.username,
+    p_session_ciphertext: sessionCiphertext,
+    p_account_created_at: input.accountCreatedAt ?? null,
+    p_link_karma: input.linkKarma ?? null,
+    p_comment_karma: input.commentKarma ?? null,
+  })
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
+export async function saveBrowserRelayRedditConnection(input: {
+  userId: string
+  username: string
+  connectorId: string
+}): Promise<void> {
+  const stored: StoredBrowserRelaySession = {
+    version: 3,
+    provider: 'browser_relay',
+    username: input.username,
+    connectorId: input.connectorId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc('save_browser_relay_reddit_connection_v1', {
+    p_user_id: input.userId,
+    p_username: input.username,
+    p_session_ciphertext: sessionCiphertext,
+  })
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
+export async function saveMcpAgentRedditConnection(input: {
+  userId: string
+  username: string
+  clientId: string
+}): Promise<void> {
+  const stored: StoredMcpAgentSession = {
+    version: 4,
+    provider: 'mcp_agent',
+    username: input.username,
+    clientId: input.clientId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc('save_mcp_agent_reddit_connection_v1', {
+    p_user_id: input.userId,
+    p_username: input.username,
+    p_session_ciphertext: sessionCiphertext,
+  })
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
+export async function saveHyperbrowserRedditConnection(input: {
+  userId: string
+  username: string
+  profileId: string
+  accountCreatedAt?: string | null
+  linkKarma?: number | null
+  commentKarma?: number | null
+}): Promise<void> {
+  const stored: StoredHyperbrowserSession = {
+    version: 5,
+    provider: 'hyperbrowser',
+    username: input.username,
+    profileId: input.profileId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc('save_hyperbrowser_reddit_connection_v1', {
+    p_user_id: input.userId,
+    p_username: input.username,
+    p_session_ciphertext: sessionCiphertext,
+    p_account_created_at: input.accountCreatedAt ?? null,
+    p_link_karma: input.linkKarma ?? null,
+    p_comment_karma: input.commentKarma ?? null,
+  })
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
 export async function getActiveRedditSession(userId: string): Promise<ActiveRedditSession> {
   const admin = getServiceRoleClient()
   const { data, error } = await admin
     .from('reddit_connection_secrets')
-    .select('session_ciphertext, status, account_created_at, link_karma, comment_karma')
+    .select('provider, session_ciphertext, status, account_created_at, link_karma, comment_karma')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -112,7 +309,7 @@ export async function getActiveRedditSession(userId: string): Promise<ActiveRedd
 
   try {
     return {
-      ...validateStoredSession(JSON.parse(decrypt(data.session_ciphertext)) as unknown),
+      ...validateStoredSession(JSON.parse(decrypt(data.session_ciphertext)) as unknown, data.provider),
       accountCreatedAt: data.account_created_at ?? null,
       linkKarma: Number.isSafeInteger(data.link_karma) ? data.link_karma : null,
       commentKarma: Number.isSafeInteger(data.comment_karma) ? data.comment_karma : null,
@@ -134,11 +331,40 @@ export async function getActiveRedditSession(userId: string): Promise<ActiveRedd
 export async function hasActiveRedditConnection(userId: string): Promise<boolean> {
   const { data, error } = await getServiceRoleClient()
     .from('reddit_connection_secrets')
-    .select('connection_id')
+    .select('connection_id, provider')
     .eq('user_id', userId)
     .eq('status', 'active')
     .maybeSingle()
-  return !error && Boolean(data)
+  // Local browser and MCP agents establish identity and perform delivery on
+  // the user's device. Hyperbrowser is a server-side provider, so it is active.
+  if (error || !data) return false
+  return data.provider !== 'browser_relay' && data.provider !== 'mcp_agent'
+}
+
+export async function getHyperbrowserRedditConnectionForVerification(
+  userId: string,
+): Promise<StoredHyperbrowserSession> {
+  const { data, error } = await getServiceRoleClient()
+    .from('reddit_connection_secrets')
+    .select('provider, session_ciphertext')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error || !data || data.provider !== 'hyperbrowser') {
+    throw new RedditConnectionStateError('hyperbrowser_profile_connection_required')
+  }
+  try {
+    const session = validateStoredSession(
+      JSON.parse(decrypt(data.session_ciphertext)) as unknown,
+      data.provider,
+    )
+    if (session.provider !== 'hyperbrowser') {
+      throw new RedditConnectionStateError('reddit_session_invalid')
+    }
+    return session
+  } catch (error) {
+    if (error instanceof RedditConnectionStateError) throw error
+    throw new RedditConnectionStateError('reddit_session_decryption_failed')
+  }
 }
 
 export async function updateRedditConnectionAccountProfile(
@@ -177,13 +403,14 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
       .maybeSingle(),
     admin
       .from('reddit_connection_secrets')
-      .select('status, last_verified_at, last_used_at, account_created_at, link_karma, comment_karma, last_error_code')
+      .select('provider, status, last_verified_at, last_used_at, account_created_at, link_karma, comment_karma, last_error_code')
       .eq('user_id', userId)
       .maybeSingle(),
   ])
 
   if (!connection) {
     return {
+      provider: null,
       username: null,
       status: 'missing',
       lastVerifiedAt: null,
@@ -202,6 +429,13 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
       : 'error'
 
   return {
+    provider: secret?.provider === 'redditapis'
+      || secret?.provider === 'sprinklr'
+      || secret?.provider === 'browser_relay'
+      || secret?.provider === 'mcp_agent'
+      || secret?.provider === 'hyperbrowser'
+      ? secret.provider
+      : null,
     username: connection.external_username,
     status,
     lastVerifiedAt: secret?.last_verified_at ?? null,
@@ -260,19 +494,11 @@ export async function markRedditConnectionReauthRequired(
 export async function recordRedditConnectionFailure(
   userId: string,
   errorCode: string,
-): Promise<void> {
-  const admin = getServiceRoleClient()
-  const { data } = await admin
-    .from('reddit_connection_secrets')
-    .select('consecutive_failures')
-    .eq('user_id', userId)
-    .maybeSingle()
-  await admin
-    .from('reddit_connection_secrets')
-    .update({
-      consecutive_failures: Math.min(100, (Number(data?.consecutive_failures) || 0) + 1),
-      last_error_code: errorCode,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
+): Promise<number> {
+  const { data, error } = await getServiceRoleClient().rpc(
+    'increment_reddit_connection_failure_v1',
+    { p_user_id: userId, p_error_code: errorCode },
+  )
+  if (error) throw error
+  return Number(data) || 0
 }
