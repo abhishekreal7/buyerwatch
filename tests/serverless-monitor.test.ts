@@ -114,6 +114,14 @@ describe('QStash monitoring route contract', () => {
     join(process.cwd(), 'src/app/api/cron/enqueue/route.ts'),
     'utf8',
   )
+  const dispatchOutboxRoute = readFileSync(
+    join(process.cwd(), 'src/app/api/cron/dispatch-outbox/route.ts'),
+    'utf8',
+  )
+  const cancelMessageRoute = readFileSync(
+    join(process.cwd(), 'src/app/api/cron/cancel-message/route.ts'),
+    'utf8',
+  )
   const failureRoute = readFileSync(
     join(process.cwd(), 'src/app/api/cron/failure/route.ts'),
     'utf8',
@@ -152,6 +160,19 @@ describe('QStash monitoring route contract', () => {
     expect(route).toContain('readTextBody(request, 4_096)')
     expect(route).toContain('runServerlessMonitoring')
     expect(route).not.toContain('enqueueDueMonitoring')
+  })
+
+  it('dispatches one exact pending outbox job through a protected repair route', () => {
+    expect(dispatchOutboxRoute).toContain('isAuthorizedCronRequest')
+    expect(dispatchOutboxRoute).toContain('readTextBody(request, 1_024)')
+    expect(dispatchOutboxRoute).toContain('isUuid(threadId)')
+    expect(dispatchOutboxRoute).toContain('dispatchPendingOutbox(1, threadId)')
+  })
+
+  it('cancels one exact QStash message through a protected repair route', () => {
+    expect(cancelMessageRoute).toContain('isAuthorizedCronRequest')
+    expect(cancelMessageRoute).toContain('qstashMessageIdPattern')
+    expect(cancelMessageRoute).toContain('cancelQStashMessage(messageId)')
   })
 
   it('creates an economical five-minute schedule with retries', () => {

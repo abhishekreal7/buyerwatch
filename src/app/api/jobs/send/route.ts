@@ -66,7 +66,12 @@ export async function POST(request: Request) {
     return NextResponse.json(result)
   } catch (error) {
     const retryable = isRetryableSendError(error)
-    logger.error({ error, threadId: message.threadId, attempt: retried + 1 }, 'QStash reply send failed')
+    logger.error({
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      threadId: message.threadId,
+      attempt: retried + 1,
+    }, 'QStash reply send failed')
     return NextResponse.json(
       { error: retryable ? 'reply_send_retrying' : 'reply_send_failed' },
       retryable

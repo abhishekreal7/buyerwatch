@@ -228,7 +228,10 @@ export async function processSendReply(
         logger.warn({ auditError, threadId }, 'Could not record Reddit community policy decision')
       })
 
-      if (triggerType === 'auto') {
+      if (
+        triggerType === 'auto'
+        && redditPolicyDecision.outcome === 'manual_review_required'
+      ) {
         await cancelQueuedAutoSend(supabase, threadId, redditPolicyDecision.reason)
         logger.info(
           { jobId: context.jobId, threadId, reason: redditPolicyDecision.reason },
@@ -237,7 +240,14 @@ export async function processSendReply(
         return { skipped: true, reason: redditPolicyDecision.reason }
       }
 
-      throw new PlatformPostError('reddit', redditPolicyDecision.message, false)
+      if (redditPolicyDecision.outcome === 'blocked') {
+        throw new PlatformPostError('reddit', redditPolicyDecision.message, false)
+      }
+
+      logger.info(
+        { jobId: context.jobId, threadId, reason: redditPolicyDecision.reason },
+        'Proceeding with explicitly approved manual Reddit reply after policy review',
+      )
     }
   }
 

@@ -16,7 +16,14 @@ import {
   RedditApisRequestError,
 } from '@/lib/redditapis-client'
 import { normalizeRedditUsername } from '@/lib/redditapis-contract'
-import { saveRedditApisConnection, saveSprinklrRedditConnection } from '@/lib/reddit-session'
+import {
+  getHyperbrowserRedditConnectionForVerification,
+  RedditConnectionStateError,
+  saveHyperbrowserRedditConnection,
+  saveRedditApisConnection,
+  saveSprinklrRedditConnection,
+} from '@/lib/reddit-session'
+import { fetchHyperbrowserRedditAccountProfile, HyperbrowserRedditError } from '@/lib/hyperbrowser-reddit'
 import {
   fetchSprinklrRedditAccount,
   SprinklrRequestError,
@@ -88,6 +95,31 @@ export async function POST(request: Request) {
       }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
+    if (provider === 'hyperbrowser') {
+      const session = await getHyperbrowserRedditConnectionForVerification(user.id)
+      const profile = await fetchHyperbrowserRedditAccountProfile({
+        username: session.username,
+        profileId: session.profileId,
+      })
+      await saveHyperbrowserRedditConnection({
+        userId: user.id,
+        username: session.username,
+        profileId: session.profileId,
+        accountCreatedAt: profile.createdAt,
+        linkKarma: profile.linkKarma,
+        commentKarma: profile.commentKarma,
+      })
+      return NextResponse.json({
+        success: true,
+        connection: {
+          platform: 'reddit',
+          external_username: session.username,
+          status: 'active',
+          provider: 'hyperbrowser',
+        },
+      }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+
     const body = await readJsonBody<Record<string, unknown>>(request, 4_096)
     const username = normalizeRedditUsername(body.username)
     const password = boundedString(body.password, 512, { required: true, trim: false })
@@ -137,6 +169,16 @@ export async function POST(request: Request) {
     }
     if (error instanceof SprinklrRequestError) {
       return NextResponse.json({ error: error.code }, { status: sprinklrErrorStatus(error) })
+    }
+    if (error instanceof HyperbrowserRedditError) {
+      return NextResponse.json({ error: error.code }, {
+        status: error.code === 'hyperbrowser_authentication_failed'
+          ? 503
+          : error.reauthRequired ? 401 : error.retryable ? 503 : 409,
+      })
+    }
+    if (error instanceof RedditConnectionStateError) {
+      return NextResponse.json({ error: error.code }, { status: 409 })
     }
     console.error('[settings/reddit] Connection failed')
     return NextResponse.json({ error: 'reddit_connection_failed' }, { status: 500 })
