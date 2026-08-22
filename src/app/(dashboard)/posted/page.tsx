@@ -44,6 +44,17 @@ interface PostedReply {
   score: number
 }
 
+interface DeliveryActivity {
+  threadId: string
+  platform: string
+  title: string
+  state: 'queued' | 'sending' | 'sent' | 'failed' | 'uncertain' | 'cancelled'
+  message: string
+  threadUrl: string | null
+  replyUrl: string | null
+  updatedAt: string
+}
+
 function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm' | 'md' }) {
   const cls = size === 'md' ? 'h-[18px] w-[18px]' : 'h-3.5 w-3.5'
   const norm = platform.toLowerCase()
@@ -308,6 +319,7 @@ function StatCard({ label, value, icon: Icon, loading }: {
 
 export default function PostedPage() {
   const [posted, setPosted] = useState<PostedReply[]>([])
+  const [deliveryActivity, setDeliveryActivity] = useState<DeliveryActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
@@ -327,7 +339,7 @@ export default function PostedPage() {
       setLoadFailed(false)
 
       try {
-        const [pageResult, countResult] = await Promise.all([
+        const [pageResult, countResult, activityResult] = await Promise.all([
           supabase
             .from('monitored_threads')
             .select('id, platform, author, title, text_content, url, intent_score, source_created_at, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)')
@@ -340,12 +352,17 @@ export default function PostedPage() {
             .select('id', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('status', 'replied'),
+          fetch('/api/replies/activity', { cache: 'no-store' }),
         ])
         if (pageResult.error) throw pageResult.error
         if (countResult.error) throw countResult.error
         if (cancelled) return
 
         const parsed = parsePostedThreads(pageResult.data ?? [])
+        if (activityResult.ok) {
+          const payload = await activityResult.json() as { activity?: DeliveryActivity[] }
+          setDeliveryActivity(payload.activity ?? [])
+        }
         setPosted(parsed)
         setTotalCount(countResult.count ?? pageResult.data?.length ?? 0)
         setHasMore((pageResult.data?.length ?? 0) === PAGE_SIZE)
@@ -434,6 +451,36 @@ export default function PostedPage() {
               <StatCard label="Clicks" value={totalClicks} icon={MousePointerClick} loading={loading} />
               <StatCard label="Conversions" value={totalConversions} icon={TrendingUp} loading={loading} />
             </div>
+
+            {deliveryActivity.length > 0 && (
+              <section aria-labelledby="delivery-activity-heading" className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 id="delivery-activity-heading" className="text-sm font-bold text-gray-900">Delivery activity</h2>
+                  <span className="text-[11px] text-gray-500">Latest attempts</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {deliveryActivity.slice(0, 8).map(item => {
+                    const tone = item.state === 'sent'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : item.state === 'uncertain' || item.state === 'failed'
+                        ? 'bg-red-50 text-red-700'
+                        : item.state === 'cancelled'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-blue-50 text-blue-700'
+                    return (
+                      <div key={item.threadId} className="flex items-start gap-3 py-3">
+                        <span className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${tone}`}>{item.state}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-gray-900">{item.title}</p>
+                          <p className="mt-0.5 text-[11px] leading-4 text-gray-600">{item.message}</p>
+                        </div>
+                        <span className="shrink-0 text-[10px] text-gray-400">{formatRelativeDate(item.updatedAt)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* Filter bar */}
             <div className="flex items-center justify-between gap-3 flex-wrap">

@@ -29,7 +29,7 @@ export default function TermsPage() {
           <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 mb-2" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>
             Terms of Service
           </h1>
-          <p className="text-sm text-neutral-400 mb-10">Last updated: July 12, 2026</p>
+          <p className="text-sm text-neutral-400 mb-10">Last updated: August 22, 2026</p>
 
           <div className="prose prose-neutral max-w-none text-neutral-600 space-y-6 text-[15px] leading-relaxed" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
             <p>
@@ -60,6 +60,9 @@ export default function TermsPage() {
             </h2>
             <p>
               When paid plans are available, purchases, subscriptions, invoices, cancellations, and refunds are processed by <strong>Dodo Payments</strong> under the terms shown during checkout. BuyerWatch does not collect or store full card numbers.
+            </p>
+            <p>
+              Operational incident communication and requests for service credits or refunds are handled under our <Link href="/service-policy" className="font-semibold text-[#0A84FF] hover:underline">Service and Incident Policy</Link>. Nothing in these Terms limits rights that cannot legally be excluded.
             </p>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>

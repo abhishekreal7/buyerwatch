@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   smoke:
@@ -18,9 +19,43 @@ jobs:
         with:
           node-version: 22
       - name: Probe production
+        id: probe
+        continue-on-error: true
         env:
           PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL || 'https://www.buyerwatch.co' }}
           # Core availability remains a hard gate. Reddit-only staleness is
           # tolerated only until a Reddit delivery account is connected.
           ALLOW_REDDIT_ONLY_DEGRADED_READINESS: 'true'
-        run: node scripts/smoke-production.mjs
+        run: |
+          node scripts/smoke-production.mjs
+          curl --fail --silent --show-error "$PRODUCTION_BASE_URL/api/status" >/dev/null
+      - name: Escalate persistent production failure
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PROBE_OUTCOME: ${{ steps.probe.outcome }}
+        with:
+          script: |
+            const title = '[Production monitor] BuyerWatch unavailable';
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'all', per_page: 100,
+            });
+            const incident = issues.find(issue => !issue.pull_request && issue.title === title);
+            const failed = process.env.PROBE_OUTCOME !== 'success';
+            if (failed && (!incident || incident.state !== 'open')) {
+              await github.rest.issues.create({
+                owner, repo, title,
+                body: `The independent 15-minute production probe failed at ${new Date().toISOString()}. Check Vercel, /api/status, the Reddit delivery circuit, and customer incident email delivery.`,
+              });
+            }
+            if (!failed && incident?.state === 'open') {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: incident.number,
+                body: `The independent production probe recovered at ${new Date().toISOString()}. Verify customer incidents are resolved before closing the operational response.`,
+              });
+              await github.rest.issues.update({ owner, repo, issue_number: incident.number, state: 'closed' });
+            }
+      - name: Fail workflow when probe failed
+        if: steps.probe.outcome != 'success'
+        run: exit 1

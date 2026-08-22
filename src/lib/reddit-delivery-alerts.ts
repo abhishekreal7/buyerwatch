@@ -5,6 +5,8 @@ import { fetchWithTimeout, withTimeout } from './http'
 import { logger } from './logger'
 import { redis } from './redis'
 import { isAllowedSlackWebhookUrl } from './security/outbound-url'
+import { createIncidentForRedditAlert } from './reddit-service-safety'
+import { deliverPendingIncidentEmails } from './incident-email'
 
 export type RedditDeliveryAlertKind =
   | 'reconnect_required'
@@ -100,6 +102,13 @@ export async function sendRedditDeliveryAlert(input: {
   userId?: string
   detail?: string
 }): Promise<boolean> {
+  try {
+    await createIncidentForRedditAlert(input)
+    await deliverPendingIncidentEmails(20)
+  } catch (error) {
+    logger.error({ error, kind: input.kind, code: input.code }, 'Unable to persist or deliver customer incident')
+  }
+
   const subject = input.userId ?? 'system'
   const dedupeKey = `alert:reddit-delivery:${input.kind}:${subject}:${input.code.slice(0, 80)}`
   let reserved = false

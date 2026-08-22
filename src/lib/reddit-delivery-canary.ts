@@ -15,6 +15,7 @@ import {
   markRedditConnectionReauthRequired,
   updateRedditConnectionAccountProfile,
 } from './reddit-session'
+import { closeTransientRedditCircuitAfterCanary } from './reddit-service-safety'
 
 const CANARY_DUE_KEY = 'schedule:reddit-delivery-canary:v1'
 const CANARY_CURSOR_KEY = 'cursor:reddit-delivery-canary:v1'
@@ -97,6 +98,7 @@ export async function runRedditDeliveryCanary(): Promise<RedditDeliveryCanaryRes
       creditsRemaining: credits.remaining,
       creditsLimit: credits.limit,
     })
+    await closeTransientRedditCircuitAfterCanary()
     await redis.set(CANARY_DUE_KEY, 'verified', 'EX', SUCCESS_INTERVAL_SECONDS)
     return { status: 'ok', checkedUser: Boolean(userId) }
   } catch (error) {

@@ -44,7 +44,7 @@ export default function ContactPage() {
                 Email Support
               </h2>
               <p className="text-neutral-500 text-[14px] mb-6 max-w-xs" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-                Send us a direct inquiry. We normally reply to all founder requests within a few hours.
+                Send us a direct inquiry. For delivery problems, use the subject “Delivery incident” and include the approximate time and thread URL—never passwords or 2FA secrets.
               </p>
               <a
                 href={`mailto:${SUPPORT_EMAIL}?subject=Inquiry%20from%20BuyerWatch`}
@@ -53,6 +53,11 @@ export default function ContactPage() {
               >
                 {SUPPORT_EMAIL}
               </a>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-4 text-sm font-semibold">
+              <Link href="/status" className="text-[#0A84FF] hover:underline">Service status</Link>
+              <Link href="/service-policy" className="text-[#0A84FF] hover:underline">Incident and refund policy</Link>
             </div>
 
             {/* Sub Action Card */}
