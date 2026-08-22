@@ -117,175 +117,166 @@ function parsePostedThreads(data: any[]): PostedReply[] {
   })
 }
 
-// ─── Timeline Card ─────────────────────────────────────────────────────────────
+// ─── Posted Reply Card ─────────────────────────────────────────────────────────
 
-function TimelineCard({ item, isLast }: { item: PostedReply; isLast: boolean }) {
+function PostedReplyCard({ item }: { item: PostedReply }) {
   const [expanded, setExpanded] = useState(true)
   const hasConversion = Boolean(item.convertedAt)
   const hasClick = Boolean(item.clickedAt)
   const hasAttribution = hasConversion || hasClick || item.revenueUsd > 0
 
   return (
-    <div className="relative flex gap-4 sm:gap-5">
-      {/* Timeline rail */}
-      <div className="relative flex flex-col items-center" style={{ width: 32, flexShrink: 0 }}>
-        {/* Node */}
-        <div className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 shadow-xs ${
-          hasConversion
-            ? 'border-emerald-300 bg-emerald-50'
-            : hasClick
-              ? 'border-blue-200 bg-blue-50'
-              : 'border-gray-200 bg-white'
-        }`}>
-          <PlatformIcon platform={item.platform} />
-        </div>
-        {/* Connector line */}
-        {!isLast && (
-          <div className="w-px flex-1 bg-gray-200 mt-2" style={{ minHeight: 24 }} />
-        )}
-      </div>
-
-      {/* Card */}
-      <div className="flex-1 min-w-0 pb-8">
-        {/* Card header — always visible */}
-        <div
-          className="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden cursor-pointer"
-          onClick={() => setExpanded(v => !v)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(v => !v) }}
-        >
-          <div className="flex items-start justify-between gap-3 px-5 py-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="text-[13px] font-bold text-gray-900 leading-tight">{item.sourceLabel}</span>
-                {item.authorLabel && (
-                  <span className="text-[12px] text-gray-400 font-medium">{item.authorLabel}</span>
-                )}
-                {item.matchedKeyword && (
-                  <span className="rounded-md bg-[#EFF6FF] border border-blue-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-blue-700 leading-none">
-                    {item.matchedKeyword}
-                  </span>
-                )}
-              </div>
-              <p className="text-[13px] text-gray-700 font-medium leading-snug line-clamp-1">{item.title}</p>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 pt-0.5">
-              {hasAttribution && (
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold border ${
-                  hasConversion
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-blue-50 text-blue-700 border-blue-200'
-                }`}>
-                  {hasConversion ? '✓ Converted' : '✓ Clicked'}
-                </span>
-              )}
-              <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">{item.sentAt}</span>
-              <IntentBadge score={item.score} />
-              {expanded
-                ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0" />
-                : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
-              }
-            </div>
+    <div className="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden transition-all">
+      {/* Card header — always visible */}
+      <div
+        className="flex items-start justify-between gap-3 px-5 py-4 cursor-pointer select-none hover:bg-gray-50/40 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(v => !v) }}
+      >
+        <div className="flex items-start gap-3 min-w-0">
+          <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border shadow-2xs ${
+            hasConversion
+              ? 'border-emerald-200 bg-emerald-50'
+              : hasClick
+                ? 'border-blue-200 bg-blue-50'
+                : 'border-gray-100 bg-[#F9F9F8]'
+          }`}>
+            <PlatformIcon platform={item.platform} />
           </div>
 
-          {/* Expanded body */}
-          {expanded && (
-            <div className="border-t border-gray-100">
-              {/* Attribution banner */}
-              {hasAttribution && (
-                <div className="flex items-center gap-2.5 bg-emerald-50 border-b border-emerald-100 px-5 py-2.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                  <span className="text-[12px] font-semibold text-emerald-700">
-                    {hasConversion && 'Customer converted from this reply'}
-                    {hasClick && !hasConversion && 'Tracked link was clicked'}
-                    {item.revenueUsd > 0 && ` · $${item.revenueUsd.toFixed(2)} attributed`}
-                  </span>
-                </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="text-[13.5px] font-bold text-gray-900 leading-tight">{item.sourceLabel}</span>
+              {item.authorLabel && (
+                <span className="text-[12px] text-gray-400 font-medium">{item.authorLabel}</span>
               )}
-
-              <div className="px-5 py-4 space-y-4">
-                {/* Original Thread — preserved exactly */}
-                <div>
-                  <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original thread</p>
-                  <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
-                    <div className="flex items-center gap-2 mb-2 text-[11px] font-medium text-[#8C8C85]">
-                      <PlatformIcon platform={item.platform} />
-                      <span>{item.sourceLabel}</span>
-                      <span className="opacity-40">·</span>
-                      <Clock className="h-3 w-3" />
-                      <span>{item.discoveredAt}</span>
-                    </div>
-                    {item.title && (
-                      <h4 className="text-[14px] font-semibold text-[#1C1C1A] leading-snug mb-1.5">{item.title}</h4>
-                    )}
-                    {item.body && item.body !== item.title && (
-                      <p className="text-[13px] leading-relaxed text-[#4A4A45] line-clamp-4">{item.body}</p>
-                    )}
-                    {item.threadUrl && (
-                      <a
-                        href={item.threadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0A84FF] hover:underline"
-                      >
-                        View on {item.platform} <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                {/* Your Reply — preserved exactly */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply</p>
-                    <span className="text-[11px] text-[#8C8C85]">Sent {item.sentAt}</span>
-                  </div>
-                  <div className="rounded-[16px] border border-emerald-200 bg-[#F2FCF7] px-4 py-3.5">
-                    <div className="flex items-center gap-2 mb-2.5">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
-                        <MessageSquare className="h-3 w-3 text-emerald-600" strokeWidth={2.3} />
-                      </span>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-[#3A6B50]">BuyerWatch reply</span>
-                    </div>
-                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#1C1C1A]">{item.reply}</p>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  {item.threadUrl && (
-                    <a
-                      href={item.threadUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 text-gray-400" />
-                      View conversation
-                    </a>
-                  )}
-                  {item.replyUrl && (
-                    <a
-                      href={item.replyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-8 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-gray-900 text-[12px] font-medium text-white hover:bg-gray-700 transition-colors cursor-pointer shadow-xs"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      View live reply
-                    </a>
-                  )}
-                </div>
-              </div>
+              {item.matchedKeyword && (
+                <span className="rounded-md bg-[#EFF6FF] border border-blue-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-blue-700 leading-none">
+                  {item.matchedKeyword}
+                </span>
+              )}
             </div>
+            <p className="text-[13px] text-gray-700 font-medium leading-snug line-clamp-1">{item.title}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 pt-0.5">
+          {hasAttribution && (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold border ${
+              hasConversion
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-blue-50 text-blue-700 border-blue-200'
+            }`}>
+              {hasConversion ? '✓ Converted' : '✓ Clicked'}
+            </span>
           )}
+          <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">{item.sentAt}</span>
+          <IntentBadge score={item.score} />
+          <div className="p-0.5 text-gray-400">
+            {expanded
+              ? <ChevronUp className="h-4 w-4 shrink-0" />
+              : <ChevronDown className="h-4 w-4 shrink-0" />
+            }
+          </div>
         </div>
       </div>
+
+      {/* Expanded body */}
+      {expanded && (
+        <div className="border-t border-gray-100">
+          {/* Attribution banner */}
+          {hasAttribution && (
+            <div className="flex items-center gap-2.5 bg-emerald-50 border-b border-emerald-100 px-5 py-2.5">
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+              <span className="text-[12px] font-semibold text-emerald-700">
+                {hasConversion && 'Customer converted from this reply'}
+                {hasClick && !hasConversion && 'Tracked link was clicked'}
+                {item.revenueUsd > 0 && ` · $${item.revenueUsd.toFixed(2)} attributed`}
+              </span>
+            </div>
+          )}
+
+          <div className="px-5 py-4 space-y-4">
+            {/* Original Thread — preserved exactly */}
+            <div>
+              <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original thread</p>
+              <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
+                <div className="flex items-center gap-2 mb-2 text-[11px] font-medium text-[#8C8C85]">
+                  <PlatformIcon platform={item.platform} />
+                  <span>{item.sourceLabel}</span>
+                  <span className="opacity-40">·</span>
+                  <Clock className="h-3 w-3" />
+                  <span>{item.discoveredAt}</span>
+                </div>
+                {item.title && (
+                  <h4 className="text-[14px] font-semibold text-[#1C1C1A] leading-snug mb-1.5">{item.title}</h4>
+                )}
+                {item.body && item.body !== item.title && (
+                  <p className="text-[13px] leading-relaxed text-[#4A4A45] line-clamp-4">{item.body}</p>
+                )}
+                {item.threadUrl && (
+                  <a
+                    href={item.threadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0A84FF] hover:underline"
+                  >
+                    View on {item.platform} <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Your Reply — preserved exactly */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply</p>
+                <span className="text-[11px] text-[#8C8C85]">Sent {item.sentAt}</span>
+              </div>
+              <div className="rounded-[16px] border border-emerald-200 bg-[#F2FCF7] px-4 py-3.5">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
+                    <MessageSquare className="h-3 w-3 text-emerald-600" strokeWidth={2.3} />
+                  </span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#3A6B50]">BuyerWatch reply</span>
+                </div>
+                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#1C1C1A]">{item.reply}</p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              {item.threadUrl && (
+                <a
+                  href={item.threadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 text-gray-400" />
+                  View conversation
+                </a>
+              )}
+              {item.replyUrl && (
+                <a
+                  href={item.replyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-gray-900 text-[12px] font-medium text-white hover:bg-gray-700 transition-colors cursor-pointer shadow-xs"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  View live reply
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -416,7 +407,7 @@ export default function PostedPage() {
 
   return (
     <AppPage>
-      <div className="flex w-full flex-col max-w-3xl mx-auto pb-16">
+      <div className="flex w-full flex-col pb-16">
         <PageHeader
           title="Posted Replies"
           action={
@@ -438,7 +429,7 @@ export default function PostedPage() {
         ) : (
           <div className="space-y-5 mt-1">
             {/* Stats strip */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <StatCard label="Sent" value={totalCount} icon={Send} loading={loading} />
               <StatCard label="Clicks" value={totalClicks} icon={MousePointerClick} loading={loading} />
               <StatCard label="Conversions" value={totalConversions} icon={TrendingUp} loading={loading} />
@@ -446,14 +437,14 @@ export default function PostedPage() {
 
             {/* Filter bar */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-initial">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search replies…"
-                  className="h-8.5 w-56 rounded-lg border border-gray-200 bg-white pl-8.5 pr-3 text-[12.5px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none transition-colors shadow-2xs"
+                  className="h-8.5 w-full sm:w-64 rounded-lg border border-gray-200 bg-white pl-8.5 pr-3 text-[12.5px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none transition-colors shadow-2xs"
                 />
               </div>
               <div className="flex items-center gap-1.5">
@@ -474,17 +465,14 @@ export default function PostedPage() {
               </div>
             </div>
 
-            {/* Timeline */}
+            {/* Replies List */}
             <div>
               {loading ? (
                 <div className="space-y-3">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex gap-4">
-                      <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse shrink-0" />
-                      <div className="flex-1 rounded-xl border border-gray-200 bg-white p-5 animate-pulse space-y-3">
-                        <div className="h-4 bg-gray-200 rounded w-1/4" />
-                        <div className="h-3 bg-gray-100 rounded w-3/4" />
-                      </div>
+                    <div key={i} className="rounded-xl border border-gray-200 bg-white p-5 animate-pulse space-y-3">
+                      <div className="h-4 bg-gray-200 rounded w-1/4" />
+                      <div className="h-3 bg-gray-100 rounded w-3/4" />
                     </div>
                   ))}
                 </div>
@@ -503,19 +491,18 @@ export default function PostedPage() {
                   </p>
                 </div>
               ) : (
-                <div>
-                  {filtered.map((item, idx) => (
-                    <TimelineCard
+                <div className="space-y-3">
+                  {filtered.map((item) => (
+                    <PostedReplyCard
                       key={item.id}
                       item={item}
-                      isLast={idx === filtered.length - 1}
                     />
                   ))}
                 </div>
               )}
 
               {!loading && hasMore && (
-                <div className="flex justify-center mt-2">
+                <div className="flex justify-center mt-6">
                   <button
                     type="button"
                     onClick={loadMorePosted}

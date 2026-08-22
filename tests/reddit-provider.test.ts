@@ -102,6 +102,117 @@ describe('Reddit provider contracts', () => {
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain('https://www.reddit.com/r/saas/new/.rss')
   })
 
+  it('falls through to RSS when the provider returns unusable posts', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_FORCE_LIVE', 'true')
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
+    vi.spyOn(redis, 'set').mockResolvedValue('OK' as never)
+    vi.spyOn(redis, 'del').mockResolvedValue(1 as never)
+
+    const rss = `
+      <feed>
+        <entry>
+          <id>t3_abc123</id>
+          <author><name>/u/buyer-account</name></author>
+          <title>Need help choosing a CRM</title>
+          <link href="https://www.reddit.com/r/SaaS/comments/abc123/need_help/" />
+          <published>2026-08-20T08:30:00+00:00</published>
+          <content type="html">Looking for recommendations</content>
+        </entry>
+      </feed>
+    `
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ posts: [{ id: 'abc123' }] }))
+      .mockResolvedValueOnce(new Response(rss, {
+        headers: { 'Content-Type': 'application/atom+xml' },
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSubredditNew('SaaS')).resolves.toHaveLength(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('https://api.redditapis.com/')
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('https://www.reddit.com/r/saas/new/.rss')
+    expect(redis.set).not.toHaveBeenCalledWith(
+      'redditapis:r:v2:saas:25',
+      '[]',
+      'EX',
+      expect.anything(),
+    )
+  })
+
+  it('caches a true empty provider listing without calling RSS', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_FORCE_LIVE', 'true')
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
+    const setMock = vi.spyOn(redis, 'set').mockResolvedValue('OK' as never)
+
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ posts: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSubredditNew('SaaS')).resolves.toEqual([])
+    expect(fetchMock.mock.calls).toHaveLength(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('https://api.redditapis.com/')
+    expect(setMock).toHaveBeenCalledWith(
+      'redditapis:r:v2:saas:25',
+      '[]',
+      'EX',
+      expect.any(Number),
+    )
+  })
+
+  it('slices provider results to the requested limit', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_FORCE_LIVE', 'true')
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
+    vi.spyOn(redis, 'set').mockResolvedValue('OK' as never)
+
+    const posts = Array.from({ length: 10 }, (_, i) => ({
+      id: `post${String(i).padStart(3, '0')}`,
+      title: `Post ${i}`,
+      text: `Body ${i}`,
+      author: 'buyer-account',
+      permalink: `/r/SaaS/comments/post${String(i).padStart(3, '0')}/title/`,
+      created: '2026-08-20T08:30:00.000Z',
+    }))
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ posts }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchSubredditNew('SaaS', 3)
+    expect(result).toHaveLength(3)
+  })
+
+  it('reuses the RSS cache after a provider failure instead of refetching', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_FORCE_LIVE', 'true')
+    vi.spyOn(redis, 'get').mockImplementation(async (key) => {
+      if (String(key).startsWith('rss:r:v2:')) {
+        return JSON.stringify([{
+          platform: 'reddit',
+          externalId: 'abc123',
+          author: 'buyer-account',
+          title: 'Need help choosing a CRM',
+          text: 'Need help choosing a CRM\n\nLooking for recommendations',
+          url: 'https://www.reddit.com/r/SaaS/comments/abc123/',
+          createdAt: '2026-08-20T08:30:00.000Z',
+          sourceTarget: 'saas',
+        }]) as never
+      }
+      return null as never
+    })
+    vi.spyOn(redis, 'set').mockResolvedValue('OK' as never)
+    vi.spyOn(redis, 'del').mockResolvedValue(1 as never)
+
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'temporary failure' }, 503))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSubredditNew('SaaS')).resolves.toHaveLength(1)
+    expect(fetchMock.mock.calls).toHaveLength(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('https://api.redditapis.com/')
+  })
+
   it('normalizes the current redditapis.com listing response shape', () => {
     expect(normalizeRedditApisPosts({
       posts: [{

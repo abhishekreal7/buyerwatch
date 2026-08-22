@@ -184,6 +184,7 @@ Rules:
       try {
         const anthropic = new Anthropic({
           apiKey: anthropicKey,
+          ...(process.env.ANTHROPIC_API_BASE_URL ? { baseURL: process.env.ANTHROPIC_API_BASE_URL } : {}),
           timeout: 30_000,
           maxRetries: 2,
         })

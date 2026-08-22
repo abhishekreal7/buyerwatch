@@ -151,6 +151,7 @@ Before writing, silently identify whether the author is asking/seeking or offeri
   }
   const anthropic = new Anthropic({
     apiKey,
+    ...(process.env.ANTHROPIC_API_BASE_URL ? { baseURL: process.env.ANTHROPIC_API_BASE_URL } : {}),
     timeout: 30_000,
     maxRetries: options.maxRetries ?? 2,
   })

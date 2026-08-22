@@ -35,6 +35,7 @@ import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { signOutAction } from '@/app/actions/auth'
 import { ConversationSearchProvider, useConversationSearch } from '@/lib/conversation-search'
 import { ACTIONABLE_INTENT_THRESHOLD } from '@/lib/intent'
+import { identifyUser, resetUser, trackEvent } from '@/lib/analytics'
 
 export type DashboardBootstrap = {
   autoSend: boolean
@@ -151,6 +152,17 @@ function DashboardShell({
   useEffect(() => {
     if (pathname !== '/dashboard') setConversationSearch('')
   }, [pathname])
+
+  useEffect(() => {
+    if (userId) {
+      identifyUser(userId, {
+        email: initialData.user?.email,
+        name: initialData.user?.name,
+        plan: initialData.plan,
+        auto_send: initialData.autoSend,
+      })
+    }
+  }, [userId, initialData])
 
   useEffect(() => {
     async function loadSidebarData() {
@@ -298,6 +310,7 @@ function DashboardShell({
     if (openingCheckout) return
 
     setOpeningCheckout(checkoutKey)
+    trackEvent('checkout_initiated', { ...body, checkoutKey })
     try {
       // Unique per intentional click so repeat add-on buys are not collapsed
       // by the server's short fallback bucket.
@@ -458,7 +471,7 @@ function DashboardShell({
                       </p>
                     </div>
                   </div>
-                  <form action={signOutAction} className="shrink-0">
+                  <form action={signOutAction} onSubmit={() => resetUser()} className="shrink-0">
                     <button
                       type="submit"
                       className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
@@ -677,7 +690,7 @@ function DashboardShell({
                     </Link>
                   )
                 })}
-                <form action={signOutAction} className="border-t border-gray-100 pt-2">
+                <form action={signOutAction} onSubmit={() => resetUser()} className="border-t border-gray-100 pt-2">
                   <button
                     type="submit"
                     className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-red-600 hover:bg-red-50"

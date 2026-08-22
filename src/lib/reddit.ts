@@ -1,4 +1,4 @@
-﻿import { NormalizedPost } from './types'
+import { NormalizedPost } from './types'
 import { fetchWithTimeout, readResponseText } from './http'
 import { redis } from './redis'
 import { hasRedditDiscoveryProvider } from './env'
@@ -303,7 +303,17 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     try {
       console.log(`[reddit] RedditAPIs primary discovery for r/${normalizedSubreddit}`)
       const payload = await fetchRedditApisDiscoveryPayload(normalizedSubreddit, boundedLimit)
+      const rawPosts = payload && typeof payload === 'object'
+        ? (payload as { posts?: unknown }).posts
+        : undefined
       const normalized = normalizeRedditApisPosts(payload, normalizedSubreddit)
+      // A true empty listing is a quiet subreddit and should be cached. A 200
+      // with a missing/non-array `posts` field, or items that all fail
+      // validation, is a contract miss — fall through to RSS instead of
+      // caching a fake empty feed.
+      if (!Array.isArray(rawPosts) || (rawPosts.length > 0 && normalized.length === 0)) {
+        throw new Error('RedditAPIs discovery returned no usable posts')
+      }
       if (redisClient) {
         // Cache empty responses too. A quiet subreddit must not consume another
         // paid read on every scheduler tick.
@@ -314,13 +324,33 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
           PROVIDER_CACHE_TTL,
         ).catch(() => {})
       }
-      return normalized
+      return normalized.slice(0, boundedLimit)
     } catch (providerError) {
       providerFailure = providerError
       console.warn(
         `[reddit] RedditAPIs primary discovery failed for r/${normalizedSubreddit}; trying RSS fallback:`,
         providerError,
       )
+    }
+  }
+
+  // Provider-first only consults the paid cache above. After a provider miss,
+  // still reuse a fresh RSS cache so an outage does not hammer the public feed.
+  if (providerFailure) {
+    try {
+      const cachedRss = await redis.get(cacheKey)
+      if (cachedRss) {
+        const posts = parseCachedRedditPosts(cachedRss, normalizedSubreddit, boundedLimit)
+        if (posts && posts.length > 0) {
+          console.log(
+            `[reddit] RSS cache HIT after provider failure for r/${normalizedSubreddit} (${posts.length} posts)`,
+          )
+          return posts
+        }
+        await redis.del(cacheKey).catch(() => undefined)
+      }
+    } catch {
+      // A missing RSS cache is not a reason to skip the bounded source call.
     }
   }
 

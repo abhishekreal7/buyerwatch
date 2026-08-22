@@ -12,6 +12,7 @@ import { springs } from '@/lib/motion'
 import { getPlanLimits, type PlanTier } from '@/lib/plan-limits'
 import { normalizeWebsiteUrl, validateProductContext } from '@/lib/onboarding-validation'
 import type { SelectedBillingCadence, SelectedBillingPlan } from '@/lib/billing-selection'
+import { trackEvent } from '@/lib/analytics'
 
 const BUSINESS_TYPES = [
   { id: 'saas', label: 'SaaS', icon: Monitor },
@@ -38,6 +39,11 @@ export default function OnboardingWizard({
   const [analyzingUrl, setAnalyzingUrl] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const keywordLimit = getPlanLimits(plan).keywords
+
+  // Track initial onboarding start
+  useState(() => {
+    trackEvent('onboarding_started', { plan })
+  })
 
   // Form State
   const [businessName, setBusinessName] = useState('')
@@ -81,6 +87,12 @@ export default function OnboardingWizard({
       setSubmitError('Select or add at least one community to monitor.')
       return
     }
+    trackEvent('onboarding_step_completed', {
+      completed_step: step,
+      business_type: businessType,
+      keyword_count: keywords.length,
+      reddit_targets_count: redditTargets.length,
+    })
     setStep(current => Math.min(4, current + 1))
   }
   const handlePrev = () => setStep(s => Math.max(1, s - 1))
@@ -200,6 +212,15 @@ export default function OnboardingWizard({
 
       if (res?.error) {
         setSubmitError(res.error)
+      } else {
+        trackEvent('onboarding_completed', {
+          plan,
+          business_type: businessType,
+          keyword_count: dbKeywords.length,
+          reddit_targets_count: redditTargets.length,
+          has_writing_style: Boolean(writingStyle.trim()),
+          has_reddit_username: Boolean(redditUsername.trim()),
+        })
       }
     } catch (error) {
       console.error('[onboarding] launch failed:', error)

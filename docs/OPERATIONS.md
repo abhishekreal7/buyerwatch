@@ -106,7 +106,7 @@ Anthropic. These integrations are optional when their complete environment
 groups are absent:
 
 - Dodo Payments: paid checkout is disabled and pricing sends users to contact.
-- RedditAPIs: Reddit discovery fallback and direct delivery are unavailable
+- RedditAPIs: Reddit discovery provider and direct delivery are unavailable
   without `REDDITAPIS_API_KEY`; writes also require the independent
   `REDDITAPIS_POSTING_ENABLED=true` kill switch.
 - Resend: digest email is unavailable unless both API key and sender are set.

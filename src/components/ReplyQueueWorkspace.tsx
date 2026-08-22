@@ -556,7 +556,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row h-[calc(100vh-210px)] min-h-[600px] rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
+        <div className="flex flex-col lg:flex-row h-[calc(100vh-280px)] min-h-[460px] rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
 
           {/* ── LEFT PANEL: Clean Inbox List ── */}
           <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 bg-[#FAFAFA] lg:w-[340px] lg:min-w-[340px] lg:max-w-[340px] shrink-0 overflow-hidden">
@@ -689,7 +689,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
               </div>
 
               {/* Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5" style={{ scrollbarWidth: 'thin' }}>
+              <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4 sm:space-y-5" style={{ scrollbarWidth: 'thin' }}>
                 {/* Original Post */}
                 <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -772,7 +772,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                     className="w-full rounded-lg border border-gray-200 bg-white p-3 text-[13px] leading-relaxed text-gray-900 resize-none focus:border-gray-400 focus:outline-none transition-colors"
                     rows={5}
                     spellCheck
-                    placeholder="Write or edit reply..."
+                    placeholder="Write a reply here, or use Generate reply when AI drafting is available."
                   />
 
                   <div className="flex items-center justify-between text-[11px] text-gray-400">

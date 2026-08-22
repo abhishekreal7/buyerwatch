@@ -6,6 +6,7 @@ import { X, ArrowRight, Sparkles, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { normalizePlan } from '@/lib/plan-limits'
+import { trackEvent } from '@/lib/analytics'
 
 interface UpgradeModalProps {
   userId: string
@@ -48,10 +49,13 @@ export function UpgradeModal({ userId, plan, keywordsUsed, keywordsMax }: Upgrad
       })
 
     // Small delay so the dashboard loads first — avoids flash-of-modal on slow connections
-    const t = setTimeout(() => setVisible(true), 600)
+    const t = setTimeout(() => {
+      setVisible(true)
+      trackEvent('upgrade_modal_viewed', { plan, keywordsUsed, keywordsMax })
+    }, 600)
     return () => clearTimeout(t)
 
-  }, [userId, plan])
+  }, [userId, plan, keywordsUsed, keywordsMax])
 
   function dismiss() {
     localStorage.setItem(storageKey, '1')
