@@ -35,6 +35,15 @@ export default async function StatusPage() {
             <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${service.redditDelivery === 'operational' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{service.redditDelivery}</span>
           </div>
         </div>
+        <div className="mt-3 rounded-2xl border border-neutral-200 p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-bold">Customer incident notifications</h2>
+              <p className="mt-1 text-sm text-neutral-500">In-app and transactional email delivery</p>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${service.customerNotifications === 'operational' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{service.customerNotifications.replace('_', ' ')}</span>
+          </div>
+        </div>
         <p className="mt-6 text-xs text-neutral-400">Last checked {new Date(service.checkedAt).toLocaleString('en-US', { timeZone: 'UTC' })} UTC</p>
         <div className="mt-10 flex flex-wrap gap-4 text-sm font-semibold">
           <Link href="/contact" className="text-blue-600 hover:underline">Contact support</Link>
