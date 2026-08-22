@@ -38,7 +38,7 @@ describe('RedditAPIs direct-delivery architecture', () => {
     expect(connectionRoute).toContain('loginRedditAccount')
     expect(connectionRoute).toContain('saveRedditApisConnection')
     expect(providerClient).toContain("'/api/reddit/login'")
-    expect(providerClient).toContain("method: 'browser'")
+    expect(providerClient).toContain("method: 'http'")
     expect(settings).toContain('BuyerWatch never stores your password or 2FA secret')
     expect(sessionStore).not.toContain('password')
     expect(sessionStore).not.toContain('totpSecret')
