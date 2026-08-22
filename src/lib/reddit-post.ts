@@ -26,6 +26,10 @@ import {
   SprinklrRequestError,
 } from './sprinklr-client'
 import { alertRedditDeliveryFailure } from './reddit-delivery-alerts'
+import {
+  assertRedditDeliveryCircuitClosed,
+  RedditDeliveryCircuitOpenError,
+} from './reddit-service-safety'
 
 export class PlatformPostError extends Error {
   public readonly deliveryUncertain: boolean
@@ -106,6 +110,15 @@ export async function postRedditReply(input: {
   const postingProvider = getRedditPostingProviderKind()
   if (!postingProvider) {
     throw new PlatformPostError('reddit', 'reddit_direct_posting_unavailable', false)
+  }
+
+  try {
+    await assertRedditDeliveryCircuitClosed()
+  } catch (error) {
+    if (error instanceof RedditDeliveryCircuitOpenError) {
+      throw new PlatformPostError('reddit', error.code, false)
+    }
+    throw error
   }
 
   const target = parseRedditPostTarget(input.postUrl)

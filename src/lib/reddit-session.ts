@@ -449,7 +449,8 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
 
 export async function markRedditConnectionHealthy(userId: string): Promise<void> {
   const now = new Date().toISOString()
-  await getServiceRoleClient()
+  const admin = getServiceRoleClient()
+  const { error } = await admin
     .from('reddit_connection_secrets')
     .update({
       status: 'active',
@@ -460,6 +461,11 @@ export async function markRedditConnectionHealthy(userId: string): Promise<void>
       updated_at: now,
     })
     .eq('user_id', userId)
+  if (error) throw error
+  const resolved = await admin.rpc('resolve_reddit_user_incidents_v1', {
+    p_user_id: userId,
+  })
+  if (resolved.error) throw resolved.error
 }
 
 export async function markRedditConnectionReauthRequired(

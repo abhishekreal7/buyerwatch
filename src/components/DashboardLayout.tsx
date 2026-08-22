@@ -108,6 +108,16 @@ type DashboardLayoutProps = {
   initialData: DashboardBootstrap
 }
 
+type ServiceIncident = {
+  id: string
+  severity: 'info' | 'warning' | 'critical'
+  status: 'open' | 'resolved'
+  title: string
+  message: string
+  actionPath: string | null
+  startedAt: string
+}
+
 export default function DashboardLayout(props: DashboardLayoutProps) {
   return (
     <ConversationSearchProvider>
@@ -136,6 +146,8 @@ function DashboardShell({
   const [redditConnectionAttention, setRedditConnectionAttention] = useState<
     'reauth_required' | 'error' | null
   >(null)
+  const [serviceIncidents, setServiceIncidents] = useState<ServiceIncident[]>([])
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { conversationSearch, setConversationSearch } = useConversationSearch()
   const searchInputRef = useRef<HTMLInputElement>(null)
   const showConversationSearch = pathname === '/dashboard'
@@ -225,20 +237,31 @@ function DashboardShell({
   useEffect(() => {
     async function loadConnectionHealth() {
       try {
-        const response = await fetch('/api/settings/connections', {
-          cache: 'no-store',
-          headers: { Accept: 'application/json' },
-        })
-        if (!response.ok) return
-        const payload = await response.json() as {
+        const [response, incidentsResponse] = await Promise.all([
+          fetch('/api/settings/connections', {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          }),
+          fetch('/api/incidents', {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          }),
+        ])
+        if (response.ok) {
+          const payload = await response.json() as {
           connections?: Array<{ platform?: string; status?: string }>
+          }
+          const reddit = payload.connections?.find(connection => connection.platform === 'reddit')
+          setRedditConnectionAttention(
+            reddit?.status === 'reauth_required' || reddit?.status === 'error'
+              ? reddit.status
+              : null,
+          )
         }
-        const reddit = payload.connections?.find(connection => connection.platform === 'reddit')
-        setRedditConnectionAttention(
-          reddit?.status === 'reauth_required' || reddit?.status === 'error'
-            ? reddit.status
-            : null,
-        )
+        if (incidentsResponse.ok) {
+          const payload = await incidentsResponse.json() as { incidents?: ServiceIncident[] }
+          setServiceIncidents(payload.incidents ?? [])
+        }
       } catch {
         // A transient status request must not disrupt dashboard navigation.
       }
@@ -347,6 +370,12 @@ function DashboardShell({
     ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
     : 0
   const draftAddonAvailable = (plan === 'free' || plan === 'starter') && creditsRemaining === 0
+  const openIncidents = serviceIncidents.filter(incident => incident.status === 'open')
+  const primaryIncident = [...openIncidents].sort((left, right) => {
+    const priority = { critical: 0, warning: 1, info: 2 }
+    return priority[left.severity] - priority[right.severity]
+      || right.startedAt.localeCompare(left.startedAt)
+  })[0]
 
   return (
     <DashboardSessionProvider userId={userId}>
@@ -556,37 +585,62 @@ function DashboardShell({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => toast.success("You're all caught up", { description: 'No new notifications right now.' })}
-                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] text-[#666662] transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8 sm:w-8"
-                title="Notifications"
-                aria-label="View notifications"
-              >
-                <Bell className="h-3.5 w-3.5" strokeWidth={1.8} />
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setNotificationsOpen(open => !open)}
+                  className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-[9px] border border-[#E2E2DF] bg-[#FAFAF9] text-[#666662] transition-colors hover:bg-[#F5F5F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/25 sm:h-8 sm:w-8"
+                  title="Notifications"
+                  aria-label={`${openIncidents.length} open service notifications`}
+                  aria-expanded={notificationsOpen}
+                  aria-controls="service-notifications"
+                >
+                  <Bell className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  {openIncidents.length > 0 && (
+                    <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-red-600 px-1 text-center text-[9px] font-bold leading-4 text-white">
+                      {Math.min(openIncidents.length, 9)}
+                    </span>
+                  )}
+                </button>
+                {notificationsOpen && (
+                  <div id="service-notifications" className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white p-2 shadow-xl">
+                    <div className="flex items-center justify-between px-2 py-1.5">
+                      <p className="text-xs font-bold text-gray-900">Service notifications</p>
+                      <Link href="/status" className="text-[11px] font-semibold text-blue-600 hover:underline">Status</Link>
+                    </div>
+                    {openIncidents.length === 0 ? (
+                      <p className="px-2 py-4 text-xs text-gray-500">No open service incidents.</p>
+                    ) : openIncidents.slice(0, 5).map(incident => (
+                      <Link key={incident.id} href={incident.actionPath ?? '/status'} onClick={() => setNotificationsOpen(false)} className="block rounded-lg px-2 py-2.5 hover:bg-gray-50">
+                        <p className="text-xs font-semibold text-gray-900">{incident.title}</p>
+                        <p className="mt-1 text-[11px] leading-4 text-gray-600">{incident.message}</p>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 
           {/* Content Container */}
           <div className="scrollbar-gutter-stable relative z-10 w-full flex-1 min-h-0 overflow-y-scroll px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
-            {redditConnectionAttention && (
+            {(primaryIncident || redditConnectionAttention) && (
               <div
                 role="alert"
-                className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-950"
+                className={`mb-4 flex items-start gap-3 rounded-xl border px-3.5 py-3 text-sm ${primaryIncident?.severity === 'critical' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}
               >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${primaryIncident?.severity === 'critical' ? 'text-red-600' : 'text-amber-600'}`} aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">Reddit automation is paused</p>
-                  <p className="mt-0.5 text-xs leading-5 text-amber-800">
-                    The saved Reddit session needs attention. Reconnect once to resume future automation safely.
+                  <p className="font-semibold">{primaryIncident?.title ?? 'Reddit automation is paused'}</p>
+                  <p className={`mt-0.5 text-xs leading-5 ${primaryIncident?.severity === 'critical' ? 'text-red-800' : 'text-amber-800'}`}>
+                    {primaryIncident?.message ?? 'The saved Reddit session needs attention. Reconnect once to resume future automation safely.'}
                   </p>
                 </div>
                 <Link
-                  href="/settings?section=connections"
-                  className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-100"
+                  href={primaryIncident?.actionPath ?? '/settings?section=connections'}
+                  className="shrink-0 rounded-lg border border-current/25 bg-white px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/60"
                 >
-                  Reconnect
+                  {primaryIncident?.actionPath === '/status' ? 'View status' : 'Review'}
                 </Link>
               </div>
             )}

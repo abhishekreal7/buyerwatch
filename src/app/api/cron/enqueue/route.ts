@@ -10,6 +10,7 @@ import { isUuid, readTextBody, RequestInputError } from '@/lib/request'
 import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
 import { runServerlessMonitoring } from '@/lib/serverless-monitor'
 import { runRedditDeliveryCanary } from '@/lib/reddit-delivery-canary'
+import { deliverPendingIncidentEmails } from '@/lib/incident-email'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -51,9 +52,14 @@ async function executeMonitor(
     }
 
     const canary = canaryPromise ? await canaryPromise : null
+    const incidentEmail = await deliverPendingIncidentEmails(20).catch((error) => {
+      logger.error({ error }, 'Customer incident email queue failed')
+      return { claimed: 0, delivered: 0, failed: 1 }
+    })
     return NextResponse.json({
       ...result,
       ...(canary ? { redditDeliveryCanary: canary } : {}),
+      incidentEmail,
     })
   } catch (error) {
     logger.error({ err: error }, 'Serverless Reddit monitor failed')

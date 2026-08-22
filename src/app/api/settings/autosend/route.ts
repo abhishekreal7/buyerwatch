@@ -7,6 +7,7 @@ import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
 import { hasActiveRedditConnection } from '@/lib/reddit-session'
+import { getRedditDeliveryControl } from '@/lib/reddit-service-safety'
 
 export async function PATCH(req: Request) {
   try {
@@ -117,6 +118,12 @@ export async function PATCH(req: Request) {
       )
       if (effectivePlatforms.length === 0) {
         return NextResponse.json({ error: 'auto_send_platform_required' }, { status: 409 })
+      }
+      if (effectivePlatforms.includes('reddit')) {
+        const control = await getRedditDeliveryControl()
+        if (control.state !== 'closed') {
+          return NextResponse.json({ error: 'reddit_delivery_paused' }, { status: 409 })
+        }
       }
 
       const { data: connectionRows, error: connectionError } = await supabase
