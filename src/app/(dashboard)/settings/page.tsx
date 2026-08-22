@@ -172,7 +172,7 @@ export default function SettingsPage() {
     bluesky: false,
     redditUsername: '',
     redditStatus: 'missing' as 'active' | 'reauth_required' | 'error' | 'missing',
-    redditProvider: null as 'redditapis' | 'sprinklr' | 'browser_relay' | null,
+    redditProvider: null as 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | null,
   })
   const [deliveryCapabilities, setDeliveryCapabilities] = useState({
     redditDirectPosting: false,
@@ -188,6 +188,14 @@ export default function SettingsPage() {
   const [redditPassword, setRedditPassword] = useState('')
   const [redditTotpSecret, setRedditTotpSecret] = useState('')
   const [redditConnecting, setRedditConnecting] = useState(false)
+  const [mcpSettings, setMcpSettings] = useState({
+    configured: false,
+    tokenPrefix: '',
+    endpoint: 'https://www.buyerwatch.co/api/mcp',
+    lastUsedAt: null as string | null,
+  })
+  const [mcpToken, setMcpToken] = useState('')
+  const [mcpUpdating, setMcpUpdating] = useState(false)
 
   const [slack, setSlack] = useState({ webhookUrl: '', threshold: 70 })
   const [slackConfigured, setSlackConfigured] = useState(false)
@@ -238,7 +246,7 @@ export default function SettingsPage() {
                 platform: string
                 external_username: string | null
                 status?: 'active' | 'reauth_required' | 'error' | 'missing'
-                provider?: 'redditapis' | 'sprinklr' | 'browser_relay' | null
+                provider?: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | null
               }>
               capabilities: {
                 redditDirectPosting: boolean
@@ -624,6 +632,65 @@ export default function SettingsPage() {
     }
   }
 
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    fetch('/api/settings/mcp/token', { cache: 'no-store' })
+      .then(async response => {
+        const payload = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(payload?.error || 'mcp_settings_load_failed')
+        if (!cancelled) {
+          setMcpSettings({
+            configured: Boolean(payload.configured),
+            tokenPrefix: payload.tokenPrefix || '',
+            endpoint: payload.endpoint || 'https://www.buyerwatch.co/api/mcp',
+            lastUsedAt: payload.lastUsedAt || null,
+          })
+        }
+      })
+      .catch(error => console.error('[settings] Unable to load MCP settings', error))
+    return () => { cancelled = true }
+  }, [userId])
+
+  const handleCreateMcpToken = async () => {
+    setMcpUpdating(true)
+    try {
+      const response = await fetch('/api/settings/mcp/token', { method: 'POST' })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.token) throw new Error(payload?.error || 'mcp_token_create_failed')
+      setMcpToken(payload.token)
+      setMcpSettings(current => ({
+        ...current,
+        configured: true,
+        tokenPrefix: payload.tokenPrefix || '',
+        endpoint: payload.endpoint || current.endpoint,
+        lastUsedAt: null,
+      }))
+      toast.success('MCP key created. Copy it now; it is shown only once.')
+    } catch (error) {
+      console.error('[settings] Unable to create MCP token', error)
+      toast.error('Could not create the MCP key.')
+    } finally {
+      setMcpUpdating(false)
+    }
+  }
+
+  const handleRevokeMcpToken = async () => {
+    setMcpUpdating(true)
+    try {
+      const response = await fetch('/api/settings/mcp/token', { method: 'DELETE' })
+      if (!response.ok) throw new Error('mcp_token_revoke_failed')
+      setMcpToken('')
+      setMcpSettings(current => ({ ...current, configured: false, tokenPrefix: '', lastUsedAt: null }))
+      toast.success('MCP access revoked')
+    } catch (error) {
+      console.error('[settings] Unable to revoke MCP token', error)
+      toast.error('Could not revoke MCP access.')
+    } finally {
+      setMcpUpdating(false)
+    }
+  }
+
   const handleConnectBluesky = async () => {
     if (!bskyHandle || !bskyPassword) { toast.error('Enter your handle and app password'); return }
     setBskyConnecting(true)
@@ -981,6 +1048,8 @@ export default function SettingsPage() {
                               ? `Connected as u/${connections.redditUsername}`
                               : connections.redditStatus === 'reauth_required'
                                 ? `Reconnect u/${connections.redditUsername || 'your account'} to resume delivery.`
+                              : deliveryCapabilities.redditBrowserConnection
+                                ? 'Connect your own account through an AI agent without sharing Reddit credentials.'
                               : deliveryCapabilities.redditDirectPosting
                                 ? 'Connect once for encrypted, server-side reply delivery.'
                                 : deliveryCapabilities.redditScheduledDiscovery
@@ -1001,82 +1070,73 @@ export default function SettingsPage() {
                                   Reddit expired the saved session. Automatic Reddit replies are paused until you reconnect.
                                 </div>
                               )}
-                              {deliveryCapabilities.redditBrowserConnection && (
-                                <div className="rounded-xl border border-orange-100 bg-orange-50 p-3">
-                                  <p className="text-[12px] font-semibold text-orange-950">Recommended: connect the Reddit account already open in Chrome</p>
-                                  <p className="mt-1 text-[11.5px] leading-5 text-orange-900/75">
-                                    BuyerWatch checks the signed-in username locally. Your Reddit password and cookies never leave Chrome.
-                                  </p>
-                                  <div className="mt-3 flex flex-wrap gap-2">
-                                    <a
-                                      href="/buyerwatch-reddit-connector.zip"
-                                      download
-                                      className="rounded-lg border border-orange-200 bg-white px-3 py-2 text-[12px] font-semibold text-orange-900 hover:bg-orange-100"
-                                    >
-                                      Download connector
-                                    </a>
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleConnectRedditBrowser()}
-                                      disabled={redditConnecting}
-                                      className="rounded-lg bg-[#FF4500] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#e63e00] disabled:cursor-wait disabled:opacity-60"
-                                    >
-                                      {redditConnecting ? 'Checking Chrome...' : 'Connect with Chrome'}
-                                    </button>
+                              <div className="rounded-xl border border-orange-100 bg-orange-50 p-3">
+                                <p className="text-[12px] font-semibold text-orange-950">Recommended: connect through your AI agent — no BuyerWatch extension</p>
+                                <p className="mt-1 text-[11.5px] leading-5 text-orange-900/75">
+                                  BuyerWatch supplies an MCP queue. Your agent verifies and posts through the Reddit account already open in its browser. Reddit passwords and cookies never reach BuyerWatch.
+                                </p>
+                                <div className="mt-3 space-y-2">
+                                  <div className="flex gap-2">
+                                    <input readOnly value={mcpSettings.endpoint} aria-label="BuyerWatch MCP endpoint" className={`${inputCls} min-w-0 flex-1 bg-white text-[11.5px]`} />
+                                    <button type="button" onClick={() => void copySettingValue(mcpSettings.endpoint, 'MCP endpoint')} className="rounded-lg border border-orange-200 bg-white px-3 text-[12px] font-semibold text-orange-900 hover:bg-orange-100">Copy</button>
                                   </div>
-                                  <p className="mt-2 text-[11px] leading-4 text-orange-900/65">
-                                    After downloading: unzip it, open chrome://extensions, enable Developer mode, choose Load unpacked, and select the folder.
-                                  </p>
+                                  {mcpToken && (
+                                    <div className="flex gap-2">
+                                      <input readOnly value={mcpToken} aria-label="BuyerWatch MCP key" className={`${inputCls} min-w-0 flex-1 bg-white font-mono text-[11px]`} />
+                                      <button type="button" onClick={() => void copySettingValue(mcpToken, 'MCP key')} className="rounded-lg border border-orange-200 bg-white px-3 text-[12px] font-semibold text-orange-900 hover:bg-orange-100">Copy key</button>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                              {deliveryCapabilities.redditConnectionProvider === 'sprinklr' ? (
-                                <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-[12px] leading-5 text-blue-900">
-                                  Reddit authorization is managed in your organization&apos;s Sprinklr account. Verify the active Reddit channel here; BuyerWatch never receives your Reddit password.
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCreateMcpToken()}
+                                    disabled={mcpUpdating}
+                                    className="rounded-lg bg-[#FF4500] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#e63e00] disabled:cursor-wait disabled:opacity-60"
+                                  >
+                                    {mcpUpdating ? 'Updating...' : mcpSettings.configured ? 'Rotate MCP key' : 'Generate MCP key'}
+                                  </button>
+                                  {mcpSettings.configured && (
+                                    <button type="button" onClick={() => void handleRevokeMcpToken()} disabled={mcpUpdating} className="rounded-lg border border-orange-200 bg-white px-3 py-2 text-[12px] font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-60">Revoke</button>
+                                  )}
+                                  {mcpSettings.configured && !mcpToken && (
+                                    <span className="text-[11px] text-orange-900/65">Key {mcpSettings.tokenPrefix}… is active. Rotate it to reveal a new key.</span>
+                                  )}
                                 </div>
-                              ) : <>
-                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <input
-                                  value={redditLoginUsername}
-                                  onChange={event => setRedditLoginUsername(event.target.value)}
-                                  placeholder="Reddit username"
-                                  autoComplete="username"
-                                  className={inputCls}
-                                />
-                                <input
-                                  type="password"
-                                  value={redditPassword}
-                                  onChange={event => setRedditPassword(event.target.value)}
-                                  placeholder="Reddit password"
-                                  autoComplete="current-password"
-                                  className={inputCls}
-                                />
+                                <p className="mt-2 text-[11px] leading-4 text-orange-900/65">
+                                  Add the endpoint and key as a Bearer-authenticated MCP server, then ask your agent to verify your open Reddit profile and call <code>connect_reddit_account</code>.
+                                </p>
                               </div>
-                              <input
-                                type="password"
-                                value={redditTotpSecret}
-                                onChange={event => setRedditTotpSecret(event.target.value)}
-                                placeholder="2FA setup secret (optional; not the 6-digit code)"
-                                autoComplete="off"
-                                className={inputCls}
-                              />
-                              <p className="text-[11.5px] leading-5 text-gray-500">
-                                Credentials are sent once to RedditAPIs to establish a Reddit session. BuyerWatch never stores your password or 2FA secret; only the returned session cookies are encrypted at rest. RedditAPIs is an independent provider, not Reddit.
-                              </p>
-                              </>}
-                              <button
-                                type="button"
-                                onClick={() => void handleConnectReddit()}
-                                disabled={redditConnecting}
-                                className="rounded-lg bg-[#FF4500] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#e63e00] disabled:cursor-wait disabled:opacity-60"
-                              >
-                                {redditConnecting
-                                  ? 'Connecting securely...'
-                                  : deliveryCapabilities.redditConnectionProvider === 'sprinklr'
-                                    ? 'Verify Sprinklr Reddit account'
-                                    : connections.redditStatus === 'reauth_required'
-                                      ? 'Reconnect Reddit'
-                                      : 'Connect Reddit'}
-                              </button>
+                              {deliveryCapabilities.redditBrowserConnection && (
+                                <details className="rounded-lg border border-gray-200 bg-white p-3">
+                                  <summary className="cursor-pointer text-[12px] font-semibold text-gray-700">Fallback: install the BuyerWatch Chrome connector</summary>
+                                  <p className="mt-2 text-[11.5px] leading-5 text-gray-500">Use this only when your AI agent cannot control a logged-in browser.</p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    <a href="/buyerwatch-reddit-connector.zip" download className="rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-semibold text-gray-700 hover:bg-gray-50">Download connector</a>
+                                    <button type="button" onClick={() => void handleConnectRedditBrowser()} disabled={redditConnecting} className="rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60">{redditConnecting ? 'Checking Chrome...' : 'Connect with Chrome'}</button>
+                                  </div>
+                                </details>
+                              )}
+                              <details className="rounded-lg border border-gray-200 bg-white p-3">
+                                <summary className="cursor-pointer text-[12px] font-semibold text-gray-700">Other method: server-side provider (legacy)</summary>
+                                <div className="mt-3 space-y-3">
+                                  {deliveryCapabilities.redditConnectionProvider === 'sprinklr' ? (
+                                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-[12px] leading-5 text-blue-900">
+                                      Reddit authorization is managed in your organization&apos;s Sprinklr account. Verify the active Reddit channel here; BuyerWatch never receives your Reddit password.
+                                    </div>
+                                  ) : <>
+                                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <input value={redditLoginUsername} onChange={event => setRedditLoginUsername(event.target.value)} placeholder="Reddit username" autoComplete="username" className={inputCls} />
+                                    <input type="password" value={redditPassword} onChange={event => setRedditPassword(event.target.value)} placeholder="Reddit password" autoComplete="current-password" className={inputCls} />
+                                  </div>
+                                  <input type="password" value={redditTotpSecret} onChange={event => setRedditTotpSecret(event.target.value)} placeholder="2FA setup secret (optional; not the 6-digit code)" autoComplete="off" className={inputCls} />
+                                  <p className="text-[11.5px] leading-5 text-gray-500">Credentials are sent once to RedditAPIs to establish a Reddit session. BuyerWatch never stores your password or 2FA secret; only the returned session cookies are encrypted at rest. RedditAPIs is an independent provider, not Reddit.</p>
+                                  </>}
+                                  <button type="button" onClick={() => void handleConnectReddit()} disabled={redditConnecting} className="rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-wait disabled:opacity-60">
+                                    {redditConnecting ? 'Connecting securely...' : deliveryCapabilities.redditConnectionProvider === 'sprinklr' ? 'Verify Sprinklr Reddit account' : connections.redditStatus === 'reauth_required' ? 'Reconnect Reddit' : 'Connect Reddit'}
+                                  </button>
+                                </div>
+                              </details>
                             </div>
                           )}
                         </PlatformRow>
