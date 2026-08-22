@@ -19,6 +19,7 @@
     "smoke:production": "node scripts/smoke-production.mjs",
     "verify": "npm run typecheck && npm run lint && npm test && npm audit --audit-level=high",
     "verify:reddit": "node scripts/verify-reddit-provider.mjs",
+    "connector:package": "powershell -ExecutionPolicy Bypass -File ./scripts/package-browser-connector.ps1",
     "verify:offline": "npm run typecheck && npm run lint && npm run test:offline && npm run build"
   },
   "dependencies": {

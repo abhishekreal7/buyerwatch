@@ -17,7 +17,14 @@ type StoredSprinklrSession = {
   channelId: string
 }
 
-type StoredRedditSession = StoredRedditApisSession | StoredSprinklrSession
+type StoredBrowserRelaySession = {
+  version: 3
+  provider: 'browser_relay'
+  username: string
+  connectorId: string
+}
+
+type StoredRedditSession = StoredRedditApisSession | StoredSprinklrSession | StoredBrowserRelaySession
 
 export type ActiveRedditSession = StoredRedditSession & {
   accountCreatedAt: string | null
@@ -28,6 +35,7 @@ export type ActiveRedditSession = StoredRedditSession & {
 export type RedditConnectionStatus = 'active' | 'reauth_required' | 'error' | 'missing'
 
 export type RedditConnectionSummary = {
+  provider: 'redditapis' | 'sprinklr' | 'browser_relay' | null
   username: string | null
   status: RedditConnectionStatus
   lastVerifiedAt: string | null
@@ -62,6 +70,19 @@ function validateStoredSession(value: unknown, expectedProvider: unknown): Store
     throw new RedditConnectionStateError('reddit_session_invalid')
   }
   const candidate = value as Record<string, unknown>
+  if (candidate.version === 3) {
+    const username = typeof candidate.username === 'string'
+      ? candidate.username.trim().replace(/^u\//i, '')
+      : ''
+    const connectorId = typeof candidate.connectorId === 'string' ? candidate.connectorId.trim() : ''
+    if (
+      expectedProvider !== 'browser_relay'
+      || candidate.provider !== 'browser_relay'
+      || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+      || !/^[a-p]{32}$/.test(connectorId)
+    ) throw new RedditConnectionStateError('reddit_session_invalid')
+    return { version: 3, provider: 'browser_relay', username, connectorId }
+  }
   if (candidate.version === 2) {
     const username = typeof candidate.username === 'string'
       ? candidate.username.trim().replace(/^u\//i, '')
@@ -151,6 +172,28 @@ export async function saveSprinklrRedditConnection(input: {
   }
 }
 
+export async function saveBrowserRelayRedditConnection(input: {
+  userId: string
+  username: string
+  connectorId: string
+}): Promise<void> {
+  const stored: StoredBrowserRelaySession = {
+    version: 3,
+    provider: 'browser_relay',
+    username: input.username,
+    connectorId: input.connectorId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc('save_browser_relay_reddit_connection_v1', {
+    p_user_id: input.userId,
+    p_username: input.username,
+    p_session_ciphertext: sessionCiphertext,
+  })
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
 export async function getActiveRedditSession(userId: string): Promise<ActiveRedditSession> {
   const admin = getServiceRoleClient()
   const { data, error } = await admin
@@ -193,11 +236,14 @@ export async function getActiveRedditSession(userId: string): Promise<ActiveRedd
 export async function hasActiveRedditConnection(userId: string): Promise<boolean> {
   const { data, error } = await getServiceRoleClient()
     .from('reddit_connection_secrets')
-    .select('connection_id')
+    .select('connection_id, provider')
     .eq('user_id', userId)
     .eq('status', 'active')
     .maybeSingle()
-  return !error && Boolean(data)
+  // Browser relay currently establishes identity only; server-side automatic
+  // delivery must not treat it as a direct posting session.
+  if (error || !data) return false
+  return data.provider !== 'browser_relay'
 }
 
 export async function updateRedditConnectionAccountProfile(
@@ -236,13 +282,14 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
       .maybeSingle(),
     admin
       .from('reddit_connection_secrets')
-      .select('status, last_verified_at, last_used_at, account_created_at, link_karma, comment_karma, last_error_code')
+      .select('provider, status, last_verified_at, last_used_at, account_created_at, link_karma, comment_karma, last_error_code')
       .eq('user_id', userId)
       .maybeSingle(),
   ])
 
   if (!connection) {
     return {
+      provider: null,
       username: null,
       status: 'missing',
       lastVerifiedAt: null,
@@ -261,6 +308,11 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
       : 'error'
 
   return {
+    provider: secret?.provider === 'redditapis'
+      || secret?.provider === 'sprinklr'
+      || secret?.provider === 'browser_relay'
+      ? secret.provider
+      : null,
     username: connection.external_username,
     status,
     lastVerifiedAt: secret?.last_verified_at ?? null,

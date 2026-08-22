@@ -33,6 +33,7 @@ export async function GET() {
         account_created_at: redditSummary.accountCreatedAt,
         link_karma: redditSummary.linkKarma,
         comment_karma: redditSummary.commentKarma,
+        provider: redditSummary.provider,
       }
     : { ...connection, status: 'active' })
 
@@ -43,6 +44,7 @@ export async function GET() {
       redditDirectPosting: hasRedditPostingProvider(),
       redditScheduledDiscovery: hasRedditDiscoveryProvider(),
       redditConnectionProvider: getRedditPostingProviderKind(),
+      redditBrowserConnection: true,
     },
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
