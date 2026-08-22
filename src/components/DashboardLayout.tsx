@@ -357,7 +357,7 @@ function DashboardShell({
     await openCheckout({ addon: type }, `addon:${type}`)
   }
 
-  async function handleAddCredits() {
+  async function handleUpgradePlan() {
     if (plan === 'growth') {
       window.location.href = '/pricing'
       return
@@ -369,7 +369,6 @@ function DashboardShell({
   const creditsPercent = credits && credits.limit > 0
     ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
     : 0
-  const draftAddonAvailable = (plan === 'free' || plan === 'starter') && creditsRemaining === 0
   const openIncidents = serviceIncidents.filter(incident => incident.status === 'open')
   const primaryIncident = [...openIncidents].sort((left, right) => {
     const priority = { critical: 0, warning: 1, info: 2 }
@@ -521,18 +520,27 @@ function DashboardShell({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={draftAddonAvailable ? () => void handleBuyAddon('drafts') : handleAddCredits}
-                  disabled={Boolean(openingCheckout)}
-                  className="w-full rounded-lg bg-zinc-900 text-white text-sm font-medium py-2 hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-60"
-                >
-                  {openingCheckout
-                    ? 'Opening checkout...'
-                    : draftAddonAvailable
-                      ? BILLING_ADDONS.drafts.ctaLabel
-                      : 'Upgrade Plan'}
-                </button>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void handleBuyAddon('drafts')}
+                    disabled={Boolean(openingCheckout)}
+                    title={BILLING_ADDONS.drafts.ctaLabel}
+                    className="min-h-9 rounded-lg border border-zinc-300 bg-white px-2 text-[11px] font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {openingCheckout === 'addon:drafts' ? 'Opening…' : 'Add credits'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleUpgradePlan()}
+                    disabled={Boolean(openingCheckout)}
+                    className="min-h-9 rounded-lg bg-zinc-900 px-2 text-[11px] font-semibold text-white transition-colors hover:bg-zinc-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {openingCheckout === 'upgrade'
+                      ? 'Opening…'
+                      : plan === 'growth' ? 'View plans' : 'Upgrade'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
