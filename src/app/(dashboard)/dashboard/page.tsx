@@ -993,7 +993,7 @@ export default function DashboardPage() {
       {/* ElevenLabs Style 4 Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Conversations Found */}
-        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">Conversations Found</span>
             <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
@@ -1009,7 +1009,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 2: High Intent */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
             <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
@@ -1036,7 +1036,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 3: Drafts Ready */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">
               Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>
@@ -1063,7 +1063,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 4: Replies sent in the selected period */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
             <div className="w-8 h-8 rounded-xl text-[#FF5101] flex items-center justify-center shrink-0">
