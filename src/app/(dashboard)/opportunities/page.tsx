@@ -634,7 +634,7 @@ export default function OpportunitiesPage() {
 
         {/* ── Split Panel Body ────────────────────────────────────── */}
         {loading ? (
-          <div className="h-[calc(100vh-250px)] min-h-[560px] rounded-2xl border border-black/[0.08] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] grid grid-cols-[380px_1fr] overflow-hidden">
+          <div className="h-[calc(100vh-280px)] min-h-[460px] rounded-2xl border border-black/[0.08] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] grid grid-cols-[380px_1fr] overflow-hidden">
             <div className="border-r border-black/[0.06] bg-[#FAFAF9]/80 space-y-2 p-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="h-[96px] animate-pulse rounded-xl bg-white border border-black/[0.04]" />
@@ -662,7 +662,7 @@ export default function OpportunitiesPage() {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row h-[calc(100vh-250px)] min-h-[560px] rounded-2xl border border-black/[0.08] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] overflow-hidden">
+          <div className="flex flex-col lg:flex-row h-[calc(100vh-280px)] min-h-[460px] rounded-2xl border border-black/[0.08] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] overflow-hidden">
 
             {/* LEFT: Scrollable Lead List */}
             <div
