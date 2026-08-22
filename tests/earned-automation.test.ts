@@ -29,6 +29,18 @@ describe('earned automation safety contracts', () => {
     expect(getPlatformCapabilities('threads').delivery).toBe('unsupported')
   })
 
+  it('recognizes the official Sprinklr Reddit provider path', () => {
+    expect(getPlatformCapabilities('reddit', {
+      redditDirectPosting: true,
+      redditProvider: 'sprinklr',
+    })).toMatchObject({
+      delivery: 'direct',
+      compliance: 'approved',
+      freshness: 'streaming',
+      proof: 'provider_permalink',
+    })
+  })
+
   it('never lowers a configured confidence boundary', () => {
     const decision = calculateAutomationDecision({
       userTrust: 100,

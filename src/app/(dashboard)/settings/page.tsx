@@ -176,6 +176,7 @@ export default function SettingsPage() {
     redditDirectPosting: false,
     redditScheduledDiscovery: false,
     blueskyDirectPosting: true,
+    redditConnectionProvider: null as 'sprinklr' | 'redditapis' | null,
   })
   const [bskyHandle, setBskyHandle] = useState('')
   const [bskyPassword, setBskyPassword] = useState('')
@@ -239,6 +240,7 @@ export default function SettingsPage() {
                 redditDirectPosting: boolean
                 redditScheduledDiscovery: boolean
                 blueskyDirectPosting: boolean
+                redditConnectionProvider: 'sprinklr' | 'redditapis' | null
               }
             }
           })
@@ -514,7 +516,8 @@ export default function SettingsPage() {
   }, [])
 
   const handleConnectReddit = async () => {
-    if (!redditLoginUsername.trim() || !redditPassword) {
+    const usesSprinklr = deliveryCapabilities.redditConnectionProvider === 'sprinklr'
+    if (!usesSprinklr && (!redditLoginUsername.trim() || !redditPassword)) {
       toast.error('Enter your Reddit username and password.')
       return
     }
@@ -523,7 +526,7 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings/reddit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(usesSprinklr ? {} : {
           username: redditLoginUsername.trim(),
           password: redditPassword,
           ...(redditTotpSecret.trim() ? { totpSecret: redditTotpSecret.trim() } : {}),
@@ -535,7 +538,8 @@ export default function SettingsPage() {
       } | null
       if (!response.ok) throw new Error(payload?.error || 'reddit_connection_failed')
 
-      const connectedUsername = payload?.connection?.external_username || redditLoginUsername.trim()
+      const connectedUsername = payload?.connection?.external_username
+        || redditLoginUsername.trim()
       clearSupabaseReadCache()
       setConnections(current => ({
         ...current,
@@ -556,6 +560,10 @@ export default function SettingsPage() {
         toast.error('RedditAPIs is rate-limiting connections. Wait 10 minutes, then try once.')
       } else if (code === 'reddit_provider_temporarily_unavailable') {
         toast.error('RedditAPIs could not reach Reddit after one safe retry. Try again later.')
+      } else if (code === 'sprinklr_authentication_failed') {
+        toast.error('Sprinklr rejected the configured API credentials. An administrator must reconnect the integration.')
+      } else if (code === 'sprinklr_reddit_account_invalid') {
+        toast.error('The configured Sprinklr account is not an active Reddit account.')
       } else {
         toast.error('Could not connect Reddit. Check the details and try again.')
       }
@@ -940,6 +948,11 @@ export default function SettingsPage() {
                                   Reddit expired the saved session. Automatic Reddit replies are paused until you reconnect.
                                 </div>
                               )}
+                              {deliveryCapabilities.redditConnectionProvider === 'sprinklr' ? (
+                                <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-[12px] leading-5 text-blue-900">
+                                  Reddit authorization is managed in your organization&apos;s Sprinklr account. Verify the active Reddit channel here; BuyerWatch never receives your Reddit password.
+                                </div>
+                              ) : <>
                               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <input
                                   value={redditLoginUsername}
@@ -968,13 +981,20 @@ export default function SettingsPage() {
                               <p className="text-[11.5px] leading-5 text-gray-500">
                                 Credentials are sent once to RedditAPIs to establish a Reddit session. BuyerWatch never stores your password or 2FA secret; only the returned session cookies are encrypted at rest. RedditAPIs is an independent provider, not Reddit.
                               </p>
+                              </>}
                               <button
                                 type="button"
                                 onClick={() => void handleConnectReddit()}
                                 disabled={redditConnecting}
                                 className="rounded-lg bg-[#FF4500] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#e63e00] disabled:cursor-wait disabled:opacity-60"
                               >
-                                {redditConnecting ? 'Connecting securely...' : connections.redditStatus === 'reauth_required' ? 'Reconnect Reddit' : 'Connect Reddit'}
+                                {redditConnecting
+                                  ? 'Connecting securely...'
+                                  : deliveryCapabilities.redditConnectionProvider === 'sprinklr'
+                                    ? 'Verify Sprinklr Reddit account'
+                                    : connections.redditStatus === 'reauth_required'
+                                      ? 'Reconnect Reddit'
+                                      : 'Connect Reddit'}
                               </button>
                             </div>
                           )}

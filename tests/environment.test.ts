@@ -48,6 +48,17 @@ function stubProductionCore() {
     'REDDITAPIS_DISCOVERY_CACHE_SECONDS',
     'REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS',
     'REDDIT_AUTO_MIN_COMBINED_KARMA',
+    'SPRINKLR_API_BASE_URL',
+    'SPRINKLR_API_KEY',
+    'SPRINKLR_ACCESS_TOKEN',
+    'SPRINKLR_WORKSPACE_ID',
+    'SPRINKLR_REDDIT_TOPIC_ID',
+    'SPRINKLR_REDDIT_ACCOUNT_ID',
+    'SPRINKLR_REDDIT_CHANNEL_ID',
+    'SPRINKLR_REDDIT_CAMPAIGN_ID',
+    'SPRINKLR_REDDIT_DISCOVERY_ENABLED',
+    'SPRINKLR_REDDIT_POSTING_ENABLED',
+    'SPRINKLR_DISCOVERY_CACHE_SECONDS',
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
   ]) {
@@ -230,6 +241,39 @@ describe('production capability configuration', () => {
 
     vi.stubEnv('REDDITAPIS_POSTING_ENABLED', 'true')
     expect(getProviderCapabilities().redditPosting).toBe(true)
+  })
+
+  it('accepts a completely configured official Sprinklr Reddit provider', () => {
+    stubProductionCore()
+    vi.stubEnv('SPRINKLR_API_BASE_URL', 'https://api3.sprinklr.com/prod9')
+    vi.stubEnv('SPRINKLR_API_KEY', 'api-key')
+    vi.stubEnv('SPRINKLR_ACCESS_TOKEN', 'access-token')
+    vi.stubEnv('SPRINKLR_REDDIT_TOPIC_ID', 'topic-1')
+    vi.stubEnv('SPRINKLR_REDDIT_ACCOUNT_ID', '123456')
+    vi.stubEnv('SPRINKLR_REDDIT_CHANNEL_ID', 'channel-1')
+    vi.stubEnv('SPRINKLR_REDDIT_CAMPAIGN_ID', 'campaign-1')
+    vi.stubEnv('SPRINKLR_REDDIT_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('SPRINKLR_REDDIT_POSTING_ENABLED', 'true')
+
+    expect(() => validateAppEnvironment()).not.toThrow()
+    expect(getProviderCapabilities()).toMatchObject({
+      redditDiscovery: true,
+      redditPosting: true,
+    })
+  })
+
+  it('rejects incomplete or untrusted Sprinklr configuration', () => {
+    stubProductionCore()
+    vi.stubEnv('SPRINKLR_API_KEY', 'api-key')
+    expect(() => validateAppEnvironment()).toThrow(/Sprinklr Reddit is partially configured/)
+
+    vi.stubEnv('SPRINKLR_API_BASE_URL', 'https://evil.example/prod9')
+    vi.stubEnv('SPRINKLR_ACCESS_TOKEN', 'access-token')
+    vi.stubEnv('SPRINKLR_REDDIT_TOPIC_ID', 'topic-1')
+    vi.stubEnv('SPRINKLR_REDDIT_ACCOUNT_ID', '123456')
+    vi.stubEnv('SPRINKLR_REDDIT_CHANNEL_ID', 'channel-1')
+    vi.stubEnv('SPRINKLR_REDDIT_CAMPAIGN_ID', 'campaign-1')
+    expect(() => validateAppEnvironment()).toThrow(/SPRINKLR_API_BASE_URL/)
   })
 
   it('rejects unsafe or malformed Reddit provider limits', () => {
