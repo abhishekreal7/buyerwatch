@@ -1,7 +1,5 @@
 'use client'
 
-import posthog from 'posthog-js'
-
 export type AnalyticsEvent =
   | 'user_signed_up'
   | 'user_signed_in'
@@ -33,13 +31,24 @@ function isBrowser(): boolean {
   return typeof globalThis !== 'undefined' && typeof (globalThis as Record<string, unknown>).window !== 'undefined'
 }
 
+function getPosthog(): { identify: (...a: unknown[]) => void; reset: () => void; capture: (...a: unknown[]) => void } | null {
+  if (!isBrowser()) return null
+  // Resolve posthog lazily so the module can be tree-shaken and avoids a
+  // hard dependency on posthog-js being present at compile time.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('posthog-js').default ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Associates current session events with a specific user identity.
  */
 export function identifyUser(userId: string, traits?: UserTraits): void {
-  if (!isBrowser()) return
   try {
-    posthog.identify(userId, traits)
+    getPosthog()?.identify(userId, traits)
   } catch (err) {
     console.warn('[analytics] identify failed:', err)
   }
@@ -49,9 +58,8 @@ export function identifyUser(userId: string, traits?: UserTraits): void {
  * Clears user identity and resets session on logout.
  */
 export function resetUser(): void {
-  if (!isBrowser()) return
   try {
-    posthog.reset()
+    getPosthog()?.reset()
   } catch (err) {
     console.warn('[analytics] reset failed:', err)
   }
@@ -64,9 +72,8 @@ export function trackEvent(
   event: AnalyticsEvent,
   properties?: Record<string, unknown>,
 ): void {
-  if (!isBrowser()) return
   try {
-    posthog.capture(event, properties)
+    getPosthog()?.capture(event, properties)
   } catch (err) {
     console.warn('[analytics] trackEvent failed:', err)
   }
