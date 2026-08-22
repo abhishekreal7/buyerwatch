@@ -552,8 +552,10 @@ export default function SettingsPage() {
         toast.error('Reddit rejected the credentials or 2FA secret.')
       } else if (code === 'rate_limited') {
         toast.error('Too many connection attempts. Please wait and try again.')
+      } else if (code === 'reddit_provider_rate_limited') {
+        toast.error('RedditAPIs is rate-limiting connections. Wait 10 minutes, then try once.')
       } else if (code === 'reddit_provider_temporarily_unavailable') {
-        toast.error('Reddit connection service is temporarily unavailable. Try again shortly.')
+        toast.error('RedditAPIs could not reach Reddit after one safe retry. Try again later.')
       } else {
         toast.error('Could not connect Reddit. Check the details and try again.')
       }

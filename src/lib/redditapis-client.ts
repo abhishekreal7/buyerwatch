@@ -21,6 +21,9 @@ const PROVIDER_BUDGET_KEY_PREFIX = 'budget:redditapis:v1'
 const DEFAULT_DAILY_READ_CALL_LIMIT = 250
 const DEFAULT_DAILY_WRITE_CALL_LIMIT = 10
 const MAX_CONFIGURED_DAILY_CALL_LIMIT = 100_000
+const DEFAULT_LOGIN_RETRY_DELAY_MS = 3_000
+const MAX_LOGIN_RETRY_DELAY_MS = 10_000
+const LOGIN_RETRYABLE_STATUSES = new Set([500, 502, 503, 504])
 
 // A fully gated automatic reply can require three community-policy reads,
 // five bounded preflight pages, and one comment write. Keep headroom above
@@ -78,6 +81,18 @@ function boundedDailyLimit(name: string, fallback: number): number {
   const value = Number(raw)
   if (!Number.isSafeInteger(value) || value < 0) return fallback
   return Math.min(value, MAX_CONFIGURED_DAILY_CALL_LIMIT)
+}
+
+function loginRetryDelayMs(): number {
+  const raw = process.env.REDDITAPIS_LOGIN_RETRY_DELAY_MS?.trim()
+  if (!raw) return DEFAULT_LOGIN_RETRY_DELAY_MS
+  const value = Number(raw)
+  if (!Number.isSafeInteger(value) || value < 0) return DEFAULT_LOGIN_RETRY_DELAY_MS
+  return Math.min(value, MAX_LOGIN_RETRY_DELAY_MS)
+}
+
+function waitFor(milliseconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
 
 function budgetKey(scope: Exclude<RedditApisBudgetScope, 'none'>, now = new Date()): string {
@@ -379,18 +394,33 @@ export async function loginRedditAccount(input: {
   password: string
   totpSecret?: string
 }): Promise<RedditLoginResult> {
-  const { response, payload } = await redditApisFetchJson('/api/reddit/login', {
+  const requestLogin = () => redditApisFetchJson('/api/reddit/login', {
     method: 'POST',
     body: JSON.stringify({
       username: input.username,
       password: input.password,
       // The provider's browser login path returns false 401s for some valid,
       // non-2FA accounts. BuyerWatch only needs comment-session cookies, so
-      // use the provider's default HTTP flow and avoid a paid retry cascade.
+      // use the provider's default HTTP flow.
       method: 'http',
       ...(input.totpSecret ? { totp_secret: input.totpSecret } : {}),
     }),
-  }, 45_000, { circuitScope: 'account', budgetScope: 'write' })
+  }, 45_000, { circuitScope: 'account' as const, budgetScope: 'write' as const })
+
+  let result = await requestLogin()
+  if (LOGIN_RETRYABLE_STATUSES.has(result.response.status)) {
+    // RedditAPIs documents transient upstream/proxy failures for login. Retry
+    // exactly once after a short pause; never retry credential failures or
+    // rate limits, and let the shared write budget cap the extra paid call.
+    console.warn('[redditapis] Login upstream unavailable; retrying once', {
+      status: result.response.status,
+      method: 'http',
+    })
+    await waitFor(loginRetryDelayMs())
+    result = await requestLogin()
+  }
+
+  const { response, payload } = result
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -399,7 +429,10 @@ export async function loginRedditAccount(input: {
     if (response.status === 402) {
       throw new RedditApisRequestError('reddit_provider_balance_unavailable', 402, false)
     }
-    if (response.status === 429 || response.status >= 500) {
+    if (response.status === 429) {
+      throw new RedditApisRequestError('reddit_provider_rate_limited', 429, true)
+    }
+    if (response.status >= 500) {
       throw new RedditApisRequestError('reddit_provider_temporarily_unavailable', response.status, true)
     }
     throw new RedditApisRequestError('reddit_connection_rejected', response.status, false)

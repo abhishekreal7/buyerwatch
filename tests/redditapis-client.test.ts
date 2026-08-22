@@ -216,6 +216,57 @@ describe('RedditAPIs client reliability', () => {
     })
   })
 
+  it('retries one transient provider login failure and then accepts the session', async () => {
+    vi.stubEnv('REDDITAPIS_LOGIN_RETRY_DELAY_MS', '0')
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ error: 'upstream proxy failed' }, 502))
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        username: 'Fluid-Mix4114',
+        cookies: {
+          reddit_session: 'session',
+          loid: 'loid',
+        },
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).resolves.toMatchObject({ username: 'Fluid-Mix4114' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not spend a retry when the provider rate-limits login', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'slow down' }, 429))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).rejects.toMatchObject({
+      code: 'reddit_provider_rate_limited',
+      status: 429,
+      retryable: true,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry rejected Reddit credentials', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'bad credentials' }, 401))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).rejects.toMatchObject({
+      code: 'reddit_credentials_or_2fa_rejected',
+      status: 401,
+      retryable: false,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('blocks paid reads before the provider call when the daily budget is exhausted', async () => {
     vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
     vi.spyOn(redis, 'eval').mockResolvedValue(-1 as never)
