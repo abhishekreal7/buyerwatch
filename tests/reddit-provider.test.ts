@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildSubredditRssUrl,
   fetchSubredditNew,
+  fetchSubredditNewWithSource,
   normalizeRedditApisPosts,
   parseRedditRss,
   shouldBackoffRedditRssStatus,
@@ -100,6 +101,44 @@ describe('Reddit provider contracts', () => {
     await expect(fetchSubredditNew('SaaS')).resolves.toHaveLength(1)
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('https://api.redditapis.com/')
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain('https://www.reddit.com/r/saas/new/.rss')
+  })
+
+  it('uses the cached RSS fallback without attempting a paid read when capacity is paused', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_FORCE_LIVE', 'true')
+    vi.spyOn(redis, 'get').mockResolvedValue(JSON.stringify([{
+      platform: 'reddit',
+      externalId: 'abc123',
+      author: 'buyer-account',
+      text: 'Need help choosing a CRM',
+      url: 'https://www.reddit.com/r/saas/comments/abc123/',
+      createdAt: '2026-08-20T08:30:00.000Z',
+      sourceTarget: 'saas',
+    }]) as never)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchSubredditNewWithSource('SaaS', 25, {
+      mode: 'rss_only',
+    })).resolves.toMatchObject({
+      source: 'rss',
+      posts: [{ externalId: 'abc123' }],
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('treats an empty valid Atom listing as a successful bounded source check', async () => {
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
+    vi.spyOn(redis, 'set').mockResolvedValue('OK' as never)
+    vi.spyOn(redis, 'del').mockResolvedValue(1 as never)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<feed></feed>', {
+      headers: { 'Content-Type': 'application/atom+xml' },
+    })))
+
+    await expect(fetchSubredditNewWithSource('SaaS', 25, {
+      mode: 'rss_only',
+    })).resolves.toEqual({ posts: [], source: 'rss' })
   })
 
   it('normalizes the current redditapis.com listing response shape', () => {

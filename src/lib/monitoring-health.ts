@@ -55,6 +55,8 @@ export function getKeywordPollIssueLabel(errorCode: string | null | undefined): 
       return 'Source timed out'
     case 'provider_auth_failed':
       return 'Source authentication failed'
+    case 'reddit_rss_fallback':
+      return 'Reddit fallback active'
     default:
       return 'Source check failed'
   }

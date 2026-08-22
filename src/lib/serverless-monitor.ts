@@ -9,7 +9,8 @@ import {
   type SocialScoreCandidate,
 } from './reddit-candidates'
 import { searchBlueskyPosts } from './bluesky'
-import { fetchSubredditNew } from './reddit'
+import { fetchSubredditNewWithSource, type RedditDiscoverySource } from './reddit'
+import { getRedditDiscoveryCapacity } from './reddit-discovery-capacity'
 import { dispatchPendingOutbox, recoverStaleSends, withRedisLock } from './backend-maintenance'
 import {
   MONITORING_RUN_LOCK_KEY,
@@ -40,6 +41,10 @@ type TargetWork = {
   platform: MonitorPlatform
   target: string
   mappings: SocialKeywordMapping[]
+}
+
+type CompletedTargetWork = TargetWork & {
+  redditSource?: RedditDiscoverySource
 }
 
 export type ServerlessMonitorResult = {
@@ -299,22 +304,38 @@ async function runLockedMonitor(
     )
   }
   const discovered: SocialScoreCandidate[] = []
-  const completedWork: TargetWork[] = []
+  const completedWork: CompletedTargetWork[] = []
   const failedWork: Array<{ target: TargetWork; error: unknown }> = []
+  const redditCapacity = await getRedditDiscoveryCapacity()
+  if (redditCapacity.mode === 'rss_only') {
+    logger.warn({
+      reason: redditCapacity.reason,
+      readBudget: redditCapacity.readBudget,
+    }, 'Reddit discovery is using the RSS fallback; paid provider reads are paused safely')
+  }
 
   for (let index = 0; index < work.length; index += 6) {
     const batch = work.slice(index, index + 6)
     const results = await Promise.allSettled(batch.map(async (target) => {
-      const posts = target.platform === 'reddit'
-        ? await fetchSubredditNew(target.target, 25)
-        : await searchBlueskyPosts(target.target, 25)
-      return buildSocialScoreCandidates(posts, target.mappings).candidates
+      if (target.platform === 'reddit') {
+        const result = await fetchSubredditNewWithSource(target.target, 25, {
+          mode: redditCapacity.mode,
+        })
+        return {
+          candidates: buildSocialScoreCandidates(result.posts, target.mappings).candidates,
+          redditSource: result.source,
+        }
+      }
+      const posts = await searchBlueskyPosts(target.target, 25)
+      return {
+        candidates: buildSocialScoreCandidates(posts, target.mappings).candidates,
+      }
     }))
     for (const [resultIndex, result] of results.entries()) {
       const target = batch[resultIndex]
       if (result.status === 'fulfilled') {
-        completedWork.push(target)
-        discovered.push(...result.value)
+        completedWork.push({ ...target, redditSource: result.value.redditSource })
+        discovered.push(...result.value.candidates)
       } else {
         failedWork.push({ target, error: result.reason })
         logger.warn({
@@ -334,7 +355,11 @@ async function runLockedMonitor(
 
   await Promise.all([
     ...completedWork.map(target =>
-      recordKeywordPollSuccess(target.mappings.map(({ id }) => id), now),
+      recordKeywordPollSuccess(
+        target.mappings.map(({ id }) => id),
+        now,
+        target.redditSource === 'rss' ? 'reddit_rss' : undefined,
+      ),
     ),
     ...failedWork.map(({ target, error }) =>
       recordKeywordPollFailure(target.mappings.map(({ id }) => id), error, now),
