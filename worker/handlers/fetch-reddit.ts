@@ -8,7 +8,8 @@ import {
   type RedditKeywordMapping,
   withProfileCompetitors,
 } from '../../src/lib/reddit-candidates'
-import { fetchSubredditNew } from '../../src/lib/reddit'
+import { fetchSubredditNewWithSource } from '../../src/lib/reddit'
+import { getRedditDiscoveryCapacity } from '../../src/lib/reddit-discovery-capacity'
 import {
   recordKeywordPollFailure,
   recordKeywordPollSuccess,
@@ -55,8 +56,14 @@ export async function redditFetchHandler(job: Job) {
     if (keywordMappings.length === 0) return
     keywordIds = keywordMappings.map(({ id }) => id)
 
-    const posts = await fetchSubredditNew(target)
-    await recordKeywordPollSuccess(keywordIds)
+    const capacity = await getRedditDiscoveryCapacity()
+    const result = await fetchSubredditNewWithSource(target, 25, { mode: capacity.mode })
+    const posts = result.posts
+    await recordKeywordPollSuccess(
+      keywordIds,
+      new Date(),
+      result.source === 'rss' ? 'reddit_rss' : undefined,
+    )
     sourceFetchRecorded = true
     if (!posts || posts.length === 0) {
       logger.info({ subreddit: target }, `r/${target}: source checked; no posts returned`)

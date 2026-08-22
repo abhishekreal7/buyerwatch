@@ -30,6 +30,7 @@ export function keywordPollErrorCode(error: unknown): string {
 export async function recordKeywordPollSuccess(
   keywordIds: string[],
   checkedAt = new Date(),
+  source?: 'reddit_provider' | 'reddit_rss',
 ): Promise<void> {
   const ids = uniqueKeywordIds(keywordIds)
   if (ids.length === 0) return
@@ -40,6 +41,21 @@ export async function recordKeywordPollSuccess(
     p_checked_at: timestamp,
   })
   if (error) throw new Error(`Unable to record keyword poll success: ${error.message}`)
+
+  // A fallback is still a successful source check, so it must not make the
+  // rule look stale. Retain a small non-sensitive marker so the customer can
+  // see that Reddit is temporarily running on its resilient fallback path.
+  if (source === 'reddit_rss') {
+    const { error: sourceError } = await getAdminClient()
+      .from('keywords')
+      .update({ last_check_error: 'reddit_rss_fallback' })
+      .in('id', ids)
+    if (sourceError) {
+      // The canonical heartbeat was already written by the RPC above. A UI
+      // annotation must never turn a successful source check into a failure.
+      console.warn('Unable to record Reddit fallback annotation:', sourceError.message)
+    }
+  }
 
   const pipeline = redis.pipeline()
   for (const keywordId of ids) {

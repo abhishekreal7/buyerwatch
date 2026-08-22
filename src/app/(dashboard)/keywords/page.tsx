@@ -562,6 +562,8 @@ export default function KeywordsPage() {
               const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
               const successRate = getSuccessRate(threadStats.total, threadStats.replied)
               const sourceDelayed = kw.is_active && isKeywordPollDelayed(kw, staleAfterMs)
+              const usingRedditFallback = kw.last_check_status === 'success'
+                && kw.last_check_error === 'reddit_rss_fallback'
 
               return (
                 <div
@@ -589,15 +591,19 @@ export default function KeywordsPage() {
                     </span>
                     <span
                       className={`mt-0.5 truncate text-[11px] font-medium ${
-                        sourceDelayed ? 'text-amber-700' : 'text-[#92928C]'
+                        sourceDelayed ? 'text-amber-700' : usingRedditFallback ? 'text-amber-700' : 'text-[#92928C]'
                       }`}
                       title={sourceDelayed
                         ? `${getKeywordPollIssueLabel(kw.last_check_error)}; retrying automatically`
-                        : 'Last successful source check'}
+                        : usingRedditFallback
+                          ? 'Reddit is temporarily using its resilient fallback source'
+                          : 'Last successful source check'}
                     >
-                      {sourceDelayed
-                        ? `${getKeywordPollIssueLabel(kw.last_check_error)} · attempted ${relativeCheckTime(kw.last_checked_at).replace('Checked ', '')}`
-                        : relativeCheckTime(kw.last_success_at)}
+                    {sourceDelayed
+                      ? `${getKeywordPollIssueLabel(kw.last_check_error)} · attempted ${relativeCheckTime(kw.last_checked_at).replace('Checked ', '')}`
+                        : usingRedditFallback
+                          ? `${getKeywordPollIssueLabel(kw.last_check_error)} · ${relativeCheckTime(kw.last_success_at).replace('Checked ', '')}`
+                          : relativeCheckTime(kw.last_success_at)}
                     </span>
                   </div>
 
