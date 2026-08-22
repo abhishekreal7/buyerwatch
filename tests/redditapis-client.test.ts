@@ -3,6 +3,7 @@ import {
   fetchRedditApisAccountStatus,
   fetchRedditPostSnapshot,
   getRedditApisDailyBudgetStatus,
+  loginRedditAccount,
   postRedditApisComment,
   RedditApisRequestError,
 } from '../src/lib/redditapis-client'
@@ -185,6 +186,34 @@ describe('RedditAPIs client reliability', () => {
     })))
 
     await expect(fetchRedditApisAccountStatus()).resolves.toEqual({ creditsRemaining: 3.25 })
+  })
+
+  it('uses the provider HTTP login flow once for comment-session cookies', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      success: true,
+      username: 'Fluid-Mix4114',
+      cookies: {
+        reddit_session: 'session',
+        loid: 'loid',
+      },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loginRedditAccount({
+      username: 'Fluid-Mix4114',
+      password: 'not-a-real-password',
+    })).resolves.toMatchObject({
+      username: 'Fluid-Mix4114',
+      cookies: { reddit_session: 'session', loid: 'loid' },
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const request = fetchMock.mock.calls[0]
+    expect(String(request[0])).toContain('/api/reddit/login')
+    expect(JSON.parse(String(request[1]?.body))).toMatchObject({
+      username: 'Fluid-Mix4114',
+      method: 'http',
+    })
   })
 
   it('blocks paid reads before the provider call when the daily budget is exhausted', async () => {

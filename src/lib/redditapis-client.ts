@@ -384,7 +384,10 @@ export async function loginRedditAccount(input: {
     body: JSON.stringify({
       username: input.username,
       password: input.password,
-      method: 'browser',
+      // The provider's browser login path returns false 401s for some valid,
+      // non-2FA accounts. BuyerWatch only needs comment-session cookies, so
+      // use the provider's default HTTP flow and avoid a paid retry cascade.
+      method: 'http',
       ...(input.totpSecret ? { totp_secret: input.totpSecret } : {}),
     }),
   }, 45_000, { circuitScope: 'account', budgetScope: 'write' })
