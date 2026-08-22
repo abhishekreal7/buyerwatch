@@ -31,10 +31,18 @@ type StoredMcpAgentSession = {
   clientId: string
 }
 
+type StoredHyperbrowserSession = {
+  version: 5
+  provider: 'hyperbrowser'
+  username: string
+  profileId: string
+}
+
 type StoredRedditSession = StoredRedditApisSession
   | StoredSprinklrSession
   | StoredBrowserRelaySession
   | StoredMcpAgentSession
+  | StoredHyperbrowserSession
 
 export type ActiveRedditSession = StoredRedditSession & {
   accountCreatedAt: string | null
@@ -45,7 +53,7 @@ export type ActiveRedditSession = StoredRedditSession & {
 export type RedditConnectionStatus = 'active' | 'reauth_required' | 'error' | 'missing'
 
 export type RedditConnectionSummary = {
-  provider: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | null
+  provider: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | 'hyperbrowser' | null
   username: string | null
   status: RedditConnectionStatus
   lastVerifiedAt: string | null
@@ -80,6 +88,19 @@ function validateStoredSession(value: unknown, expectedProvider: unknown): Store
     throw new RedditConnectionStateError('reddit_session_invalid')
   }
   const candidate = value as Record<string, unknown>
+  if (candidate.version === 5) {
+    const username = typeof candidate.username === 'string'
+      ? candidate.username.trim().replace(/^u\//i, '')
+      : ''
+    const profileId = typeof candidate.profileId === 'string' ? candidate.profileId.trim() : ''
+    if (
+      expectedProvider !== 'hyperbrowser'
+      || candidate.provider !== 'hyperbrowser'
+      || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)
+    ) throw new RedditConnectionStateError('reddit_session_invalid')
+    return { version: 5, provider: 'hyperbrowser', username, profileId }
+  }
   if (candidate.version === 4) {
     const username = typeof candidate.username === 'string'
       ? candidate.username.trim().replace(/^u\//i, '')
@@ -240,6 +261,34 @@ export async function saveMcpAgentRedditConnection(input: {
   }
 }
 
+export async function saveHyperbrowserRedditConnection(input: {
+  userId: string
+  username: string
+  profileId: string
+  accountCreatedAt?: string | null
+  linkKarma?: number | null
+  commentKarma?: number | null
+}): Promise<void> {
+  const stored: StoredHyperbrowserSession = {
+    version: 5,
+    provider: 'hyperbrowser',
+    username: input.username,
+    profileId: input.profileId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc('save_hyperbrowser_reddit_connection_v1', {
+    p_user_id: input.userId,
+    p_username: input.username,
+    p_session_ciphertext: sessionCiphertext,
+    p_account_created_at: input.accountCreatedAt ?? null,
+    p_link_karma: input.linkKarma ?? null,
+    p_comment_karma: input.commentKarma ?? null,
+  })
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
 export async function getActiveRedditSession(userId: string): Promise<ActiveRedditSession> {
   const admin = getServiceRoleClient()
   const { data, error } = await admin
@@ -287,10 +336,35 @@ export async function hasActiveRedditConnection(userId: string): Promise<boolean
     .eq('status', 'active')
     .maybeSingle()
   // Local browser and MCP agents establish identity and perform delivery on
-  // the user's device. Server-side automatic delivery must not mistake either
-  // mapping for provider credentials.
+  // the user's device. Hyperbrowser is a server-side provider, so it is active.
   if (error || !data) return false
   return data.provider !== 'browser_relay' && data.provider !== 'mcp_agent'
+}
+
+export async function getHyperbrowserRedditConnectionForVerification(
+  userId: string,
+): Promise<StoredHyperbrowserSession> {
+  const { data, error } = await getServiceRoleClient()
+    .from('reddit_connection_secrets')
+    .select('provider, session_ciphertext')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error || !data || data.provider !== 'hyperbrowser') {
+    throw new RedditConnectionStateError('hyperbrowser_profile_connection_required')
+  }
+  try {
+    const session = validateStoredSession(
+      JSON.parse(decrypt(data.session_ciphertext)) as unknown,
+      data.provider,
+    )
+    if (session.provider !== 'hyperbrowser') {
+      throw new RedditConnectionStateError('reddit_session_invalid')
+    }
+    return session
+  } catch (error) {
+    if (error instanceof RedditConnectionStateError) throw error
+    throw new RedditConnectionStateError('reddit_session_decryption_failed')
+  }
 }
 
 export async function updateRedditConnectionAccountProfile(
@@ -359,6 +433,7 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
       || secret?.provider === 'sprinklr'
       || secret?.provider === 'browser_relay'
       || secret?.provider === 'mcp_agent'
+      || secret?.provider === 'hyperbrowser'
       ? secret.provider
       : null,
     username: connection.external_username,
@@ -419,19 +494,11 @@ export async function markRedditConnectionReauthRequired(
 export async function recordRedditConnectionFailure(
   userId: string,
   errorCode: string,
-): Promise<void> {
-  const admin = getServiceRoleClient()
-  const { data } = await admin
-    .from('reddit_connection_secrets')
-    .select('consecutive_failures')
-    .eq('user_id', userId)
-    .maybeSingle()
-  await admin
-    .from('reddit_connection_secrets')
-    .update({
-      consecutive_failures: Math.min(100, (Number(data?.consecutive_failures) || 0) + 1),
-      last_error_code: errorCode,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
+): Promise<number> {
+  const { data, error } = await getServiceRoleClient().rpc(
+    'increment_reddit_connection_failure_v1',
+    { p_user_id: userId, p_error_code: errorCode },
+  )
+  if (error) throw error
+  return Number(data) || 0
 }

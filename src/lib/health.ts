@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { withRedisLock } from './backend-maintenance'
-import { hasRedditPostingProvider } from './env'
+import { getRedditPostingProviderKind, hasRedditPostingProvider } from './env'
 import { withTimeout } from './http'
 import { PLAN_POLL_INTERVAL_MINUTES, normalizePlan } from './plan-limits'
 import { hasQStashConfiguration } from './qstash'
@@ -10,6 +10,10 @@ import {
   getRedditApisDailyBudgetStatus,
   REDDITAPIS_MINIMUM_OPERATIONAL_CREDITS,
 } from './redditapis-client'
+import {
+  HYPERBROWSER_HEALTH_MAX_AGE_MS,
+  readHyperbrowserHealth,
+} from './reddit-delivery-health'
 
 const REDDIT_PROVIDER_HEALTH_KEY = 'health:redditapis:v1'
 const REDDIT_PROVIDER_HEALTH_LOCK_KEY = 'lock:health:redditapis:v1'
@@ -91,9 +95,39 @@ function parseProviderHealthSnapshot(value: string | null): ProviderHealthSnapsh
   return null
 }
 
-async function checkRedditProviderReadiness(): Promise<ReadinessCheck> {
+async function checkRedditProviderReadiness(required: boolean): Promise<ReadinessCheck> {
   if (!hasRedditPostingProvider()) {
     return { status: 'ok', latencyMs: 0, detail: 'disabled' }
+  }
+
+  const provider = getRedditPostingProviderKind()
+  if (provider === 'hyperbrowser') {
+    const startedAt = Date.now()
+    if (!required) return { status: 'ok', latencyMs: 0, detail: 'no active connections' }
+    try {
+      const snapshot = await readHyperbrowserHealth()
+      const fresh = snapshot
+        && Date.now() - Date.parse(snapshot.checkedAt) < HYPERBROWSER_HEALTH_MAX_AGE_MS
+      return {
+        status: fresh && snapshot.status === 'ok' ? 'ok' : 'error',
+        latencyMs: Date.now() - startedAt,
+        ...(!fresh || snapshot?.status === 'error'
+          ? {
+              detail: 'reddit delivery canary unavailable',
+              ...(snapshot?.code ? { code: snapshot.code } : {}),
+            }
+          : {}),
+      }
+    } catch {
+      return {
+        status: 'error',
+        latencyMs: Date.now() - startedAt,
+        detail: 'reddit delivery health cache unavailable',
+      }
+    }
+  }
+  if (provider === 'sprinklr') {
+    return { status: 'ok', latencyMs: 0, detail: 'configured' }
   }
 
   const startedAt = Date.now()
@@ -262,7 +296,7 @@ export async function checkApplicationReadiness() {
   })
 
   const redditProvider = cache.status === 'ok'
-    ? await checkRedditProviderReadiness()
+    ? await checkRedditProviderReadiness(redditProviderRequired)
     : { status: 'error' as const, latencyMs: 0, detail: 'cache unavailable' }
 
   return {

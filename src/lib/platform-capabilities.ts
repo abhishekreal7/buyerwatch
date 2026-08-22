@@ -18,7 +18,7 @@ export function getPlatformCapabilities(
   platform: SocialPlatform,
   options: {
     redditDirectPosting?: boolean
-    redditProvider?: 'sprinklr' | 'redditapis' | null
+    redditProvider?: 'sprinklr' | 'hyperbrowser' | 'redditapis' | null
   } = {},
 ): PlatformCapabilities {
   if (platform === 'reddit') {
@@ -27,8 +27,8 @@ export function getPlatformCapabilities(
       delivery: options.redditDirectPosting ? 'direct' : 'manual',
       identity: 'customer_account',
       proof: options.redditDirectPosting ? 'provider_permalink' : 'manual_confirmation',
-      // Sprinklr is the official data-partner path. RedditAPIs remains
-      // explicitly provisional while it is retained for compatibility.
+      // Sprinklr is the official data-partner path. Browser automation and
+      // RedditAPIs remain explicitly provisional compatibility paths.
       compliance: options.redditDirectPosting
         ? options.redditProvider === 'sprinklr' ? 'approved' : 'provisional'
         : 'restricted',
@@ -65,7 +65,7 @@ export function isDirectAutomationAvailable(
   platform: SocialPlatform,
   options: {
     redditDirectPosting?: boolean
-    redditProvider?: 'sprinklr' | 'redditapis' | null
+    redditProvider?: 'sprinklr' | 'hyperbrowser' | 'redditapis' | null
   } = {},
 ): boolean {
   return getPlatformCapabilities(platform, options).delivery === 'direct'

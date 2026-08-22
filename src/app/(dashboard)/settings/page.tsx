@@ -172,13 +172,13 @@ export default function SettingsPage() {
     bluesky: false,
     redditUsername: '',
     redditStatus: 'missing' as 'active' | 'reauth_required' | 'error' | 'missing',
-    redditProvider: null as 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | null,
+    redditProvider: null as 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | 'hyperbrowser' | null,
   })
   const [deliveryCapabilities, setDeliveryCapabilities] = useState({
     redditDirectPosting: false,
     redditScheduledDiscovery: false,
     blueskyDirectPosting: true,
-    redditConnectionProvider: null as 'sprinklr' | 'redditapis' | null,
+    redditConnectionProvider: null as 'sprinklr' | 'hyperbrowser' | 'redditapis' | null,
     redditBrowserConnection: false,
   })
   const [bskyHandle, setBskyHandle] = useState('')
@@ -246,13 +246,13 @@ export default function SettingsPage() {
                 platform: string
                 external_username: string | null
                 status?: 'active' | 'reauth_required' | 'error' | 'missing'
-                provider?: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | null
+                provider?: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | 'hyperbrowser' | null
               }>
               capabilities: {
                 redditDirectPosting: boolean
                 redditScheduledDiscovery: boolean
                 blueskyDirectPosting: boolean
-                redditConnectionProvider: 'sprinklr' | 'redditapis' | null
+                redditConnectionProvider: 'sprinklr' | 'hyperbrowser' | 'redditapis' | null
                 redditBrowserConnection: boolean
               }
             }
@@ -531,7 +531,8 @@ export default function SettingsPage() {
 
   const handleConnectReddit = async () => {
     const usesSprinklr = deliveryCapabilities.redditConnectionProvider === 'sprinklr'
-    if (!usesSprinklr && (!redditLoginUsername.trim() || !redditPassword)) {
+    const usesHyperbrowser = deliveryCapabilities.redditConnectionProvider === 'hyperbrowser'
+    if (!usesSprinklr && !usesHyperbrowser && (!redditLoginUsername.trim() || !redditPassword)) {
       toast.error('Enter your Reddit username and password.')
       return
     }
@@ -540,7 +541,7 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings/reddit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(usesSprinklr ? {} : {
+        body: JSON.stringify(usesSprinklr || usesHyperbrowser ? {} : {
           username: redditLoginUsername.trim(),
           password: redditPassword,
           ...(redditTotpSecret.trim() ? { totpSecret: redditTotpSecret.trim() } : {}),
@@ -578,6 +579,10 @@ export default function SettingsPage() {
         toast.error('Sprinklr rejected the configured API credentials. An administrator must reconnect the integration.')
       } else if (code === 'sprinklr_reddit_account_invalid') {
         toast.error('The configured Sprinklr account is not an active Reddit account.')
+      } else if (code === 'reddit_reconnect_required' || code === 'reddit_account_identity_mismatch') {
+        toast.error('Open the BuyerWatch Reddit profile in Hyperbrowser, sign in to the expected account, then verify again.')
+      } else if (code === 'hyperbrowser_session_unavailable') {
+        toast.error('The cloud Reddit session is temporarily unavailable. Wait a moment, then verify again.')
       } else {
         toast.error('Could not connect Reddit. Check the details and try again.')
       }
@@ -1124,6 +1129,10 @@ export default function SettingsPage() {
                                     <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-[12px] leading-5 text-blue-900">
                                       Reddit authorization is managed in your organization&apos;s Sprinklr account. Verify the active Reddit channel here; BuyerWatch never receives your Reddit password.
                                     </div>
+                                  ) : deliveryCapabilities.redditConnectionProvider === 'hyperbrowser' ? (
+                                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-[12px] leading-5 text-blue-900">
+                                      Reddit delivery uses your private BuyerWatch profile in Hyperbrowser. If Reddit signs it out, log back into that profile in Hyperbrowser, then verify the session here. BuyerWatch never receives your Reddit password or browser cookies.
+                                    </div>
                                   ) : <>
                                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <input value={redditLoginUsername} onChange={event => setRedditLoginUsername(event.target.value)} placeholder="Reddit username" autoComplete="username" className={inputCls} />
@@ -1133,7 +1142,7 @@ export default function SettingsPage() {
                                   <p className="text-[11.5px] leading-5 text-gray-500">Credentials are sent once to RedditAPIs to establish a Reddit session. BuyerWatch never stores your password or 2FA secret; only the returned session cookies are encrypted at rest. RedditAPIs is an independent provider, not Reddit.</p>
                                   </>}
                                   <button type="button" onClick={() => void handleConnectReddit()} disabled={redditConnecting} className="rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-wait disabled:opacity-60">
-                                    {redditConnecting ? 'Connecting securely...' : deliveryCapabilities.redditConnectionProvider === 'sprinklr' ? 'Verify Sprinklr Reddit account' : connections.redditStatus === 'reauth_required' ? 'Reconnect Reddit' : 'Connect Reddit'}
+                                    {redditConnecting ? 'Connecting securely...' : deliveryCapabilities.redditConnectionProvider === 'sprinklr' ? 'Verify Sprinklr Reddit account' : deliveryCapabilities.redditConnectionProvider === 'hyperbrowser' ? 'Verify cloud Reddit session' : connections.redditStatus === 'reauth_required' ? 'Reconnect Reddit' : 'Connect Reddit'}
                                   </button>
                                 </div>
                               </details>

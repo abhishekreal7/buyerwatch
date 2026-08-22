@@ -56,6 +56,13 @@ export async function publishQStashJson<T>(
   return 'messageId' in result ? result.messageId : null
 }
 
+export async function cancelQStashMessage(messageId: string): Promise<number> {
+  const token = process.env.QSTASH_TOKEN?.trim()
+  if (!token) throw new Error('QStash is not configured')
+  const result = await new Client({ token }).messages.cancel(messageId)
+  return result.cancelled
+}
+
 export function publishMonitoringRun(
   forceUserId?: string,
   forceTarget?: string,

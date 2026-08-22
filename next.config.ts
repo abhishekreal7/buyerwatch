@@ -4,6 +4,12 @@ import { withSentryConfig } from '@sentry/nextjs'
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   deploymentId: process.env.DEPLOYMENT_VERSION,
+  // playwright-core reads this registry at module initialization. Next's
+  // tracer does not discover the dynamic JSON lookup, so include the one
+  // runtime asset explicitly in server functions that load cloud delivery.
+  outputFileTracingIncludes: {
+    '/*': ['node_modules/playwright-core/browsers.json'],
+  },
   async headers() {
     return [{
       source: '/:path*',

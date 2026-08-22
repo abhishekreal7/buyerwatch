@@ -9,6 +9,7 @@ import {
 import { isUuid, readTextBody, RequestInputError } from '@/lib/request'
 import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
 import { runServerlessMonitoring } from '@/lib/serverless-monitor'
+import { runRedditDeliveryCanary } from '@/lib/reddit-delivery-canary'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -19,8 +20,15 @@ async function executeMonitor(
   forceUserId?: string,
   forcePlatform?: 'reddit' | 'bluesky',
   forceTarget?: string,
+  runCanary = false,
 ) {
   try {
+    const canaryPromise = runCanary
+      ? runRedditDeliveryCanary().catch((error) => {
+          logger.error({ error }, 'Reddit delivery canary crashed')
+          return { status: 'failed' as const, code: 'canary_crashed' }
+        })
+      : null
     const result = await runServerlessMonitoring(new Date(), {
       forceUserId,
       forcePlatform,
@@ -42,7 +50,11 @@ async function executeMonitor(
       }
     }
 
-    return NextResponse.json(result)
+    const canary = canaryPromise ? await canaryPromise : null
+    return NextResponse.json({
+      ...result,
+      ...(canary ? { redditDeliveryCanary: canary } : {}),
+    })
   } catch (error) {
     logger.error({ err: error }, 'Serverless Reddit monitor failed')
     return NextResponse.json(
@@ -160,7 +172,7 @@ export async function POST(request: Request) {
     }
   }
 
-  return executeMonitor(forceUserId, forcePlatform, forceTarget)
+  return executeMonitor(forceUserId, forcePlatform, forceTarget, !body.trim())
 }
 
 export async function GET(request: Request) {
@@ -171,5 +183,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  return executeMonitor()
+  return executeMonitor(undefined, undefined, undefined, true)
 }

@@ -90,7 +90,7 @@ export interface ProviderCapabilities {
   sentry: boolean
 }
 
-export type RedditProviderKind = 'sprinklr' | 'redditapis'
+export type RedditProviderKind = 'sprinklr' | 'hyperbrowser' | 'redditapis'
 
 const SPRINKLR_REDDIT_REQUIRED_ENV = [
   'SPRINKLR_API_BASE_URL',
@@ -135,6 +135,10 @@ export function getRedditDiscoveryProviderKind(): RedditProviderKind | null {
 
 export function getRedditPostingProviderKind(): RedditProviderKind | null {
   if (hasSprinklrRedditPostingProvider()) return 'sprinklr'
+  if (
+    process.env.HYPERBROWSER_POSTING_ENABLED === 'true'
+    && Boolean(getConfiguredSecret(process.env.HYPERBROWSER_API_KEY))
+  ) return 'hyperbrowser'
   return process.env.REDDITAPIS_POSTING_ENABLED === 'true'
     && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
     ? 'redditapis'
@@ -216,6 +220,14 @@ function validateOptionalProviders(): void {
   ) {
     throw new Error('RedditAPIs posting is enabled but REDDITAPIS_API_KEY is missing')
   }
+  assertOptionalBoolean('HYPERBROWSER_POSTING_ENABLED')
+  if (
+    process.env.HYPERBROWSER_POSTING_ENABLED === 'true'
+    && !getConfiguredSecret(process.env.HYPERBROWSER_API_KEY)
+  ) {
+    throw new Error('Hyperbrowser posting is enabled but HYPERBROWSER_API_KEY is missing')
+  }
+  assertOptionalInteger('HYPERBROWSER_CREDIT_ALERT_PERCENT', 1, 100)
   assertCompleteOptionalGroup(SPRINKLR_REDDIT_REQUIRED_ENV, 'Sprinklr Reddit')
   assertOptionalBoolean('SPRINKLR_REDDIT_DISCOVERY_ENABLED')
   assertOptionalBoolean('SPRINKLR_REDDIT_POSTING_ENABLED')
