@@ -53,5 +53,7 @@ describe('customer incident safety', () => {
     expect(workflow).toContain('github.rest.issues.create')
     expect(workflow).toContain('github.rest.issues.update')
     expect(workflow).toContain('/api/status')
+    expect(source('src/lib/public-service-status.ts')).toContain(".gte('attempts', 3)")
+    expect(source('src/app/api/status/route.ts')).toContain("status.status === 'operational' ? 200 : 503")
   })
 })
