@@ -90,7 +90,37 @@ export interface ProviderCapabilities {
   sentry: boolean
 }
 
-export function hasRedditDiscoveryProvider(): boolean {
+export type RedditProviderKind = 'sprinklr' | 'redditapis'
+
+const SPRINKLR_REDDIT_REQUIRED_ENV = [
+  'SPRINKLR_API_BASE_URL',
+  'SPRINKLR_API_KEY',
+  'SPRINKLR_ACCESS_TOKEN',
+  'SPRINKLR_REDDIT_TOPIC_ID',
+  'SPRINKLR_REDDIT_ACCOUNT_ID',
+  'SPRINKLR_REDDIT_CHANNEL_ID',
+  'SPRINKLR_REDDIT_CAMPAIGN_ID',
+] as const
+
+function hasCompleteSprinklrRedditConfiguration(): boolean {
+  return SPRINKLR_REDDIT_REQUIRED_ENV.every(name => (
+    Boolean(getConfiguredSecret(process.env[name]))
+  ))
+}
+
+export function hasSprinklrRedditDiscoveryProvider(): boolean {
+  return process.env.SPRINKLR_REDDIT_DISCOVERY_ENABLED === 'true'
+    && hasCompleteSprinklrRedditConfiguration()
+}
+
+export function hasSprinklrRedditPostingProvider(): boolean {
+  return process.env.SPRINKLR_REDDIT_POSTING_ENABLED === 'true'
+    && hasCompleteSprinklrRedditConfiguration()
+}
+
+export function getRedditDiscoveryProviderKind(): RedditProviderKind | null {
+  if (hasSprinklrRedditDiscoveryProvider()) return 'sprinklr'
+
   // REDDITAPIS_FALLBACK_ENABLED was the original name while RSS was the
   // primary path. Keep it as a compatibility alias for already-deployed
   // environments, but let the explicit discovery switch take precedence.
@@ -98,14 +128,26 @@ export function hasRedditDiscoveryProvider(): boolean {
   const enabled = configured === 'true' || configured === 'false'
     ? configured === 'true'
     : process.env.REDDITAPIS_FALLBACK_ENABLED === 'true'
-
   return enabled && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
+    ? 'redditapis'
+    : null
+}
+
+export function getRedditPostingProviderKind(): RedditProviderKind | null {
+  if (hasSprinklrRedditPostingProvider()) return 'sprinklr'
+  return process.env.REDDITAPIS_POSTING_ENABLED === 'true'
+    && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
+    ? 'redditapis'
+    : null
+}
+
+export function hasRedditDiscoveryProvider(): boolean {
+  return getRedditDiscoveryProviderKind() !== null
 }
 
 /** Reddit writes require both the provider key and an explicit kill switch. */
 export function hasRedditPostingProvider(): boolean {
-  return process.env.REDDITAPIS_POSTING_ENABLED === 'true'
-    && Boolean(getConfiguredSecret(process.env.REDDITAPIS_API_KEY))
+  return getRedditPostingProviderKind() !== null
 }
 
 export function getProviderCapabilities(): ProviderCapabilities {
@@ -174,6 +216,32 @@ function validateOptionalProviders(): void {
   ) {
     throw new Error('RedditAPIs posting is enabled but REDDITAPIS_API_KEY is missing')
   }
+  assertCompleteOptionalGroup(SPRINKLR_REDDIT_REQUIRED_ENV, 'Sprinklr Reddit')
+  assertOptionalBoolean('SPRINKLR_REDDIT_DISCOVERY_ENABLED')
+  assertOptionalBoolean('SPRINKLR_REDDIT_POSTING_ENABLED')
+  assertOptionalInteger('SPRINKLR_DISCOVERY_CACHE_SECONDS', 60, 900)
+  if (
+    (process.env.SPRINKLR_REDDIT_DISCOVERY_ENABLED === 'true'
+      || process.env.SPRINKLR_REDDIT_POSTING_ENABLED === 'true')
+    && !hasCompleteSprinklrRedditConfiguration()
+  ) {
+    throw new Error('Sprinklr Reddit is enabled but its required configuration is incomplete')
+  }
+  const sprinklrBaseUrl = process.env.SPRINKLR_API_BASE_URL?.trim()
+  if (sprinklrBaseUrl) {
+    try {
+      const url = new URL(sprinklrBaseUrl)
+      if (
+        url.protocol !== 'https:'
+        || url.hostname.toLowerCase() !== 'api3.sprinklr.com'
+        || url.search
+        || url.hash
+      ) throw new Error('invalid')
+    } catch {
+      throw new Error('SPRINKLR_API_BASE_URL must be an HTTPS api3.sprinklr.com URL')
+    }
+  }
+  assertOptionalInteger('SPRINKLR_REDDIT_ACCOUNT_ID', 1, Number.MAX_SAFE_INTEGER)
   assertOptionalBoolean('REDDITAPIS_DISCOVERY_ENABLED')
   assertOptionalBoolean('REDDITAPIS_FALLBACK_ENABLED')
   assertOptionalInteger('REDDITAPIS_MAX_DAILY_READ_CALLS', 0, 100_000)
@@ -230,7 +298,7 @@ export function validateWorkerEnvironment(): void {
   }
   if (!hasRedditDiscoveryProvider()) {
     throw new Error(
-      'BuyerWatch worker requires enabled RedditAPIs discovery',
+      'BuyerWatch worker requires enabled RedditAPIs discovery or another enabled Reddit discovery provider',
     )
   }
 }

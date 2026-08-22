@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { hasRedditPostingProvider } from '@/lib/env'
+import { getRedditPostingProviderKind } from '@/lib/env'
 import { authRateLimit, getIp } from '@/lib/ratelimit'
 import {
   boundedString,
@@ -16,7 +16,11 @@ import {
   RedditApisRequestError,
 } from '@/lib/redditapis-client'
 import { normalizeRedditUsername } from '@/lib/redditapis-contract'
-import { saveRedditApisConnection } from '@/lib/reddit-session'
+import { saveRedditApisConnection, saveSprinklrRedditConnection } from '@/lib/reddit-session'
+import {
+  fetchSprinklrRedditAccount,
+  SprinklrRequestError,
+} from '@/lib/sprinklr-client'
 
 export const runtime = 'nodejs'
 
@@ -35,6 +39,13 @@ function errorStatus(error: RedditApisRequestError): number {
   return 502
 }
 
+function sprinklrErrorStatus(error: SprinklrRequestError): number {
+  if (error.code === 'sprinklr_authentication_failed') return 401
+  if (error.status === 429) return 429
+  if (error.retryable) return 503
+  return 502
+}
+
 export async function POST(request: Request) {
   try {
     if (!isTrustedSameOriginMutation(request)) {
@@ -44,13 +55,37 @@ export async function POST(request: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasRedditPostingProvider()) {
+    const provider = getRedditPostingProviderKind()
+    if (!provider) {
       return NextResponse.json({ error: 'reddit_direct_posting_unavailable' }, { status: 503 })
     }
 
     const rate = await authRateLimit.limit(`reddit-connect:${user.id}:${await getIp()}`)
     if (!rate.success) {
       return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+    }
+
+
+    if (provider === 'sprinklr') {
+      // The end user authorizes Reddit inside the customer's Sprinklr tenant.
+      // BuyerWatch only verifies the configured active Reddit account and
+      // stores its non-secret account mapping; no Reddit password is handled.
+      const account = await fetchSprinklrRedditAccount()
+      await saveSprinklrRedditConnection({
+        userId: user.id,
+        username: account.username,
+        accountId: account.accountId,
+        channelId: account.channelId,
+      })
+      return NextResponse.json({
+        success: true,
+        connection: {
+          platform: 'reddit',
+          external_username: account.username,
+          status: 'active',
+          provider: 'sprinklr',
+        },
+      }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
     const body = await readJsonBody<Record<string, unknown>>(request, 4_096)
@@ -99,6 +134,9 @@ export async function POST(request: Request) {
     }
     if (error instanceof RedditApisRequestError) {
       return NextResponse.json({ error: error.code }, { status: errorStatus(error) })
+    }
+    if (error instanceof SprinklrRequestError) {
+      return NextResponse.json({ error: error.code }, { status: sprinklrErrorStatus(error) })
     }
     console.error('[settings/reddit] Connection failed')
     return NextResponse.json({ error: 'reddit_connection_failed' }, { status: 500 })
