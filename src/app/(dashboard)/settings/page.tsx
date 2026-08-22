@@ -29,6 +29,7 @@ import {
   normalizeHighIntentThreshold,
 } from '@/lib/high-intent-threshold'
 import { DataLoadError } from '@/components/DataLoadError'
+import { connectRedditThroughChrome } from '@/lib/browser-connector-client'
 
 /* ─── Nav sections ────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -171,12 +172,14 @@ export default function SettingsPage() {
     bluesky: false,
     redditUsername: '',
     redditStatus: 'missing' as 'active' | 'reauth_required' | 'error' | 'missing',
+    redditProvider: null as 'redditapis' | 'sprinklr' | 'browser_relay' | null,
   })
   const [deliveryCapabilities, setDeliveryCapabilities] = useState({
     redditDirectPosting: false,
     redditScheduledDiscovery: false,
     blueskyDirectPosting: true,
     redditConnectionProvider: null as 'sprinklr' | 'redditapis' | null,
+    redditBrowserConnection: false,
   })
   const [bskyHandle, setBskyHandle] = useState('')
   const [bskyPassword, setBskyPassword] = useState('')
@@ -235,12 +238,14 @@ export default function SettingsPage() {
                 platform: string
                 external_username: string | null
                 status?: 'active' | 'reauth_required' | 'error' | 'missing'
+                provider?: 'redditapis' | 'sprinklr' | 'browser_relay' | null
               }>
               capabilities: {
                 redditDirectPosting: boolean
                 redditScheduledDiscovery: boolean
                 blueskyDirectPosting: boolean
                 redditConnectionProvider: 'sprinklr' | 'redditapis' | null
+                redditBrowserConnection: boolean
               }
             }
           })
@@ -336,6 +341,7 @@ export default function SettingsPage() {
           bluesky: conns.some(c => c.platform === 'bluesky'),
           redditUsername: redditConn?.external_username || '',
           redditStatus: redditConn?.status ?? 'missing',
+          redditProvider: redditConn?.provider ?? null,
         })
         }
         setDeliveryCapabilities(connectionsResult.capabilities)
@@ -574,6 +580,50 @@ export default function SettingsPage() {
     }
   }
 
+  const handleConnectRedditBrowser = async () => {
+    setRedditConnecting(true)
+    try {
+      const identity = await connectRedditThroughChrome()
+      if (!identity) throw new Error('connector_not_installed')
+      if (!identity.success || !identity.username) {
+        throw new Error(identity.error || 'reddit_identity_failed')
+      }
+      const response = await fetch('/api/settings/reddit/browser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: identity.username }),
+      })
+      const payload = await response.json().catch(() => null) as {
+        error?: string
+        connection?: { external_username?: string }
+      } | null
+      if (!response.ok) throw new Error(payload?.error || 'reddit_browser_connection_failed')
+
+      const username = payload?.connection?.external_username || identity.username
+      clearSupabaseReadCache()
+      setConnections(current => ({
+        ...current,
+        reddit: true,
+        redditUsername: username,
+        redditStatus: 'active',
+        redditProvider: 'browser_relay',
+      }))
+      window.dispatchEvent(new Event('buyerwatch:connections-changed'))
+      toast.success(`Reddit connected as u/${username}`)
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'reddit_browser_connection_failed'
+      if (code === 'connector_not_installed') {
+        toast.error('Install the BuyerWatch Reddit Connector, then click Connect with Chrome again.')
+      } else if (code === 'reddit_login_required') {
+        toast.error('Log in to Reddit in Chrome, then try again.')
+      } else {
+        toast.error('Chrome could not verify the logged-in Reddit account. Open your Reddit profile and retry.')
+      }
+    } finally {
+      setRedditConnecting(false)
+    }
+  }
+
   const handleConnectBluesky = async () => {
     if (!bskyHandle || !bskyPassword) { toast.error('Enter your handle and app password'); return }
     setBskyConnecting(true)
@@ -608,7 +658,7 @@ export default function SettingsPage() {
       if (!response.ok) throw new Error('disconnect_failed')
       clearSupabaseReadCache()
       setConnections(p => platform === 'reddit'
-        ? { ...p, reddit: false, redditUsername: '', redditStatus: 'missing' }
+        ? { ...p, reddit: false, redditUsername: '', redditStatus: 'missing', redditProvider: null }
         : { ...p, bluesky: false })
       window.dispatchEvent(new Event('buyerwatch:connections-changed'))
       toast.success(`${platform} disconnected`)
@@ -940,12 +990,43 @@ export default function SettingsPage() {
                           connected={connections.reddit}
                           onDisconnect={() => handleDisconnect('reddit')}
                         >
-                          {!connections.reddit && deliveryCapabilities.redditDirectPosting && (
+                          {!connections.reddit && (
+                            deliveryCapabilities.redditDirectPosting
+                            || deliveryCapabilities.redditBrowserConnection
+                          ) && (
                             <div className="space-y-3">
                               {connections.redditStatus === 'reauth_required' && (
                                 <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-[12px] leading-5 text-amber-800" role="status">
                                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                   Reddit expired the saved session. Automatic Reddit replies are paused until you reconnect.
+                                </div>
+                              )}
+                              {deliveryCapabilities.redditBrowserConnection && (
+                                <div className="rounded-xl border border-orange-100 bg-orange-50 p-3">
+                                  <p className="text-[12px] font-semibold text-orange-950">Recommended: connect the Reddit account already open in Chrome</p>
+                                  <p className="mt-1 text-[11.5px] leading-5 text-orange-900/75">
+                                    BuyerWatch checks the signed-in username locally. Your Reddit password and cookies never leave Chrome.
+                                  </p>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <a
+                                      href="/buyerwatch-reddit-connector.zip"
+                                      download
+                                      className="rounded-lg border border-orange-200 bg-white px-3 py-2 text-[12px] font-semibold text-orange-900 hover:bg-orange-100"
+                                    >
+                                      Download connector
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleConnectRedditBrowser()}
+                                      disabled={redditConnecting}
+                                      className="rounded-lg bg-[#FF4500] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#e63e00] disabled:cursor-wait disabled:opacity-60"
+                                    >
+                                      {redditConnecting ? 'Checking Chrome...' : 'Connect with Chrome'}
+                                    </button>
+                                  </div>
+                                  <p className="mt-2 text-[11px] leading-4 text-orange-900/65">
+                                    After downloading: unzip it, open chrome://extensions, enable Developer mode, choose Load unpacked, and select the folder.
+                                  </p>
                                 </div>
                               )}
                               {deliveryCapabilities.redditConnectionProvider === 'sprinklr' ? (
