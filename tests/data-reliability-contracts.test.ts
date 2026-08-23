@@ -11,7 +11,8 @@ const draftsRedirect = source('src/app/(dashboard)/drafts/page.tsx')
 const opportunityStageNav = source('src/components/OpportunityStageNav.tsx')
 const analytics = source('src/app/(dashboard)/analytics/page.tsx')
 const keywords = source('src/app/(dashboard)/keywords/page.tsx')
-const settings = source('src/app/(dashboard)/settings/page.tsx')
+const settings = source('src/app/(dashboard)/settings/SettingsPage.tsx')
+const settingsServer = source('src/app/(dashboard)/settings/page.tsx')
 const posted = source('src/app/(dashboard)/posted/page.tsx')
 const generateDraftRoute = source('src/app/api/replies/generate/route.ts')
 const drafting = source('src/lib/draft-reply.ts')
@@ -54,6 +55,13 @@ describe('dashboard data reliability contracts', () => {
     expect(settings).toContain('settingsLoading || loadFailed')
     expect(settings).toContain('Load your settings successfully before saving changes.')
     expect(settings).toContain('editing is disabled to protect them')
+  })
+
+  it('does not hydrate failed server-prefetch reads as empty settings', () => {
+    expect(settingsServer).toContain('const initialDataError = [')
+    expect(settingsServer).toContain('slackResult')
+    expect(settingsServer).toContain('platformConnectionsResult')
+    expect(settingsServer).toContain('return <SettingsPage />')
   })
 
   it('keeps unscored and non-actionable candidates out of every Opportunities page query', () => {
