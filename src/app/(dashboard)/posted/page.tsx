@@ -67,6 +67,22 @@ function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm'
   return <MessageCircle className={`${cls} text-gray-500`} />
 }
 
+function ConversationsKpiIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 256 256" fill="none" aria-hidden="true">
+      <path
+        d="M67 92a34 34 0 0 1 34-34h68a34 34 0 0 1 34 34v39a34 34 0 0 1-34 34h-35l-30 24v-24h-3a34 34 0 0 1-34-34z"
+        stroke="currentColor"
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M48 116v30a30 30 0 0 0 30 30h8" stroke="currentColor" strokeWidth="10" strokeLinecap="round" />
+      <circle cx="169" cy="96" r="17" fill="#2EC4B6" stroke="#F8FAFC" strokeWidth="8" />
+    </svg>
+  )
+}
+
 function formatRelativeDate(dateString: string) {
   const date = new Date(dateString)
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
@@ -457,7 +473,7 @@ export default function PostedPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <StatCard label="Sent" value={totalCount} icon={Send} loading={loading} />
               <StatCard label="Clicks" value={totalClicks} icon={MousePointerClick} loading={loading} />
-              <StatCard label="Conversations" value={conversationsStarted} icon={MessageSquare} loading={loading} />
+              <StatCard label="Conversations" value={conversationsStarted} icon={ConversationsKpiIcon} loading={loading} />
             </div>
 
             {deliveryActivity.length > 0 && (
