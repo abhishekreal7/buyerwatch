@@ -1,5 +1,4 @@
 import { getServiceRoleClient } from './admin'
-import { recordEngagementEvent } from './automation-audit'
 import { getRedditDiscoveryProviderKind } from './env'
 import { logger } from './logger'
 import { fetchRedditCommentReplies, RedditApisRequestError } from './redditapis-client'
@@ -56,7 +55,7 @@ export async function runRedditReplyTracker(): Promise<RedditReplyTrackingResult
     const admin = getServiceRoleClient()
     const oldest = new Date(Date.now() - MAX_TRACKING_AGE_DAYS * 24 * 60 * 60 * 1_000).toISOString()
     const settled = new Date(Date.now() - 5 * 60 * 1_000).toISOString()
-    const [{ data: audits, error: auditError }, { data: connections, error: connectionError }, { data: existing, error: existingError }] = await Promise.all([
+    const [{ data: audits, error: auditError }, { data: connections, error: connectionError }] = await Promise.all([
       admin.from('send_audit_log')
         .select('id, user_id, thread_id, permalink, created_at')
         .eq('platform', 'reddit').eq('status', 'success')
@@ -66,27 +65,12 @@ export async function runRedditReplyTracker(): Promise<RedditReplyTrackingResult
       admin.from('platform_connections')
         .select('user_id, external_username')
         .eq('platform', 'reddit'),
-      admin.from('engagement_events')
-        .select('metadata')
-        .eq('event_type', 'reply_confirmed')
-        .eq('source', 'reddit_reply_tracker')
-        .gte('occurred_at', oldest).limit(500),
     ])
     if (auditError) throw auditError
     if (connectionError) throw connectionError
-    if (existingError) throw existingError
-
-    const trackedCommentIds = new Set(
-      (existing ?? []).flatMap(({ metadata }) => {
-        const id = metadata && typeof metadata === 'object'
-          ? (metadata as Record<string, unknown>).outboundCommentId
-          : null
-        return typeof id === 'string' ? [id.toLowerCase()] : []
-      }),
-    )
     const candidates = (audits ?? []).flatMap((audit) => {
       const commentId = parseRedditCommentIdFromPermalink(audit.permalink)
-      return commentId && !trackedCommentIds.has(commentId)
+      return commentId
         ? [{ ...audit, commentId }]
         : []
     }) as Array<SentAudit & { commentId: string }>
@@ -111,12 +95,13 @@ export async function runRedditReplyTracker(): Promise<RedditReplyTrackingResult
     }
 
     const firstReply = externalReplies[0]
-    await recordEngagementEvent(admin, {
-      userId: candidate.user_id,
-      threadId: candidate.thread_id,
-      eventType: 'reply_confirmed',
+    const checkedAt = new Date().toISOString()
+    const { error: eventError } = await admin.from('engagement_events').upsert({
+      user_id: candidate.user_id,
+      thread_id: candidate.thread_id,
+      event_type: 'reply_confirmed',
       platform: 'reddit',
-      actorType: 'provider',
+      actor_type: 'provider',
       source: 'reddit_reply_tracker',
       metadata: {
         direction: 'inbound',
@@ -124,10 +109,15 @@ export async function runRedditReplyTracker(): Promise<RedditReplyTrackingResult
         incomingCommentId: firstReply.commentId,
         incomingAuthor: firstReply.author,
         replyCount: externalReplies.length,
+        checkedAt,
       },
-      idempotencyKey: `conversation-started:${candidate.commentId}`,
-      occurredAt: firstReply.createdAt ?? undefined,
+      idempotency_key: `conversation-started:${candidate.commentId}`,
+      occurred_at: firstReply.createdAt ?? checkedAt,
+    }, {
+      onConflict: 'user_id,idempotency_key',
+      ignoreDuplicates: false,
     })
+    if (eventError) throw eventError
     logger.info({ auditId: candidate.id, replyCount: externalReplies.length }, 'Reddit conversation started')
     return { status: 'checked', checkedAuditId: candidate.id, conversationsStarted: 1 }
   } catch (error) {

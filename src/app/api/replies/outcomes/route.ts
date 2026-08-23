@@ -16,8 +16,9 @@ export async function GET() {
       .eq('user_id', user.id).eq('status', 'success'),
     admin.from('send_audit_log').select('id', { count: 'exact', head: true })
       .eq('user_id', user.id).in('status', ['failed_retryable', 'failed_permanent']),
-    admin.from('engagement_events').select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id).eq('event_type', 'reply_confirmed').eq('source', 'reddit_reply_tracker'),
+    admin.from('engagement_events').select('thread_id, metadata, occurred_at')
+      .eq('user_id', user.id).eq('event_type', 'reply_confirmed').eq('source', 'reddit_reply_tracker')
+      .order('occurred_at', { ascending: false }).limit(500),
   ])
   const error = sent.error ?? terminalFailures.error ?? conversations.error
   if (error) {
@@ -27,8 +28,24 @@ export async function GET() {
   const sentCount = sent.count ?? 0
   const failureCount = terminalFailures.count ?? 0
   const totalResolved = sentCount + failureCount
+  const replyEngagementByThread = (conversations.data ?? []).reduce<Record<string, { replyCount: number; checkedAt: string | null }>>((result, event) => {
+    if (!event.thread_id) return result
+    const metadata = event.metadata && typeof event.metadata === 'object'
+      ? event.metadata as Record<string, unknown>
+      : {}
+    const replyCount = Math.max(0, Math.floor(Number(metadata.replyCount) || 0))
+    if (replyCount === 0) return result
+    const checkedAt = typeof metadata.checkedAt === 'string' ? metadata.checkedAt : event.occurred_at
+    const current = result[event.thread_id]
+    result[event.thread_id] = {
+      replyCount: (current?.replyCount ?? 0) + replyCount,
+      checkedAt: current?.checkedAt && checkedAt && current.checkedAt > checkedAt ? current.checkedAt : checkedAt ?? null,
+    }
+    return result
+  }, {})
   return NextResponse.json({
     deliverySuccessRate: totalResolved > 0 ? (sentCount / totalResolved) * 100 : null,
-    conversationsStarted: conversations.count ?? 0,
+    conversationsStarted: conversations.data?.length ?? 0,
+    replyEngagementByThread,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

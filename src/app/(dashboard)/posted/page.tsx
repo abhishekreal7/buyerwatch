@@ -149,7 +149,10 @@ function parsePostedThreads(data: any[]): PostedReply[] {
 
 // ─── Posted Reply Card ─────────────────────────────────────────────────────────
 
-function PostedReplyCard({ item }: { item: PostedReply }) {
+function PostedReplyCard({ item, replyEngagement }: {
+  item: PostedReply
+  replyEngagement?: { replyCount: number; checkedAt: string | null }
+}) {
   const [expanded, setExpanded] = useState(true)
   const hasConversion = Boolean(item.convertedAt)
   const hasClick = Boolean(item.clickedAt)
@@ -200,6 +203,15 @@ function PostedReplyCard({ item }: { item: PostedReply }) {
                 : 'bg-blue-50 text-blue-700 border-blue-200'
             }`}>
               {hasConversion ? '✓ Converted' : '✓ Clicked'}
+            </span>
+          )}
+          {replyEngagement && (
+            <span
+              title={replyEngagement.checkedAt ? `Verified ${formatRelativeDate(replyEngagement.checkedAt)}` : 'Verified reply tracking'}
+              className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10.5px] font-semibold text-teal-700"
+            >
+              <MessageCircle className="h-3 w-3" strokeWidth={2.2} />
+              {replyEngagement.replyCount} {replyEngagement.replyCount === 1 ? 'reply' : 'replies'} received
             </span>
           )}
           <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">{item.sentAt}</span>
@@ -340,6 +352,7 @@ export default function PostedPage() {
   const [posted, setPosted] = useState<PostedReply[]>([])
   const [deliveryActivity, setDeliveryActivity] = useState<DeliveryActivity[]>([])
   const [conversationsStarted, setConversationsStarted] = useState(0)
+  const [replyEngagementByThread, setReplyEngagementByThread] = useState<Record<string, { replyCount: number; checkedAt: string | null }>>({})
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
@@ -385,8 +398,15 @@ export default function PostedPage() {
           setDeliveryActivity(payload.activity ?? [])
         }
         if (outcomesResult.ok) {
-          const payload = await outcomesResult.json() as { conversationsStarted?: number }
+          const payload = await outcomesResult.json() as {
+            conversationsStarted?: number
+            replyEngagementByThread?: Record<string, { replyCount?: number; checkedAt?: string | null }>
+          }
           setConversationsStarted(Math.max(0, Math.floor(Number(payload.conversationsStarted) || 0)))
+          setReplyEngagementByThread(Object.fromEntries(Object.entries(payload.replyEngagementByThread ?? {}).flatMap(([threadId, engagement]) => {
+            const replyCount = Math.max(0, Math.floor(Number(engagement.replyCount) || 0))
+            return replyCount > 0 ? [[threadId, { replyCount, checkedAt: engagement.checkedAt ?? null }]] : []
+          })))
         }
         setPosted(parsed)
         setTotalCount(countResult.count ?? pageResult.data?.length ?? 0)
@@ -568,6 +588,7 @@ export default function PostedPage() {
                     <PostedReplyCard
                       key={item.id}
                       item={item}
+                      replyEngagement={replyEngagementByThread[item.id]}
                     />
                   ))}
                 </div>
