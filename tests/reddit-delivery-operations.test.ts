@@ -43,6 +43,16 @@ describe('Reddit delivery production operations', () => {
     expect(route).toContain('runRedditDeliveryCanary()')
   })
 
+  it('checks the free RedditAPIs balance endpoint on the scheduler and alerts only on threshold transitions', () => {
+    const route = source('src/app/api/cron/enqueue/route.ts')
+    const monitor = source('src/lib/redditapis-balance-monitor.ts')
+    expect(route).toContain('runRedditApisBalanceMonitor()')
+    expect(monitor).toContain('fetchRedditApisAccountStatus()')
+    expect(monitor).toContain("kind: 'credits_low'")
+    expect(monitor).toContain('CHECK_INTERVAL_SECONDS = 15 * 60')
+    expect(monitor).toContain('REDDITAPIS_LOW_BALANCE_USD')
+  })
+
   it('alerts on every high-signal delivery failure class with deduplication', () => {
     const alerts = source('src/lib/reddit-delivery-alerts.ts')
     for (const kind of [

@@ -11,6 +11,7 @@ import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
 import { runServerlessMonitoring } from '@/lib/serverless-monitor'
 import { runRedditDeliveryCanary } from '@/lib/reddit-delivery-canary'
 import { deliverPendingIncidentEmails } from '@/lib/incident-email'
+import { runRedditApisBalanceMonitor } from '@/lib/redditapis-balance-monitor'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -24,6 +25,10 @@ async function executeMonitor(
   runCanary = false,
 ) {
   try {
+    const balanceMonitorPromise = runRedditApisBalanceMonitor().catch((error) => {
+      logger.error({ error }, 'RedditAPIs balance monitor crashed')
+      return { status: 'unavailable' as const, alerted: false }
+    })
     const canaryPromise = runCanary
       ? runRedditDeliveryCanary().catch((error) => {
           logger.error({ error }, 'Reddit delivery canary crashed')
@@ -51,7 +56,10 @@ async function executeMonitor(
       }
     }
 
-    const canary = canaryPromise ? await canaryPromise : null
+    const [canary, redditApisBalance] = await Promise.all([
+      canaryPromise,
+      balanceMonitorPromise,
+    ])
     const incidentEmail = await deliverPendingIncidentEmails(20).catch((error) => {
       logger.error({ error }, 'Customer incident email queue failed')
       return { claimed: 0, delivered: 0, failed: 1 }
@@ -59,6 +67,7 @@ async function executeMonitor(
     return NextResponse.json({
       ...result,
       ...(canary ? { redditDeliveryCanary: canary } : {}),
+      redditApisBalance,
       incidentEmail,
     })
   } catch (error) {
