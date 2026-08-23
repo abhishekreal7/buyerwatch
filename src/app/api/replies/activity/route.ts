@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
+import {
+  deliveryActivityPresentation,
+  type DeliveryActivityState,
+} from '@/lib/delivery-activity'
 import { logger } from '@/lib/logger'
+import { getSafeThreadUrl } from '@/lib/thread-url'
 
 export const dynamic = 'force-dynamic'
-
-type State = 'queued' | 'sending' | 'sent' | 'failed' | 'uncertain' | 'cancelled'
-
-function customerMessage(state: State) {
-  if (state === 'queued') return 'Waiting for a safe delivery attempt.'
-  if (state === 'sending') return 'Delivery is in progress.'
-  if (state === 'sent') return 'Reply delivery was confirmed.'
-  if (state === 'uncertain') return 'Check the original thread before retrying.'
-  if (state === 'cancelled') return 'Delivery was stopped safely and will not retry automatically.'
-  return 'Delivery did not complete. No automatic retry is pending.'
-}
 
 export async function GET() {
   const supabase = await createClient()
@@ -28,7 +22,7 @@ export async function GET() {
       .in('status', ['sending', 'send_reconciliation_required'])
       .order('created_at', { ascending: false }).limit(50),
     admin.from('job_outbox')
-      .select('thread_id, status, created_at, dispatched_at, completed_at, permalink')
+      .select('thread_id, status, last_error, created_at, dispatched_at, completed_at, permalink')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }).limit(50),
     admin.from('send_audit_log')
@@ -56,22 +50,39 @@ export async function GET() {
     const thread = byThread.get(threadId)
     const audit = (audits.data ?? []).find(row => row.thread_id === threadId)
     const job = (outbox.data ?? []).find(row => row.thread_id === threadId)
-    let state: State = 'queued'
+    let state: DeliveryActivityState | null = null
     if (audit?.status === 'success' || job?.status === 'completed') state = 'sent'
     else if (audit?.status === 'reconciliation_required' || thread?.status === 'send_reconciliation_required') state = 'uncertain'
     else if (audit?.status?.startsWith('failed') || job?.status === 'failed') state = 'failed'
     else if (job?.status === 'cancelled') state = 'cancelled'
-    else if (thread?.status === 'sending' || job?.status === 'dispatched') state = 'sending'
+    if (!state || !thread) return null
+    const platform = thread.platform ?? audit?.platform ?? 'reddit'
+    const threadUrl = getSafeThreadUrl({ platform, url: thread.url ?? null })
+    const replyUrl = getSafeThreadUrl({
+      platform,
+      url: audit?.permalink ?? job?.permalink ?? null,
+    })
+    const presentation = deliveryActivityPresentation({
+      state,
+      threadId,
+      threadUrl,
+      replyUrl,
+      cancellationReason: job?.last_error ?? null,
+    })
     return {
       threadId,
-      platform: thread?.platform ?? audit?.platform ?? 'reddit',
-      title: thread?.title?.trim() || 'Reply delivery',
+      platform,
+      title: presentation.title,
+      subject: thread.title?.trim() || 'Original conversation',
       state,
-      message: customerMessage(state),
-      threadUrl: thread?.url ?? null,
-      replyUrl: audit?.permalink ?? job?.permalink ?? null,
+      message: presentation.message,
+      actionLabel: presentation.actionLabel,
+      actionHref: presentation.actionHref,
+      threadUrl,
+      replyUrl,
       updatedAt: audit?.created_at ?? job?.completed_at ?? job?.dispatched_at ?? job?.created_at ?? thread?.created_at,
     }
-  }).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0, 30)
+  }).filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0, 30)
   return NextResponse.json({ activity }, { headers: { 'Cache-Control': 'no-store' } })
 }

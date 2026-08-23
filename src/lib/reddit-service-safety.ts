@@ -101,10 +101,23 @@ const copy: Record<RedditDeliveryAlertKind, {
   },
 }
 
+function customerIncidentCopy(input: { kind: RedditDeliveryAlertKind; code: string }) {
+  if (input.kind === 'repeated_failures' && input.code === 'reply_not_sent') {
+    return {
+      severity: 'warning' as const,
+      title: 'Reply was not sent',
+      message: 'Nothing was posted. Review the draft before trying again.',
+      actionPath: '/dashboard',
+    }
+  }
+  return copy[input.kind]
+}
+
 export async function createIncidentForRedditAlert(input: {
   kind: RedditDeliveryAlertKind
   code: string
   userId?: string
+  actionPath?: string
 }): Promise<string | null> {
   // Provider account balances are BuyerWatch operating costs, not customer
   // incidents. They are delivered to the operator by sendRedditDeliveryAlert
@@ -114,7 +127,8 @@ export async function createIncidentForRedditAlert(input: {
   if (input.kind === 'credits_low' && !providerIsExhausted) return null
 
   const admin = getServiceRoleClient()
-  const safe = copy[input.kind]
+  const safe = customerIncidentCopy(input)
+  const actionPath = input.actionPath ?? safe.actionPath
   const isGlobal = input.kind === 'selector_changed'
     || input.kind === 'canary_failed'
   const mustOpenCircuit = input.kind === 'selector_changed'
@@ -138,7 +152,7 @@ export async function createIncidentForRedditAlert(input: {
         p_reason_code: input.code.slice(0, 160),
         p_title: safe.title,
         p_message: safe.message,
-        p_action_path: safe.actionPath,
+        p_action_path: actionPath,
       })
       if (userIncident.error) throw userIncident.error
     }
@@ -152,7 +166,7 @@ export async function createIncidentForRedditAlert(input: {
         p_reason_code: input.code.slice(0, 160),
         p_title: safe.title,
         p_message: safe.message,
-        p_action_path: safe.actionPath,
+        p_action_path: actionPath,
       })
     : input.userId
       ? await admin.rpc('create_reddit_user_incident_v1', {
@@ -162,7 +176,7 @@ export async function createIncidentForRedditAlert(input: {
           p_reason_code: input.code.slice(0, 160),
           p_title: safe.title,
           p_message: safe.message,
-          p_action_path: safe.actionPath,
+          p_action_path: actionPath,
         })
       : null
   if (result?.error) throw result.error
@@ -177,6 +191,23 @@ export async function closeTransientRedditCircuitAfterCanary(): Promise<boolean>
   })
   if (error) throw error
   return data === true
+}
+
+/** Resolve the one actionable final-delivery warning after a later success. */
+export async function resolveReplyNotSentIncident(userId: string): Promise<void> {
+  const { error } = await getServiceRoleClient()
+    .from('service_incidents')
+    .update({
+      status: 'resolved',
+      resolved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId)
+    .eq('platform', 'reddit')
+    .eq('kind', 'repeated_failures')
+    .eq('reason_code', 'reply_not_sent')
+    .eq('status', 'open')
+  if (error) throw error
 }
 
 export async function resolveRedditUserIncidents(userId: string): Promise<number> {
