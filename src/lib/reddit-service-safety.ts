@@ -85,9 +85,12 @@ const copy: Record<RedditDeliveryAlertKind, {
     actionPath: '/settings?section=connections',
   },
   credits_low: {
-    severity: 'warning',
-    title: 'Reddit delivery capacity is low',
-    message: 'We are monitoring reduced delivery capacity. Delivery will stop safely if capacity is exhausted.',
+    // This copy is shown only if the provider is actually exhausted and the
+    // global circuit has paused delivery. Low-balance warnings remain
+    // operator-only below.
+    severity: 'critical',
+    title: 'Reddit delivery is temporarily paused',
+    message: 'Delivery is paused safely while we restore service capacity.',
     actionPath: '/status',
   },
   canary_failed: {
@@ -103,15 +106,21 @@ export async function createIncidentForRedditAlert(input: {
   code: string
   userId?: string
 }): Promise<string | null> {
+  // Provider account balances are BuyerWatch operating costs, not customer
+  // incidents. They are delivered to the operator by sendRedditDeliveryAlert
+  // but must never create a global record that the dashboard or email queue
+  // can expose to every customer.
+  const providerIsExhausted = input.code === 'hyperbrowser_credits_exhausted'
+  if (input.kind === 'credits_low' && !providerIsExhausted) return null
+
   const admin = getServiceRoleClient()
   const safe = copy[input.kind]
   const isGlobal = input.kind === 'selector_changed'
     || input.kind === 'canary_failed'
-    || input.kind === 'credits_low'
   const mustOpenCircuit = input.kind === 'selector_changed'
     || input.kind === 'delivery_uncertain'
     || input.kind === 'canary_failed'
-    || (input.kind === 'credits_low' && input.code === 'hyperbrowser_credits_exhausted')
+    || providerIsExhausted
 
   if (mustOpenCircuit) {
     const { data, error } = await admin.rpc('open_reddit_delivery_circuit_v1', {

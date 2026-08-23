@@ -55,6 +55,7 @@ describe('Reddit delivery production operations', () => {
 
   it('alerts on every high-signal delivery failure class with deduplication', () => {
     const alerts = source('src/lib/reddit-delivery-alerts.ts')
+    const safety = source('src/lib/reddit-service-safety.ts')
     for (const kind of [
       'reconnect_required',
       'selector_changed',
@@ -66,6 +67,10 @@ describe('Reddit delivery production operations', () => {
     expect(alerts).toContain("'NX'")
     expect(alerts).toContain('new Resend(apiKey).emails.send')
     expect(alerts).toContain('isAllowedSlackWebhookUrl')
+    expect(alerts).toContain("input.kind === 'credits_low'")
+    expect(safety).toContain("if (input.kind === 'credits_low' && !providerIsExhausted) return null")
+    expect(source('supabase/migrations/20260823140000_keep_provider_credit_alerts_admin_only.sql'))
+      .toContain("kind = 'credits_low'")
   })
 
   it('records QStash identity and closes successful outbox deliveries', () => {
