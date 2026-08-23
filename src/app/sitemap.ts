@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next'
 
 const publicRoutes = [
   '/',
+  '/reddit-lead-generation',
   '/about',
   '/pricing',
   '/contact',
