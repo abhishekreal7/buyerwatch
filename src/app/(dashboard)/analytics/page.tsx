@@ -508,13 +508,6 @@ export default function AnalyticsPage() {
     : previousTrendTotal === 0
       ? currentTrendTotal > 0 ? 'New this period' : 'No change'
       : `${trendDifference >= 0 ? '+' : ''}${Math.round((trendDifference / previousTrendTotal) * 100)}% vs previous ${leadDiscoveryRange} days`
-  const funnelStages = [
-    { label: 'Discovered', value: data.stats.found, tone: 'bg-gray-900 text-white' },
-    { label: 'High-intent', value: data.stats.highIntent, tone: 'bg-[#0A84FF] text-white' },
-    { label: 'Drafted', value: data.stats.drafted, tone: 'bg-sky-100 text-[#075EBA]' },
-    { label: 'Sent', value: data.stats.sent, tone: 'bg-emerald-100 text-emerald-700' },
-    { label: 'Conversations', value: data.replyOutcomes.conversationsStarted, tone: 'bg-violet-100 text-violet-700' },
-  ]
   return (
     <AppPage>
       <div className="w-full max-w-[1200px] pb-12">
@@ -649,25 +642,6 @@ export default function AnalyticsPage() {
                     />
                   </AreaChart>
                 </ResponsiveContainer>
-              </div>
-
-              <div className="mt-4 w-full border-t border-black/[0.05] pt-3">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-text-tertiary">Workflow · all time</p>
-                <ol className="grid grid-cols-5 gap-1.5 sm:gap-2" aria-label="Lead workflow funnel">
-                  {funnelStages.map((stage, index) => (
-                    <li key={stage.label} className="relative min-w-0">
-                      <div className="rounded-lg border border-black/[0.04] bg-white/70 px-1.5 py-2 text-center sm:px-2">
-                        <span className={`mx-auto mb-1 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${stage.tone}`}>
-                          {stage.value}
-                        </span>
-                        <p className="truncate text-[9.5px] font-semibold text-text-secondary sm:text-[10.5px]" title={stage.label}>{stage.label}</p>
-                      </div>
-                      {index < funnelStages.length - 1 && (
-                        <span className="absolute -right-1.5 top-1/2 z-10 hidden h-px w-2 bg-black/[0.12] sm:block" aria-hidden="true" />
-                      )}
-                    </li>
-                  ))}
-                </ol>
               </div>
             </div>
 
