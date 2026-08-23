@@ -121,7 +121,7 @@ describe('dashboard data reliability contracts', () => {
 describe('manual and AI drafting resilience', () => {
   it('keeps the reply editor writable when no generated draft exists', () => {
     expect(drafts).toContain('aria-label="Reply draft"')
-    expect(drafts).toContain('Write a reply here, or use Generate reply when AI drafting is available.')
+    expect(drafts).toContain('Write your reply, or regenerate when AI drafting is available.')
     expect(drafts).not.toContain('{draftContent ? (\n                    <textarea')
   })
 

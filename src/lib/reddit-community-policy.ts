@@ -208,8 +208,8 @@ function makePolicy(
       message: `r/${subreddit} does not clearly permit automated commercial replies.`,
     },
     unavailable: {
-      label: 'Rules could not be verified',
-      message: `BuyerWatch could not verify r/${subreddit}'s current rules, so automated Reddit delivery is paused.`,
+      label: 'Rules check unavailable',
+      message: `We couldn't verify r/${subreddit}'s current rules, so automated posting is paused. Review the rules before posting.`,
     },
   }
   const presentation = statusPresentation[status]
