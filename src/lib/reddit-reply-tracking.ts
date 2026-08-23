@@ -90,10 +90,6 @@ export async function runRedditReplyTracker(): Promise<RedditReplyTrackingResult
     const replies = await fetchRedditCommentReplies(candidate.commentId)
     const ownUsername = accountNames.get(candidate.user_id)
     const externalReplies = replies.filter(reply => reply.author.toLowerCase() !== ownUsername)
-    if (externalReplies.length === 0) {
-      return { status: 'checked', checkedAuditId: candidate.id, conversationsStarted: 0 }
-    }
-
     const firstReply = externalReplies[0]
     const checkedAt = new Date().toISOString()
     const { error: eventError } = await admin.from('engagement_events').upsert({
@@ -106,20 +102,20 @@ export async function runRedditReplyTracker(): Promise<RedditReplyTrackingResult
       metadata: {
         direction: 'inbound',
         outboundCommentId: candidate.commentId,
-        incomingCommentId: firstReply.commentId,
-        incomingAuthor: firstReply.author,
+        incomingCommentId: firstReply?.commentId ?? null,
+        incomingAuthor: firstReply?.author ?? null,
         replyCount: externalReplies.length,
         checkedAt,
       },
       idempotency_key: `conversation-started:${candidate.commentId}`,
-      occurred_at: firstReply.createdAt ?? checkedAt,
+      occurred_at: firstReply?.createdAt ?? checkedAt,
     }, {
       onConflict: 'user_id,idempotency_key',
       ignoreDuplicates: false,
     })
     if (eventError) throw eventError
     logger.info({ auditId: candidate.id, replyCount: externalReplies.length }, 'Reddit conversation started')
-    return { status: 'checked', checkedAuditId: candidate.id, conversationsStarted: 1 }
+    return { status: 'checked', checkedAuditId: candidate.id, conversationsStarted: externalReplies.length > 0 ? 1 : 0 }
   } catch (error) {
     const code = error instanceof RedditApisRequestError ? error.code : 'reply_tracking_failed'
     logger.warn({ error, code }, 'Reddit reply tracker could not complete')

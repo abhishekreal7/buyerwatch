@@ -28,7 +28,15 @@ export async function GET() {
   const sentCount = sent.count ?? 0
   const failureCount = terminalFailures.count ?? 0
   const totalResolved = sentCount + failureCount
-  const replyEngagementByThread = (conversations.data ?? []).reduce<Record<string, { replyCount: number; checkedAt: string | null }>>((result, event) => {
+  const trackedReplies = conversations.data ?? []
+  const checkedReplies = trackedReplies.length
+  const repliedToPosts = trackedReplies.filter(event => {
+    const metadata = event.metadata && typeof event.metadata === 'object'
+      ? event.metadata as Record<string, unknown>
+      : {}
+    return Math.max(0, Math.floor(Number(metadata.replyCount) || 0)) > 0
+  })
+  const replyEngagementByThread = repliedToPosts.reduce<Record<string, { replyCount: number; checkedAt: string | null }>>((result, event) => {
     if (!event.thread_id) return result
     const metadata = event.metadata && typeof event.metadata === 'object'
       ? event.metadata as Record<string, unknown>
@@ -45,7 +53,15 @@ export async function GET() {
   }, {})
   return NextResponse.json({
     deliverySuccessRate: totalResolved > 0 ? (sentCount / totalResolved) * 100 : null,
-    conversationsStarted: conversations.data?.length ?? 0,
+    conversationsStarted: repliedToPosts.length,
+    repliesReceived: repliedToPosts.reduce((total, event) => {
+      const metadata = event.metadata && typeof event.metadata === 'object'
+        ? event.metadata as Record<string, unknown>
+        : {}
+      return total + Math.max(0, Math.floor(Number(metadata.replyCount) || 0))
+    }, 0),
+    conversationResponseRate: checkedReplies > 0 ? (repliedToPosts.length / checkedReplies) * 100 : null,
+    verifiedRepliesChecked: checkedReplies,
     replyEngagementByThread,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

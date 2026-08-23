@@ -143,8 +143,13 @@ export default function AnalyticsPage() {
     }>
     topKeywords: any[]
     needsAttention: any[]
-    replyRate: number
-    replyOutcomes: { deliverySuccessRate: number | null; conversationsStarted: number }
+    replyOutcomes: {
+      deliverySuccessRate: number | null
+      conversationsStarted: number
+      repliesReceived: number
+      conversationResponseRate: number | null
+      verifiedRepliesChecked: number
+    }
     platformData: any[]
     highIntentThreshold: number
     attributionStats: { clicks: number; conversions: number; totalRevenue: number }
@@ -291,6 +296,9 @@ export default function AnalyticsPage() {
       const replyOutcomes = await replyOutcomesRes.json() as {
         deliverySuccessRate?: number | null
         conversationsStarted?: number
+        repliesReceived?: number
+        conversationResponseRate?: number | null
+        verifiedRepliesChecked?: number
       }
       const deliveryActivity = deliveryPayload.activity ?? []
       // A completed send belongs in the history. Anything that was stopped,
@@ -310,10 +318,6 @@ export default function AnalyticsPage() {
 
       activityEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       const recentActivity = activityEvents.slice(0, 6)
-
-      // --- REPLY RATE ---
-      const totalDraftedEver = totalSent + draftedCount + feedback.filter(f => f.action_type === 'REJECTED' || f.action_type === 'SKIPPED').length
-      const replyRate = totalDraftedEver > 0 ? (totalSent / totalDraftedEver) * 100 : 0
 
       // --- PLATFORM TRAFFIC ---
       const platformCounts: Record<string, number> = { reddit: 0, bluesky: 0, x: 0 }
@@ -388,12 +392,16 @@ export default function AnalyticsPage() {
         activity: recentActivity,
         topKeywords,
         needsAttention: alerts,
-        replyRate,
         replyOutcomes: {
           deliverySuccessRate: Number.isFinite(replyOutcomes.deliverySuccessRate)
             ? Number(replyOutcomes.deliverySuccessRate)
             : null,
           conversationsStarted: Math.max(0, Math.floor(Number(replyOutcomes.conversationsStarted) || 0)),
+          repliesReceived: Math.max(0, Math.floor(Number(replyOutcomes.repliesReceived) || 0)),
+          conversationResponseRate: Number.isFinite(replyOutcomes.conversationResponseRate)
+            ? Number(replyOutcomes.conversationResponseRate)
+            : null,
+          verifiedRepliesChecked: Math.max(0, Math.floor(Number(replyOutcomes.verifiedRepliesChecked) || 0)),
         },
         platformData,
         highIntentThreshold,
@@ -716,20 +724,25 @@ export default function AnalyticsPage() {
                 <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Reply outcomes</h3>
               </div>
               <div className="mt-10 flex w-full justify-center">
-                <RadialGauge percentage={data.replyRate} label="Draft-to-post rate" />
+                <RadialGauge
+                  percentage={data.replyOutcomes.conversationResponseRate}
+                  label={data.replyOutcomes.verifiedRepliesChecked > 0 ? 'Conversation response rate' : 'Waiting for verified checks'}
+                />
               </div>
               <div className="mt-1 grid w-full grid-cols-2 divide-x divide-black/[0.06] border-t border-black/[0.06] pt-4 text-center">
                 <div className="px-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Delivery success</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Replies received</p>
+                  <p className="mt-1 text-[20px] font-bold tracking-tight text-text-primary">
+                    {data.replyOutcomes.repliesReceived}
+                  </p>
+                </div>
+                <div className="px-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Delivery reliability</p>
                   <p className="mt-1 text-[20px] font-bold tracking-tight text-text-primary">
                     {data.replyOutcomes.deliverySuccessRate === null
                       ? '—'
                       : `${Math.round(data.replyOutcomes.deliverySuccessRate)}%`}
                   </p>
-                </div>
-                <div className="px-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Reddit conversations</p>
-                  <p className="mt-1 text-[20px] font-bold tracking-tight text-text-primary">{data.replyOutcomes.conversationsStarted}</p>
                 </div>
               </div>
             </div>
