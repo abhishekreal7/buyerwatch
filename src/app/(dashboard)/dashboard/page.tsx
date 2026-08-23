@@ -1036,10 +1036,10 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
-            <div className="w-8 h-8 rounded-xl text-[#FF5101] flex items-center justify-center shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M8.5 12L11 14.5L15.5 9.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#FFF4ED] text-[#F06A22]">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M20.3 3.9 4.44 10.57c-.67.28-.64 1.24.04 1.48l6.02 2.1 2.1 6.02c.24.68 1.2.71 1.48.04L20.75 4.35c.16-.4-.05-.62-.45-.45Z" fill="currentColor" />
+                <path d="m4.95 11.58 14.37-6.05-8.17 8.17M11.1 14.14l1.55 4.49" stroke="#FFF4ED" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
           </div>
