@@ -394,7 +394,7 @@ export async function updateRedditConnectionAccountProfile(
 
 export async function getRedditConnectionSummary(userId: string): Promise<RedditConnectionSummary> {
   const admin = getServiceRoleClient()
-  const [{ data: connection }, { data: secret, error: secretError }] = await Promise.all([
+  const [{ data: connection, error: connectionError }, { data: secret, error: secretError }] = await Promise.all([
     admin
       .from('platform_connections')
       .select('external_username')
@@ -407,6 +407,8 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
       .eq('user_id', userId)
       .maybeSingle(),
   ])
+
+  if (connectionError) throw connectionError
 
   if (!connection) {
     return {

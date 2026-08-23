@@ -253,7 +253,13 @@ function parseCachedRedditPosts(
   return posts.slice(0, limit)
 }
 
-export async function fetchSubredditNew(subreddit: string, limit: number = 25): Promise<NormalizedPost[]> {
+export type RedditDiscoverySource = 'provider' | 'rss'
+
+export async function fetchSubredditNewWithSource(
+  subreddit: string,
+  limit: number = 25,
+  options: { mode?: 'auto' | 'rss_only' } = {},
+): Promise<{ posts: NormalizedPost[]; source: RedditDiscoverySource }> {
   const normalizedSubreddit = subreddit.trim().replace(/^r\//i, '').toLowerCase()
   if (!/^[a-z0-9_]{2,50}$/.test(normalizedSubreddit)) {
     throw new Error('Invalid subreddit target')
@@ -267,7 +273,9 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
     && (process.env.NODE_ENV !== 'development' || forceLive)
     ? configuredProvider
     : null
-  const providerDiscoveryEnabled = hasRedditDiscoveryProvider() && providerKind !== null
+  const providerDiscoveryEnabled = options.mode !== 'rss_only'
+    && hasRedditDiscoveryProvider()
+    && providerKind !== null
 
   // ── Redis cache key ────────────────────────────────────────────────
   // Each upstream has an independent cache. When the paid provider is enabled,
@@ -295,9 +303,9 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
       const posts = parseCachedRedditPosts(cached, normalizedSubreddit, boundedLimit)
       if (posts) {
         console.log(
-          `[reddit] ${providerKind ?? 'RSS'} cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`,
+          `[reddit] ${providerDiscoveryEnabled ? providerKind : 'RSS'} cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`,
         )
-        return posts
+        return { posts, source: providerDiscoveryEnabled ? 'provider' : 'rss' }
       }
       await redis.del(preferredCacheKey).catch(() => undefined)
     }
@@ -330,7 +338,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
           PROVIDER_CACHE_TTL,
         ).catch(() => {})
       }
-      return normalized
+      return { posts: normalized, source: 'provider' }
     } catch (providerError) {
       providerFailure = providerError
       console.warn(
@@ -362,18 +370,20 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
 
       if (rssResponse.ok) {
         const xml = await readResponseText(rssResponse, MAX_REDDIT_SOURCE_BYTES)
-        const posts = parseRedditRss(xml, normalizedSubreddit).slice(0, boundedLimit)
-        if (posts.length > 0) {
-          console.log(`[reddit] RSS: ${posts.length} posts from r/${normalizedSubreddit}`)
-          if (redisClient) {
-            await Promise.all([
-              redisClient.set(cacheKey, JSON.stringify(posts), 'EX', CACHE_TTL),
-              redisClient.del(rssBackoffKey),
-            ]).catch(() => {})
-          }
-          return posts
+        if (!/<feed(?:\s|>)/i.test(xml)) {
+          throw new Error('reddit_rss_invalid_feed')
         }
-        console.warn(`[reddit] RSS returned 0 parseable posts for r/${normalizedSubreddit}`)
+        const posts = parseRedditRss(xml, normalizedSubreddit).slice(0, boundedLimit)
+        console.log(`[reddit] RSS: ${posts.length} posts from r/${normalizedSubreddit}`)
+        if (redisClient) {
+          // Cache a valid empty listing too. Quiet communities are successful
+          // checks and must not be retried every scheduler tick.
+          await Promise.all([
+            redisClient.set(cacheKey, JSON.stringify(posts), 'EX', CACHE_TTL),
+            redisClient.del(rssBackoffKey),
+          ]).catch(() => {})
+        }
+        return { posts, source: 'rss' }
       } else if (shouldBackoffRedditRssStatus(rssResponse.status)) {
         console.warn(`[reddit] RSS ${rssResponse.status} for r/${normalizedSubreddit} — backing off the public feed`)
         const retryAfterSeconds = Number(rssResponse.headers.get('retry-after'))
@@ -414,7 +424,7 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
         if (redisClient && normalized.length > 0) {
           await redisClient.set(cacheKey, JSON.stringify(normalized), 'EX', CACHE_TTL).catch(() => {})
         }
-        return normalized
+        return { posts: normalized, source: 'rss' }
       }
     } catch (jsonErr) {
       console.warn(`[reddit] Public JSON fallback failed for r/${normalizedSubreddit}:`, jsonErr)
@@ -423,4 +433,11 @@ export async function fetchSubredditNew(subreddit: string, limit: number = 25): 
 
   if (providerFailure instanceof Error) throw providerFailure
   throw new Error(`All Reddit fetch paths failed for r/${normalizedSubreddit}`)
+}
+
+export async function fetchSubredditNew(
+  subreddit: string,
+  limit: number = 25,
+): Promise<NormalizedPost[]> {
+  return (await fetchSubredditNewWithSource(subreddit, limit)).posts
 }

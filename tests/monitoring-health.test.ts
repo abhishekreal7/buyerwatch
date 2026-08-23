@@ -38,5 +38,6 @@ describe('monitoring health presentation', () => {
       'Reddit source unavailable',
     )
     expect(getKeywordPollIssueLabel('source_rate_limited')).toBe('Source rate-limited')
+    expect(getKeywordPollIssueLabel('reddit_rss_fallback')).toBe('Reddit fallback active')
   })
 })
