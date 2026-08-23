@@ -48,8 +48,11 @@ interface DeliveryActivity {
   threadId: string
   platform: string
   title: string
-  state: 'queued' | 'sending' | 'sent' | 'failed' | 'uncertain' | 'cancelled'
+  subject: string
+  state: 'sent' | 'failed' | 'uncertain' | 'cancelled'
   message: string
+  actionLabel: string
+  actionHref: string
   threadUrl: string | null
   replyUrl: string | null
   updatedAt: string
@@ -471,8 +474,9 @@ export default function PostedPage() {
                       <div key={item.threadId} className="flex items-start gap-3 py-3">
                         <span className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${tone}`}>{item.state}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold text-gray-900">{item.title}</p>
+                          <p className="text-xs font-semibold text-gray-900">{item.title}</p>
                           <p className="mt-0.5 text-[11px] leading-4 text-gray-600">{item.message}</p>
+                          <p className="mt-1 truncate text-[10px] text-gray-400">{item.subject}</p>
                         </div>
                         <span className="shrink-0 text-[10px] text-gray-400">{formatRelativeDate(item.updatedAt)}</span>
                       </div>

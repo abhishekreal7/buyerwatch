@@ -44,6 +44,13 @@ function adminRecipients(): string[] {
 }
 
 function alertCopy(kind: RedditDeliveryAlertKind, code: string) {
+  if (kind === 'repeated_failures' && code === 'reply_not_sent') {
+    return {
+      title: 'Reply was not sent',
+      action: 'Nothing was posted. Review the draft before trying again.',
+      detail: `Operational code: ${code.slice(0, 160)}`,
+    }
+  }
   const copy: Record<RedditDeliveryAlertKind, { title: string; action: string }> = {
     reconnect_required: {
       title: 'Reddit connection needs attention',
@@ -101,6 +108,7 @@ export async function sendRedditDeliveryAlert(input: {
   code: string
   userId?: string
   detail?: string
+  actionPath?: string
 }): Promise<boolean> {
   try {
     await createIncidentForRedditAlert(input)

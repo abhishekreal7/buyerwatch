@@ -18,6 +18,17 @@ import { fetchAllPages } from '@/lib/supabase-pagination'
 import { normalizeHighIntentThreshold } from '@/lib/high-intent-threshold'
 import { DataLoadError } from '@/components/DataLoadError'
 
+type DeliveryActivity = {
+  threadId: string
+  state: 'sent' | 'failed' | 'uncertain' | 'cancelled'
+  title: string
+  subject: string
+  message: string
+  actionLabel: string
+  actionHref: string
+  updatedAt: string
+}
+
 // Custom Label for Horizontal Bar Chart
 const CustomBarLabel = (props: any) => {
   const { x, y, width, height, value, index, platformData } = props
@@ -121,7 +132,15 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<{
     stats: { found: number, drafted: number, sent: number, sentThisMonth: number, sentLastMonth: number }
     trendData: { date: string, discovered: number, qualified: number }[]
-    activity: any[]
+    activity: Array<{
+      id: string
+      type: 'approved' | 'draft' | 'auto' | DeliveryActivity['state']
+      timestamp: Date
+      label: string
+      detail?: string
+      actionLabel?: string
+      actionHref?: string
+    }>
     topKeywords: any[]
     needsAttention: any[]
     replyRate: number
@@ -159,6 +178,7 @@ export default function AnalyticsPage() {
         clicksRes,
         conversionsRes,
         revenueRes,
+        deliveryActivityRes,
       ] = await Promise.all([
         supabase.from('profiles').select('auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
@@ -170,6 +190,7 @@ export default function AnalyticsPage() {
         supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('clicked_at', 'is', null),
         supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('converted_at', 'is', null),
         fetchAllPages((from, to) => supabase.from('reply_attribution').select('revenue_usd').eq('user_id', userId).not('revenue_usd', 'is', null).range(from, to)),
+        fetch('/api/replies/activity', { cache: 'no-store' }),
       ])
 
       const queryError = [
@@ -185,6 +206,7 @@ export default function AnalyticsPage() {
         revenueRes,
       ].find(result => result.error)?.error
       if (queryError) throw queryError
+      if (!deliveryActivityRes.ok) throw new Error('delivery_activity_load_failed')
 
       const threads = threadsRes.data || []
       const feedback = feedbackRes.data || []
@@ -230,7 +252,15 @@ export default function AnalyticsPage() {
       }))
 
       // --- ACTIVITY FEED ---
-      const activityEvents: any[] = []
+      const activityEvents: Array<{
+        id: string
+        type: 'approved' | 'draft' | 'auto' | DeliveryActivity['state']
+        timestamp: Date
+        label: string
+        detail?: string
+        actionLabel?: string
+        actionHref?: string
+      }> = []
 
       feedback.forEach(f => {
         if (f.action_type === 'APPROVED' || f.action_type === 'EDITED_APPROVED') {
@@ -252,6 +282,19 @@ export default function AnalyticsPage() {
           label: `Draft ready: "${t.author || 'thread'}"`
         })
       })
+
+      const deliveryPayload = await deliveryActivityRes.json() as { activity?: DeliveryActivity[] }
+      for (const item of deliveryPayload.activity ?? []) {
+        activityEvents.push({
+          id: `delivery-${item.threadId}-${item.state}-${item.updatedAt}`,
+          type: item.state,
+          timestamp: new Date(item.updatedAt),
+          label: item.title,
+          detail: item.message,
+          actionLabel: item.actionLabel,
+          actionHref: item.actionHref,
+        })
+      }
 
       activityEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       const recentActivity = activityEvents.slice(0, 6)
@@ -561,9 +604,20 @@ export default function AnalyticsPage() {
                           {event.type === 'approved' && <CheckCircle className="w-4 h-4 text-[#10B981]" />}
                           {event.type === 'draft' && <FileText className="w-4 h-4 text-[#F59E0B]" />}
                           {event.type === 'auto' && <Send className="w-4 h-4 text-[#0A84FF]" />}
+                          {event.type === 'sent' && <Send className="w-4 h-4 text-[#10B981]" />}
+                          {(event.type === 'failed' || event.type === 'uncertain') && <AlertTriangle className={`w-4 h-4 ${event.type === 'failed' ? 'text-[#EF4444]' : 'text-[#F59E0B]'}`} />}
+                          {event.type === 'cancelled' && <FileText className="w-4 h-4 text-[#F59E0B]" />}
                         </div>
                         <div className="flex-1 min-w-0 pt-1.5">
                           <p className="text-[13px] font-medium text-text-primary leading-snug truncate group-hover:text-clip group-hover:whitespace-normal transition-all">{event.label}</p>
+                          {event.detail && <p className="mt-1 text-[11.5px] leading-4 text-text-secondary">{event.detail}</p>}
+                          {event.actionHref && event.actionLabel && (
+                            event.actionHref.startsWith('/') ? (
+                              <Link href={event.actionHref} className="mt-1.5 inline-flex text-[11.5px] font-semibold text-[#0A84FF] hover:underline">{event.actionLabel}</Link>
+                            ) : (
+                              <a href={event.actionHref} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex text-[11.5px] font-semibold text-[#0A84FF] hover:underline">{event.actionLabel}</a>
+                            )
+                          )}
                           <p className="text-[11.5px] text-text-tertiary mt-1">{formatDistanceToNow(event.timestamp, { addSuffix: true })}</p>
                         </div>
                       </div>

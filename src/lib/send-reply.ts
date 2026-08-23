@@ -13,6 +13,8 @@ import {
 } from './send-limiter'
 import { ensureAttributionMapping } from './attribution-store'
 import { recordEngagementEvent } from './automation-audit'
+import { sendRedditDeliveryAlert } from './reddit-delivery-alerts'
+import { resolveReplyNotSentIncident } from './reddit-service-safety'
 import { queuedAutoSendBlockReason } from './auto-send-policy'
 import { hasActiveRedditConnection } from './reddit-session'
 import {
@@ -362,6 +364,9 @@ export async function processSendReply(
     }).catch((auditError) => {
       logger.warn({ auditError, threadId }, 'Reply sent but engagement audit was not recorded')
     })
+    await resolveReplyNotSentIncident(userId).catch((incidentError) => {
+      logger.warn({ incidentError, threadId }, 'Could not resolve prior reply failure notice')
+    })
 
     return { success: true, permalink: result.permalink }
   } catch (error) {
@@ -435,6 +440,21 @@ export async function processSendReply(
       }).catch((auditError) => {
         logger.warn({ auditError, threadId }, 'Reply failure audit was not recorded')
       })
+      // A final failure changes the user's work and needs a concise, durable
+      // alert. Uncertain and reconnect states already have their own specific
+      // incidents, so do not stack a second generic warning on top of them.
+      const hasSpecificCustomerAlert = error instanceof PlatformPostError
+        && (error.deliveryUncertain || error.reconnectRequired)
+      if (!hasSpecificCustomerAlert) {
+        await sendRedditDeliveryAlert({
+          kind: 'repeated_failures',
+          code: 'reply_not_sent',
+          userId,
+          actionPath: `/dashboard?thread=${encodeURIComponent(threadId)}`,
+        }).catch((alertError) => {
+          logger.warn({ alertError, threadId }, 'Reply failure customer alert was not recorded')
+        })
+      }
     }
 
     throw error

@@ -35,14 +35,17 @@ describe('customer incident safety', () => {
     expect(email).toContain('record_incident_email_delivery_v1')
     expect(alerts).toContain('createIncidentForRedditAlert(input)')
     expect(alerts).toContain('deliverPendingIncidentEmails(20)')
+    expect(source('src/lib/send-reply.ts')).toContain("code: 'reply_not_sent'")
+    expect(source('src/lib/send-reply.ts')).toContain('resolveReplyNotSentIncident(userId)')
   })
 
   it('exposes real incidents, delivery states, status, and support commitments', () => {
     expect(source('src/components/DashboardLayout.tsx')).toContain("fetch('/api/incidents'")
     const activity = source('src/app/api/replies/activity/route.ts')
-    for (const state of ['queued', 'sending', 'sent', 'failed', 'uncertain', 'cancelled']) {
+    for (const state of ['sent', 'failed', 'uncertain', 'cancelled']) {
       expect(activity).toContain(`'${state}'`)
     }
+    expect(activity).toContain('deliveryActivityPresentation')
     expect(source('src/app/status/page.tsx')).toContain('getPublicServiceStatus')
     expect(source('src/app/service-policy/page.tsx')).toContain('prorated credit or refund')
   })
