@@ -21,11 +21,16 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
   const cy = 160
 
   const safePercentage = Math.min(Math.max(percentage, 0), 100)
+  // Reply-rate calculations are ratios and often produce repeating decimals
+  // (for example 8.181818…). Keep the dashboard label readable and bounded.
+  const displayPercentage = Number.isInteger(safePercentage)
+    ? String(safePercentage)
+    : (Math.round(safePercentage * 10) / 10).toFixed(1)
   const activeTicks = Math.round((safePercentage / 100) * tickCount)
 
   return (
     <div className="relative flex aspect-[276/198] w-full max-w-[276px] flex-col items-center justify-center">
-      <svg className="h-full w-full overflow-visible" viewBox="0 0 276 198" role="img" aria-label={`${label}: ${safePercentage}%`}>
+      <svg className="h-full w-full overflow-visible" viewBox="0 0 276 198" role="img" aria-label={`${label}: ${displayPercentage}%`}>
         {Array.from({ length: tickCount }).map((_, i) => {
           const angle = startAngle + i * angleStep
           const angleRad = (angle * Math.PI) / 180
@@ -73,14 +78,14 @@ export function RadialGauge({ percentage, label }: RadialGaugeProps) {
         <span
           style={{
             fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif',
-            fontSize: 'clamp(32px, 12vw, 42px)',
+            fontSize: 'clamp(30px, 11vw, 42px)',
             fontWeight: 700,
             letterSpacing: '-0.03em',
             color: '#0A0A0A',
             lineHeight: 1,
           }}
         >
-          {safePercentage}%
+          {displayPercentage}%
         </span>
         <span className="mt-2 text-center text-xs font-medium text-gray-500">{label}</span>
       </div>
