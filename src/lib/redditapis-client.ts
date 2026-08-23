@@ -3,11 +3,13 @@ import { fetchWithTimeout } from './http'
 import { redis } from './redis'
 import {
   parseRedditCommentResponse,
+  parseRedditDirectCommentReplies,
   parseRedditApisListingPage,
   parseRedditLoginResponse,
   parseRedditPostTarget,
   providerMessageSignalsExpiredSession,
   type RedditCommentResult,
+  type RedditDirectCommentReply,
   type RedditLoginResult,
   type RedditApisListingPost,
   type RedditSessionCookies,
@@ -549,6 +551,33 @@ export async function fetchRedditApisDiscoveryPayload(
     )
   }
   return payload
+}
+
+/** Read the direct replies to one BuyerWatch-posted Reddit comment. */
+export async function fetchRedditCommentReplies(
+  commentId: string,
+): Promise<RedditDirectCommentReply[]> {
+  const normalizedCommentId = commentId.trim().toLowerCase().replace(/^t1_/, '')
+  if (!/^[a-z0-9]{3,20}$/i.test(normalizedCommentId)) {
+    throw new RedditApisRequestError('reddit_comment_id_invalid', null, false)
+  }
+  const { response, payload } = await redditApisFetchJson(
+    `/api/reddit/comment/${encodeURIComponent(normalizedCommentId)}`,
+    { method: 'GET' },
+  )
+  if (!response.ok) {
+    if (response.status === 402) {
+      throw new RedditApisRequestError('reddit_provider_balance_unavailable', 402, false)
+    }
+    throw new RedditApisRequestError(
+      response.status === 429 || response.status >= 500
+        ? 'reddit_provider_temporarily_unavailable'
+        : 'reddit_comment_unavailable',
+      response.status,
+      response.status === 429 || response.status >= 500,
+    )
+  }
+  return parseRedditDirectCommentReplies(payload, `t1_${normalizedCommentId}`)
 }
 
 export async function fetchRedditApisAccountStatus(timeoutMs = 2_500): Promise<{

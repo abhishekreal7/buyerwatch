@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchRedditApisAccountStatus,
+  fetchRedditCommentReplies,
   fetchRedditPostSnapshot,
   getRedditApisDailyBudgetStatus,
   loginRedditAccount,
@@ -186,6 +187,28 @@ describe('RedditAPIs client reliability', () => {
     })))
 
     await expect(fetchRedditApisAccountStatus()).resolves.toEqual({ creditsRemaining: 3.25 })
+  })
+
+  it('reads only direct replies to a posted Reddit comment', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      kind: 'Listing',
+      data: {
+        children: [{
+          kind: 't1',
+          data: {
+            id: 'reply123',
+            parent_id: 't1_outgoing',
+            author: 'prospect',
+          },
+        }],
+      },
+    })))
+
+    await expect(fetchRedditCommentReplies('t1_outgoing')).resolves.toEqual([{
+      commentId: 't1_reply123',
+      author: 'prospect',
+      createdAt: null,
+    }])
   })
 
   it('uses the provider HTTP login flow once for comment-session cookies', async () => {

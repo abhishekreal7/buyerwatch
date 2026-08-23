@@ -144,6 +144,7 @@ export default function AnalyticsPage() {
     topKeywords: any[]
     needsAttention: any[]
     replyRate: number
+    replyOutcomes: { deliverySuccessRate: number | null; conversationsStarted: number }
     platformData: any[]
     highIntentThreshold: number
     attributionStats: { clicks: number; conversions: number; totalRevenue: number }
@@ -179,6 +180,7 @@ export default function AnalyticsPage() {
         conversionsRes,
         revenueRes,
         deliveryActivityRes,
+        replyOutcomesRes,
       ] = await Promise.all([
         supabase.from('profiles').select('auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
@@ -191,6 +193,7 @@ export default function AnalyticsPage() {
         supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('converted_at', 'is', null),
         fetchAllPages((from, to) => supabase.from('reply_attribution').select('revenue_usd').eq('user_id', userId).not('revenue_usd', 'is', null).range(from, to)),
         fetch('/api/replies/activity', { cache: 'no-store' }),
+        fetch('/api/replies/outcomes', { cache: 'no-store' }),
       ])
 
       const queryError = [
@@ -207,6 +210,7 @@ export default function AnalyticsPage() {
       ].find(result => result.error)?.error
       if (queryError) throw queryError
       if (!deliveryActivityRes.ok) throw new Error('delivery_activity_load_failed')
+      if (!replyOutcomesRes.ok) throw new Error('reply_outcomes_load_failed')
 
       const threads = threadsRes.data || []
       const feedback = feedbackRes.data || []
@@ -284,6 +288,10 @@ export default function AnalyticsPage() {
       })
 
       const deliveryPayload = await deliveryActivityRes.json() as { activity?: DeliveryActivity[] }
+      const replyOutcomes = await replyOutcomesRes.json() as {
+        deliverySuccessRate?: number | null
+        conversationsStarted?: number
+      }
       for (const item of deliveryPayload.activity ?? []) {
         activityEvents.push({
           id: `delivery-${item.threadId}-${item.state}-${item.updatedAt}`,
@@ -361,6 +369,12 @@ export default function AnalyticsPage() {
         topKeywords,
         needsAttention: alerts,
         replyRate,
+        replyOutcomes: {
+          deliverySuccessRate: Number.isFinite(replyOutcomes.deliverySuccessRate)
+            ? Number(replyOutcomes.deliverySuccessRate)
+            : null,
+          conversationsStarted: Math.max(0, Math.floor(Number(replyOutcomes.conversationsStarted) || 0)),
+        },
         platformData,
         highIntentThreshold,
         attributionStats: { clicks, conversions, totalRevenue }
@@ -676,13 +690,27 @@ export default function AnalyticsPage() {
               )}
             </div>
 
-            {/* Middle Card: Reply Rate Gauge */}
-            <div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:p-8">
+            {/* Middle Card: Reply outcomes */}
+            <div className="relative flex min-h-[360px] flex-col items-center justify-center overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:p-8">
               <div className="absolute inset-x-5 top-5 flex items-start justify-between sm:inset-x-6 sm:top-6">
-                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Reply Rate</h3>
+                <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Reply outcomes</h3>
               </div>
-              <div className="mt-8 flex w-full justify-center">
-                <RadialGauge percentage={data.replyRate} label="Drafted → Posted" />
+              <div className="mt-10 flex w-full justify-center">
+                <RadialGauge percentage={data.replyRate} label="Draft-to-post rate" />
+              </div>
+              <div className="mt-1 grid w-full grid-cols-2 divide-x divide-black/[0.06] border-t border-black/[0.06] pt-4 text-center">
+                <div className="px-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Delivery success</p>
+                  <p className="mt-1 text-[20px] font-bold tracking-tight text-text-primary">
+                    {data.replyOutcomes.deliverySuccessRate === null
+                      ? '—'
+                      : `${Math.round(data.replyOutcomes.deliverySuccessRate)}%`}
+                  </p>
+                </div>
+                <div className="px-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Conversations started</p>
+                  <p className="mt-1 text-[20px] font-bold tracking-tight text-text-primary">{data.replyOutcomes.conversationsStarted}</p>
+                </div>
               </div>
             </div>
 
