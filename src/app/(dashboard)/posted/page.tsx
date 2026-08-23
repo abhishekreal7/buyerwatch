@@ -323,6 +323,7 @@ function StatCard({ label, value, icon: Icon, loading }: {
 export default function PostedPage() {
   const [posted, setPosted] = useState<PostedReply[]>([])
   const [deliveryActivity, setDeliveryActivity] = useState<DeliveryActivity[]>([])
+  const [conversationsStarted, setConversationsStarted] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
@@ -342,7 +343,7 @@ export default function PostedPage() {
       setLoadFailed(false)
 
       try {
-        const [pageResult, countResult, activityResult] = await Promise.all([
+        const [pageResult, countResult, activityResult, outcomesResult] = await Promise.all([
           supabase
             .from('monitored_threads')
             .select('id, platform, author, title, text_content, url, intent_score, source_created_at, created_at, reply_analytics(draft_text, edited_text, sent_at), keywords(term, target), send_audit_log(status, permalink, created_at), reply_attribution(clicked_at, converted_at, revenue_usd)')
@@ -356,6 +357,7 @@ export default function PostedPage() {
             .eq('user_id', userId)
             .eq('status', 'replied'),
           fetch('/api/replies/activity', { cache: 'no-store' }),
+          fetch('/api/replies/outcomes', { cache: 'no-store' }),
         ])
         if (pageResult.error) throw pageResult.error
         if (countResult.error) throw countResult.error
@@ -365,6 +367,10 @@ export default function PostedPage() {
         if (activityResult.ok) {
           const payload = await activityResult.json() as { activity?: DeliveryActivity[] }
           setDeliveryActivity(payload.activity ?? [])
+        }
+        if (outcomesResult.ok) {
+          const payload = await outcomesResult.json() as { conversationsStarted?: number }
+          setConversationsStarted(Math.max(0, Math.floor(Number(payload.conversationsStarted) || 0)))
         }
         setPosted(parsed)
         setTotalCount(countResult.count ?? pageResult.data?.length ?? 0)
@@ -423,7 +429,6 @@ export default function PostedPage() {
   }, [posted, searchQuery, platformFilter])
 
   const totalClicks = useMemo(() => posted.filter(p => Boolean(p.clickedAt)).length, [posted])
-  const totalConversions = useMemo(() => posted.filter(p => Boolean(p.convertedAt)).length, [posted])
 
   return (
     <AppPage>
@@ -452,7 +457,7 @@ export default function PostedPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <StatCard label="Sent" value={totalCount} icon={Send} loading={loading} />
               <StatCard label="Clicks" value={totalClicks} icon={MousePointerClick} loading={loading} />
-              <StatCard label="Conversions" value={totalConversions} icon={TrendingUp} loading={loading} />
+              <StatCard label="Conversations" value={conversationsStarted} icon={MessageSquare} loading={loading} />
             </div>
 
             {deliveryActivity.length > 0 && (
