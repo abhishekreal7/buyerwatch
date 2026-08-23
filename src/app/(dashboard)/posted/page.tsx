@@ -452,7 +452,7 @@ export default function PostedPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <StatCard label="Sent" value={totalCount} icon={Send} loading={loading} />
               <StatCard label="Clicks" value={totalClicks} icon={MousePointerClick} loading={loading} />
-              <StatCard label="Conversions" value={totalConversions} icon={TrendingUp} loading={loading} />
+              <StatCard label="Attributed conversions" value={totalConversions} icon={TrendingUp} loading={loading} />
             </div>
 
             {deliveryActivity.length > 0 && (
