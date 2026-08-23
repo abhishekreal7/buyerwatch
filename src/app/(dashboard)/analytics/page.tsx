@@ -728,7 +728,7 @@ export default function AnalyticsPage() {
                   </p>
                 </div>
                 <div className="px-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Conversations started</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Reddit conversations</p>
                   <p className="mt-1 text-[20px] font-bold tracking-tight text-text-primary">{data.replyOutcomes.conversationsStarted}</p>
                 </div>
               </div>
@@ -796,9 +796,9 @@ export default function AnalyticsPage() {
                 <p className="text-xs text-gray-500 mt-1.5 font-medium">Tracked replies with at least one verified click</p>
               </div>
               <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
-                <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-wider mb-1">Conversions</p>
+                <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-wider mb-1">Attributed conversions</p>
                 <p className="text-3xl font-extrabold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
-                <p className="text-xs text-gray-600 mt-1.5 font-medium">Attributed signups / payments</p>
+                <p className="text-xs text-gray-600 mt-1.5 font-medium">Signups or payments from replies</p>
               </div>
               <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
                 <p className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-wider mb-1">Attributed Revenue</p>
