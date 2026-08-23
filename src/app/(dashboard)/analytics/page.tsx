@@ -292,7 +292,11 @@ export default function AnalyticsPage() {
         deliverySuccessRate?: number | null
         conversationsStarted?: number
       }
-      for (const item of deliveryPayload.activity ?? []) {
+      const deliveryActivity = deliveryPayload.activity ?? []
+      // A completed send belongs in the history. Anything that was stopped,
+      // failed, or could not be confirmed is an unresolved task, so it is
+      // deliberately kept out of the quiet activity timeline below.
+      for (const item of deliveryActivity.filter(item => item.state === 'sent')) {
         activityEvents.push({
           id: `delivery-${item.threadId}-${item.state}-${item.updatedAt}`,
           type: item.state,
@@ -334,7 +338,23 @@ export default function AnalyticsPage() {
         }))
 
       // --- NEEDS ATTENTION ---
-      const alerts = []
+      const alerts: Array<{
+        id: string
+        type: 'warning' | 'error'
+        label: string
+        detail?: string
+        actionLabel: string
+        href: string
+      }> = deliveryActivity
+        .filter(item => item.state === 'failed' || item.state === 'uncertain' || item.state === 'cancelled')
+        .map(item => ({
+          id: `delivery-${item.threadId}-${item.state}`,
+          type: item.state === 'failed' ? 'error' : 'warning',
+          label: item.title,
+          detail: item.message,
+          actionLabel: item.actionLabel,
+          href: item.actionHref,
+        }))
       if (draftedCount > 0) {
         alerts.push({ id: 'drafts', type: 'warning', label: `${draftedCount} drafts ready for review`, actionLabel: 'Take action →', href: '/dashboard' })
       }
@@ -736,18 +756,17 @@ export default function AnalyticsPage() {
                           <AlertTriangle className={`w-4 h-4 ${alert.type === 'error' ? 'text-[#EF4444]' : 'text-[#F59E0B]'}`} strokeWidth={2.5} />
                           <p className="text-[14px] font-semibold text-text-primary">{alert.label}</p>
                         </div>
-                        {alert.onClick ? (
-                          <button
-                            type="button"
-                            onClick={alert.onClick}
-                            className="flex w-fit items-center gap-1 text-[13px] font-semibold text-[#0A84FF] transition-colors hover:text-[#0A84FF]/80"
-                          >
-                            {alert.actionLabel}
-                          </button>
-                        ) : (
+                        {alert.detail && (
+                          <p className="mb-3 text-[12.5px] leading-5 text-text-secondary">{alert.detail}</p>
+                        )}
+                        {alert.href.startsWith('/') ? (
                           <Link href={alert.href} className="text-[13px] font-semibold text-[#0A84FF] hover:text-[#0A84FF]/80 flex items-center gap-1 transition-colors w-fit">
                             {alert.actionLabel}
                           </Link>
+                        ) : (
+                          <a href={alert.href} target="_blank" rel="noreferrer" className="text-[13px] font-semibold text-[#0A84FF] hover:text-[#0A84FF]/80 flex items-center gap-1 transition-colors w-fit">
+                            {alert.actionLabel}
+                          </a>
                         )}
                       </div>
                     ))}

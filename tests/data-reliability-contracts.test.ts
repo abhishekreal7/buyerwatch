@@ -41,6 +41,12 @@ describe('dashboard data reliability contracts', () => {
     expect(keywords).toMatch(/from\('monitored_threads'\)[\s\S]{0,220}not\('intent_score', 'is', null\)/)
   })
 
+  it('keeps unresolved reply delivery out of the quiet activity timeline', () => {
+    expect(analytics).toContain("deliveryActivity.filter(item => item.state === 'sent')")
+    expect(analytics).toContain("item.state === 'failed' || item.state === 'uncertain' || item.state === 'cancelled'")
+    expect(analytics).toContain('detail: item.message')
+  })
+
   it('loads active and dismissed dashboard windows independently', () => {
     expect(dashboard).toContain('activeThreadsResult')
     expect(dashboard).toContain('dismissedThreadsResult')
