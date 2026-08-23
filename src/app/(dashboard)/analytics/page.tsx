@@ -84,8 +84,6 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 const LEAD_DISCOVERY_RANGES = [7, 14, 30] as const
 type LeadDiscoveryRange = typeof LEAD_DISCOVERY_RANGES[number]
-const LEAD_DISCOVERY_SERIES = ['all', 'discovered', 'qualified'] as const
-type LeadDiscoverySeries = typeof LEAD_DISCOVERY_SERIES[number]
 
 function normalizePlatform(value: unknown) {
   const platform = String(value || '').trim().toLowerCase()
@@ -96,14 +94,14 @@ function normalizePlatform(value: unknown) {
 }
 
 // Custom Tooltip for Lead Discovery Chart
-const LeadDiscoveryTooltip = ({ active, payload, label, series }: { active?: boolean; payload?: any[]; label?: string; series: LeadDiscoverySeries }) => {
+const LeadDiscoveryTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
   if (active && payload && payload.length) {
     const discovered = payload.find((p: any) => p.dataKey === 'discovered')
     const qualified = payload.find((p: any) => p.dataKey === 'qualified')
     return (
       <div className="bg-white/95 border border-black/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.10)] rounded-xl px-3.5 py-3 text-[12.5px] min-w-[142px] z-50 relative backdrop-blur">
         <p className="font-semibold text-text-primary mb-2">{label}</p>
-        {series !== 'qualified' && discovered && (
+        {discovered && (
           <p className="flex items-center justify-between gap-3 text-text-secondary mb-1">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
@@ -112,7 +110,7 @@ const LeadDiscoveryTooltip = ({ active, payload, label, series }: { active?: boo
             <span className="font-bold text-text-primary">{discovered.value}</span>
           </p>
         )}
-        {series !== 'discovered' && qualified && (
+        {qualified && (
           <p className="flex items-center justify-between gap-3 text-text-secondary">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
@@ -156,7 +154,6 @@ export default function AnalyticsPage() {
     highIntentThreshold: number
   } | null>(null)
   const [leadDiscoveryRange, setLeadDiscoveryRange] = useState<LeadDiscoveryRange>(14)
-  const [leadDiscoverySeries, setLeadDiscoverySeries] = useState<LeadDiscoverySeries>('all')
 
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
@@ -502,10 +499,8 @@ export default function AnalyticsPage() {
     { discovered: 0, qualified: 0 },
   )
   const previousLeadDiscoveryData = data.trendData.slice(-(leadDiscoveryRange * 2), -leadDiscoveryRange)
-  const selectedTrendKey = leadDiscoverySeries === 'qualified' ? 'qualified' : 'discovered'
-  const selectedTrendLabel = leadDiscoverySeries === 'qualified' ? 'High-intent' : 'Discovered'
-  const currentTrendTotal = leadDiscoveryTotals[selectedTrendKey]
-  const previousTrendTotal = previousLeadDiscoveryData.reduce((total, point) => total + point[selectedTrendKey], 0)
+  const currentTrendTotal = leadDiscoveryTotals.discovered
+  const previousTrendTotal = previousLeadDiscoveryData.reduce((total, point) => total + point.discovered, 0)
   const trendDifference = currentTrendTotal - previousTrendTotal
   const hasPreviousTrend = previousLeadDiscoveryData.length === leadDiscoveryRange
   const trendComparisonLabel = !hasPreviousTrend
@@ -520,9 +515,6 @@ export default function AnalyticsPage() {
     { label: 'Sent', value: data.stats.sent, tone: 'bg-emerald-100 text-emerald-700' },
     { label: 'Conversations', value: data.replyOutcomes.conversationsStarted, tone: 'bg-violet-100 text-violet-700' },
   ]
-  const showDiscovered = leadDiscoverySeries !== 'qualified'
-  const showQualified = leadDiscoverySeries !== 'discovered'
-
   return (
     <AppPage>
       <div className="w-full max-w-[1200px] pb-12">
@@ -537,76 +529,50 @@ export default function AnalyticsPage() {
 
             {/* Left Card: Lead Discovery */}
             <div className="relative flex flex-col overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:col-span-2 lg:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <div>
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-medium text-text-secondary">
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#171717]" />
+                      Discovered <span className="font-bold text-text-primary">{leadDiscoveryTotals.discovered}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#0A84FF]" />
+                      High-intent <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
+                    </span>
+                    {trendComparisonLabel && (
+                      <span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${
+                        trendDifference > 0
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : trendDifference < 0
+                            ? 'bg-rose-50 text-rose-700'
+                            : 'bg-black/[0.04] text-text-tertiary'
+                      }`}>
+                        {trendComparisonLabel}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-medium text-text-secondary">
-                  <div className="inline-flex rounded-full bg-black/[0.04] p-0.5" aria-label="Lead discovery date range">
-                    {LEAD_DISCOVERY_RANGES.map((range) => {
-                      const active = leadDiscoveryRange === range
-                      return (
-                        <button
-                          key={range}
-                          type="button"
-                          onClick={() => setLeadDiscoveryRange(range)}
-                          aria-pressed={active}
-                          className={
-                            active
-                              ? 'rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-colors'
-                              : 'rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-tertiary transition-colors hover:text-text-secondary'
-                          }
-                        >
-                          {range}D
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <div className="inline-flex rounded-full border border-black/[0.05] bg-white p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" aria-label="Lead discovery metric">
-                    {LEAD_DISCOVERY_SERIES.map((series) => {
-                      const active = leadDiscoverySeries === series
-                      const label = series === 'all' ? 'All' : series === 'discovered' ? 'Discovered' : 'High-intent'
-                      return (
-                        <button
-                          key={series}
-                          type="button"
-                          onClick={() => setLeadDiscoverySeries(series)}
-                          aria-pressed={active}
-                          className={
-                            active
-                              ? 'rounded-full bg-[#0A84FF] px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_2px_8px_rgba(10,132,255,0.24)] transition-all'
-                              : 'rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-tertiary transition-colors hover:text-text-secondary'
-                          }
-                        >
-                          {label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {leadDiscoverySeries !== 'qualified' && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#171717]" />
-                      Discovered: <span className="font-bold text-text-primary">{leadDiscoveryTotals.discovered}</span>
-                    </span>
-                  )}
-                  {leadDiscoverySeries === 'all' && <span className="text-text-tertiary hidden sm:inline">|</span>}
-                  {leadDiscoverySeries !== 'discovered' && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-                      High-intent (≥{data.highIntentThreshold}%): <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
-                    </span>
-                  )}
-                  {trendComparisonLabel && (
-                    <span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${
-                      trendDifference > 0
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : trendDifference < 0
-                          ? 'bg-rose-50 text-rose-700'
-                          : 'bg-black/[0.04] text-text-tertiary'
-                    }`}>
-                      {selectedTrendLabel}: {trendComparisonLabel}
-                    </span>
-                  )}
+                <div className="inline-flex shrink-0 self-start rounded-full bg-black/[0.04] p-0.5" aria-label="Lead discovery date range">
+                  {LEAD_DISCOVERY_RANGES.map((range) => {
+                    const active = leadDiscoveryRange === range
+                    return (
+                      <button
+                        key={range}
+                        type="button"
+                        onClick={() => setLeadDiscoveryRange(range)}
+                        aria-pressed={active}
+                        className={
+                          active
+                            ? 'rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-colors'
+                            : 'rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-tertiary transition-colors hover:text-text-secondary'
+                        }
+                      >
+                        {range}D
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -639,15 +605,6 @@ export default function AnalyticsPage() {
                           <feMergeNode in="SourceGraphic" />
                         </feMerge>
                       </filter>
-                      <filter id="leadDiscoveryDiscoveredGlow" x="-20%" y="-25%" width="140%" height="150%">
-                        <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
-                        <feFlood floodColor="#171717" floodOpacity="0.16" result="glowColor" />
-                        <feComposite in="glowColor" in2="blur" operator="in" result="glow" />
-                        <feMerge>
-                          <feMergeNode in="glow" />
-                          <feMergeNode in="SourceGraphic" />
-                        </feMerge>
-                      </filter>
                     </defs>
                     <CartesianGrid vertical={false} stroke="rgba(20,18,16,0.045)" strokeDasharray="3 6" />
                     <XAxis
@@ -665,45 +622,37 @@ export default function AnalyticsPage() {
                       allowDecimals={false}
                     />
                     <Tooltip
-                      content={<LeadDiscoveryTooltip series={leadDiscoverySeries} />}
+                      content={<LeadDiscoveryTooltip />}
                       cursor={{ stroke: 'rgba(10,132,255,0.16)', strokeWidth: 1 }}
                       wrapperStyle={{ outline: 'none' }}
                     />
-                    {showDiscovered && (
-                      <Area
-                        type="linear"
-                        dataKey="discovered"
-                        stroke="#171717"
-                        strokeWidth={leadDiscoverySeries === 'discovered' ? 2.5 : 1.75}
-                        fillOpacity={1}
-                        fill="url(#colorDiscovered)"
-                        filter={leadDiscoverySeries === 'discovered' ? 'url(#leadDiscoveryDiscoveredGlow)' : undefined}
-                        dot={false}
-                        activeDot={{ r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    )}
-                    {showQualified && (
-                      <Area
-                        type="linear"
-                        dataKey="qualified"
-                        stroke="#0A84FF"
-                        strokeWidth={leadDiscoverySeries === 'qualified' ? 3 : 2.5}
-                        fillOpacity={1}
-                        fill="url(#colorQualified)"
-                        filter={leadDiscoverySeries === 'qualified' ? 'url(#leadDiscoveryGlow)' : undefined}
-                        dot={false}
-                        activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    )}
+                    <Area
+                      type="linear"
+                      dataKey="discovered"
+                      stroke="#171717"
+                      strokeWidth={1.75}
+                      fillOpacity={1}
+                      fill="url(#colorDiscovered)"
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                    <Area
+                      type="linear"
+                      dataKey="qualified"
+                      stroke="#0A84FF"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#colorQualified)"
+                      filter="url(#leadDiscoveryGlow)"
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
               <div className="mt-4 w-full border-t border-black/[0.05] pt-3">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-tertiary">All-time workflow</p>
-                  <p className="text-[10.5px] text-text-tertiary">From discovery to conversation</p>
-                </div>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-text-tertiary">Workflow · all time</p>
                 <ol className="grid grid-cols-5 gap-1.5 sm:gap-2" aria-label="Lead workflow funnel">
                   {funnelStages.map((stage, index) => (
                     <li key={stage.label} className="relative min-w-0">
