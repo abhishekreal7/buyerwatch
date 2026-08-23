@@ -96,7 +96,7 @@ export function RedditCommunityPolicyNotice({
   if (!policy) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
-        <ShieldQuestion className="h-3.5 w-3.5" /> Rules check unavailable — manual review only
+        <ShieldQuestion className="h-3.5 w-3.5" /> Rules check unavailable — review manually
       </span>
     )
   }

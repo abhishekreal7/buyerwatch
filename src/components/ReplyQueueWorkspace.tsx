@@ -40,7 +40,7 @@ const MANUAL_DRAFT_REASON_LABELS: Record<string, string> = {
   intent_provider_failed: 'AI intent scoring was unavailable. Review the deterministic match before writing a reply.',
   intent_spend_limit_reached: 'The AI scoring budget was reached. Review the deterministic match before writing a reply.',
   intent_plan_limit_reached: 'The daily AI scoring allowance was reached. Review the deterministic match before writing a reply.',
-  preflight_ai_bypassed: 'This conversation was scored deterministically. Review it before writing a reply.',
+  preflight_ai_bypassed: 'AI scoring was unavailable. Review the match signals before writing a reply.',
 }
 
 function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -61,6 +61,15 @@ function formatTimeAgo(dateString: string) {
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
   const days = Math.floor(diffInSeconds / 86400)
   return `${days}d ago`
+}
+
+function postBodyWithoutRepeatedTitle(title: string, content: string) {
+  const normalizedTitle = title.trim()
+  const lines = content.trim().split(/\r?\n/)
+  if (normalizedTitle && lines[0]?.trim().toLocaleLowerCase() === normalizedTitle.toLocaleLowerCase()) {
+    return lines.slice(1).join('\n').trim()
+  }
+  return content.trim()
 }
 
 function parseDrafts(data: any[]) {
@@ -494,6 +503,10 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
       })
     : null
 
+  const postBody = selected
+    ? postBodyWithoutRepeatedTitle(selected.title || '', selected.content || '')
+    : ''
+
   const filteredDrafts = drafts.filter(d => {
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase().trim()
@@ -694,7 +707,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                 <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                      Post
+                      Original post
                     </span>
                     <button
                       type="button"
@@ -714,7 +727,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
 
                   <div className="text-[13px] leading-relaxed text-gray-700 whitespace-pre-line">
                     <p className={!isPostExpanded && (selected.content?.length > 280) ? 'line-clamp-4' : ''}>
-                      {selected.content}
+                      {postBody || 'No post text available.'}
                     </p>
                     {selected.content?.length > 280 && (
                       <button
@@ -729,7 +742,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
 
                   {selected.matchedKeyword && (
                     <div className="mt-3 pt-2 border-t border-gray-200/60 text-[11px] text-gray-500">
-                      Matched keyword: <strong className="text-gray-700 font-medium">&ldquo;{selected.matchedKeyword}&rdquo;</strong>
+                      Matched monitoring rule: <strong className="text-gray-700 font-medium">&ldquo;{selected.matchedKeyword}&rdquo;</strong>
                     </div>
                   )}
                 </div>
@@ -751,7 +764,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-semibold text-gray-700 flex items-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-                      Draft reply
+                      Your reply
                     </span>
 
                     <button
@@ -772,11 +785,11 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                     className="w-full rounded-lg border border-gray-200 bg-white p-3 text-[13px] leading-relaxed text-gray-900 resize-none focus:border-gray-400 focus:outline-none transition-colors"
                     rows={5}
                     spellCheck
-                    placeholder="Write a reply here, or use Generate reply when AI drafting is available."
+                    placeholder="Write your reply, or regenerate when AI drafting is available."
                   />
 
                   <div className="flex items-center justify-between text-[11px] text-gray-400">
-                    <span>Edit draft before posting</span>
+                    <span>Edit before posting</span>
                     <span>{draftContent.length} chars</span>
                   </div>
 
@@ -795,10 +808,10 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
 
               {/* Bottom Action Footer */}
               <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-between gap-4">
-                <div className="text-[12px] text-gray-400 font-normal">
+                <div className="hidden min-w-0 flex-1 truncate text-[12px] text-gray-400 font-normal sm:block">
                   {selected?.platform === 'reddit'
-                    ? 'Copies draft & opens thread in new tab'
-                    : 'Publishes directly to connected account'}
+                    ? 'Your reply is copied and the Reddit post opens in a new tab.'
+                    : 'Your reply will be published to the connected account.'}
                 </div>
 
                 {(() => {
@@ -807,7 +820,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   const isDisabled = !draftContent || isSending || currentQuality?.blocksAutomation
 
                   return (
-                    <div className="flex items-center gap-2">
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
                       <button
                         type="button"
                         onClick={handleDismiss}
@@ -823,7 +836,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         className="h-8.5 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 transition-colors shadow-2xs"
                       >
                         {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-gray-400" />}
-                        <span>{copied ? 'Copied' : 'Copy'}</span>
+                        <span>{copied ? 'Copied' : 'Copy reply'}</span>
                       </button>
 
                       <button
@@ -845,7 +858,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         ) : isMarkAsPosted ? (
                           <><CheckCircle className="h-3.5 w-3.5" /> Mark as Posted</>
                         ) : isReddit ? (
-                          <><RedditIcon className="h-3.5 w-3.5" /> Copy &amp; Open Reddit</>
+                          <><RedditIcon className="h-3.5 w-3.5" /> Copy &amp; open Reddit</>
                         ) : (
                           <><CheckCircle className="h-3.5 w-3.5" /> Post to Bluesky</>
                         )}
