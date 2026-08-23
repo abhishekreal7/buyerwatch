@@ -983,7 +983,12 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
             <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
-              <Sparkles className="w-4 h-4" strokeWidth={2} />
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="10.5" cy="13.5" r="7.25" stroke="currentColor" strokeWidth="1.75" />
+                <circle cx="10.5" cy="13.5" r="3.95" stroke="currentColor" strokeWidth="1.75" />
+                <circle cx="10.5" cy="13.5" r="1.45" fill="currentColor" />
+                <path d="M10.5 13.5 20.15 3.85M16.25 3.85h3.9v3.9" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
           </div>
           <div className="flex items-baseline justify-between">
