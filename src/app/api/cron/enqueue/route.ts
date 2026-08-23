@@ -12,6 +12,7 @@ import { runServerlessMonitoring } from '@/lib/serverless-monitor'
 import { runRedditDeliveryCanary } from '@/lib/reddit-delivery-canary'
 import { deliverPendingIncidentEmails } from '@/lib/incident-email'
 import { runRedditApisBalanceMonitor } from '@/lib/redditapis-balance-monitor'
+import { runRedditReplyTracker } from '@/lib/reddit-reply-tracking'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -35,6 +36,10 @@ async function executeMonitor(
           return { status: 'failed' as const, code: 'canary_crashed' }
         })
       : null
+    const replyTrackingPromise = runRedditReplyTracker().catch((error) => {
+      logger.error({ error }, 'Reddit reply tracker crashed')
+      return { status: 'unavailable' as const }
+    })
     const result = await runServerlessMonitoring(new Date(), {
       forceUserId,
       forcePlatform,
@@ -56,9 +61,10 @@ async function executeMonitor(
       }
     }
 
-    const [canary, redditApisBalance] = await Promise.all([
+    const [canary, redditApisBalance, redditReplyTracking] = await Promise.all([
       canaryPromise,
       balanceMonitorPromise,
+      replyTrackingPromise,
     ])
     const incidentEmail = await deliverPendingIncidentEmails(20).catch((error) => {
       logger.error({ error }, 'Customer incident email queue failed')
@@ -68,6 +74,7 @@ async function executeMonitor(
       ...result,
       ...(canary ? { redditDeliveryCanary: canary } : {}),
       redditApisBalance,
+      redditReplyTracking,
       incidentEmail,
     })
   } catch (error) {

@@ -11,6 +11,8 @@ import {
   parseRedditApisListing,
   parseRedditApisListingPage,
   parseRedditCommentResponse,
+  parseRedditCommentIdFromPermalink,
+  parseRedditDirectCommentReplies,
   parseRedditLoginResponse,
   parseRedditPostTarget,
   RedditApisContractError,
@@ -282,5 +284,55 @@ describe('Reddit provider contracts', () => {
       posts: [],
       after: 'https://evil.test/cursor',
     }).after).toBeNull()
+  })
+
+  it('extracts only real comment permalinks and keeps only direct external replies', () => {
+    expect(parseRedditCommentIdFromPermalink(
+      'https://www.reddit.com/r/SaaS/comments/abc123/comment/reply123/',
+    )).toBe('t1_reply123')
+    expect(parseRedditCommentIdFromPermalink(
+      'https://www.reddit.com/r/SaaS/comments/abc123/a-title/reply123/',
+    )).toBe('t1_reply123')
+    expect(parseRedditCommentIdFromPermalink(
+      'https://www.reddit.com/r/SaaS/comments/abc123/a-title/',
+    )).toBeNull()
+
+    expect(parseRedditDirectCommentReplies({
+      kind: 'Listing',
+      data: {
+        children: [{
+          kind: 't1',
+          data: {
+            id: 'firstreply',
+            parent_id: 't1_outgoing',
+            author: 'real-person',
+            created_utc: 1_786_000_000,
+            replies: {
+              data: {
+                children: [{
+                  kind: 't1',
+                  data: {
+                    id: 'nestedreply',
+                    parent_id: 't1_firstreply',
+                    author: 'another-person',
+                  },
+                }],
+              },
+            },
+          },
+        }, {
+          kind: 't1',
+          data: {
+            id: 'deletedreply',
+            parent_id: 't1_outgoing',
+            author: '[deleted]',
+          },
+        }],
+      },
+    }, 't1_outgoing')).toEqual([{
+      commentId: 't1_firstreply',
+      author: 'real-person',
+      createdAt: '2026-08-06T07:06:40.000Z',
+    }])
   })
 })

@@ -256,9 +256,11 @@ function validateOptionalProviders(): void {
   assertOptionalInteger('SPRINKLR_REDDIT_ACCOUNT_ID', 1, Number.MAX_SAFE_INTEGER)
   assertOptionalBoolean('REDDITAPIS_DISCOVERY_ENABLED')
   assertOptionalBoolean('REDDITAPIS_FALLBACK_ENABLED')
+  assertOptionalBoolean('REDDIT_REPLY_TRACKING_ENABLED')
   assertOptionalInteger('REDDITAPIS_MAX_DAILY_READ_CALLS', 0, 100_000)
   assertOptionalInteger('REDDITAPIS_MAX_DAILY_WRITE_CALLS', 0, 100_000)
   assertOptionalInteger('REDDITAPIS_DISCOVERY_CACHE_SECONDS', 300, 1_800)
+  assertOptionalInteger('REDDIT_REPLY_TRACKING_INTERVAL_MINUTES', 15, 360)
   assertOptionalInteger('REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS', 7, 365)
   assertOptionalInteger('REDDIT_AUTO_MIN_COMBINED_KARMA', 0, 100_000)
   assertCompleteOptionalGroup([
