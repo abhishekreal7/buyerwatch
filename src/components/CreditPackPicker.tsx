@@ -51,7 +51,7 @@ export function CreditPackPicker({
       if (!response.ok || !payload?.url) {
         throw new Error(payload?.error || 'checkout_failed')
       }
-      window.location.href = payload.url
+      window.location.assign(payload.url)
     } catch (error) {
       setOpeningPack(null)
       const message = error instanceof Error ? error.message : ''

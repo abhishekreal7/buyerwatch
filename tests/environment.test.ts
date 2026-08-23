@@ -163,7 +163,7 @@ describe('production capability configuration', () => {
 
   it('requires add-on product IDs as a pair', () => {
     stubProductionCore()
-    vi.stubEnv('DODO_PAYMENTS_SIGNAL_PACK_PRODUCT_ID', 'signals')
+    vi.stubEnv('DODO_PAYMENTS_SIGNAL_20_PRODUCT_ID', 'signals')
 
     expect(() => validateAppEnvironment()).toThrow(/Dodo add-on billing is partially configured/)
   })

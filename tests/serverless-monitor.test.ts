@@ -215,7 +215,7 @@ describe('QStash monitoring route contract', () => {
   })
 
   it('monitors Bluesky through the same durable serverless path', () => {
-    expect(monitor).toContain(".in('platform', ['reddit', 'bluesky'])")
+    expect(monitor).toContain(".in('platform', ['reddit', 'bluesky', 'x'])")
     expect(monitor).toContain('searchBlueskyPosts(target.target, 25)')
     expect(monitor).toContain('platform: post.platform')
     expect(monitor).toContain('recordKeywordPollSuccess')
@@ -232,7 +232,8 @@ describe('QStash monitoring route contract', () => {
 
   it('dispatches manual fetches for the exact selected social target', () => {
     expect(fetchNow).toContain('publishMonitoringRun(user.id, target, keyword.platform)')
-    expect(fetchNow).toContain("keyword.platform !== 'reddit' && keyword.platform !== 'bluesky'")
+    expect(fetchNow).toContain('canMonitorPlatform(plan, keyword.platform)')
+    expect(fetchNow).toContain("keyword.platform === 'x' && !isXDiscoveryConfigured()")
   })
 
   it('runs scoring through a signed, retryable job endpoint', () => {
