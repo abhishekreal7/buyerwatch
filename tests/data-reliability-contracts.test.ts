@@ -47,6 +47,12 @@ describe('dashboard data reliability contracts', () => {
     expect(analytics).toContain('detail: item.message')
   })
 
+  it('uses the verified conversation outcome in posted-reply reporting', () => {
+    expect(posted).toContain("fetch('/api/replies/outcomes'")
+    expect(posted).toContain('conversationsStarted')
+    expect(posted).toContain('label="Conversations"')
+  })
+
   it('loads active and dismissed dashboard windows independently', () => {
     expect(dashboard).toContain('activeThreadsResult')
     expect(dashboard).toContain('dismissedThreadsResult')
