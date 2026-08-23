@@ -62,8 +62,8 @@ function alertCopy(kind: RedditDeliveryAlertKind, code: string) {
       action: 'Inspect the connection and recent delivery logs before the next attempt.',
     },
     credits_low: {
-      title: 'Hyperbrowser credits are low',
-      action: 'Add credits or reduce usage before cloud-browser delivery becomes unavailable.',
+      title: 'Reddit provider credits are low',
+      action: 'Top up the affected Reddit provider before delivery capacity is exhausted.',
     },
     canary_failed: {
       title: 'Reddit connection canary failed',
@@ -122,7 +122,11 @@ export async function sendRedditDeliveryAlert(input: {
   const copy = alertCopy(input.kind, input.code)
   const deliveries: Array<Promise<unknown>> = []
   try {
-    const webhook = await configuredSlackWebhook(input.userId)
+    // Provider-credit warnings are internal operational alerts. A user's
+    // optional Slack connection must not receive them.
+    const webhook = input.kind === 'credits_low'
+      ? null
+      : await configuredSlackWebhook(input.userId)
     if (webhook) {
       deliveries.push(fetchWithTimeout(webhook, {
         method: 'POST',
