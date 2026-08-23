@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
   const [loadFailed, setLoadFailed] = useState(false)
   const hasLoadedDataRef = useRef(false)
   const [data, setData] = useState<{
-    stats: { found: number, drafted: number, sent: number, sentThisMonth: number, sentLastMonth: number }
+    stats: { found: number, highIntent: number, drafted: number, sent: number, sentThisMonth: number, sentLastMonth: number }
     trendData: { date: string, discovered: number, qualified: number }[]
     activity: Array<{
       id: string
@@ -154,7 +154,6 @@ export default function AnalyticsPage() {
     }
     platformData: any[]
     highIntentThreshold: number
-    attributionStats: { clicks: number; conversions: number; totalRevenue: number }
   } | null>(null)
   const [leadDiscoveryRange, setLeadDiscoveryRange] = useState<LeadDiscoveryRange>(14)
   const [leadDiscoverySeries, setLeadDiscoverySeries] = useState<LeadDiscoverySeries>('all')
@@ -181,12 +180,10 @@ export default function AnalyticsPage() {
         connsRes,
         threadsRes,
         totalSentRes,
+        generatedDraftsRes,
         sentThisMonthRes,
         sentLastMonthRes,
         feedbackRes,
-        clicksRes,
-        conversionsRes,
-        revenueRes,
         deliveryActivityRes,
         replyOutcomesRes,
       ] = await Promise.all([
@@ -194,12 +191,10 @@ export default function AnalyticsPage() {
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
         fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).not('intent_score', 'is', null).range(from, to)),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).not('sent_at', 'is', null),
+        supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('draft_text', 'is', null),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).gte('sent_at', thirtyDaysAgoIso),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).gte('sent_at', sixtyDaysAgoIso).lt('sent_at', thirtyDaysAgoIso),
         supabase.from('draft_feedback').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
-        supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('clicked_at', 'is', null),
-        supabase.from('reply_attribution').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('converted_at', 'is', null),
-        fetchAllPages((from, to) => supabase.from('reply_attribution').select('revenue_usd').eq('user_id', userId).not('revenue_usd', 'is', null).range(from, to)),
         fetch('/api/replies/activity', { cache: 'no-store' }),
         fetch('/api/replies/outcomes', { cache: 'no-store' }),
       ])
@@ -209,12 +204,10 @@ export default function AnalyticsPage() {
         connsRes,
         threadsRes,
         totalSentRes,
+        generatedDraftsRes,
         sentThisMonthRes,
         sentLastMonthRes,
         feedbackRes,
-        clicksRes,
-        conversionsRes,
-        revenueRes,
       ].find(result => result.error)?.error
       if (queryError) throw queryError
       if (!deliveryActivityRes.ok) throw new Error('delivery_activity_load_failed')
@@ -232,13 +225,15 @@ export default function AnalyticsPage() {
       const draftedCount = draftedThreads.length
 
       const totalSent = totalSentRes.count ?? 0
+      const generatedDrafts = generatedDraftsRes.count ?? 0
       const sentThisMonth = sentThisMonthRes.count ?? 0
       const sentLastMonth = sentLastMonthRes.count ?? 0
+      const highIntentCount = threads.filter(thread => Number(thread.intent_score) >= highIntentThreshold).length
 
-      // --- TREND DATA (Last 30 Days) ---
+      // --- TREND DATA (Last 60 Days: selected range + prior comparison period) ---
       const discoveredMap: Record<string, number> = {}
       const qualifiedMap: Record<string, number> = {}
-      for (let i = 29; i >= 0; i--) {
+      for (let i = 59; i >= 0; i--) {
         const d = subDays(startOfDay(now), i)
         const key = format(d, 'MMM d')
         discoveredMap[key] = 0
@@ -247,7 +242,7 @@ export default function AnalyticsPage() {
 
       threads.forEach(t => {
         const d = new Date(t.created_at)
-        if (isAfter(d, thirtyDaysAgo)) {
+        if (isAfter(d, sixtyDaysAgo)) {
           const dateStr = format(d, 'MMM d')
           if (discoveredMap[dateStr] !== undefined) {
             discoveredMap[dateStr]++
@@ -372,11 +367,6 @@ export default function AnalyticsPage() {
         alerts.push({ id: 'autosend', type: 'warning', label: 'Auto-send paused', actionLabel: 'Resume →', href: '/settings' })
       }
 
-      // --- ATTRIBUTION STATS ---
-      const clicks = clicksRes.count ?? 0
-      const conversions = conversionsRes.count ?? 0
-      const totalRevenue = (revenueRes.data || []).reduce((sum, a) => sum + (Number(a.revenue_usd) || 0), 0)
-
       // --- TOP KEYWORDS ---
       const kwMap: Record<string, { term: string; count: number }> = {}
       threads.forEach((t: any) => {
@@ -390,7 +380,7 @@ export default function AnalyticsPage() {
       const topKeywords = Object.values(kwMap).sort((a, b) => b.count - a.count).slice(0, 5)
 
       setData({
-        stats: { found, drafted: draftedCount, sent: totalSent, sentThisMonth, sentLastMonth },
+        stats: { found, highIntent: highIntentCount, drafted: generatedDrafts, sent: totalSent, sentThisMonth, sentLastMonth },
         trendData,
         activity: recentActivity,
         topKeywords,
@@ -408,7 +398,6 @@ export default function AnalyticsPage() {
         },
         platformData,
         highIntentThreshold,
-        attributionStats: { clicks, conversions, totalRevenue }
       })
       hasLoadedDataRef.current = true
       setLoadFailed(false)
@@ -512,6 +501,25 @@ export default function AnalyticsPage() {
     }),
     { discovered: 0, qualified: 0 },
   )
+  const previousLeadDiscoveryData = data.trendData.slice(-(leadDiscoveryRange * 2), -leadDiscoveryRange)
+  const selectedTrendKey = leadDiscoverySeries === 'qualified' ? 'qualified' : 'discovered'
+  const selectedTrendLabel = leadDiscoverySeries === 'qualified' ? 'High-intent' : 'Discovered'
+  const currentTrendTotal = leadDiscoveryTotals[selectedTrendKey]
+  const previousTrendTotal = previousLeadDiscoveryData.reduce((total, point) => total + point[selectedTrendKey], 0)
+  const trendDifference = currentTrendTotal - previousTrendTotal
+  const hasPreviousTrend = previousLeadDiscoveryData.length === leadDiscoveryRange
+  const trendComparisonLabel = !hasPreviousTrend
+    ? null
+    : previousTrendTotal === 0
+      ? currentTrendTotal > 0 ? 'New this period' : 'No change'
+      : `${trendDifference >= 0 ? '+' : ''}${Math.round((trendDifference / previousTrendTotal) * 100)}% vs previous ${leadDiscoveryRange} days`
+  const funnelStages = [
+    { label: 'Discovered', value: data.stats.found, tone: 'bg-gray-900 text-white' },
+    { label: 'High-intent', value: data.stats.highIntent, tone: 'bg-[#0A84FF] text-white' },
+    { label: 'Drafted', value: data.stats.drafted, tone: 'bg-sky-100 text-[#075EBA]' },
+    { label: 'Sent', value: data.stats.sent, tone: 'bg-emerald-100 text-emerald-700' },
+    { label: 'Conversations', value: data.replyOutcomes.conversationsStarted, tone: 'bg-violet-100 text-violet-700' },
+  ]
   const showDiscovered = leadDiscoverySeries !== 'qualified'
   const showQualified = leadDiscoverySeries !== 'discovered'
 
@@ -588,10 +596,21 @@ export default function AnalyticsPage() {
                       High-intent (≥{data.highIntentThreshold}%): <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
                     </span>
                   )}
+                  {trendComparisonLabel && (
+                    <span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${
+                      trendDifference > 0
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : trendDifference < 0
+                          ? 'bg-rose-50 text-rose-700'
+                          : 'bg-black/[0.04] text-text-tertiary'
+                    }`}>
+                      {selectedTrendLabel}: {trendComparisonLabel}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className="flex-1 mt-2 h-[200px] -ml-2 -mb-2 relative z-10">
+              <div className="flex-1 mt-2 h-[176px] -ml-2 relative z-10">
                 {data.stats.found === 0 && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 backdrop-blur-[0.5px] z-20">
                     <p className="text-[13.5px] font-bold text-text-primary mb-1">No leads discovered yet</p>
@@ -678,6 +697,28 @@ export default function AnalyticsPage() {
                     )}
                   </AreaChart>
                 </ResponsiveContainer>
+              </div>
+
+              <div className="mt-4 w-full border-t border-black/[0.05] pt-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-tertiary">All-time workflow</p>
+                  <p className="text-[10.5px] text-text-tertiary">From discovery to conversation</p>
+                </div>
+                <ol className="grid grid-cols-5 gap-1.5 sm:gap-2" aria-label="Lead workflow funnel">
+                  {funnelStages.map((stage, index) => (
+                    <li key={stage.label} className="relative min-w-0">
+                      <div className="rounded-lg border border-black/[0.04] bg-white/70 px-1.5 py-2 text-center sm:px-2">
+                        <span className={`mx-auto mb-1 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${stage.tone}`}>
+                          {stage.value}
+                        </span>
+                        <p className="truncate text-[9.5px] font-semibold text-text-secondary sm:text-[10.5px]" title={stage.label}>{stage.label}</p>
+                      </div>
+                      {index < funnelStages.length - 1 && (
+                        <span className="absolute -right-1.5 top-1/2 z-10 hidden h-px w-2 bg-black/[0.12] sm:block" aria-hidden="true" />
+                      )}
+                    </li>
+                  ))}
+                </ol>
               </div>
             </div>
 
@@ -783,6 +824,11 @@ export default function AnalyticsPage() {
                   label={data.replyOutcomes.verifiedRepliesChecked > 0 ? 'Conversation response rate' : 'Waiting for verified checks'}
                 />
               </div>
+              <p className="-mt-1 max-w-[250px] text-center text-[11px] leading-4 text-text-tertiary">
+                {data.replyOutcomes.verifiedRepliesChecked > 0
+                  ? `Based on ${data.replyOutcomes.verifiedRepliesChecked} verified ${data.replyOutcomes.verifiedRepliesChecked === 1 ? 'posted reply' : 'posted replies'}.`
+                  : 'This rate appears after BuyerWatch verifies a posted reply.'}
+              </p>
               <div className="mt-1 grid w-full grid-cols-2 divide-x divide-black/[0.06] border-t border-black/[0.06] pt-4 text-center">
                 <div className="px-2">
                   <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-text-tertiary">Replies received</p>
@@ -843,40 +889,6 @@ export default function AnalyticsPage() {
             </div>
 
           </div>
-
-          {/* Feature 2: Attribution Pipeline Card (Positioned at bottom) */}
-          <div className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-6">
-            <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-              <div>
-                <h3 className="text-[16px] font-bold text-gray-900 tracking-tight">Attribution Pipeline</h3>
-                <p className="text-xs text-gray-500 mt-0.5 font-medium">Track replies that generated a verified click, conversion, or payment.</p>
-              </div>
-              <Link href="/settings#notifications" className="text-xs font-semibold text-[#0A84FF] hover:underline">
-                Setup Conversion Webhook →
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Replies Clicked</p>
-                <p className="text-3xl font-extrabold text-gray-900 tracking-tight">{data.attributionStats?.clicks || 0}</p>
-                <p className="text-xs text-gray-500 mt-1.5 font-medium">Tracked replies with at least one verified click</p>
-              </div>
-              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
-                <p className="text-[11px] font-bold text-blue-600/80 uppercase tracking-wider mb-1">Attributed conversions</p>
-                <p className="text-3xl font-extrabold text-[#0A84FF] tracking-tight">{data.attributionStats?.conversions || 0}</p>
-                <p className="text-xs text-gray-600 mt-1.5 font-medium">Signups or payments from replies</p>
-              </div>
-              <div className="rounded-[14px] border border-[#E3E3E0] bg-white p-5">
-                <p className="text-[11px] font-bold text-emerald-600/80 uppercase tracking-wider mb-1">Attributed Revenue</p>
-                <p className="text-3xl font-extrabold text-emerald-600 tracking-tight">
-                  {'$' + (data.attributionStats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-gray-600 mt-1.5 font-medium">Total revenue generated</p>
-              </div>
-            </div>
-          </div>
-
         </div>
       </div>
     </AppPage>
