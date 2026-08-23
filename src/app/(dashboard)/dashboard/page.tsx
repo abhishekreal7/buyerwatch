@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { Search, Target, CheckCircle, MessageCircle, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react'
+import { Search, Target, CheckCircle, MessageCircle, Send, ExternalLink, X, RefreshCcw, Copy, FileText, Lock, Sparkles, Globe, CalendarDays, ChevronDown, ArrowUp, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { toast } from 'sonner'
@@ -1042,10 +1042,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#F06A22]">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M20.3 3.9 4.44 10.57c-.67.28-.64 1.24.04 1.48l6.02 2.1 2.1 6.02c.24.68 1.2.71 1.48.04L20.75 4.35c.16-.4-.05-.62-.45-.45Z" fill="currentColor" />
-                <path d="m4.95 11.58 14.37-6.05-8.17 8.17M11.1 14.14l1.55 4.49" stroke="#FFF4ED" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <Send className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
