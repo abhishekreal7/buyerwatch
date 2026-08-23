@@ -84,6 +84,8 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 const LEAD_DISCOVERY_RANGES = [7, 14, 30] as const
 type LeadDiscoveryRange = typeof LEAD_DISCOVERY_RANGES[number]
+const LEAD_DISCOVERY_SERIES = ['all', 'discovered', 'qualified'] as const
+type LeadDiscoverySeries = typeof LEAD_DISCOVERY_SERIES[number]
 
 function normalizePlatform(value: unknown) {
   const platform = String(value || '').trim().toLowerCase()
@@ -94,14 +96,14 @@ function normalizePlatform(value: unknown) {
 }
 
 // Custom Tooltip for Lead Discovery Chart
-const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
+const LeadDiscoveryTooltip = ({ active, payload, label, series }: { active?: boolean; payload?: any[]; label?: string; series: LeadDiscoverySeries }) => {
   if (active && payload && payload.length) {
     const discovered = payload.find((p: any) => p.dataKey === 'discovered')
     const qualified = payload.find((p: any) => p.dataKey === 'qualified')
     return (
       <div className="bg-white/95 border border-black/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.10)] rounded-xl px-3.5 py-3 text-[12.5px] min-w-[142px] z-50 relative backdrop-blur">
         <p className="font-semibold text-text-primary mb-2">{label}</p>
-        {discovered && (
+        {series !== 'qualified' && discovered && (
           <p className="flex items-center justify-between gap-3 text-text-secondary mb-1">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
@@ -110,7 +112,7 @@ const LeadDiscoveryTooltip = ({ active, payload, label }: any) => {
             <span className="font-bold text-text-primary">{discovered.value}</span>
           </p>
         )}
-        {qualified && (
+        {series !== 'discovered' && qualified && (
           <p className="flex items-center justify-between gap-3 text-text-secondary">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
@@ -155,6 +157,7 @@ export default function AnalyticsPage() {
     attributionStats: { clicks: number; conversions: number; totalRevenue: number }
   } | null>(null)
   const [leadDiscoveryRange, setLeadDiscoveryRange] = useState<LeadDiscoveryRange>(14)
+  const [leadDiscoverySeries, setLeadDiscoverySeries] = useState<LeadDiscoverySeries>('all')
 
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
@@ -509,6 +512,8 @@ export default function AnalyticsPage() {
     }),
     { discovered: 0, qualified: 0 },
   )
+  const showDiscovered = leadDiscoverySeries !== 'qualified'
+  const showQualified = leadDiscoverySeries !== 'discovered'
 
   return (
     <AppPage>
@@ -528,7 +533,7 @@ export default function AnalyticsPage() {
                 <div>
                   <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-text-secondary">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-medium text-text-secondary">
                   <div className="inline-flex rounded-full bg-black/[0.04] p-0.5" aria-label="Lead discovery date range">
                     {LEAD_DISCOVERY_RANGES.map((range) => {
                       const active = leadDiscoveryRange === range
@@ -549,15 +554,40 @@ export default function AnalyticsPage() {
                       )
                     })}
                   </div>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#171717]" />
-                    Discovered: <span className="font-bold text-text-primary">{leadDiscoveryTotals.discovered}</span>
-                  </span>
-                  <span className="text-text-tertiary hidden sm:inline">|</span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
-                    High-intent (≥{data.highIntentThreshold}%): <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
-                  </span>
+                  <div className="inline-flex rounded-full border border-black/[0.05] bg-white p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" aria-label="Lead discovery metric">
+                    {LEAD_DISCOVERY_SERIES.map((series) => {
+                      const active = leadDiscoverySeries === series
+                      const label = series === 'all' ? 'All' : series === 'discovered' ? 'Discovered' : 'High-intent'
+                      return (
+                        <button
+                          key={series}
+                          type="button"
+                          onClick={() => setLeadDiscoverySeries(series)}
+                          aria-pressed={active}
+                          className={
+                            active
+                              ? 'rounded-full bg-[#0A84FF] px-2.5 py-1 text-[11px] font-bold text-white shadow-[0_2px_8px_rgba(10,132,255,0.24)] transition-all'
+                              : 'rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-tertiary transition-colors hover:text-text-secondary'
+                          }
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {leadDiscoverySeries !== 'qualified' && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#171717]" />
+                      Discovered: <span className="font-bold text-text-primary">{leadDiscoveryTotals.discovered}</span>
+                    </span>
+                  )}
+                  {leadDiscoverySeries === 'all' && <span className="text-text-tertiary hidden sm:inline">|</span>}
+                  {leadDiscoverySeries !== 'discovered' && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#0A84FF]" />
+                      High-intent (≥{data.highIntentThreshold}%): <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -581,6 +611,24 @@ export default function AnalyticsPage() {
                         <stop offset="5%" stopColor="#0A84FF" stopOpacity={0.12} />
                         <stop offset="95%" stopColor="#0A84FF" stopOpacity={0} />
                       </linearGradient>
+                      <filter id="leadDiscoveryGlow" x="-20%" y="-25%" width="140%" height="150%">
+                        <feGaussianBlur in="SourceGraphic" stdDeviation="1.7" result="blur" />
+                        <feFlood floodColor="#0A84FF" floodOpacity="0.26" result="glowColor" />
+                        <feComposite in="glowColor" in2="blur" operator="in" result="glow" />
+                        <feMerge>
+                          <feMergeNode in="glow" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                      <filter id="leadDiscoveryDiscoveredGlow" x="-20%" y="-25%" width="140%" height="150%">
+                        <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+                        <feFlood floodColor="#171717" floodOpacity="0.16" result="glowColor" />
+                        <feComposite in="glowColor" in2="blur" operator="in" result="glow" />
+                        <feMerge>
+                          <feMergeNode in="glow" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
                     </defs>
                     <CartesianGrid vertical={false} stroke="rgba(20,18,16,0.045)" strokeDasharray="3 6" />
                     <XAxis
@@ -598,30 +646,36 @@ export default function AnalyticsPage() {
                       allowDecimals={false}
                     />
                     <Tooltip
-                      content={<LeadDiscoveryTooltip />}
+                      content={<LeadDiscoveryTooltip series={leadDiscoverySeries} />}
                       cursor={{ stroke: 'rgba(10,132,255,0.16)', strokeWidth: 1 }}
                       wrapperStyle={{ outline: 'none' }}
                     />
-                    <Area
-                      type="linear"
-                      dataKey="discovered"
-                      stroke="#171717"
-                      strokeWidth={1.75}
-                      fillOpacity={1}
-                      fill="url(#colorDiscovered)"
-                      dot={false}
-                      activeDot={{ r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2 }}
-                    />
-                    <Area
-                      type="linear"
-                      dataKey="qualified"
-                      stroke="#0A84FF"
-                      strokeWidth={2.5}
-                      fillOpacity={1}
-                      fill="url(#colorQualified)"
-                      dot={false}
-                      activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
-                    />
+                    {showDiscovered && (
+                      <Area
+                        type="linear"
+                        dataKey="discovered"
+                        stroke="#171717"
+                        strokeWidth={leadDiscoverySeries === 'discovered' ? 2.5 : 1.75}
+                        fillOpacity={1}
+                        fill="url(#colorDiscovered)"
+                        filter={leadDiscoverySeries === 'discovered' ? 'url(#leadDiscoveryDiscoveredGlow)' : undefined}
+                        dot={false}
+                        activeDot={{ r: 4, fill: '#171717', stroke: '#fff', strokeWidth: 2 }}
+                      />
+                    )}
+                    {showQualified && (
+                      <Area
+                        type="linear"
+                        dataKey="qualified"
+                        stroke="#0A84FF"
+                        strokeWidth={leadDiscoverySeries === 'qualified' ? 3 : 2.5}
+                        fillOpacity={1}
+                        fill="url(#colorQualified)"
+                        filter={leadDiscoverySeries === 'qualified' ? 'url(#leadDiscoveryGlow)' : undefined}
+                        dot={false}
+                        activeDot={{ r: 5, fill: '#0A84FF', stroke: '#fff', strokeWidth: 2 }}
+                      />
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
