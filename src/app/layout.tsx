@@ -35,7 +35,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.buyerwatch.co'),
   title: {
-    default: 'Reddit Lead Generation & Intent Monitoring | BuyerWatch',
+    default: 'BuyerWatch — Social Lead Discovery',
     template: '%s | BuyerWatch',
   },
   description: 'Find high-intent Reddit and Bluesky conversations, score buyer signals, and prepare helpful replies for human review with BuyerWatch.',
@@ -44,13 +44,13 @@ export const metadata: Metadata = {
     type: 'website',
     url: 'https://www.buyerwatch.co/',
     siteName: 'BuyerWatch',
-    title: 'Reddit Lead Generation & Intent Monitoring | BuyerWatch',
+    title: 'BuyerWatch — Social Lead Discovery',
     description: 'Find high-intent conversations and prepare thoughtful replies before the opportunity passes.',
     images: [{ url: '/buyerwatch_logo.png', width: 512, height: 512, alt: 'BuyerWatch' }],
   },
   twitter: {
     card: 'summary',
-    title: 'Reddit Lead Generation & Intent Monitoring | BuyerWatch',
+    title: 'BuyerWatch — Social Lead Discovery',
     description: 'Find high-intent conversations and prepare thoughtful replies with BuyerWatch.',
     images: ['/buyerwatch_logo.png'],
   },

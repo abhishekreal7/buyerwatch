@@ -9,16 +9,16 @@ const layout = readFileSync(
 
 describe('sidebar billing actions', () => {
   it('keeps current-plan credit packs separate from subscription upgrades', () => {
-    expect(layout).toContain("handleBuyAddon('drafts')")
-    expect(layout).toContain("openCheckout({ addon: type }")
+    expect(layout).toContain('CreditPackPicker')
+    expect(layout).toContain('initialType="drafts"')
     expect(layout).toContain("openCheckout({ plan: plan === 'free'")
-    expect(layout).toContain("'Add credits'")
+    expect(layout).not.toContain("handleBuyAddon('drafts')")
     expect(layout).toContain("'Upgrade'")
     expect(layout).not.toContain('draftAddonAvailable')
   })
 
   it('shows independent checkout progress for each action', () => {
-    expect(layout).toContain("openingCheckout === 'addon:drafts'")
     expect(layout).toContain("openingCheckout === 'upgrade'")
+    expect(layout).toContain('disabled={Boolean(openingCheckout)}')
   })
 })

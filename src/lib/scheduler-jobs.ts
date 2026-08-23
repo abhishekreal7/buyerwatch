@@ -7,10 +7,11 @@ import {
   xFetchQueue,
 } from './queues'
 import {
-  X_DAILY_SPEND_LIMIT_CENTS,
+  canMonitorPlatform,
   isPollingDue,
   normalizePlan,
 } from './plan-limits'
+import { isXDiscoveryConfigured } from './x'
 import { createUnsubscribeUrl } from './email-preferences'
 
 type KeywordRow = {
@@ -68,7 +69,7 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
     if ((data?.length ?? 0) < pageSize) break
   }
 
-  const xEnabled = process.env.ENABLE_X_DISCOVERY === 'true'
+  const xEnabled = isXDiscoveryConfigured()
   const dueUsers = new Set<string>()
   const jobs = new Map<string, {
     platform: KeywordRow['platform']
@@ -88,10 +89,10 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
       keyword.last_success_at,
       now.getTime(),
     )) continue
-    if (keyword.platform === 'threads') continue
+    if (!canMonitorPlatform(plan, keyword.platform)) continue
     if (
       keyword.platform === 'x'
-      && (!xEnabled || X_DAILY_SPEND_LIMIT_CENTS[plan] === 0)
+      && !xEnabled
     ) {
       continue
     }

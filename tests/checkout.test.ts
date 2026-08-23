@@ -27,6 +27,7 @@ describe('Dodo billing contracts', () => {
     expect(parseBillingCheckoutIntent({ addon: 'signals' })).toEqual({
       kind: 'addon',
       addon: 'signals',
+      pack: 'signals_20',
     })
     expect(parseBillingCheckoutIntent({ plan: 'enterprise' })).toBeNull()
     expect(parseBillingCheckoutIntent({ plan: 'pro', billing: 'weekly' })).toBeNull()

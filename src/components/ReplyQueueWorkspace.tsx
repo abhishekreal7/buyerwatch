@@ -72,6 +72,14 @@ function postBodyWithoutRepeatedTitle(title: string, content: string) {
   return content.trim()
 }
 
+function formatCommunityLabel(platform: string, community: string | null | undefined) {
+  const value = (community || platform || 'Source').trim()
+  if (platform.toLowerCase() === 'reddit') {
+    return `r/${value.replace(/^r\//i, '')}`
+  }
+  return value
+}
+
 function parseDrafts(data: any[]) {
   return data.map(t => {
     const keyword = Array.isArray(t.keywords) ? t.keywords[0] : t.keywords
@@ -706,8 +714,10 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                 {/* Original Post */}
                 <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                      Original post
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-gray-400">
+                      <span className="uppercase">Original post</span>
+                      <span className="text-gray-300" aria-hidden="true">·</span>
+                      <span className="normal-case tracking-normal text-gray-500">{formatCommunityLabel(selected.platform, selected.community)}</span>
                     </span>
                     <button
                       type="button"

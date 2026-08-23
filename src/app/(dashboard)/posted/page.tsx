@@ -69,7 +69,7 @@ function PlatformIcon({ platform, size = 'sm' }: { platform: string; size?: 'sm'
 
 function ConversationsKpiIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 256 256" fill="none" aria-hidden="true">
+    <svg className={className} viewBox="40 50 175 150" fill="none" aria-hidden="true">
       <path
         d="M67 92a34 34 0 0 1 34-34h68a34 34 0 0 1 34 34v39a34 34 0 0 1-34 34h-35l-30 24v-24h-3a34 34 0 0 1-34-34z"
         stroke="currentColor"

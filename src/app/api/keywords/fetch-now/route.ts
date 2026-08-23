@@ -4,6 +4,8 @@ import { logger } from '@/lib/logger'
 import { publishMonitoringRun } from '@/lib/qstash'
 import { fetchNowRateLimit, getIp } from '@/lib/ratelimit'
 import { isUuid, readJsonBody, RequestInputError } from '@/lib/request'
+import { canMonitorPlatform, normalizePlan } from '@/lib/plan-limits'
+import { isXDiscoveryConfigured } from '@/lib/x'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,15 +32,20 @@ export async function POST(req: Request) {
 
     const { data: keyword, error } = await supabase
       .from('keywords')
-      .select('platform, target')
+      .select('platform, target, profiles!inner(plan)')
       .eq('id', keywordId)
       .eq('user_id', user.id)
       .single()
     if (error || !keyword) {
       return NextResponse.json({ error: 'Keyword not found' }, { status: 404 })
     }
-    if (keyword.platform !== 'reddit' && keyword.platform !== 'bluesky') {
-      return NextResponse.json({ error: 'platform_not_enabled' }, { status: 409 })
+    const profile = Array.isArray(keyword.profiles) ? keyword.profiles[0] : keyword.profiles
+    const plan = normalizePlan(profile?.plan)
+    if (!canMonitorPlatform(plan, keyword.platform)) {
+      return NextResponse.json({ error: 'plan_feature_unavailable', feature: 'platform' }, { status: 403 })
+    }
+    if (keyword.platform === 'x' && !isXDiscoveryConfigured()) {
+      return NextResponse.json({ error: 'platform_temporarily_unavailable', platform: 'x' }, { status: 503 })
     }
 
     const target = keyword.platform === 'reddit'

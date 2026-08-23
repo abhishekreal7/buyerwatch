@@ -12,20 +12,21 @@ describe('pricing plan promises', () => {
     expect(getIntentDailyLimit('unknown')).toBe(50)
   })
 
-  it('keeps Growth at $149 with the five-minute cadence', () => {
+  it('keeps Growth at $249 with the five-minute cadence', () => {
     const growth = PRICING_PLANS.find(plan => plan.id === 'growth')
 
-    expect(growth?.price).toBe('$149')
+    expect(growth?.price).toBe('$249')
     expect(growth?.period).toBe('/month')
     expect(growth?.features).toContain('5-minute polling cadence')
     expect(growth?.features).not.toContain('15-minute polling cadence')
   })
 
-  it('does not advertise X while the product supports Reddit and Bluesky', () => {
+  it('includes X only from Professional onward', () => {
     const professional = PRICING_PLANS.find(plan => plan.id === 'pro')
+    const starter = PRICING_PLANS.find(plan => plan.id === 'starter')
 
-    expect(professional?.features).toContain('Reddit & Bluesky monitoring')
-    expect(professional?.features.some(feature => feature.includes('X monitoring'))).toBe(false)
+    expect(professional?.features).toContain('X monitoring')
+    expect(starter?.features).not.toContain('X monitoring')
   })
 
   it('gives Starter a meaningful entitlement increase over Free', () => {
@@ -38,7 +39,8 @@ describe('pricing plan promises', () => {
     expect(PLAN_LIMITS.starter).toMatchObject({
       keywords: 5,
       threadsPerMonth: 250,
-      aiDraftsPerMonth: 40,
+      aiDraftsPerMonth: 30,
+      monitoredTargets: 2,
       autoSend: false,
     })
   })
@@ -58,9 +60,9 @@ describe('pricing plan promises', () => {
 
   it('publishes exact annual charges and monthly equivalents', () => {
     expect(PRICING_PLANS.map(({ id, annualPrice, annualTotal }) => ({ id, annualPrice, annualTotal }))).toEqual([
-      { id: 'starter', annualPrice: '$15', annualTotal: '$180' },
-      { id: 'pro', annualPrice: '$39', annualTotal: '$468' },
-      { id: 'growth', annualPrice: '$119', annualTotal: '$1,428' },
+      { id: 'starter', annualPrice: '$31', annualTotal: '$372' },
+      { id: 'pro', annualPrice: '$79', annualTotal: '$948' },
+      { id: 'growth', annualPrice: '$199', annualTotal: '$2,388' },
     ])
   })
 })

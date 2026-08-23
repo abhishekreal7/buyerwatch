@@ -5,6 +5,7 @@ import { fetchWithTimeout, withTimeout } from './http'
 import { logger } from './logger'
 import { redis } from './redis'
 import { isAllowedSlackWebhookUrl } from './security/outbound-url'
+import { getPlanLimits } from './plan-limits'
 import { createIncidentForRedditAlert } from './reddit-service-safety'
 import { deliverPendingIncidentEmails } from './incident-email'
 
@@ -93,10 +94,11 @@ async function configuredSlackWebhook(userId?: string): Promise<string | null> {
   })
   const { data, error } = await admin
     .from('profiles')
-    .select('slack_webhook_ciphertext, slack_webhook_url')
+    .select('plan, slack_webhook_ciphertext, slack_webhook_url')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw error
+  if (!getPlanLimits(data?.plan).slackNotifications) return null
   const webhook = data?.slack_webhook_ciphertext
     ? decrypt(data.slack_webhook_ciphertext)
     : data?.slack_webhook_url ?? ''

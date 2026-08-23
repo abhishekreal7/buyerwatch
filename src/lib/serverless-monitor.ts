@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { getConfiguredSecret } from './env'
 import { logger } from './logger'
-import { isPollingDue, normalizePlan } from './plan-limits'
+import { canMonitorPlatform, getPlanLimits, isPollingDue, normalizePlan } from './plan-limits'
 import { redis } from './redis'
 import {
   buildSocialScoreCandidates,
@@ -9,6 +9,7 @@ import {
   type SocialScoreCandidate,
 } from './reddit-candidates'
 import { searchBlueskyPosts } from './bluesky'
+import { fetchXPosts, isXDiscoveryConfigured } from './x'
 import { fetchSubredditNewWithSource, type RedditDiscoverySource } from './reddit'
 import { getRedditDiscoveryCapacity } from './reddit-discovery-capacity'
 import { dispatchPendingOutbox, recoverStaleSends, withRedisLock } from './backend-maintenance'
@@ -25,7 +26,7 @@ import {
 } from './keyword-poll-health'
 import { DISCOVERY_MAX_AGE_MS } from './content-freshness'
 
-type MonitorPlatform = 'reddit' | 'bluesky'
+type MonitorPlatform = 'reddit' | 'bluesky' | 'x'
 
 type KeywordRow = SocialKeywordMapping & {
   platform: MonitorPlatform
@@ -71,6 +72,37 @@ function candidateKey(candidate: SocialScoreCandidate): string {
   return `${candidate.userId}\0${candidate.post.platform}\0${candidate.post.externalId}`
 }
 
+async function reserveXCapacity(
+  supabase: ReturnType<typeof createClient<any>>,
+  mappings: SocialKeywordMapping[],
+): Promise<SocialKeywordMapping[]> {
+  const costCents = Number.parseInt(process.env.X_SEARCH_COST_CENTS || '5', 10)
+  if (!Number.isInteger(costCents) || costCents < 1) {
+    throw new Error('X_SEARCH_COST_CENTS must be a positive integer')
+  }
+  const allowedUsers = new Set<string>()
+  for (const userId of new Set(mappings.map(mapping => mapping.user_id))) {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', userId)
+      .single()
+    if (profileError) throw new Error(`Unable to load X plan: ${profileError.message}`)
+    const dailyLimit = getPlanLimits((profile as { plan?: string } | null)?.plan).xDailySpendLimitCents
+    if (dailyLimit === 0) continue
+    const { data: reserved, error: reserveError } = await (supabase.rpc as unknown as (
+      functionName: string,
+      args: { p_user_id: string; p_cost_cents: number; p_daily_limit_cents: number },
+    ) => Promise<{ data: boolean | null; error: { message: string } | null }>)(
+      'increment_x_spend_if_under_limit',
+      { p_user_id: userId, p_cost_cents: costCents, p_daily_limit_cents: dailyLimit },
+    )
+    if (reserveError) throw new Error(`Unable to reserve X capacity: ${reserveError.message}`)
+    if (reserved) allowedUsers.add(userId)
+  }
+  return mappings.filter(mapping => allowedUsers.has(mapping.user_id))
+}
+
 async function loadDueSocialWork(
   now: Date,
   forceUserId?: string,
@@ -92,7 +124,7 @@ async function loadDueSocialWork(
     const { data, error } = await supabase
       .from('keywords')
       .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, last_polled_at, competitors)')
-      .in('platform', ['reddit', 'bluesky'])
+      .in('platform', ['reddit', 'bluesky', 'x'])
       .eq('is_active', true)
       .order('id', { ascending: true })
       .range(offset, offset + pageSize - 1)
@@ -104,7 +136,9 @@ async function loadDueSocialWork(
   const forced = Boolean(forceUserId)
   const relevantRows = rows.filter((row) =>
     (!forceUserId || row.user_id === forceUserId)
-    && (!forcePlatform || row.platform === forcePlatform),
+    && (!forcePlatform || row.platform === forcePlatform)
+    && canMonitorPlatform(normalizePlan(profileFor(row)?.plan), row.platform)
+    && (row.platform !== 'x' || isXDiscoveryConfigured()),
   )
   const dueUsers = new Set<string>()
   const targets = new Map<string, TargetWork>()
@@ -158,7 +192,7 @@ async function loadPendingSocialCheckpoints(
   let query = supabase
     .from('monitored_threads')
     .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, source_created_at, created_at, keywords!inner(target)')
-    .in('platform', ['reddit', 'bluesky'])
+    .in('platform', ['reddit', 'bluesky', 'x'])
     .eq('status', 'pending')
     .gte('source_created_at', new Date(Date.now() - DISCOVERY_MAX_AGE_MS).toISOString())
     .order('created_at', { ascending: true })
@@ -202,7 +236,7 @@ async function removePersistedCandidates(
   const { data, error } = await supabase
     .from('monitored_threads')
     .select('user_id, platform, external_id, status')
-    .in('platform', ['reddit', 'bluesky'])
+    .in('platform', ['reddit', 'bluesky', 'x'])
     .in('external_id', externalIds)
     .in('user_id', userIds)
   if (error) throw error
@@ -324,6 +358,16 @@ async function runLockedMonitor(
         return {
           candidates: buildSocialScoreCandidates(result.posts, target.mappings).candidates,
           redditSource: result.source,
+        }
+      }
+      if (target.platform === 'x') {
+        const mappings = await reserveXCapacity(maintenanceClient, target.mappings)
+        if (mappings.length === 0) {
+          return { candidates: [] }
+        }
+        const posts = await fetchXPosts(target.target)
+        return {
+          candidates: buildSocialScoreCandidates(posts, mappings).candidates,
         }
       }
       const posts = await searchBlueskyPosts(target.target, 25)

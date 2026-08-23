@@ -37,7 +37,6 @@ import {
   BeforeAfterTransformation,
   CoreFeatureBento,
 } from '@/components/landing/PremiumFeatureSections'
-import { DeviceShowcase } from '@/components/landing/DeviceShowcase'
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
 import { Reveal } from '@/components/Reveal'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
@@ -280,27 +279,6 @@ export default function LandingPage() {
                   Acquire buyers organically
                 </span>
               </div>
-            </motion.div>
-          </div>
-        </Section>
-
-        {/* ━ ━ ━ ━  section separator: DASHBOARD PROOF ━ ━ ━ ━  */}
-        <Section className="border-b border-black/[0.05] bg-[#F7F8FA] py-20 sm:py-24 lg:py-[112px]">
-          <div className="mx-auto max-w-[1180px] px-6">
-            <motion.div variants={fadeUp} className="mx-auto mb-11 max-w-[650px] text-center sm:mb-14">
-              <SectionBadge color="#0A84FF" text="See it in action" />
-              <h2
-                style={{ fontFamily: 'var(--font-jakarta), var(--font-inter), sans-serif', fontWeight: 800, fontSize: 'clamp(34px, 4vw, 54px)', letterSpacing: '-0.045em', lineHeight: 1.05, color: '#0A0A0A', marginBottom: '14px' }}
-              >
-                See which conversations deserve your time.
-              </h2>
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: '16px', color: '#626B76', lineHeight: 1.65 }}>
-                A focused workspace for buyer intent, reply readiness, and the policy signals that keep automation under control.
-              </p>
-            </motion.div>
-
-            <motion.div variants={fadeUp} className="w-full">
-              <DeviceShowcase />
             </motion.div>
           </div>
         </Section>

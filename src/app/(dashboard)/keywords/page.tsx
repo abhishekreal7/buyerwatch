@@ -10,14 +10,14 @@ import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
-import { getPlanLimits, normalizePlan, PLAN_POLL_INTERVAL_MINUTES } from '@/lib/plan-limits'
+import { canMonitorPlatform, getPlanLimits, normalizePlan, PLAN_POLL_INTERVAL_MINUTES } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { DataLoadError } from '@/components/DataLoadError'
 import { getKeywordPollIssueLabel, isKeywordPollDelayed } from '@/lib/monitoring-health'
 
-type Platform = 'reddit' | 'bluesky' | 'x' | 'threads'
+type Platform = 'reddit' | 'bluesky' | 'x'
 
 interface Keyword {
   id: string
@@ -48,10 +48,7 @@ const PLATFORM_META: Record<Platform, { label: string; color: string; bg: string
   reddit: { label: 'Reddit', color: '#FF4500', bg: 'bg-[#FF4500]/8', border: 'border-[#FF4500]/15' },
   bluesky: { label: 'Bluesky', color: '#1185FE', bg: 'bg-[#1185FE]/8', border: 'border-[#1185FE]/15' },
   x: { label: 'X', color: '#000000', bg: 'bg-black/5', border: 'border-black/10' },
-  threads: { label: 'Threads', color: '#000000', bg: 'bg-black/5', border: 'border-black/10' },
 }
-
-const PLATFORMS_AVAILABLE: Platform[] = ['reddit', 'bluesky']
 
 /* ─── Tiny primitives ────────────────────────────────────────────── */
 function StatusPill({ active, onClick }: { active: boolean; onClick: () => void }) {
@@ -128,6 +125,15 @@ export default function KeywordsPage() {
   const termRef = useRef<HTMLInputElement>(null)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
+  const availablePlatforms = useMemo(
+    () => (['reddit', 'bluesky', 'x'] as Platform[])
+      .filter(platform => canMonitorPlatform(userPlan, platform)),
+    [userPlan],
+  )
+
+  useEffect(() => {
+    if (!availablePlatforms.includes(newPlatform)) setNewPlatform('reddit')
+  }, [availablePlatforms, newPlatform])
 
 
   useEffect(() => {
@@ -233,14 +239,24 @@ export default function KeywordsPage() {
       setSearch('')
 
       toast.success('Rule created')
-      toast.info('Searching network for past 24 hours of data...')
 
-      // Trigger Instant Aha Moment
-      fetch('/api/keywords/fetch-now', {
+      // Queue an initial check, but surface a provider/configuration failure
+      // instead of implying that a new rule is already being monitored.
+      const firstCheck = await fetch('/api/keywords/fetch-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keywordId: data.id })
-      }).catch(err => console.error('fetch-now error:', err))
+      })
+      if (firstCheck.ok) {
+        toast.info('Initial monitoring check queued.')
+      } else {
+        const firstCheckPayload = await firstCheck.json().catch(() => ({}))
+        if (firstCheckPayload.error === 'platform_temporarily_unavailable') {
+          toast.error('This platform is temporarily unavailable. Your rule was saved but will not run until it is restored.')
+        } else {
+          toast.error('Your rule was saved, but the initial check could not be queued. Try “Check now” later.')
+        }
+      }
     } catch {
       toast.error('Failed to save keyword')
     }
@@ -259,7 +275,10 @@ export default function KeywordsPage() {
     } catch (error) {
       console.error('[keywords] Unable to update monitoring rule', error)
       setKeywords(prev => prev.map(k => k.id === kw.id ? { ...k, is_active: kw.is_active } : k))
-      toast.error('Failed to update')
+      const message = error instanceof Error ? error.message.toLowerCase() : ''
+      toast.error(message.includes('plan limit') || message.includes('platform is not included')
+        ? 'This rule needs a plan upgrade before it can be activated.'
+        : 'Failed to update')
     }
   }
 
@@ -419,7 +438,7 @@ export default function KeywordsPage() {
                   <div>
                     <label className="text-[11.5px] font-semibold text-text-tertiary uppercase tracking-wider mb-1.5 block">Platform</label>
                     <select value={newPlatform} onChange={e => setNewPlatform(e.target.value as Platform)} className={fieldCls + ' cursor-pointer'}>
-                      {PLATFORMS_AVAILABLE.map(p => (
+                      {availablePlatforms.map(p => (
                         <option key={p} value={p}>{PLATFORM_META[p].label}</option>
                       ))}
                     </select>
@@ -442,7 +461,9 @@ export default function KeywordsPage() {
                   <p className="text-[12px] text-text-tertiary">
                     {newPlatform === 'reddit'
                       ? 'Monitors r/{subreddit} for posts containing your keyword.'
-                      : 'Searches Bluesky posts and replies for your keyword.'}
+                      : newPlatform === 'x'
+                        ? 'Searches recent public X posts for your keyword and query.'
+                        : 'Searches Bluesky posts and replies for your keyword.'}
                   </p>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <button onClick={() => setShowAdd(false)}

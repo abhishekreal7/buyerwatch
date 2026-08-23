@@ -207,8 +207,12 @@ function validateOptionalProviders(): void {
     throw new Error('DODO_PAYMENTS_ENVIRONMENT must be test_mode or live_mode')
   }
   assertCompleteOptionalGroup([
-    'DODO_PAYMENTS_SIGNAL_PACK_PRODUCT_ID',
-    'DODO_PAYMENTS_DRAFT_PACK_PRODUCT_ID',
+    'DODO_PAYMENTS_SIGNAL_20_PRODUCT_ID',
+    'DODO_PAYMENTS_SIGNAL_50_PRODUCT_ID',
+    'DODO_PAYMENTS_SIGNAL_120_PRODUCT_ID',
+    'DODO_PAYMENTS_DRAFT_5_PRODUCT_ID',
+    'DODO_PAYMENTS_DRAFT_12_PRODUCT_ID',
+    'DODO_PAYMENTS_DRAFT_30_PRODUCT_ID',
   ], 'Dodo add-on billing')
   assertCompleteOptionalGroup([
     'RESEND_API_KEY',

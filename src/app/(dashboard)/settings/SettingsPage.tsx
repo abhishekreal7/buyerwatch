@@ -253,6 +253,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
     draftsMax: PLAN_LIMITS.free.aiDraftsPerMonth,
   })
   const [usageStats, setUsageStats] = useState(initialData?.usageStats ?? { threads: 0, drafts: 0, replies: 0, keywords: 0 })
+  const planEntitlements = getPlanLimits(planState.plan)
   // total_drafts_reviewed from user_trust_metrics — used to show trust-meter in locked auto-send toggle
   const [draftsReviewed, setDraftsReviewed] = useState<number>(initialData?.draftsReviewed ?? 0)
 
@@ -447,7 +448,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
         competitors: profile.competitors.split(',').map(s => s.trim()).filter(Boolean),
         tone_examples: profile.toneExamples,
         reddit_username: profile.redditUsername,
-        referral_tracking_enabled: profile.referralTrackingEnabled,
+        referral_tracking_enabled: planEntitlements.replyAttribution && profile.referralTrackingEnabled,
         notification_preferences: notifications,
         high_intent_threshold: normalizeHighIntentThreshold(highIntentThreshold),
       }
@@ -466,11 +467,13 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
         threshold: slack.threshold,
       }
       if (slackWebhookUrl || !slackConfigured) slackPayload.webhookUrl = slackWebhookUrl
-      const slackRequest = fetch('/api/settings/slack', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(slackPayload),
-      })
+      const slackRequest = planEntitlements.slackNotifications
+        ? fetch('/api/settings/slack', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(slackPayload),
+          })
+        : Promise.resolve(new Response(null, { status: 204 }))
       const [{ error }, autoSendResponse, slackResponse] = await Promise.all([
         saveProfile(),
         fetch('/api/settings/autosend', {
@@ -1435,6 +1438,12 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                     </SectionCard>
 
                     <SectionCard title="Reply Tracking" description="Control how BuyerWatch attributes clicks and revenue from your replies.">
+                      {!planEntitlements.replyAttribution ? (
+                        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
+                          Reply attribution is available on Professional and Growth. Existing historical links remain measurable, but new Starter replies do not include tracking links.
+                          <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
+                        </div>
+                      ) : <>
                       <div className="flex items-start justify-between gap-6">
                         <div className="flex-1">
                           <p className="text-[14px] font-semibold text-gray-900">Include referral tracking in replies</p>
@@ -1452,6 +1461,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                         <span className="font-semibold text-gray-700">How it works: </span>
                         A link such as <span className="font-mono text-gray-700">{process.env.NEXT_PUBLIC_APP_URL || 'https://app.buyerwatch.co'}/r/abc123</span> redirects to <span className="font-mono text-gray-700">{profile.businessUrl || 'https://yoursite.com'}?ref=buyerwatch&amp;sid=abc123</span>. It is included only when the product is directly relevant and the affiliation is disclosed.
                       </div>
+                      </>}
                     </SectionCard>
 
                     <div className="flex justify-end pt-2">
@@ -1538,7 +1548,12 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                       title="Slack Notifications"
                       description="Get an instant Slack message with the AI draft reply whenever BuyerWatch finds a high-intent lead."
                     >
-                      <div className="space-y-5">
+                      {!planEntitlements.slackNotifications ? (
+                        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
+                          Slack notifications are available on Professional and Growth. Your current plan can still use email alerts.
+                          <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
+                        </div>
+                      ) : <div className="space-y-5">
                         {/* Webhook URL */}
                         <Field
                           label="Webhook URL"
@@ -1630,7 +1645,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                             )}
                           </div>
                         )}
-                      </div>
+                      </div>}
                     </SectionCard>
 
                     {/* Feature 2: Conversion Webhook Integration Card */}
@@ -1638,7 +1653,12 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                       title="Conversion Webhook Integration"
                       description="Attribute paid conversions back to your BuyerWatch replies by firing a webhook from Stripe, Paddle, or your payment system."
                     >
-                      <div className="space-y-4">
+                      {!planEntitlements.replyAttribution ? (
+                        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
+                          Conversion attribution is available on Professional and Growth, together with tracked reply links.
+                          <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
+                        </div>
+                      ) : <div className="space-y-4">
                         <Field
                           label="Webhook Receiver Endpoint"
                           hint="POST JSON payloads to this endpoint when a user who clicked a BuyerWatch link converts."
@@ -1687,7 +1707,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
 Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                           </pre>
                         </div>
-                      </div>
+                      </div>}
                     </SectionCard>
 
                     <div className="flex justify-end pt-2">

@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     // 3. Set up attribution before reserving paid AI capacity.
     const admin = getServiceRoleClient()
     let trackingSid = thread.tracking_sid as string | null
-    if (profile.referral_tracking_enabled !== false && profile.business_url && !trackingSid) {
+    if (limits.replyAttribution && profile.referral_tracking_enabled !== false && profile.business_url && !trackingSid) {
       trackingSid = randomBytes(5).toString('base64url')
       const { error: trackingError } = await admin
         .from('monitored_threads')
@@ -118,7 +118,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const trackingUrl = profile.referral_tracking_enabled !== false
+    const trackingUrl = limits.replyAttribution
+      && profile.referral_tracking_enabled !== false
       && profile.business_url
       && trackingSid
       ? buildAttributionShortUrl(getAppUrl(), trackingSid)

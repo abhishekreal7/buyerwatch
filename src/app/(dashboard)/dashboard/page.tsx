@@ -11,12 +11,11 @@ import { BlueskyIcon, RedditIcon, XIcon } from '@/components/Icons'
 import { PageHeader } from '@/components/PageHeader'
 import { PLAN_POLL_INTERVAL_MINUTES, normalizePlan, type PlanTier } from '@/lib/plan-limits'
 import {
-  BILLING_ADDONS,
   getCurrentUsageMonth,
   getPlanLimitsWithAddons,
   sumMonthlyAddonCredits,
-  type BillingAddonType,
 } from '@/lib/billing-addons'
+import { CreditPackPicker } from '@/components/CreditPackPicker'
 import { useDashboardSession } from '@/components/DashboardContext'
 import { getIntentDisplayLabel, isLowRelevanceScore, type IntentLabel } from '@/lib/intent'
 import { getSafeThreadUrl } from '@/lib/thread-url'
@@ -176,7 +175,6 @@ export default function DashboardPage() {
   })
   const [signalUsage, setSignalUsage] = useState({ used: 0, limit: 250 })
   const [draftUsage, setDraftUsage] = useState({ used: 0, limit: 40 })
-  const [openingAddonCheckout, setOpeningAddonCheckout] = useState<BillingAddonType | null>(null)
   const [supabase] = useState(createClient)
   const { userId } = useDashboardSession()
 
@@ -774,34 +772,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleBuyAddon = async (type: BillingAddonType) => {
-    if (openingAddonCheckout) return
-    setOpeningAddonCheckout(type)
-    try {
-      const idempotencyKey = crypto.randomUUID()
-      const response = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: JSON.stringify({ addon: type }),
-      })
-      const payload = await response.json().catch(() => null)
-      if (!response.ok || !payload?.url) {
-        throw new Error(payload?.error || 'checkout_failed')
-      }
-      window.location.href = payload.url
-    } catch (error) {
-      setOpeningAddonCheckout(null)
-      if (error instanceof Error && error.message === 'addon_billing_not_configured') {
-        toast.error('This add-on is temporarily unavailable. No charge was created.')
-        return
-      }
-      toast.error('Could not open add-on checkout')
-    }
-  }
-
   const generateReplyForThread = async (threadToDraft: Thread) => {
     if (regenerating) return
     const isFirstDraft = !threadToDraft.draft
@@ -1121,14 +1091,11 @@ export default function DashboardPage() {
                   {signalUsage.used}/{signalUsage.limit} Starter signals used this month.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void handleBuyAddon('signals')}
-                disabled={Boolean(openingAddonCheckout)}
-                className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-4 text-xs font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
-              >
-                {openingAddonCheckout === 'signals' ? 'Opening...' : BILLING_ADDONS.signals.ctaLabel}
-              </button>
+              <CreditPackPicker
+                initialType="signals"
+                triggerLabel="Choose signal pack"
+                className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-4 text-xs font-semibold text-white transition-colors hover:bg-black"
+              />
             </div>
           )}
 
@@ -1143,14 +1110,11 @@ export default function DashboardPage() {
                   {draftUsage.used}/{draftUsage.limit} Starter drafts used this month.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void handleBuyAddon('drafts')}
-                disabled={Boolean(openingAddonCheckout)}
-                className="inline-flex min-h-10 items-center rounded-xl bg-[#0A84FF] px-4 text-xs font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-60"
-              >
-                {openingAddonCheckout === 'drafts' ? 'Opening...' : BILLING_ADDONS.drafts.ctaLabel}
-              </button>
+              <CreditPackPicker
+                initialType="drafts"
+                triggerLabel="Choose draft pack"
+                className="inline-flex min-h-10 items-center rounded-xl bg-[#0A84FF] px-4 text-xs font-semibold text-white transition-colors hover:bg-blue-600"
+              />
             </div>
           )}
         </div>
@@ -1813,16 +1777,13 @@ export default function DashboardPage() {
                         Starter signal limit reached
                       </h3>
                       <p className="text-[13px] text-gray-500 mb-4 max-w-[260px]">
-                        Add 100 more monitored signals for this month without changing plans.
+                        Choose a signal pack for this month without changing plans.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => void handleBuyAddon('signals')}
-                        disabled={Boolean(openingAddonCheckout)}
-                        className="px-5 py-2 rounded-lg bg-[#0A84FF] hover:bg-blue-600 text-white text-[13px] font-medium transition-colors shadow-[0_0_20px_rgba(10,132,255,0.2)] disabled:opacity-60"
-                      >
-                        {openingAddonCheckout === 'signals' ? 'Opening...' : BILLING_ADDONS.signals.ctaLabel}
-                      </button>
+                      <CreditPackPicker
+                        initialType="signals"
+                        triggerLabel="Choose signal pack"
+                        className="px-5 py-2 rounded-lg bg-[#0A84FF] hover:bg-blue-600 text-white text-[13px] font-medium transition-colors shadow-[0_0_20px_rgba(10,132,255,0.2)]"
+                      />
                     </div>
 
                     {/* Dummy blurred content behind */}

@@ -21,7 +21,7 @@ const subredditPattern = /^[a-z0-9_]{2,50}$/
 
 async function executeMonitor(
   forceUserId?: string,
-  forcePlatform?: 'reddit' | 'bluesky',
+  forcePlatform?: 'reddit' | 'bluesky' | 'x',
   forceTarget?: string,
   runCanary = false,
 ) {
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
   }
 
   let forceUserId: string | undefined
-  let forcePlatform: 'reddit' | 'bluesky' | undefined
+  let forcePlatform: 'reddit' | 'bluesky' | 'x' | undefined
   let forceTarget: string | undefined
   if (body.trim()) {
     try {
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
         forceUserId = payload.forceUserId
       }
       if (payload.forcePlatform !== undefined) {
-        if (payload.forcePlatform !== 'reddit' && payload.forcePlatform !== 'bluesky') {
+        if (!['reddit', 'bluesky', 'x'].includes(String(payload.forcePlatform))) {
           return NextResponse.json(
             { error: 'Invalid payload' },
             {
@@ -157,15 +157,15 @@ export async function POST(request: Request) {
             },
           )
         }
-        forcePlatform = payload.forcePlatform
+        forcePlatform = payload.forcePlatform as 'reddit' | 'bluesky' | 'x'
       }
       if (payload.forceTarget !== undefined) {
         const normalizedTarget = typeof payload.forceTarget === 'string'
           ? payload.forceTarget.trim()
           : ''
-        const validTarget = forcePlatform === 'bluesky'
-          ? normalizedTarget.length > 0 && normalizedTarget.length <= 200
-          : subredditPattern.test(normalizedTarget.toLowerCase())
+        const validTarget = forcePlatform === 'reddit'
+          ? subredditPattern.test(normalizedTarget.toLowerCase())
+          : normalizedTarget.length > 0 && normalizedTarget.length <= 200
         if (
           !forceUserId
           || !forcePlatform

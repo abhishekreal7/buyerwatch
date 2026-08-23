@@ -23,12 +23,11 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { normalizePlan, type PlanTier } from '@/lib/plan-limits'
 import {
-  BILLING_ADDONS,
   getCurrentUsageMonth,
   getPlanLimitsWithAddons,
   sumMonthlyAddonCredits,
-  type BillingAddonType,
 } from '@/lib/billing-addons'
+import { CreditPackPicker } from '@/components/CreditPackPicker'
 import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -353,10 +352,6 @@ function DashboardShell({
     }
   }
 
-  async function handleBuyAddon(type: BillingAddonType) {
-    await openCheckout({ addon: type }, `addon:${type}`)
-  }
-
   async function handleUpgradePlan() {
     if (plan === 'growth') {
       window.location.href = '/pricing'
@@ -378,7 +373,7 @@ function DashboardShell({
 
   return (
     <DashboardSessionProvider userId={userId}>
-      <div className="h-screen w-screen overflow-hidden bg-[#F7F7F7] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
+      <div className="h-dvh w-full overflow-hidden bg-[#F7F7F7] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
         {/* Desktop Sidebar sitting directly on background */}
         <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F7F7F7] px-2 py-2.5 h-full lg:flex select-none">
@@ -521,15 +516,10 @@ function DashboardShell({
                 </div>
 
                 <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => void handleBuyAddon('drafts')}
-                    disabled={Boolean(openingCheckout)}
-                    title={BILLING_ADDONS.drafts.ctaLabel}
-                    className="min-h-9 rounded-lg border border-zinc-300 bg-white px-2 text-[11px] font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {openingCheckout === 'addon:drafts' ? 'Opening…' : 'Add credits'}
-                  </button>
+                  <CreditPackPicker
+                    initialType="drafts"
+                    className="min-h-9 rounded-lg border border-zinc-300 bg-white px-2 text-[11px] font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 cursor-pointer"
+                  />
                   <button
                     type="button"
                     onClick={() => void handleUpgradePlan()}
@@ -631,7 +621,7 @@ function DashboardShell({
           </header>
 
           {/* Content Container */}
-          <div className="scrollbar-gutter-stable relative z-10 w-full flex-1 min-h-0 overflow-y-scroll px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
+          <div className="scrollbar-gutter-stable relative z-10 w-full flex-1 min-h-0 overflow-y-auto px-4 py-5 pb-[104px] sm:px-6 sm:py-6 lg:px-8 lg:pb-8">
             {(primaryIncident || redditConnectionAttention) && (
               <div
                 role="alert"
