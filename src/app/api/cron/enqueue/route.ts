@@ -205,5 +205,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // This daily Vercel Cron is the independent recovery path for the QStash
+  // five-minute schedule. Do not make its monitor run depend on QStash being
+  // alive first: a paused or deleted QStash schedule would otherwise have no
+  // request through which it could repair itself.
+  await withTimeout(
+    ensureMonitoringSchedule(),
+    5_000,
+    'QStash monitoring schedule recovery check',
+  ).catch((error) => {
+    logger.error({ error }, 'Unable to recover the QStash monitoring schedule')
+  })
+
   return executeMonitor(undefined, undefined, undefined, true)
 }

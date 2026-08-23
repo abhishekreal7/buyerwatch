@@ -162,6 +162,12 @@ describe('QStash monitoring route contract', () => {
     expect(route).not.toContain('enqueueDueMonitoring')
   })
 
+  it('repairs the QStash schedule from the independent Vercel Cron path', () => {
+    const vercelCronHandler = route.slice(route.indexOf('export async function GET'))
+    expect(vercelCronHandler).toContain('ensureMonitoringSchedule()')
+    expect(vercelCronHandler).toContain('QStash monitoring schedule recovery check')
+  })
+
   it('dispatches one exact pending outbox job through a protected repair route', () => {
     expect(dispatchOutboxRoute).toContain('isAuthorizedCronRequest')
     expect(dispatchOutboxRoute).toContain('readTextBody(request, 1_024)')
