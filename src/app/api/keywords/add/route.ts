@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { canMonitorPlatform, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { isXDiscoveryConfigured } from '@/lib/x'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
 
@@ -29,13 +30,7 @@ export async function POST(req: Request) {
     if (platform === 'reddit') target = target.toLowerCase()
     if (platform === 'bluesky') target = target.replace(/\s+/g, ' ')
 
-    const allowedPlatforms = [
-      'reddit',
-      'bluesky',
-      ...(process.env.ENABLE_X_DISCOVERY === 'true' ? ['x'] : []),
-      ...(process.env.ENABLE_THREADS_DISCOVERY === 'true' ? ['threads'] : []),
-    ]
-    if (!allowedPlatforms.includes(platform)) {
+    if (!['reddit', 'bluesky', 'x'].includes(platform)) {
       return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
     }
     const rate = await actionRateLimit.limit(`keyword-add:${user.id}:${await getIp()}`)
@@ -56,12 +51,27 @@ export async function POST(req: Request) {
 
     const plan = normalizePlan(profile?.plan)
     const limits = getPlanLimits(plan)
+    if (!canMonitorPlatform(plan, platform)) {
+      return NextResponse.json(
+        { error: 'plan_feature_unavailable', feature: 'platform', platform },
+        { status: 403 },
+      )
+    }
+    if (platform === 'x' && !isXDiscoveryConfigured()) {
+      // A paid user must receive an actionable failure instead of a rule that
+      // looks active but can never be polled while the provider is disabled.
+      return NextResponse.json(
+        { error: 'platform_temporarily_unavailable', platform: 'x' },
+        { status: 503 },
+      )
+    }
 
     // Count existing keywords
     const { count, error: countError } = await supabase
       .from('keywords')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
+      .eq('is_active', true)
 
     if (countError) {
       return NextResponse.json({ error: 'Failed to count keywords' }, { status: 500 })
@@ -71,6 +81,25 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'plan_limit_reached', limit: 'keywords' },
         { status: 403 }
+      )
+    }
+
+    const { data: targets, error: targetsError } = await supabase
+      .from('keywords')
+      .select('platform, target')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+    if (targetsError) {
+      return NextResponse.json({ error: 'Failed to count monitored communities' }, { status: 500 })
+    }
+    const targetKey = `${platform}\u0000${target.toLowerCase()}`
+    const uniqueTargets = new Set((targets ?? []).map(item =>
+      `${item.platform}\u0000${String(item.target).toLowerCase()}`,
+    ))
+    if (!uniqueTargets.has(targetKey) && uniqueTargets.size >= limits.monitoredTargets) {
+      return NextResponse.json(
+        { error: 'plan_limit_reached', limit: 'monitored_communities' },
+        { status: 403 },
       )
     }
 
@@ -93,6 +122,7 @@ export async function POST(req: Request) {
         error.code === 'P0001'
         || error.code === '42501'
         || message.includes('keyword plan limit')
+        || message.includes('monitored community plan limit')
         || message.includes('policy')
       ) {
         return NextResponse.json(

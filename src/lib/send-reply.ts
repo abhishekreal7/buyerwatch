@@ -26,6 +26,7 @@ import {
 } from './reddit-community-policy'
 import { AUTO_REPLY_MAX_AGE_MS, evaluateContentFreshness } from './content-freshness'
 import { areRepliesNearDuplicate } from './reply-similarity'
+import { getPlanLimits } from './plan-limits'
 
 export type SendReplyData = {
   userId: string
@@ -85,7 +86,7 @@ export async function processSendReply(
 
   let maxPerDay: number | undefined
   let autoSendThreshold = 85
-  let businessProfile: { business_name: string; business_url: string | null } | null = null
+  let businessProfile: { business_name: string; business_url: string | null; plan?: string | null } | null = null
   let redditPolicyDecision: RedditReplyPolicyDecision | null = null
   let redditPostUrl: string | null = null
   let sendCommunity: string | undefined
@@ -138,6 +139,7 @@ export async function processSendReply(
     businessProfile = {
       business_name: automationProfile.business_name,
       business_url: automationProfile.business_url,
+      plan: automationProfile.plan,
     }
   }
 
@@ -145,7 +147,7 @@ export async function processSendReply(
     if (!businessProfile) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('business_name, business_url')
+        .select('business_name, business_url, plan')
         .eq('id', userId)
         .single()
       if (profileError || !profile?.business_name) {
@@ -301,20 +303,21 @@ export async function processSendReply(
       const profile = businessProfile ?? await (async () => {
         const { data, error } = await supabase
           .from('profiles')
-          .select('business_name, business_url')
+          .select('business_name, business_url, plan')
           .eq('id', userId)
           .single()
         if (error || !data) throw new Error(`Unable to load attribution destination: ${error?.message ?? 'profile not found'}`)
         return data
       })()
-      if (!profile.business_url) throw new Error('Attribution is enabled but no business URL is configured')
-
-      await ensureAttributionMapping(supabase, {
-        userId,
-        threadId,
-        token: threadRow.tracking_sid,
-        businessUrl: profile.business_url,
-      })
+      if (getPlanLimits(profile.plan).replyAttribution) {
+        if (!profile.business_url) throw new Error('Attribution is enabled but no business URL is configured')
+        await ensureAttributionMapping(supabase, {
+          userId,
+          threadId,
+          token: threadRow.tracking_sid,
+          businessUrl: profile.business_url,
+        })
+      }
     }
 
     const result = platform === 'reddit'

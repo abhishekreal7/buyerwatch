@@ -66,7 +66,7 @@ export async function cancelQStashMessage(messageId: string): Promise<number> {
 export function publishMonitoringRun(
   forceUserId?: string,
   forceTarget?: string,
-  forcePlatform?: 'reddit' | 'bluesky',
+  forcePlatform?: 'reddit' | 'bluesky' | 'x',
 ): Promise<string | null> {
   return publishQStashJson(
     '/api/cron/enqueue',

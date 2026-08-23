@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 import { getAppUrl } from '@/lib/app-url'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { readJsonBody, RequestInputError } from '@/lib/request'
-import { BILLING_ADDONS, type BillingAddonType } from '@/lib/billing-addons'
+import { getBillingAddonPack } from '@/lib/billing-addons'
 import { getAddonProductId } from '@/lib/billing-addons-server'
 import {
   getBillingPlanChangeStrategy,
@@ -74,13 +74,14 @@ export async function POST(req: Request) {
     })
 
     if (intent.kind === 'addon') {
-      const requestedAddon: BillingAddonType = intent.addon
-      const productId = getAddonProductId(requestedAddon)
+      const requestedAddon = intent.addon
+      const requestedPack = intent.pack
+      const productId = getAddonProductId(requestedPack)
       if (!productId) {
         return NextResponse.json({ error: 'addon_billing_not_configured' }, { status: 503 })
       }
 
-      const addon = BILLING_ADDONS[requestedAddon]
+      const addon = getBillingAddonPack(requestedPack)
       // Prefer a client-supplied key so intentional back-to-back pack purchases
       // each get a fresh checkout. Without one, use a short bucket so accidental
       // double-submits collapse but intentional repeats after ~30s still work.
@@ -96,12 +97,13 @@ export async function POST(req: Request) {
           user_id: user.id,
           purchase_type: 'addon',
           addon_type: requestedAddon,
+          addon_pack: requestedPack,
           credits: String(addon.credits),
         },
         return_url: `${getAppUrl()}/dashboard?billing=addon`,
       }, {
         idempotencyKey: createHash('sha256')
-          .update(`${user.id}:addon:${requestedAddon}:${addonIdempotencySeed}`)
+          .update(`${user.id}:addon:${requestedPack}:${addonIdempotencySeed}`)
           .digest('hex'),
       })
 

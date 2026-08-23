@@ -3,11 +3,14 @@ import { createClient } from '@supabase/supabase-js'
 import DodoPayments from 'dodopayments'
 import { readTextBody, RequestInputError } from '@/lib/request'
 import {
-  getAddonCredits,
-  getAddonTypeFromProductId,
-  normalizeAddonType,
+  getAddonPackFromProductId,
 } from '@/lib/billing-addons-server'
-import { getDodoEnvironment, getDodoPlanFromProductId, getDodoProductId } from '@/lib/dodo'
+import {
+  getDodoEnvironment,
+  getDodoPlanFromProductId,
+  getDodoProductId,
+  hasPendingDodoScheduledChange,
+} from '@/lib/dodo'
 
 type BillingPlan = 'starter' | 'pro' | 'growth'
 type BillingStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired'
@@ -29,6 +32,7 @@ function getStatus(eventType: string, value: unknown): BillingStatus | null {
   }
   if (eventType.includes('active') || eventType.includes('renewed')) return 'active'
   if (eventType.includes('plan_changed')) return 'active'
+  if (eventType.includes('unpaused')) return 'active'
   if (eventType.includes('cancel')) return 'cancelled'
   if (eventType.includes('fail')) return 'failed'
   if (eventType.includes('expire')) return 'expired'
@@ -168,13 +172,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true, result })
   }
 
-  const metadataAddon = normalizeAddonType(metadata.addon_type)
-  const productAddon = getAddonTypeFromProductId(productId)
-  const addonType = metadata.purchase_type === 'addon'
-    ? metadataAddon ?? productAddon
-    : productAddon
+  const addonPack = getAddonPackFromProductId(productId)
+  const addonType = addonPack?.type ?? null
 
   if (addonType && !eventType.startsWith('subscription.')) {
+    if (!addonPack) {
+      // Kept explicit for TypeScript and as a defence against future changes
+      // to the product-to-pack mapping.
+      return NextResponse.json({ error: 'invalid_addon_product' }, { status: 500 })
+    }
     if (!isSuccessfulOneTimePayment(eventType, data.status)) {
       return NextResponse.json({ received: true, result: 'ignored_addon_status' })
     }
@@ -190,7 +196,6 @@ export async function POST(req: Request) {
 
     // Credits are a server-owned entitlement. Never trust webhook metadata for
     // the quantity even though the event signature itself is authentic.
-    const credits = getAddonCredits(addonType)
     const { data: result, error } = await getSupabase().rpc('apply_billing_addon_event', {
       p_event_id: eventId,
       p_event_type: eventType,
@@ -199,7 +204,7 @@ export async function POST(req: Request) {
       p_product_id: productId,
       p_addon_type: addonType,
       p_quantity: 1,
-      p_credits: credits,
+      p_credits: addonPack.credits,
       p_event_at: eventAt,
     })
 
@@ -217,6 +222,14 @@ export async function POST(req: Request) {
 
   if (!eventType.startsWith('subscription.')) {
     return NextResponse.json({ received: true, result: 'ignored' })
+  }
+
+  // A scheduled downgrade/cadence change keeps the current plan active until
+  // Dodo applies it at the next billing date. Applying the target product now
+  // would remove paid access early; an actual later subscription event applies
+  // the new tier through the atomic database function below.
+  if (eventType === 'subscription.plan_changed' && hasPendingDodoScheduledChange(data)) {
+    return NextResponse.json({ received: true, result: 'scheduled_plan_change' })
   }
 
   if ((!userId || !productId) && subscriptionId) {

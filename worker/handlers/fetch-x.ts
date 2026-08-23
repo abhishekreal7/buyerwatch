@@ -2,7 +2,7 @@ import { logger } from '../../src/lib/logger';
 import { Job } from 'bullmq'
 import { fetchXPosts } from '../../src/lib/x'
 import { scorePostQueue } from '../../src/lib/queues'
-import { X_DAILY_SPEND_LIMIT_CENTS } from '../../src/lib/plan-limits'
+import { getPlanLimits } from '../../src/lib/plan-limits'
 import {
   recordKeywordPollFailure,
   recordKeywordPollSuccess,
@@ -115,7 +115,7 @@ async function checkXSpendBudget(userId: string) {
 
   if (profileError) throw new Error(`Failed to load X budget profile: ${profileError.message}`)
   if (!profile) return false
-  const limit = X_DAILY_SPEND_LIMIT_CENTS[profile.plan] || 0
+  const limit = getPlanLimits(profile.plan).xDailySpendLimitCents
   if (limit === 0) return false
 
   // Cost per search in cents. Live value is ~5 cents depending on operation.

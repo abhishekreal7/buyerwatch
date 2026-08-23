@@ -1,3 +1,9 @@
+import {
+  getDefaultBillingAddonPack,
+  type BillingAddonPackId,
+  type BillingAddonType,
+} from './billing-addons'
+
 export type DodoEnvironment = 'test_mode' | 'live_mode'
 
 export type BillingPlan = 'starter' | 'pro' | 'growth'
@@ -11,7 +17,7 @@ export type BillingPlanChangeStrategy = {
 
 export type BillingCheckoutIntent =
   | { kind: 'plan'; plan: BillingPlan; cadence: BillingCadence }
-  | { kind: 'addon'; addon: 'signals' | 'drafts' }
+  | { kind: 'addon'; addon: BillingAddonType; pack: BillingAddonPackId }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -108,9 +114,20 @@ export function parseBillingCheckoutIntent(
 
   if (hasPlan && hasAddon) return null
   if (hasAddon) {
-    return body.addon === 'signals' || body.addon === 'drafts'
-      ? { kind: 'addon', addon: body.addon }
-      : null
+    const addon = body.addon === 'signals' || body.addon === 'drafts' ? body.addon : null
+    if (!addon) return null
+
+    // An omitted pack preserves older client behavior by selecting the entry
+    // pack. A provided pack must be one of the server-owned pack IDs and must
+    // belong to the requested add-on family.
+    const defaultPack = getDefaultBillingAddonPack(addon)
+    const pack = typeof body.addonPack === 'string' ? body.addonPack : defaultPack.id
+    if (!['signals_20', 'signals_50', 'signals_120', 'drafts_5', 'drafts_12', 'drafts_30'].includes(pack)) {
+      return null
+    }
+    const packId = pack as BillingAddonPackId
+    if (!packId.startsWith(`${addon}_`)) return null
+    return { kind: 'addon', addon, pack: packId }
   }
 
   if (!hasPlan) return { kind: 'plan', plan: 'pro', cadence: 'monthly' }
@@ -143,4 +160,13 @@ export function getDodoProductId(data: unknown): string | null {
     .filter((productId): productId is string => Boolean(productId))
 
   return productIds.length === 1 ? productIds[0] : null
+}
+
+/**
+ * Dodo retains the current subscription benefits while a change is scheduled
+ * for the next billing date. Do not revoke access from a plan-change webhook
+ * until the subsequent event reflects the newly active product.
+ */
+export function hasPendingDodoScheduledChange(data: unknown): boolean {
+  return isRecord(data) && data.scheduled_change != null
 }

@@ -33,14 +33,11 @@ function isBrowser(): boolean {
 
 function getPosthog(): { identify: (...a: unknown[]) => void; reset: () => void; capture: (...a: unknown[]) => void } | null {
   if (!isBrowser()) return null
-  // Resolve posthog lazily so the module can be tree-shaken and avoids a
-  // hard dependency on posthog-js being present at compile time.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('posthog-js').default ?? null
-  } catch {
-    return null
-  }
+  // PostHog is optional. Read a browser-initialized client when one exists;
+  // do not dynamically require a package that is intentionally not installed.
+  return (globalThis as typeof globalThis & {
+    posthog?: { identify: (...a: unknown[]) => void; reset: () => void; capture: (...a: unknown[]) => void }
+  }).posthog ?? null
 }
 
 /**

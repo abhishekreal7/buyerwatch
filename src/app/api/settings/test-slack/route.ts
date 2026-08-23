@@ -4,6 +4,7 @@ import { getServiceRoleClient } from '@/lib/admin'
 import { decrypt } from '@/lib/encryption'
 import { fetchWithTimeout } from '@/lib/http'
 import { isAllowedSlackWebhookUrl } from '@/lib/security/outbound-url'
+import { getPlanLimits } from '@/lib/plan-limits'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
 
@@ -27,14 +28,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
   }
 
+  const { data: profile, error } = await getServiceRoleClient()
+    .from('profiles')
+    .select('plan, slack_webhook_ciphertext, slack_webhook_url')
+    .eq('id', user.id)
+    .single()
+  if (error) throw error
+  if (!getPlanLimits(profile?.plan).slackNotifications) {
+    return NextResponse.json({ error: 'plan_feature_unavailable', feature: 'slack_notifications' }, { status: 403 })
+  }
+
   let webhookUrl = suppliedWebhook
   if (!webhookUrl) {
-    const { data: profile, error } = await getServiceRoleClient()
-      .from('profiles')
-      .select('slack_webhook_ciphertext, slack_webhook_url')
-      .eq('id', user.id)
-      .single()
-    if (error) throw error
     webhookUrl = profile?.slack_webhook_ciphertext
       ? decrypt(profile.slack_webhook_ciphertext)
       : profile?.slack_webhook_url || ''
