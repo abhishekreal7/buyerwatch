@@ -15,7 +15,7 @@ const faqs = [
   { q: 'Does it work for non-SaaS businesses?', a: 'Yes. You can monitor configured Reddit communities and Bluesky searches for conversations relevant to any product or service.' },
   { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. BuyerWatch finds active buying intent from people who don\'t know you yet.' },
   { q: 'How does intent scoring work?', a: 'We classify posts into Buying, Researching, Complaining, and Other, then attach a 0–100 confidence score for review.' },
-  { q: 'What does the Starter plan include?', a: 'Starter is $19/month and includes 5 keyword rules, up to 250 conversations per month, and manual review before anything is posted.' },
+  { q: 'What does the Starter plan include?', a: 'Starter is $39/month after a 7-day free trial. It includes 5 keyword rules, up to 250 conversations per month, and manual review before anything is posted.' },
   { q: 'Does this violate platform terms of service?', a: 'BuyerWatch uses public-feed access and authenticated connections where configured. Manual review is the default, and you remain responsible for each platform\'s rules.' },
   { q: 'How does BuyerWatch reduce promotional replies?', a: 'Drafts include an affiliation disclosure, are checked for promotional phrasing, and stay in manual review until the confidence engine has enough trust evidence.' }
 ]

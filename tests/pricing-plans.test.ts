@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PRICING_PLANS } from '../src/lib/pricing-plans'
+import { getTrialDaysForPlan, STARTER_TRIAL_DAYS } from '../src/lib/dodo'
 import { getIntentDailyLimit, PLAN_LIMITS } from '../src/lib/plan-limits'
 import { afterAuthenticationDestination } from '../src/lib/billing-selection'
 
@@ -19,6 +20,18 @@ describe('pricing plan promises', () => {
     expect(growth?.period).toBe('/month')
     expect(growth?.features).toContain('5-minute polling cadence')
     expect(growth?.features).not.toContain('15-minute polling cadence')
+  })
+
+  it('offers the seven-day trial only on Starter', () => {
+    const starter = PRICING_PLANS.find(plan => plan.id === 'starter')
+
+    expect(starter?.price).toBe('$39')
+    expect(starter?.cta).toBe('Start 7-day free trial')
+    expect(starter?.features).toContain('7-day free trial')
+    expect(STARTER_TRIAL_DAYS).toBe(7)
+    expect(getTrialDaysForPlan('starter')).toBe(7)
+    expect(getTrialDaysForPlan('pro')).toBeUndefined()
+    expect(getTrialDaysForPlan('growth')).toBeUndefined()
   })
 
   it('includes X only from Professional onward', () => {

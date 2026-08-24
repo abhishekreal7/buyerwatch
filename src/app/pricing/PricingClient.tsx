@@ -94,7 +94,11 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                 )}
               </div>
               <p className={`-mt-2 mb-4 min-h-5 text-[12px] ${isHighlighted ? 'text-white/50' : 'text-[#777]'}`}>
-                {annual ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
+                {plan.id === 'starter'
+                  ? annual
+                    ? `7-day free trial, then ${plan.annualTotal}/year`
+                    : '7-day free trial, then billed monthly'
+                  : annual ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
               </p>
 
               {/* Description */}
