@@ -37,6 +37,11 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
           const paidPlan = price !== '$0' && price !== 'Custom'
           const checkoutAvailable = !paidPlan || billingEnabled
           const isHighlighted = plan.highlight
+          const hasTrial = plan.id === 'starter' && !annual
+          const features = hasTrial
+            ? ['7-day full Starter trial', ...plan.features]
+            : plan.features
+          const cta = plan.id === 'starter' && annual ? 'Choose Starter' : plan.cta
 
           return (
             <div
@@ -96,8 +101,8 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
               <p className={`-mt-2 mb-4 min-h-5 text-[12px] ${isHighlighted ? 'text-white/50' : 'text-[#777]'}`}>
                 {plan.id === 'starter'
                   ? annual
-                    ? `7-day free trial, then ${plan.annualTotal}/year`
-                    : '7-day free trial, then billed monthly'
+                    ? `Billed ${plan.annualTotal} once per year`
+                    : '7-day full Starter trial, then billed monthly'
                   : annual ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
               </p>
 
@@ -124,7 +129,7 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                     : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
                 }`}
               >
-                {checkoutAvailable ? plan.cta : `Contact us about ${plan.name}`}
+                {checkoutAvailable ? cta : `Contact us about ${plan.name}`}
                 <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
               </Link>
 
@@ -144,7 +149,7 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                 What&apos;s included
               </p>
               <ul className="flex-1 space-y-3">
-                {plan.features.map((f) => (
+                {features.map((f) => (
                   <li key={f} className="flex items-start gap-2.5 text-[14px]">
                     {/* Filled circle check icon */}
                     <span

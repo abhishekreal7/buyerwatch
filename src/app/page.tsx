@@ -156,7 +156,7 @@ export default function LandingPage() {
             </motion.div>
           </div>
 
-          <p className="text-[13px] text-[#9B9B9B] font-[450]">7-day free trial on Starter &middot; Plans from $39/month &middot; Cancel anytime</p>
+          <p className="text-[13px] text-[#9B9B9B] font-[450]">7-day full Starter trial on monthly billing &middot; Plans from $39/month &middot; Cancel anytime</p>
         </motion.div>
 
         {/* Platform logos — clean, no box */}
@@ -799,6 +799,11 @@ export default function LandingPage() {
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
                 const price: string = annualHome ? plan.annualPrice : plan.price
+                const hasTrial = plan.id === 'starter' && !annualHome
+                const features = hasTrial
+                  ? ['7-day full Starter trial', ...plan.features]
+                  : plan.features
+                const cta = plan.id === 'starter' && annualHome ? 'Choose Starter' : plan.cta
                 return (
                   <motion.article
                     key={plan.id}
@@ -831,8 +836,8 @@ export default function LandingPage() {
                     <p className={`-mt-2 mb-4 min-h-5 text-[12px] ${isHighlighted ? 'text-white/50' : 'text-[#777]'}`}>
                       {plan.id === 'starter'
                         ? annualHome
-                          ? `7-day free trial, then ${plan.annualTotal}/year`
-                          : '7-day free trial, then billed monthly'
+                          ? `Billed ${plan.annualTotal} once per year`
+                          : '7-day full Starter trial, then billed monthly'
                         : annualHome ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
                     </p>
                     <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>
@@ -843,7 +848,7 @@ export default function LandingPage() {
                         isHighlighted ? 'bg-white text-[#0A0A0A] hover:bg-white/90' : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
                       }`}
                     >
-                      {plan.cta}
+                      {cta}
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden><path d="M3 13L13 3M13 3H6M13 3V10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </a>
                     {/* Divider */}
@@ -851,7 +856,7 @@ export default function LandingPage() {
                     <p className={`mb-3 text-[12px] font-semibold uppercase tracking-widest ${isHighlighted ? 'text-white/40' : 'text-[#999]'}`}>What&apos;s included</p>
                     {/* Features */}
                     <ul className="flex flex-col gap-3">
-                      {plan.features.map((feature) => (
+                      {features.map((feature) => (
                         <li key={feature} className="flex items-start gap-2.5 text-left">
                           <span className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full ${isHighlighted ? 'bg-white/15' : 'bg-[#0A0A0A]'}`}>
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>

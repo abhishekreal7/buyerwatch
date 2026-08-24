@@ -9,11 +9,14 @@ export type DodoEnvironment = 'test_mode' | 'live_mode'
 export type BillingPlan = 'starter' | 'pro' | 'growth'
 export type BillingCadence = 'monthly' | 'annual'
 
-/** The Starter trial is set on each checkout session, not inferred by the UI. */
+/** The card-required trial is a monthly Starter acquisition offer. */
 export const STARTER_TRIAL_DAYS = 7
 
-export function getTrialDaysForPlan(plan: BillingPlan): number | undefined {
-  return plan === 'starter' ? STARTER_TRIAL_DAYS : undefined
+export function getTrialDaysForPlan(
+  plan: BillingPlan,
+  cadence: BillingCadence = 'monthly',
+): number | undefined {
+  return plan === 'starter' && cadence === 'monthly' ? STARTER_TRIAL_DAYS : undefined
 }
 
 export type BillingPlanChangeStrategy = {

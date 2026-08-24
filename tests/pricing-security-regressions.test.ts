@@ -21,12 +21,13 @@ describe('public pricing and session security regressions', () => {
     const homepage = source('src/app/page.tsx')
     const footer = source('src/components/landing/LandingFooter.tsx')
 
-    expect(checkout).toContain('trial_period_days: getTrialDaysForPlan(requestedPlan)')
+    expect(checkout).toContain('trial_period_days: getTrialDaysForPlan(requestedPlan, requestedCadence)')
     expect(pricing).toContain("price: '$39'")
     expect(pricing).toContain("cta: 'Start 7-day free trial'")
-    expect(homepage).toContain('7-day free trial on Starter')
+    expect(homepage).toContain('7-day full Starter trial on monthly billing')
     expect(homepage).not.toContain('$19/month')
-    expect(footer).toContain('Starter is $39/month after a 7-day free trial')
+    expect(footer).toContain('Monthly Starter is $39/month after a 7-day full-access trial')
+    expect(footer).toContain('Annual Starter is billed $372 upfront')
   })
 
   it('keeps the how-it-works anchor valid', () => {
