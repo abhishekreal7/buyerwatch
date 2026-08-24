@@ -9,6 +9,13 @@ export type DodoEnvironment = 'test_mode' | 'live_mode'
 export type BillingPlan = 'starter' | 'pro' | 'growth'
 export type BillingCadence = 'monthly' | 'annual'
 
+/** The Starter trial is set on each checkout session, not inferred by the UI. */
+export const STARTER_TRIAL_DAYS = 7
+
+export function getTrialDaysForPlan(plan: BillingPlan): number | undefined {
+  return plan === 'starter' ? STARTER_TRIAL_DAYS : undefined
+}
+
 export type BillingPlanChangeStrategy = {
   effectiveAt: 'immediately' | 'next_billing_date'
   prorationBillingMode: 'prorated_immediately' | 'do_not_bill'

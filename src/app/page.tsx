@@ -156,7 +156,7 @@ export default function LandingPage() {
             </motion.div>
           </div>
 
-          <p className="text-[13px] text-[#9B9B9B] font-[450]">Free plan available &middot; Paid plans from $19/month &middot; Cancel anytime</p>
+          <p className="text-[13px] text-[#9B9B9B] font-[450]">7-day free trial on Starter &middot; Plans from $39/month &middot; Cancel anytime</p>
         </motion.div>
 
         {/* Platform logos — clean, no box */}
@@ -829,7 +829,11 @@ export default function LandingPage() {
                       </span>
                     </div>
                     <p className={`-mt-2 mb-4 min-h-5 text-[12px] ${isHighlighted ? 'text-white/50' : 'text-[#777]'}`}>
-                      {annualHome ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
+                      {plan.id === 'starter'
+                        ? annualHome
+                          ? `7-day free trial, then ${plan.annualTotal}/year`
+                          : '7-day free trial, then billed monthly'
+                        : annualHome ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
                     </p>
                     <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>
                     {/* CTA */}

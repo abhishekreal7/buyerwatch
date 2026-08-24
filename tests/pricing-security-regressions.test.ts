@@ -15,6 +15,20 @@ describe('public pricing and session security regressions', () => {
     expect(`${homepage}\n${pricing}`).toContain('billing=annual')
   })
 
+  it('keeps the public Starter pricing and trial promise aligned with checkout', () => {
+    const checkout = source('src/app/api/billing/checkout/route.ts')
+    const pricing = source('src/lib/pricing-plans.ts')
+    const homepage = source('src/app/page.tsx')
+    const footer = source('src/components/landing/LandingFooter.tsx')
+
+    expect(checkout).toContain('trial_period_days: getTrialDaysForPlan(requestedPlan)')
+    expect(pricing).toContain("price: '$39'")
+    expect(pricing).toContain("cta: 'Start 7-day free trial'")
+    expect(homepage).toContain('7-day free trial on Starter')
+    expect(homepage).not.toContain('$19/month')
+    expect(footer).toContain('Starter is $39/month after a 7-day free trial')
+  })
+
   it('keeps the how-it-works anchor valid', () => {
     const homepage = source('src/app/page.tsx')
     expect(homepage).toContain('href="#how-it-works"')
