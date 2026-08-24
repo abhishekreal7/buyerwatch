@@ -12,6 +12,7 @@ import {
   getDodoBillingSelectionFromProductId,
   getDodoEnvironment,
   getDodoProductIdForPlan,
+  getTrialDaysForPlan,
   parseBillingCheckoutIntent,
 } from '@/lib/dodo'
 
@@ -206,12 +207,18 @@ export async function POST(req: Request) {
       customer: {
         email: user.email,
       },
+      // Dodo applies this to the subscription itself, overriding any product
+      // default. This keeps the seven-day Starter promise tied to checkout.
+      subscription_data: {
+        trial_period_days: getTrialDaysForPlan(requestedPlan) ?? null,
+      },
       // metadata is returned verbatim in every webhook event —
       // the webhook handler reads metadata.user_id and metadata.plan
       metadata: {
         user_id: user.id,
         plan: requestedPlan,
         billing_cadence: requestedCadence,
+        trial_days: String(getTrialDaysForPlan(requestedPlan) ?? 0),
       },
       return_url: `${getAppUrl()}/dashboard`,
     }, { idempotencyKey })
