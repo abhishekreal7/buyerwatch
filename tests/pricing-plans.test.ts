@@ -22,14 +22,15 @@ describe('pricing plan promises', () => {
     expect(growth?.features).not.toContain('15-minute polling cadence')
   })
 
-  it('offers the seven-day trial only on Starter', () => {
+  it('offers the seven-day trial only on monthly Starter', () => {
     const starter = PRICING_PLANS.find(plan => plan.id === 'starter')
 
     expect(starter?.price).toBe('$39')
     expect(starter?.cta).toBe('Start 7-day free trial')
-    expect(starter?.features).toContain('7-day free trial')
+    expect(starter?.features).not.toContain('7-day free trial')
     expect(STARTER_TRIAL_DAYS).toBe(7)
-    expect(getTrialDaysForPlan('starter')).toBe(7)
+    expect(getTrialDaysForPlan('starter', 'monthly')).toBe(7)
+    expect(getTrialDaysForPlan('starter', 'annual')).toBeUndefined()
     expect(getTrialDaysForPlan('pro')).toBeUndefined()
     expect(getTrialDaysForPlan('growth')).toBeUndefined()
   })

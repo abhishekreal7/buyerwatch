@@ -208,9 +208,10 @@ export async function POST(req: Request) {
         email: user.email,
       },
       // Dodo applies this to the subscription itself, overriding any product
-      // default. This keeps the seven-day Starter promise tied to checkout.
+      // default. Only monthly Starter uses the acquisition trial; annual
+      // subscriptions are paid upfront.
       subscription_data: {
-        trial_period_days: getTrialDaysForPlan(requestedPlan) ?? null,
+        trial_period_days: getTrialDaysForPlan(requestedPlan, requestedCadence) ?? null,
       },
       // metadata is returned verbatim in every webhook event —
       // the webhook handler reads metadata.user_id and metadata.plan
@@ -218,7 +219,7 @@ export async function POST(req: Request) {
         user_id: user.id,
         plan: requestedPlan,
         billing_cadence: requestedCadence,
-        trial_days: String(getTrialDaysForPlan(requestedPlan) ?? 0),
+        trial_days: String(getTrialDaysForPlan(requestedPlan, requestedCadence) ?? 0),
       },
       return_url: `${getAppUrl()}/dashboard`,
     }, { idempotencyKey })
