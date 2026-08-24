@@ -1,0 +1,9 @@
+name = "buyerwatch-rss-shadow"
+main = "rss-shadow-monitor.mjs"
+compatibility_date = "2026-08-24"
+
+# Deliberately slower than BuyerWatch's paid monitoring cadence. This is a
+# shadow-only proof run, so it should validate RSS without imposing aggressive
+# traffic on Reddit or affecting a customer's promised polling interval.
+[triggers]
+crons = ["*/15 * * * *"]
