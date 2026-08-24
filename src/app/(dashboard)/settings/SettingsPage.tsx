@@ -7,12 +7,12 @@ import {
   Globe, AtSign, Shield,
   Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info
 } from 'lucide-react'
-import { RedditIcon, BlueskyIcon } from '@/components/Icons'
+import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { AppPage } from '@/components/AppPage'
 import { toast } from 'sonner'
-import { PLAN_LIMITS, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { PLAN_LIMITS, canMonitorPlatform, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
 import { useDashboardSession } from '@/components/DashboardContext'
 import {
   STYLE_GUARDRAILS,
@@ -141,12 +141,12 @@ export type SettingsInitialData = {
   slack: { configured: boolean; threshold: number }
   webhookSecret: string
   connections: {
-    reddit: boolean; bluesky: boolean; redditUsername: string
+    reddit: boolean; bluesky: boolean; x: boolean; xUsername: string; redditUsername: string
     redditStatus: 'active' | 'reauth_required' | 'error' | 'missing'
     redditProvider: 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | 'hyperbrowser' | null
   }
   deliveryCapabilities: {
-    redditDirectPosting: boolean; redditScheduledDiscovery: boolean; blueskyDirectPosting: boolean
+    redditDirectPosting: boolean; redditScheduledDiscovery: boolean; blueskyDirectPosting: boolean; xDiscovery: boolean; xDirectPosting: boolean
     redditConnectionProvider: 'sprinklr' | 'hyperbrowser' | 'redditapis' | null; redditBrowserConnection: boolean
   }
   usageStats: { threads: number; drafts: number; replies: number; keywords: number }
@@ -206,6 +206,8 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
   const [connections, setConnections] = useState(initialData?.connections ?? {
     reddit: false,
     bluesky: false,
+    x: false,
+    xUsername: '',
     redditUsername: '',
     redditStatus: 'missing' as 'active' | 'reauth_required' | 'error' | 'missing',
     redditProvider: null as 'redditapis' | 'sprinklr' | 'browser_relay' | 'mcp_agent' | 'hyperbrowser' | null,
@@ -214,6 +216,8 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
     redditDirectPosting: false,
     redditScheduledDiscovery: false,
     blueskyDirectPosting: true,
+    xDiscovery: false,
+    xDirectPosting: false,
     redditConnectionProvider: null as 'sprinklr' | 'hyperbrowser' | 'redditapis' | null,
     redditBrowserConnection: false,
   })
@@ -294,6 +298,8 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                 redditDirectPosting: boolean
                 redditScheduledDiscovery: boolean
                 blueskyDirectPosting: boolean
+                xDiscovery: boolean
+                xDirectPosting: boolean
                 redditConnectionProvider: 'sprinklr' | 'hyperbrowser' | 'redditapis' | null
                 redditBrowserConnection: boolean
               }
@@ -389,6 +395,8 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
         setConnections({
           reddit: redditConn?.status === 'active',
           bluesky: conns.some(c => c.platform === 'bluesky'),
+          x: conns.some(c => c.platform === 'x'),
+          xUsername: conns.find(c => c.platform === 'x')?.external_username || '',
           redditUsername: redditConn?.external_username || '',
           redditStatus: redditConn?.status ?? 'missing',
           redditProvider: redditConn?.provider ?? null,
@@ -567,6 +575,11 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
     upgradeHandledRef.current = true
     window.history.replaceState({}, '', '/settings?section=plan')
     void handleUpgrade(requestedPlan, requestedBilling)
+  }, [])
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get('x')
+    if (result === 'connected') toast.success('X connected. BuyerWatch can now post only when you approve or enable guarded auto-send.')
+    if (result && result !== 'connected') toast.error(result === 'plan_required' ? 'X is available on Professional and Growth.' : 'X connection did not complete. Please try again.')
   }, [])
 
   const handleConnectReddit = async () => {
@@ -760,7 +773,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
     }
   }
 
-  const handleDisconnect = async (platform: 'reddit' | 'bluesky') => {
+  const handleDisconnect = async (platform: 'reddit' | 'bluesky' | 'x') => {
     try {
       const response = await fetch('/api/settings/connections', {
         method: 'DELETE',
@@ -771,7 +784,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
       clearSupabaseReadCache()
       setConnections(p => platform === 'reddit'
         ? { ...p, reddit: false, redditUsername: '', redditStatus: 'missing', redditProvider: null }
-        : { ...p, bluesky: false })
+        : platform === 'bluesky' ? { ...p, bluesky: false } : { ...p, x: false, xUsername: '' })
       window.dispatchEvent(new Event('buyerwatch:connections-changed'))
       toast.success(`${platform} disconnected`)
     } catch (error) {
@@ -1215,6 +1228,18 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                         </PlatformRow>
 
                         <PlatformRow
+                          icon={<XIcon className="w-5 h-5 text-[#0F1419]" />}
+                          name="X"
+                          description={connections.x ? `Connected as @${connections.xUsername}` : canMonitorPlatform(planState.plan, 'x') ? 'Connect your X account to post replies from your own account.' : 'Professional or Growth is required for X monitoring and posting.'}
+                          connected={connections.x}
+                          onDisconnect={() => handleDisconnect('x')}
+                        >
+                          {!connections.x && canMonitorPlatform(planState.plan, 'x') && (
+                            <a href="/api/settings/x" className="inline-flex rounded-lg bg-[#0F1419] px-4 py-2 text-[13px] font-semibold text-white hover:bg-black">Connect X securely</a>
+                          )}
+                        </PlatformRow>
+
+                        <PlatformRow
                           icon={<BlueskyIcon className="w-5 h-5 text-[#1185FE]" />}
                           name="Bluesky"
                           description="Post via App Password. Generate one in Bluesky Settings → Privacy → App Passwords."
@@ -1418,6 +1443,10 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                     ) : (
                                       <span className="text-[11px] font-semibold text-gray-500">Connect above</span>
                                     )}
+                                  </label>
+                                  <label className={`flex items-center justify-between rounded-xl border px-3.5 py-3 text-[12.5px] ${connections.x && deliveryCapabilities.xDirectPosting ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'}`}>
+                                    <span className="flex items-center gap-2.5 font-medium text-gray-700"><XIcon className="h-4 w-4 text-[#0F1419]" />X <span className="font-normal text-gray-400">{connections.x && deliveryCapabilities.xDirectPosting ? 'Direct' : 'Connect above'}</span></span>
+                                    <input type="checkbox" disabled={!connections.x || !deliveryCapabilities.xDirectPosting} checked={profile.autoSendPlatforms.includes('x')} onChange={event => setProfile(current => ({ ...current, autoSendPlatforms: event.target.checked ? [...new Set([...current.autoSendPlatforms, 'x'])] : current.autoSendPlatforms.filter(platform => platform !== 'x') }))} className="h-4 w-4 accent-gray-900" />
                                   </label>
                                 </div>
 

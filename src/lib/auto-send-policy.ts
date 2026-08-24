@@ -10,9 +10,9 @@ export type AutoSendPolicySnapshot = {
 
 export function queuedAutoSendBlockReason(
   profile: AutoSendPolicySnapshot,
-  platform: 'reddit' | 'bluesky',
+  platform: 'reddit' | 'bluesky' | 'x',
   sourceTarget: string | undefined,
-  options: { redditDirectPostingEnabled: boolean },
+  options: { redditDirectPostingEnabled: boolean; xDirectPostingEnabled?: boolean },
 ): string | null {
   if (!profile.auto_send_enabled) return 'auto_send_disabled'
   if (!getPlanLimits(profile.plan).autoSend) return 'auto_send_plan_ineligible'
@@ -35,5 +35,6 @@ export function queuedAutoSendBlockReason(
   if (platform === 'reddit' && !options.redditDirectPostingEnabled) {
     return 'reddit_direct_posting_unavailable'
   }
+  if (platform === 'x' && !options.xDirectPostingEnabled) return 'x_direct_posting_unavailable'
   return null
 }

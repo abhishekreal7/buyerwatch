@@ -5,6 +5,7 @@ import { logger } from './logger'
 const POST_LIMITS = {
   reddit: { maxPerHour: 3, minGapSeconds: 300 },
   bluesky: { maxPerHour: 10, minGapSeconds: 60 },
+  x: { maxPerHour: 8, minGapSeconds: 90 },
 } as const
 
 type SupportedPlatform = keyof typeof POST_LIMITS

@@ -17,8 +17,8 @@ alter table public.profiles
     check (auto_send_daily_limit between 1 and 25),
   add constraint profiles_auto_send_platforms_check
     check (
-      auto_send_platforms <@ array['reddit', 'bluesky']::text[]
-      and cardinality(auto_send_platforms) <= 2
+      auto_send_platforms <@ array['reddit', 'bluesky', 'x']::text[]
+      and cardinality(auto_send_platforms) <= 3
     ),
   add constraint profiles_auto_send_communities_check
     check (

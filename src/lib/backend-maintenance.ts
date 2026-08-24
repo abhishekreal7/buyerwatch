@@ -10,7 +10,7 @@ type OutboxPayload = {
   threadExternalId: string
   threadId: string
   text: string
-  platform: 'reddit' | 'bluesky'
+  platform: 'reddit' | 'bluesky' | 'x'
   triggerType: 'manual' | 'auto'
   sourceTarget?: string
 }

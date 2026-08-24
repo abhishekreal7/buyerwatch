@@ -1,29 +1,11 @@
-import { TwitterApi, type TwitterApiTokens } from 'twitter-api-v2'
-import { NormalizedPost } from './types'
+import { fetchWithTimeout, readResponseText } from './http'
+import type { NormalizedPost } from './types'
 import { isDevelopmentMockEnabled } from './env'
 
-const hasCredentials = Boolean(
-  process.env.X_API_KEY
-  && process.env.X_API_SECRET
-  && process.env.X_ACCESS_TOKEN
-  && process.env.X_ACCESS_SECRET,
-)
-
-const credentials: TwitterApiTokens | null = hasCredentials ? {
-  appKey: process.env.X_API_KEY!,
-  appSecret: process.env.X_API_SECRET!,
-  accessToken: process.env.X_ACCESS_TOKEN!,
-  accessSecret: process.env.X_ACCESS_SECRET!,
-} : null
-
-// Instantiate only with a complete credential set. Partial credentials used to
-// create a client that failed later during a paid monitoring run.
-const client = credentials ? new TwitterApi(credentials) : null
-
-/** True only when X can really be offered to a paying customer. */
+/** Discovery is app-only and never grants posting rights. */
 export function isXDiscoveryConfigured(): boolean {
   return process.env.ENABLE_X_DISCOVERY === 'true'
-    && (isDevelopmentMockEnabled('USE_MOCK_X') || hasCredentials)
+    && (isDevelopmentMockEnabled('USE_MOCK_X') || Boolean(process.env.X_BEARER_TOKEN))
 }
 
 export async function fetchXPosts(query: string): Promise<NormalizedPost[]> {
@@ -41,31 +23,23 @@ export async function fetchXPosts(query: string): Promise<NormalizedPost[]> {
     ]
   }
 
-  if (!client) {
-    throw new Error('X API keys missing in environment')
-  }
-
-  const results = await client.get<{
-    data?: Array<{
-      id: string
-      author_id?: string
-      text: string
-      created_at?: string
-    }>
-  }>(
-    'https://api.x.com/2/tweets/search/recent',
-    {
-      query,
-      max_results: 25,
-      'tweet.fields': 'created_at,author_id,text',
-    },
-    { timeout: 15_000 },
-  )
-
+  const bearer = process.env.X_BEARER_TOKEN
+  if (!bearer) throw new Error('x_discovery_not_configured')
+  const params = new URLSearchParams({
+    query, max_results: '25', 'tweet.fields': 'created_at,author_id,text', expansions: 'author_id', 'user.fields': 'username',
+  })
+  const response = await fetchWithTimeout(`https://api.x.com/2/tweets/search/recent?${params}`, {
+    headers: { Authorization: `Bearer ${bearer}`, Accept: 'application/json' },
+  }, 15_000)
+  const raw = await readResponseText(response, 512_000)
+  let results: { data?: Array<{ id: string; author_id?: string; text: string; created_at?: string }>; includes?: { users?: Array<{ id: string; username?: string }> }; errors?: Array<{ detail?: string }> }
+  try { results = JSON.parse(raw) } catch { throw new Error('x_search_invalid_response') }
+  if (!response.ok) throw new Error(`x_search_${response.status}:${results.errors?.[0]?.detail || 'request_failed'}`)
+  const usernames = new Map((results.includes?.users ?? []).map(user => [user.id, user.username || user.id]))
   return (results.data || []).map(tweet => ({
     platform: 'x' as const,
     externalId: tweet.id,
-    author: tweet.author_id ?? 'unknown',
+    author: usernames.get(tweet.author_id || '') || tweet.author_id || 'unknown',
     text: tweet.text,
     url: `https://x.com/i/status/${tweet.id}`,
     createdAt: tweet.created_at ?? new Date().toISOString(),

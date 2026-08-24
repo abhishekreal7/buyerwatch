@@ -6,6 +6,7 @@ import {
   PlatformPostError,
 } from './reddit-post'
 import { postBlueskyReply } from './bluesky-post'
+import { isXPostingConfigured, postXReply } from './x-post'
 import {
   recordSuccessfulSend,
   releaseSendSlot,
@@ -33,7 +34,7 @@ export type SendReplyData = {
   threadExternalId: string
   threadId: string
   text: string
-  platform: 'reddit' | 'bluesky'
+  platform: 'reddit' | 'bluesky' | 'x'
   triggerType: 'manual' | 'auto'
   sourceTarget?: string
 }
@@ -104,7 +105,7 @@ export async function processSendReply(
       automationProfile,
       platform,
       data.sourceTarget,
-      { redditDirectPostingEnabled: isRedditDirectPostingConfigured() },
+      { redditDirectPostingEnabled: isRedditDirectPostingConfigured(), xDirectPostingEnabled: isXPostingConfigured() },
     )
     if (policyBlock) {
       await cancelQueuedAutoSend(supabase, threadId, policyBlock)
@@ -328,7 +329,9 @@ export async function processSendReply(
           text,
           triggerType,
         })
-      : await postBlueskyReply(userId, threadExternalId, text)
+      : platform === 'bluesky'
+        ? await postBlueskyReply(userId, threadExternalId, text)
+        : await postXReply(userId, threadExternalId, text)
     externalSendSucceeded = true
     externalPermalink = result.permalink
 

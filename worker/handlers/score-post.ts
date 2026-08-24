@@ -25,6 +25,7 @@ import { dispatchPendingOutbox } from '../../src/lib/backend-maintenance'
 import { checkGoogleRankQueue, notifySlackQueue } from '../../src/lib/queues'
 import { recordAutomationDecision, recordEngagementEvent } from '../../src/lib/automation-audit'
 import { getPlatformCapabilities } from '../../src/lib/platform-capabilities'
+import { isXPostingConfigured } from '../../src/lib/x-post'
 import { withScoreLock } from '../../src/lib/score-lock'
 import {
   evaluateRedditReplyPolicy,
@@ -498,6 +499,7 @@ export async function processScorePost(
     )
     const capabilities = getPlatformCapabilities(post.platform, {
       redditDirectPosting: hasRedditPostingProvider(),
+      xDirectPosting: isXPostingConfigured(),
     })
     const platformConnected = post.platform === 'reddit'
       ? Boolean((await supabase
@@ -506,7 +508,7 @@ export async function processScorePost(
           .eq('user_id', userId)
           .eq('status', 'active')
           .maybeSingle()).data)
-      : post.platform === 'bluesky'
+      : post.platform === 'bluesky' || post.platform === 'x'
         ? Boolean((await supabase
             .from('platform_connections')
             .select('id')
@@ -556,14 +558,14 @@ export async function processScorePost(
     if (
       evaluation.approved
       && capabilities.delivery === 'direct'
-      && ['reddit', 'bluesky'].includes(post.platform)
+      && ['reddit', 'bluesky', 'x'].includes(post.platform)
     ) {
       // All gates cleared — save and enqueue for auto-send
       const autoSendPayload = {
         userId,
         threadExternalId: post.externalId,
         text: draftText,
-        platform: post.platform as 'reddit' | 'bluesky',
+        platform: post.platform as 'reddit' | 'bluesky' | 'x',
         triggerType: 'auto' as const,
         sourceTarget: post.sourceTarget || undefined,
       }
@@ -915,7 +917,7 @@ async function saveThread(input: {
     userId: string
     threadExternalId: string
     text: string
-    platform: 'reddit' | 'bluesky'
+    platform: 'reddit' | 'bluesky' | 'x'
     triggerType: 'auto'
     sourceTarget?: string
   }

@@ -17,6 +17,7 @@ import { useDashboardSession } from '@/components/DashboardContext'
 import { fetchAllPages } from '@/lib/supabase-pagination'
 import { normalizeHighIntentThreshold } from '@/lib/high-intent-threshold'
 import { DataLoadError } from '@/components/DataLoadError'
+import { canMonitorPlatform } from '@/lib/plan-limits'
 
 type DeliveryActivity = {
   threadId: string
@@ -184,7 +185,7 @@ export default function AnalyticsPage() {
         deliveryActivityRes,
         replyOutcomesRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
+        supabase.from('profiles').select('plan, auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
         fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).not('intent_score', 'is', null).range(from, to)),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).not('sent_at', 'is', null),
@@ -215,6 +216,7 @@ export default function AnalyticsPage() {
       const conns = connsRes.data || []
       const profile = profileRes.data
       const highIntentThreshold = normalizeHighIntentThreshold(profile?.high_intent_threshold)
+      const xAllowed = canMonitorPlatform(profile?.plan, 'x')
 
       // --- STATS ---
       const found = threads.length
@@ -319,13 +321,13 @@ export default function AnalyticsPage() {
       threads.forEach(t => {
         if (t.status === 'dismissed') return
         const platform = normalizePlatform(t.platform)
-        if (platform in platformCounts) platformCounts[platform] += 1
+        if (platform in platformCounts && (platform !== 'x' || xAllowed)) platformCounts[platform] += 1
       })
       const totalPlatforms = Object.values(platformCounts).reduce((sum, count) => sum + count, 0)
       const primaryPlatform = Object.entries(platformCounts)
         .sort(([, left], [, right]) => right - left)[0]?.[0]
       const platformData = (Object.keys(platformCounts) as Array<keyof typeof platformCounts>)
-        .filter(platform => platformCounts[platform] > 0 || platform !== 'x')
+        .filter(platform => platform !== 'x' || xAllowed)
         .map(platform => ({
           platform: PLATFORM_LABELS[platform],
           count: platformCounts[platform],

@@ -9,6 +9,8 @@ import {
   hasRedditPostingProvider,
 } from '@/lib/env'
 import { getRedditConnectionSummary } from '@/lib/reddit-session'
+import { isXDiscoveryConfigured } from '@/lib/x'
+import { isXPostingConfigured } from '@/lib/x-post'
 
 export async function GET() {
   const supabase = await createClient()
@@ -45,6 +47,8 @@ export async function GET() {
       redditScheduledDiscovery: hasRedditDiscoveryProvider(),
       redditConnectionProvider: getRedditPostingProviderKind(),
       redditBrowserConnection: true,
+      xDiscovery: isXDiscoveryConfigured(),
+      xDirectPosting: isXPostingConfigured(),
     },
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
@@ -60,7 +64,7 @@ export async function DELETE(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { platform } = await readJsonBody<Record<string, unknown>>(request, 1_024)
-    if (platform !== 'reddit' && platform !== 'bluesky') {
+    if (platform !== 'reddit' && platform !== 'bluesky' && platform !== 'x') {
       return NextResponse.json({ error: 'invalid_platform' }, { status: 400 })
     }
     const rate = await settingsRateLimit.limit(`connection-delete:${user.id}:${await getIp()}`)

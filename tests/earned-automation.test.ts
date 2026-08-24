@@ -25,7 +25,10 @@ describe('earned automation safety contracts', () => {
       identity: 'customer_account',
       compliance: 'approved',
     })
-    expect(getPlatformCapabilities('x').delivery).toBe('unsupported')
+    expect(getPlatformCapabilities('x').delivery).toBe('manual')
+    expect(getPlatformCapabilities('x', { xDirectPosting: true })).toMatchObject({
+      delivery: 'direct', identity: 'customer_account', compliance: 'approved',
+    })
     expect(getPlatformCapabilities('threads').delivery).toBe('unsupported')
   })
 
