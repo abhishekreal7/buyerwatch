@@ -20,6 +20,7 @@ import {
   getSubredditCommunityPolicy,
 } from '@/lib/reddit-community-policy'
 import { hasActiveRedditConnection } from '@/lib/reddit-session'
+import { canMonitorPlatform } from '@/lib/plan-limits'
 
 function safeRedditUrl(value: string | null): string | null {
   if (!value) return null
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
       .single()
 
     if (!thread) return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
-    if (thread.platform !== 'reddit' && thread.platform !== 'bluesky') {
+    if (thread.platform !== 'reddit' && thread.platform !== 'bluesky' && thread.platform !== 'x') {
       return NextResponse.json({ error: 'Unsupported platform' }, { status: 400 })
     }
     if (!['drafted', 'needs_manual_reply'].includes(thread.status)) {
@@ -77,11 +78,14 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('business_name, business_url')
+      .select('business_name, business_url, plan')
       .eq('id', user.id)
       .single()
     if (!profile?.business_name) {
       return NextResponse.json({ error: 'Profile is incomplete' }, { status: 409 })
+    }
+    if (!canMonitorPlatform(profile.plan, thread.platform)) {
+      return NextResponse.json({ error: 'platform_requires_professional_plan' }, { status: 403 })
     }
 
     const quality = evaluateReplyQuality(text, {

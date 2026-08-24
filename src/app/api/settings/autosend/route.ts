@@ -2,12 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPlanLimits } from '@/lib/plan-limits'
+import { canMonitorPlatform, getPlanLimits } from '@/lib/plan-limits'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
 import { hasActiveRedditConnection } from '@/lib/reddit-session'
 import { getRedditDeliveryControl } from '@/lib/reddit-service-safety'
+import { isXPostingConfigured } from '@/lib/x-post'
 
 export async function PATCH(req: Request) {
   try {
@@ -65,9 +66,9 @@ export async function PATCH(req: Request) {
         || dailyLimit > 25
       ))
       || (platforms !== undefined && (
-        platforms.length > 2
+        platforms.length > 3
         || new Set(platforms).size !== platforms.length
-        || platforms.some(platform => !['reddit', 'bluesky'].includes(platform))
+        || platforms.some(platform => !['reddit', 'bluesky', 'x'].includes(platform))
       ))
       || (communities !== undefined && (
         communities.length > 50
@@ -90,6 +91,9 @@ export async function PATCH(req: Request) {
     const isActivating = enabled && profile.auto_send_enabled !== true
     if (enabled && !getPlanLimits(profile.plan).autoSend) {
       return NextResponse.json({ error: 'auto_send_requires_paid_plan' }, { status: 403 })
+    }
+    if (platforms?.some(platform => !canMonitorPlatform(profile.plan, platform))) {
+      return NextResponse.json({ error: 'platform_requires_professional_plan' }, { status: 403 })
     }
     if (isActivating) {
       const { data: trust } = await supabase
@@ -143,6 +147,7 @@ export async function PATCH(req: Request) {
         !connected.has(platform)
         || (platform === 'reddit' && !redditConnectionActive)
         || (platform === 'reddit' && !isRedditDirectPostingConfigured())
+        || (platform === 'x' && !isXPostingConfigured())
       ))
       if (unavailable.length > 0) {
         return NextResponse.json({

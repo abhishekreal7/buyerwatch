@@ -19,6 +19,7 @@ export function getPlatformCapabilities(
   options: {
     redditDirectPosting?: boolean
     redditProvider?: 'sprinklr' | 'hyperbrowser' | 'redditapis' | null
+    xDirectPosting?: boolean
   } = {},
 ): PlatformCapabilities {
   if (platform === 'reddit') {
@@ -49,6 +50,13 @@ export function getPlatformCapabilities(
       canConfirmPermalink: true,
     }
   }
+  if (platform === 'x') {
+    return {
+      discovery: 'public_api', delivery: options.xDirectPosting ? 'direct' : 'manual', identity: 'customer_account',
+      proof: options.xDirectPosting ? 'provider_permalink' : 'manual_confirmation', compliance: options.xDirectPosting ? 'approved' : 'restricted',
+      freshness: 'scheduled_poll', requiresUserSubmit: !options.xDirectPosting, canConfirmPermalink: true,
+    }
+  }
   return {
     discovery: 'unsupported',
     delivery: 'unsupported',
@@ -66,6 +74,7 @@ export function isDirectAutomationAvailable(
   options: {
     redditDirectPosting?: boolean
     redditProvider?: 'sprinklr' | 'hyperbrowser' | 'redditapis' | null
+    xDirectPosting?: boolean
   } = {},
 ): boolean {
   return getPlatformCapabilities(platform, options).delivery === 'direct'

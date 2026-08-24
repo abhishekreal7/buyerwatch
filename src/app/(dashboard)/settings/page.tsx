@@ -17,6 +17,8 @@ import {
   hasRedditPostingProvider,
 } from '@/lib/env'
 import { getRedditConnectionSummary } from '@/lib/reddit-session'
+import { isXDiscoveryConfigured } from '@/lib/x'
+import { isXPostingConfigured } from '@/lib/x-post'
 import SettingsPage, { type SettingsInitialData } from './SettingsPage'
 
 export default async function SettingsServerPage() {
@@ -75,6 +77,8 @@ export default async function SettingsServerPage() {
   const connections: SettingsInitialData['connections'] = {
     reddit: redditSummary.status === 'active',
     bluesky: rawConns.some(c => c.platform === 'bluesky'),
+    x: rawConns.some(c => c.platform === 'x'),
+    xUsername: rawConns.find(c => c.platform === 'x')?.external_username || '',
     redditUsername: redditConn?.external_username || '',
     redditStatus: redditSummary.status ?? 'missing',
     redditProvider: redditSummary.provider ?? null,
@@ -116,6 +120,8 @@ export default async function SettingsServerPage() {
     connections,
     deliveryCapabilities: {
       blueskyDirectPosting: true,
+      xDiscovery: isXDiscoveryConfigured(),
+      xDirectPosting: isXPostingConfigured(),
       redditDirectPosting: hasRedditPostingProvider(),
       redditScheduledDiscovery: hasRedditDiscoveryProvider(),
       redditConnectionProvider: getRedditPostingProviderKind(),
