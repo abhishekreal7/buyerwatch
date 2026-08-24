@@ -27,7 +27,6 @@ export const PRICING_PLANS = [
     period: '/month',
     description: 'Start monitoring real buying signals with enough coverage to prove the workflow.',
     features: [
-      '7-day free trial',
       ...featuresFor('starter'),
       'Manual review and send workflow',
     ],
