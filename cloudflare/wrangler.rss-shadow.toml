@@ -5,8 +5,8 @@ compatibility_date = "2026-08-24"
 [vars]
 BUYERWATCH_APP_URL = "https://www.buyerwatch.co"
 
-# Deliberately slower than BuyerWatch's paid monitoring cadence. This is a
-# shadow-only proof run, so it should validate RSS without imposing aggressive
-# traffic on Reddit or affecting a customer's promised polling interval.
+# Cloudflare is the production monitoring clock. Per-plan polling remains
+# enforced inside BuyerWatch, so this 5-minute tick never grants a customer a
+# faster cadence than their plan allows.
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/5 * * * *"]

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   hasCloudflareRssShadowConfiguration,
+  hasCloudflareMonitoringConfiguration,
   isAuthorizedCloudflareRssShadowRequest,
+  isAuthorizedCloudflareMonitoringRequest,
   normalizeRssShadowTarget,
   parseRssShadowRunPayload,
 } from '../src/lib/cloudflare-rss-shadow'
@@ -38,7 +40,9 @@ describe('Cloudflare RSS shadow monitor contract', () => {
   it('requires a long, constant-time compared shared secret', () => {
     vi.stubEnv('CLOUDFLARE_RSS_SHADOW_SECRET', 's'.repeat(32))
     expect(hasCloudflareRssShadowConfiguration()).toBe(true)
+    expect(hasCloudflareMonitoringConfiguration()).toBe(true)
     expect(isAuthorizedCloudflareRssShadowRequest(`Bearer ${'s'.repeat(32)}`)).toBe(true)
+    expect(isAuthorizedCloudflareMonitoringRequest(`Bearer ${'s'.repeat(32)}`)).toBe(true)
     expect(isAuthorizedCloudflareRssShadowRequest('Bearer wrong')).toBe(false)
 
     vi.stubEnv('CLOUDFLARE_RSS_SHADOW_SECRET', 'short')
@@ -72,18 +76,19 @@ describe('Cloudflare RSS shadow monitor contract', () => {
     expect(parseRssShadowRunPayload(errorWithPosts)).toBeNull()
   })
 
-  it('keeps the Cloudflare worker telemetry-only and slower than paid monitoring', async () => {
-    const [worker, config, resultsRoute] = await Promise.all([
+  it('uses Cloudflare as the production clock while preserving server-side plan gating', async () => {
+    const [worker, config, enqueueRoute] = await Promise.all([
       import('node:fs/promises').then(fs => fs.readFile('cloudflare/rss-shadow-monitor.mjs', 'utf8')),
       import('node:fs/promises').then(fs => fs.readFile('cloudflare/wrangler.rss-shadow.toml', 'utf8')),
-      import('node:fs/promises').then(fs => fs.readFile('src/app/api/internal/rss-shadow/results/route.ts', 'utf8')),
+      import('node:fs/promises').then(fs => fs.readFile('src/app/api/cron/enqueue/route.ts', 'utf8')),
     ])
 
-    expect(config).toContain('*/15 * * * *')
-    expect(worker).toContain('/api/internal/rss-shadow/targets')
-    expect(worker).toContain('/api/internal/rss-shadow/results')
+    expect(config).toContain('*/5 * * * *')
+    expect(worker).toContain('/api/cron/enqueue')
+    expect(worker).toContain('BUYERWATCH_RSS_SHADOW_SECRET')
+    expect(worker).not.toContain('reddit.com')
     expect(worker).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
-    expect(resultsRoute).not.toContain('processScorePost')
-    expect(resultsRoute).not.toContain('dispatchPendingOutbox')
+    expect(enqueueRoute).toContain('isAuthorizedCloudflareMonitoringRequest')
+    expect(enqueueRoute).toContain('runServerlessMonitoring')
   })
 })
