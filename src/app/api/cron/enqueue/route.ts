@@ -8,6 +8,10 @@ import {
 } from '@/lib/qstash'
 import { isUuid, readTextBody, RequestInputError } from '@/lib/request'
 import { isAuthorizedCronRequest } from '@/lib/security/cron-auth'
+import {
+  hasCloudflareMonitoringConfiguration,
+  isAuthorizedCloudflareMonitoringRequest,
+} from '@/lib/cloudflare-rss-shadow'
 import { runServerlessMonitoring } from '@/lib/serverless-monitor'
 import { runRedditDeliveryCanary } from '@/lib/reddit-delivery-canary'
 import { deliverPendingIncidentEmails } from '@/lib/incident-email'
@@ -87,10 +91,15 @@ async function executeMonitor(
 }
 
 export async function POST(request: Request) {
-  if (!hasQStashConfiguration()) {
+  const authorization = request.headers.get('authorization')
+  const isCloudflareScheduler = hasCloudflareMonitoringConfiguration()
+    && isAuthorizedCloudflareMonitoringRequest(authorization)
+  const isQStashScheduler = hasQStashConfiguration()
+
+  if (!isCloudflareScheduler && !isQStashScheduler) {
     logger.error('QStash signing keys are not configured')
     return NextResponse.json(
-      { error: 'qstash_not_configured' },
+      { error: 'monitor_scheduler_not_configured' },
       { status: 503 },
     )
   }
@@ -110,12 +119,12 @@ export async function POST(request: Request) {
     }
     throw error
   }
-  if (!await verifyQStashRequest(request, body)) {
+  if (!isCloudflareScheduler && !await verifyQStashRequest(request, body)) {
     logger.warn('Rejected invalid QStash monitor request')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (!body.trim()) {
+  if (!body.trim() && !isCloudflareScheduler) {
     await withTimeout(
       ensureMonitoringSchedule(),
       5_000,

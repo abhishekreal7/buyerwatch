@@ -54,12 +54,27 @@ export function hasCloudflareRssShadowConfiguration(): boolean {
   return (process.env.CLOUDFLARE_RSS_SHADOW_SECRET?.trim().length ?? 0) >= 32
 }
 
+/**
+ * The same private Worker credential authorizes the production monitoring
+ * scheduler. It is deliberately server-to-server only; no browser or customer
+ * request can use it to run the monitor.
+ */
+export function hasCloudflareMonitoringConfiguration(): boolean {
+  return hasCloudflareRssShadowConfiguration()
+}
+
 export function isAuthorizedCloudflareRssShadowRequest(
   authorization: string | null,
 ): boolean {
   const secret = process.env.CLOUDFLARE_RSS_SHADOW_SECRET?.trim()
   const token = authorization?.replace(/^Bearer\s+/i, '').trim()
   return Boolean(secret && secret.length >= 32 && token && safeEqual(token, secret))
+}
+
+export function isAuthorizedCloudflareMonitoringRequest(
+  authorization: string | null,
+): boolean {
+  return isAuthorizedCloudflareRssShadowRequest(authorization)
 }
 
 export function normalizeRssShadowTarget(value: unknown): string | null {
