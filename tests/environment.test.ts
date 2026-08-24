@@ -227,6 +227,15 @@ describe('production capability configuration', () => {
     expect(() => validateAppEnvironment()).toThrow(/REDDITAPIS_DISCOVERY_ENABLED must be true or false/)
   })
 
+  it('rejects an unsafe Cloudflare RSS shadow secret', () => {
+    stubProductionCore()
+    vi.stubEnv('CLOUDFLARE_RSS_SHADOW_SECRET', 'too-short')
+
+    expect(() => validateAppEnvironment()).toThrow(
+      /CLOUDFLARE_RSS_SHADOW_SECRET must be at least 32 characters/,
+    )
+  })
+
   it('never treats a discovery proxy key as customer-authorized Reddit posting', () => {
     stubProductionCore()
     vi.stubEnv('REDDITAPIS_API_KEY', 'proxy-key')
