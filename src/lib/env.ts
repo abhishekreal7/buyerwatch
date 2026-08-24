@@ -286,10 +286,19 @@ function assertOptionalBoolean(name: string): void {
   }
 }
 
+function assertOptionalSecret(name: string, minimumLength = 32): void {
+  const raw = process.env[name]?.trim()
+  if (raw && raw.length < minimumLength) {
+    throw new Error(`${name} must be at least ${minimumLength} characters`)
+  }
+}
+
 export function validateAppEnvironment(): void {
   if (process.env.NODE_ENV !== 'production') return
   assertValues(CORE_PRODUCTION_ENV, 'BuyerWatch app')
   validateOptionalProviders()
+  assertOptionalSecret('CLOUDFLARE_RSS_SHADOW_SECRET')
+  assertOptionalInteger('CLOUDFLARE_RSS_SHADOW_MAX_TARGETS', 1, 100)
   if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
     throw new Error('BuyerWatch app requires ANTHROPIC_API_KEY')
   }
@@ -311,6 +320,8 @@ export function validateWorkerEnvironment(): void {
   if (process.env.NODE_ENV !== 'production') return
   assertValues(WORKER_PRODUCTION_ENV, 'BuyerWatch worker')
   validateOptionalProviders()
+  assertOptionalSecret('CLOUDFLARE_RSS_SHADOW_SECRET')
+  assertOptionalInteger('CLOUDFLARE_RSS_SHADOW_MAX_TARGETS', 1, 100)
   if (!getConfiguredSecret(process.env.ANTHROPIC_API_KEY)) {
     throw new Error('BuyerWatch worker requires ANTHROPIC_API_KEY')
   }
