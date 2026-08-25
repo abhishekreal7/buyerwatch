@@ -8,7 +8,7 @@ import { getBillingPlanChangeStrategy, hasPendingDodoScheduledChange } from '../
 
 describe('tier entitlement contract', () => {
   it.each([
-    ['starter', 5, 2, 250, 30, false],
+    ['starter', 5, 2, 250, 30, true],
     ['pro', 10, 3, 1000, 200, true],
     ['growth', 50, 6, 5000, 750, true],
   ] as const)('enforces the promised %s capacity', (plan, rules, targets, signals, drafts, autoSend) => {

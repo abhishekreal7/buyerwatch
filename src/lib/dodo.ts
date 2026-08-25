@@ -3,6 +3,7 @@ import {
   type BillingAddonPackId,
   type BillingAddonType,
 } from './billing-addons'
+import { appliesStarterPromotion } from './starter-promotion'
 
 export type DodoEnvironment = 'test_mode' | 'live_mode'
 
@@ -15,7 +16,9 @@ export const STARTER_TRIAL_DAYS = 7
 export function getTrialDaysForPlan(
   plan: BillingPlan,
   cadence: BillingCadence = 'monthly',
+  now: Date = new Date(),
 ): number | undefined {
+  if (appliesStarterPromotion(plan, cadence, now)) return undefined
   return plan === 'starter' && cadence === 'monthly' ? STARTER_TRIAL_DAYS : undefined
 }
 

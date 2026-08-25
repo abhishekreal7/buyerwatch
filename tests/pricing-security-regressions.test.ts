@@ -15,18 +15,20 @@ describe('public pricing and session security regressions', () => {
     expect(`${homepage}\n${pricing}`).toContain('billing=annual')
   })
 
-  it('keeps the public Starter pricing and trial promise aligned with checkout', () => {
+  it('keeps the public Starter introductory price aligned with checkout', () => {
     const checkout = source('src/app/api/billing/checkout/route.ts')
     const pricing = source('src/lib/pricing-plans.ts')
     const homepage = source('src/app/page.tsx')
     const footer = source('src/components/landing/LandingFooter.tsx')
 
     expect(checkout).toContain('trial_period_days: getTrialDaysForPlan(requestedPlan, requestedCadence)')
+    expect(checkout).toContain('discount_code: starterPromotionCode ?? null')
     expect(pricing).toContain("price: '$39'")
-    expect(pricing).toContain("cta: 'Start 7-day free trial'")
-    expect(homepage).toContain('7-day full Starter trial on monthly billing')
-    expect(homepage).not.toContain('$19/month')
-    expect(footer).toContain('Monthly Starter is $39/month after a 7-day full-access trial')
+    expect(pricing).toContain("cta: 'Start for $19'")
+    expect(homepage).toContain('Limited-time offer')
+    expect(homepage).toContain('Starter is $19 for the first month, then $39/month')
+    expect(homepage).not.toMatch(/launch offer/i)
+    expect(footer).toContain('For a limited time, Monthly Starter is $19 for the first month, then $39/month')
     expect(footer).toContain('Annual Starter is billed $372 upfront')
   })
 

@@ -40,6 +40,7 @@ import {
 import { PremiumCtaButton } from '@/components/landing/PremiumCtaButton'
 import { Reveal } from '@/components/Reveal'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
+import { isStarterPromotionActive, STARTER_PROMOTION } from '@/lib/starter-promotion'
 // ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
 const fadeUp = {
   hidden: { opacity: 1, y: 14 },
@@ -76,6 +77,7 @@ function Section({ children, className = '', delay = 0, id }: { children: React.
 export default function LandingPage() {
   const [activeAccordion, setActiveAccordion] = useState(0)
   const [annualHome, setAnnualHome] = useState(false)
+  const starterPromotionActive = isStarterPromotionActive()
 
   // Navbar scroll animation
   const { scrollY } = useScroll()
@@ -156,7 +158,9 @@ export default function LandingPage() {
             </motion.div>
           </div>
 
-          <p className="text-[13px] text-[#9B9B9B] font-[450]">7-day full Starter trial on monthly billing &middot; Plans from $39/month &middot; Cancel anytime</p>
+          <p className="text-[13px] text-[#9B9B9B] font-[450]">
+            Limited-time offer &middot; Starter is $19 for the first month, then $39/month &middot; Cancel anytime
+          </p>
         </motion.div>
 
         {/* Platform logos — clean, no box */}
@@ -798,12 +802,17 @@ export default function LandingPage() {
             <motion.div variants={staggerContainer} className="mx-auto grid max-w-5xl gap-5 px-4 sm:px-6 lg:grid-cols-3">
               {PRICING_PLANS.map((plan) => {
                 const isHighlighted = plan.highlight
-                const price: string = annualHome ? plan.annualPrice : plan.price
-                const hasTrial = plan.id === 'starter' && !annualHome
+                const hasStarterPromotion = plan.id === 'starter' && !annualHome && starterPromotionActive
+                const price: string = hasStarterPromotion
+                  ? `$${STARTER_PROMOTION.introductoryMonthlyPriceUsd}`
+                  : annualHome ? plan.annualPrice : plan.price
+                const hasTrial = plan.id === 'starter' && !annualHome && !hasStarterPromotion
                 const features = hasTrial
                   ? ['7-day full Starter trial', ...plan.features]
                   : plan.features
-                const cta = plan.id === 'starter' && annualHome ? 'Choose Starter' : plan.cta
+                const cta = plan.id === 'starter' && annualHome
+                  ? 'Choose Starter'
+                  : hasStarterPromotion ? 'Start for $19' : plan.cta
                 return (
                   <motion.article
                     key={plan.id}
@@ -828,6 +837,11 @@ export default function LandingPage() {
                     </p>
                     {/* Price */}
                     <div className="mb-4 flex items-baseline gap-1">
+                      {hasStarterPromotion && (
+                        <span className={`mr-1 text-[20px] font-semibold line-through ${isHighlighted ? 'text-white/45' : 'text-[#999]'}`}>
+                          ${STARTER_PROMOTION.standardMonthlyPriceUsd}
+                        </span>
+                      )}
                       <span className={`text-[46px] font-bold leading-none tracking-tight ${isHighlighted ? 'text-white' : 'text-[#0A0A0A]'}`}>{price}</span>
                       <span className={`text-[14px] font-medium ${isHighlighted ? 'text-white/50' : 'text-[#888]'}`}>
                         {price === '$0' ? 'forever' : plan.period}
@@ -837,7 +851,9 @@ export default function LandingPage() {
                       {plan.id === 'starter'
                         ? annualHome
                           ? `Billed ${plan.annualTotal} once per year`
-                          : '7-day full Starter trial, then billed monthly'
+                          : hasStarterPromotion
+                            ? 'Limited-time offer · First month, then $39/month'
+                            : '7-day full Starter trial, then billed monthly'
                         : annualHome ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
                     </p>
                     <p className={`text-[14px] leading-relaxed mb-6 min-h-[44px] ${isHighlighted ? 'text-white/70' : 'text-[#555]'}`}>{plan.description}</p>

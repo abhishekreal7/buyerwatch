@@ -16,7 +16,7 @@ export const PLAN_ENTITLEMENTS = {
   starter: {
     keywords: 5, monitoredTargets: 2, threadsPerMonth: 250, aiDraftsPerMonth: 30,
     pollingIntervalMinutes: 60, monitoringPlatforms: ['reddit', 'bluesky'],
-    autoSend: false, slackNotifications: false, replyAttribution: false,
+    autoSend: true, slackNotifications: false, replyAttribution: false,
     trustAnalytics: false, xDailySpendLimitCents: 0, workspaces: 1,
   },
   pro: {

@@ -4,13 +4,17 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
+import type { PlanTier } from '@/lib/plan-limits'
+import { isStarterPromotionActive, STARTER_PROMOTION } from '@/lib/starter-promotion'
 
 interface PricingClientProps {
   billingEnabled: boolean
+  currentPlan: PlanTier | null
 }
 
-export function PricingClient({ billingEnabled }: PricingClientProps) {
+export function PricingClient({ billingEnabled, currentPlan }: PricingClientProps) {
   const [annual, setAnnual] = useState(false)
+  const starterPromotionActive = isStarterPromotionActive()
 
   return (
     <>
@@ -33,15 +37,21 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
       {/* Plans grid */}
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 px-4 pb-20 sm:px-6 md:grid-cols-2 md:pb-24 lg:grid-cols-3">
         {PRICING_PLANS.map((plan) => {
-          const price: string = annual ? plan.annualPrice : plan.price
+          const hasStarterPromotion = plan.id === 'starter' && !annual && starterPromotionActive
+          const price: string = hasStarterPromotion
+            ? `$${STARTER_PROMOTION.introductoryMonthlyPriceUsd}`
+            : annual ? plan.annualPrice : plan.price
           const paidPlan = price !== '$0' && price !== 'Custom'
           const checkoutAvailable = !paidPlan || billingEnabled
           const isHighlighted = plan.highlight
-          const hasTrial = plan.id === 'starter' && !annual
+          const hasTrial = plan.id === 'starter' && !annual && !hasStarterPromotion
+          const isCurrentPlan = currentPlan === plan.id
           const features = hasTrial
             ? ['7-day full Starter trial', ...plan.features]
             : plan.features
-          const cta = plan.id === 'starter' && annual ? 'Choose Starter' : plan.cta
+          const cta = plan.id === 'starter' && annual
+            ? 'Choose Starter'
+            : hasStarterPromotion ? 'Start for $19' : plan.cta
 
           return (
             <div
@@ -52,6 +62,15 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                   : 'bg-white border border-[#E8E8E8] text-[#0A0A0A] shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.1)]'
               } ${plan.id === 'growth' ? 'md:col-span-2 md:w-[calc(50%-0.625rem)] md:justify-self-center lg:col-span-1 lg:w-auto' : ''}`}
             >
+              {isCurrentPlan && (
+                <span
+                  className={`absolute right-5 top-5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                    isHighlighted ? 'bg-white text-black' : 'bg-black text-white'
+                  }`}
+                >
+                  Current plan
+                </span>
+              )}
               {/* Card header */}
               <div className="mb-5">
                 <p
@@ -76,6 +95,11 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
 
               {/* Price */}
               <div className="mb-4 flex items-baseline gap-1">
+                {hasStarterPromotion && (
+                  <span className={`mr-1 text-[20px] font-semibold line-through ${isHighlighted ? 'text-white/45' : 'text-[#999]'}`}>
+                    ${STARTER_PROMOTION.standardMonthlyPriceUsd}
+                  </span>
+                )}
                 <span className="text-[46px] font-bold tracking-tight leading-none">
                   {price}
                 </span>
@@ -102,7 +126,9 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                 {plan.id === 'starter'
                   ? annual
                     ? `Billed ${plan.annualTotal} once per year`
-                    : '7-day full Starter trial, then billed monthly'
+                    : hasStarterPromotion
+                      ? 'Limited-time offer · First month, then $39/month'
+                      : '7-day full Starter trial, then billed monthly'
                   : annual ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
               </p>
 
@@ -117,11 +143,13 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
 
               {/* CTA */}
               <Link
-                href={checkoutAvailable
-                  ? annual
-                    ? `/signup?plan=${plan.id}&billing=annual`
-                    : plan.href
-                  : '/contact'}
+                href={isCurrentPlan
+                  ? '/settings?section=plan'
+                  : checkoutAvailable
+                    ? annual
+                      ? `/signup?plan=${plan.id}&billing=annual`
+                      : plan.href
+                    : '/contact'}
                 id={`pricing-cta-${plan.id}`}
                 className={`mb-6 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-semibold transition-all duration-200 ${
                   isHighlighted
@@ -129,8 +157,10 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                     : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
                 }`}
               >
-                {checkoutAvailable ? cta : `Contact us about ${plan.name}`}
-                <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
+                {isCurrentPlan
+                  ? 'Manage current plan'
+                  : checkoutAvailable ? cta : `Contact us about ${plan.name}`}
+                {!isCurrentPlan && <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />}
               </Link>
 
               {/* Divider */}

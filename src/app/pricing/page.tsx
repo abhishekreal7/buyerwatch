@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { getProviderCapabilities } from '@/lib/env'
 import { BrandLogo } from '@/components/BrandLogo'
+import { normalizePlan, type PlanTier } from '@/lib/plan-limits'
+import { createClient } from '@/utils/supabase/server'
 import { PricingClient } from './PricingClient'
 
 export const metadata = {
@@ -10,8 +12,22 @@ export const metadata = {
 
 export const dynamic = 'force-dynamic'
 
-export default function PricingPage() {
+export default async function PricingPage() {
   const billingEnabled = getProviderCapabilities().billing
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = typeof claimsData?.claims?.sub === 'string' ? claimsData.claims.sub : null
+  let currentPlan: PlanTier | null = null
+
+  if (userId) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (profile?.plan) currentPlan = normalizePlan(profile.plan)
+  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans selection:bg-black selection:text-white">
@@ -22,16 +38,16 @@ export default function PricingPage() {
         </Link>
         <div className="flex items-center gap-4">
           <Link
-            href="/login"
+            href={userId ? '/dashboard' : '/login'}
             className="inline-flex min-h-11 items-center px-1 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors"
           >
-            Log in
+            {userId ? 'Dashboard' : 'Log in'}
           </Link>
           <Link
-            href="/signup?plan=starter&billing=monthly"
+            href={userId ? '/settings?section=plan' : '/signup?plan=starter&billing=monthly'}
             className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white bg-[#0A0A0A] hover:bg-[#1C1C1E] px-4 py-2 rounded-xl transition-colors"
           >
-            Start for $19
+            {userId ? 'Manage plan' : 'Start for $19'}
           </Link>
         </div>
       </nav>
@@ -50,7 +66,7 @@ export default function PricingPage() {
       </div>
 
       {/* Toggle + Plans (client) */}
-      <PricingClient billingEnabled={billingEnabled} />
+      <PricingClient billingEnabled={billingEnabled} currentPlan={currentPlan} />
 
       {/* Footer */}
       <div className="text-center pb-12 text-[13px] text-[#888888]">

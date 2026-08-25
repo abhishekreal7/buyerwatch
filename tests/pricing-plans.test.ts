@@ -3,6 +3,11 @@ import { PRICING_PLANS } from '../src/lib/pricing-plans'
 import { getTrialDaysForPlan, STARTER_TRIAL_DAYS } from '../src/lib/dodo'
 import { getIntentDailyLimit, PLAN_LIMITS } from '../src/lib/plan-limits'
 import { afterAuthenticationDestination } from '../src/lib/billing-selection'
+import {
+  appliesStarterPromotion,
+  getStarterPromotionDiscountCode,
+  STARTER_PROMOTION,
+} from '../src/lib/starter-promotion'
 
 describe('pricing plan promises', () => {
   it('gives every billing tier an explicit daily intent-scoring allowance', () => {
@@ -22,14 +27,23 @@ describe('pricing plan promises', () => {
     expect(growth?.features).not.toContain('15-minute polling cadence')
   })
 
-  it('offers the seven-day trial only on monthly Starter', () => {
+  it('uses the first-month Starter price without stacking the trial', () => {
     const starter = PRICING_PLANS.find(plan => plan.id === 'starter')
+    const duringPromotion = new Date('2026-08-25T00:00:00.000Z')
+    const afterPromotion = new Date('2026-09-16T00:00:00.000Z')
 
     expect(starter?.price).toBe('$39')
-    expect(starter?.cta).toBe('Start 7-day free trial')
+    expect(starter?.cta).toBe('Start for $19')
     expect(starter?.features).not.toContain('7-day free trial')
     expect(STARTER_TRIAL_DAYS).toBe(7)
-    expect(getTrialDaysForPlan('starter', 'monthly')).toBe(7)
+    expect(STARTER_PROMOTION.introductoryMonthlyPriceUsd).toBe(19)
+    expect(STARTER_PROMOTION.standardMonthlyPriceUsd).toBe(39)
+    expect(STARTER_PROMOTION.subscriptionCycles).toBe(1)
+    expect(appliesStarterPromotion('starter', 'monthly', duringPromotion)).toBe(true)
+    expect(appliesStarterPromotion('starter', 'annual', duringPromotion)).toBe(false)
+    expect(getStarterPromotionDiscountCode('starter', 'monthly', duringPromotion)).toBe('START19')
+    expect(getTrialDaysForPlan('starter', 'monthly', duringPromotion)).toBeUndefined()
+    expect(getTrialDaysForPlan('starter', 'monthly', afterPromotion)).toBe(7)
     expect(getTrialDaysForPlan('starter', 'annual')).toBeUndefined()
     expect(getTrialDaysForPlan('pro')).toBeUndefined()
     expect(getTrialDaysForPlan('growth')).toBeUndefined()
@@ -50,12 +64,14 @@ describe('pricing plan promises', () => {
       aiDraftsPerMonth: 10,
       autoSend: false,
     })
+    expect(PRICING_PLANS.find(plan => plan.id === 'starter')?.features)
+      .toContain('Guarded auto-send')
     expect(PLAN_LIMITS.starter).toMatchObject({
       keywords: 5,
       threadsPerMonth: 250,
       aiDraftsPerMonth: 30,
       monitoredTargets: 2,
-      autoSend: false,
+      autoSend: true,
     })
   })
 

@@ -30,7 +30,7 @@ export const PRICING_PLANS = [
       ...featuresFor('starter'),
       'Manual review and send workflow',
     ],
-    cta: 'Start 7-day free trial',
+    cta: 'Start for $19',
     href: '/signup?plan=starter&billing=monthly',
     highlight: false,
   },

@@ -6,6 +6,7 @@ import { queuedAutoSendBlockReason } from '../src/lib/auto-send-policy'
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 
 const deliveryMigration = read('supabase/migrations/20260806100000_automation_delivery_reliability.sql')
+const starterAutoSendMigration = read('supabase/migrations/20260825050000_starter_guarded_auto_send.sql')
 const sendProcessor = read('src/lib/send-reply.ts')
 const maintenance = read('src/lib/backend-maintenance.ts')
 const serverlessMonitor = read('src/lib/serverless-monitor.ts')
@@ -33,7 +34,7 @@ describe('automation delivery reliability', () => {
       'bluesky',
       'founders',
       { redditDirectPostingEnabled: false },
-    )).toBe('auto_send_plan_ineligible')
+    )).toBeNull()
     expect(queuedAutoSendBlockReason(
       { ...activeAutoSendProfile, auto_send_platforms: ['reddit'] },
       'bluesky',
@@ -66,6 +67,8 @@ describe('automation delivery reliability', () => {
 
   it('turns off queued auto-send on a plan downgrade at the database boundary', () => {
     expect(deliveryMigration).toContain("not in ('pro', 'growth')")
+    expect(starterAutoSendMigration).toContain("in ('starter', 'pro', 'growth')")
+    expect(starterAutoSendMigration).toContain('create or replace function public.enforce_automation_plan_entitlement()')
     expect(deliveryMigration).toContain('create trigger a00_profiles_automation_plan_entitlement')
     expect(deliveryMigration).toContain('create trigger profiles_cancel_auto_send_outbox')
   })

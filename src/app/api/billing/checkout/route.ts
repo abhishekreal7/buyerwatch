@@ -15,6 +15,7 @@ import {
   getTrialDaysForPlan,
   parseBillingCheckoutIntent,
 } from '@/lib/dodo'
+import { getStarterPromotionDiscountCode } from '@/lib/starter-promotion'
 
 /**
  * POST /api/billing/checkout
@@ -119,6 +120,10 @@ export async function POST(req: Request) {
 
     const requestedPlan = intent.plan
     const requestedCadence = intent.cadence
+    const starterPromotionCode = getStarterPromotionDiscountCode(
+      requestedPlan,
+      requestedCadence,
+    )
     const productId = getDodoProductIdForPlan(requestedPlan, requestedCadence)
     if (!productId) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
@@ -213,6 +218,12 @@ export async function POST(req: Request) {
       subscription_data: {
         trial_period_days: getTrialDaysForPlan(requestedPlan, requestedCadence) ?? null,
       },
+      // Dodo enforces this introductory price for one billing cycle. The
+      // promotion and the Starter trial are intentionally never stacked.
+      discount_code: starterPromotionCode ?? null,
+      feature_flags: {
+        allow_discount_code: false,
+      },
       // metadata is returned verbatim in every webhook event —
       // the webhook handler reads metadata.user_id and metadata.plan
       metadata: {
@@ -220,6 +231,7 @@ export async function POST(req: Request) {
         plan: requestedPlan,
         billing_cadence: requestedCadence,
         trial_days: String(getTrialDaysForPlan(requestedPlan, requestedCadence) ?? 0),
+        starter_promotion: starterPromotionCode ? 'first_month_19' : 'none',
       },
       return_url: `${getAppUrl()}/dashboard`,
     }, { idempotencyKey })
