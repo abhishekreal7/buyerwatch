@@ -57,10 +57,12 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   icons: {
     icon: [
-      { url: '/buyerwatch-favicon.svg?v=8', type: 'image/svg+xml', sizes: 'any' },
+      // Use the same filled BuyerWatch mark as the app shell. The previous
+      // circular eye SVG rendered as a tiny unrelated dot in browser tabs.
+      { url: '/buyerwatch-icon.png?v=4', type: 'image/png', sizes: '128x128' },
     ],
-    shortcut: [{ url: '/buyerwatch-favicon.svg?v=8', type: 'image/svg+xml' }],
-    apple: [{ url: '/buyerwatch-icon.png?v=3', type: 'image/png', sizes: '128x128' }],
+    shortcut: [{ url: '/buyerwatch-icon.png?v=4', type: 'image/png', sizes: '128x128' }],
+    apple: [{ url: '/buyerwatch-icon.png?v=4', type: 'image/png', sizes: '128x128' }],
   },
 };
 
