@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { fetchPublicText } from '@/lib/security/outbound-url'
-import { getConfiguredSecret } from '@/lib/env'
 import {
   buildFallbackSuggestions,
-  sanitizeOnboardingSuggestions,
-  type OnboardingSuggestions,
+  extractWebsiteProfile,
 } from '@/lib/onboarding-intelligence'
 import { normalizeWebsiteUrl } from '@/lib/onboarding-validation'
 import { aiRateLimit, getIp } from '@/lib/ratelimit'
 import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
-import { getServiceRoleClient } from '@/lib/admin'
-import {
-  calculateAnthropicUsage,
-  recordAiUsage,
-  releaseAiSpend,
-  reserveAiSpend,
-} from '@/lib/ai-usage'
 
 function titleCase(value: string): string {
   return value
@@ -36,56 +26,6 @@ function deriveBusinessName(url: string, fallback: string): string {
   }
 }
 
-function parseAiJson(value: string): OnboardingSuggestions | null {
-  const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim()
-  if (!jsonString) return null
-  try {
-    const result = sanitizeOnboardingSuggestions(JSON.parse(jsonString), 'ai')
-    const keywordCount =
-      result.buyerKeywords.length
-      + result.competitorKeywords.length
-      + result.painPointKeywords.length
-    return result.description && result.subreddits.length > 0 && keywordCount >= 3
-      ? result
-      : null
-  } catch {
-    return null
-  }
-}
-
-const ONBOARDING_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    businessName: { type: 'string' },
-    description: { type: 'string' },
-    subreddits: {
-      type: 'array',
-      items: { type: 'string' },
-    },
-    buyerKeywords: {
-      type: 'array',
-      items: { type: 'string' },
-    },
-    competitorKeywords: {
-      type: 'array',
-      items: { type: 'string' },
-    },
-    painPointKeywords: {
-      type: 'array',
-      items: { type: 'string' },
-    },
-  },
-  required: [
-    'businessName',
-    'description',
-    'subreddits',
-    'buyerKeywords',
-    'competitorKeywords',
-    'painPointKeywords',
-  ],
-  additionalProperties: false,
-} as const
-
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -101,25 +41,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Enter a website URL or business name.' }, { status: 400 })
     }
     try {
-      const rate = await aiRateLimit.limit(`onboarding-ai:${user.id}:${await getIp()}`)
+      const rate = await aiRateLimit.limit(`onboarding-analysis:${user.id}:${await getIp()}`)
       if (!rate.success) {
-        return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+        return NextResponse.json({ error: 'analysis_rate_limited' }, { status: 429 })
       }
     } catch (rateLimitError) {
-      // The rate-limit store must not make first-run setup unusable. We skip
-      // network analysis below and return bounded deterministic suggestions.
-      console.warn('[ai-suggest] Rate limiter unavailable; using fallback suggestions', rateLimitError)
-      return NextResponse.json(buildFallbackSuggestions({
-        businessName: deriveBusinessName(url, businessName),
-        description: businessDescription,
-        webpageTitle: '',
-        webpageDescription: '',
-      }))
+      // Rate-limit infrastructure must not make first-run setup unusable.
+      console.warn('[onboarding/analyze] Rate limiter unavailable; continuing safely', rateLimitError)
     }
 
-    let webpageText = ''
     let webpageTitle = ''
     let webpageDescription = ''
+    let webpageContent = ''
     if (url) {
       try {
         const { response: fetchRes, text: html } = await fetchPublicText(url, {
@@ -131,113 +64,23 @@ export async function POST(req: NextRequest) {
           maxRedirects: 3,
         })
         if (fetchRes.ok) {
-          // Extract text from title, meta description, and body headers
-          const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? ''
-          const metaDesc = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)?.[1] ?? ''
-          webpageTitle = title.trim()
-          webpageDescription = metaDesc.trim()
-          const bodySnippet = html.replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[\s\S]*?<\/style>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .slice(0, 1500)
-          webpageText = `Title: ${title}\nDescription: ${metaDesc}\nContent: ${bodySnippet}`
+          const profile = extractWebsiteProfile(html)
+          webpageTitle = profile.title
+          webpageDescription = profile.description
+          webpageContent = profile.content
         }
       } catch {
-        console.warn('[ai-suggest] Website fetch failed; using supplied profile data')
-      }
-    }
-
-    const prompt = `You are a world-class SaaS growth engineer & Reddit marketing strategist.
-Analyze this product and output strategic Reddit monitoring intelligence.
-
-Product Info:
-- Name: ${businessName || 'Product'}
-- User Description: ${businessDescription || 'None'}
-- Website Content: ${webpageText || 'None'}
-
-Return ONLY a raw valid JSON object (no markdown, no backticks, no markdown fence):
-{
-  "businessName": "Detected product or company name",
-  "description": "A concise 2-sentence summary of what the product does and its primary value proposition.",
-  "subreddits": ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8"],
-  "buyerKeywords": ["phrase 1", "phrase 2", "phrase 3"],
-  "competitorKeywords": ["alternative to BrandX", "leaving BrandY"],
-  "painPointKeywords": ["struggling with X", "how to solve Y"]
-}
-
-Rules:
-1. Subreddits must be real popular subreddit names without "r/" (e.g. "SaaS", "startups", "Entrepreneur", "webdev").
-2. buyerKeywords: high-intent phrases people search when looking for a tool like this.
-3. competitorKeywords: phrases people use when looking to replace direct competitors in this space.
-4. painPointKeywords: core problem statements users discuss on Reddit.
-5. NEVER append duplicate words like "reddit reddit". Keep phrases natural.`
-
-    const anthropicKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
-    let aiResponse = ''
-    if (anthropicKey) {
-      let reservation: { id: string; reservedMicrousd: number } | null = null
-      let admin: ReturnType<typeof getServiceRoleClient> | null = null
-      try {
-        admin = getServiceRoleClient()
-        const { data: profile } = await admin
-          .from('profiles')
-          .select('plan')
-          .eq('id', user.id)
-          .single()
-        reservation = await reserveAiSpend(admin, {
-          userId: user.id,
-          // Onboarding is bounded and accounted within the same generative-AI
-          // budget as drafts, without consuming a monthly draft allowance.
-          purpose: 'draft',
-          plan: profile?.plan,
-        })
-        if (!reservation) {
-          return NextResponse.json({ error: 'ai_spend_limit_reached' }, { status: 429 })
-        }
-        const anthropic = new Anthropic({
-          apiKey: anthropicKey,
-          timeout: 30_000,
-          maxRetries: 2,
-        })
-        const response = await anthropic.messages.create({
-          model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
-          max_tokens: 800,
-          output_config: {
-            effort: 'high',
-            format: {
-              type: 'json_schema',
-              schema: ONBOARDING_OUTPUT_SCHEMA,
-            },
-          },
-          system: 'You produce precise product-monitoring suggestions grounded only in the supplied context.',
-          messages: [{ role: 'user', content: prompt }],
-        })
-        if (response.stop_reason === 'max_tokens') {
-          throw new Error('Anthropic onboarding response was truncated')
-        }
-        aiResponse = response.content
-          .filter(block => block.type === 'text')
-          .map(block => block.text)
-          .join('')
-        await recordAiUsage(admin, {
-          reservationId: reservation.id,
-          usage: calculateAnthropicUsage(response.model, response.usage),
-        })
-      } catch (anthropicErr) {
-        if (admin && reservation) {
-          await releaseAiSpend(admin, reservation.id).catch(() => undefined)
-        }
-        console.warn('[ai-suggest] Anthropic failed, using fallback suggestions:', anthropicErr)
+        console.warn('[onboarding/analyze] Website fetch failed; using supplied profile data')
       }
     }
 
     const detectedBusinessName = deriveBusinessName(url, businessName)
-    const result = parseAiJson(aiResponse) ?? buildFallbackSuggestions({
+    const result = buildFallbackSuggestions({
       businessName: detectedBusinessName,
       description: businessDescription,
       webpageTitle,
       webpageDescription,
+      webpageContent,
     })
 
     return NextResponse.json(result)
@@ -245,7 +88,7 @@ Rules:
     if (err instanceof RequestInputError) {
       return NextResponse.json({ error: err.message }, { status: 400 })
     }
-    console.error('[ai-suggest] Error generating suggestions:', err)
-    return NextResponse.json({ error: 'suggestion_generation_failed' }, { status: 502 })
+    console.error('[onboarding/analyze] Website analysis failed:', err)
+    return NextResponse.json({ error: 'website_analysis_failed' }, { status: 502 })
   }
 }

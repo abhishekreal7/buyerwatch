@@ -125,8 +125,8 @@ export default function OnboardingWizard({
     setStep(s => Math.max(1, s - 1))
   }
 
-  // AI Auto-Analyze URL or Inputs
-  const handleAiAnalyze = async () => {
+  // Extract website context and prepare deterministic monitoring suggestions.
+  const handleWebsiteAnalyze = async () => {
     const trimmedUrl = businessUrl.trim()
     if (!trimmedUrl) return
 
@@ -149,11 +149,9 @@ export default function OnboardingWizard({
       })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data) {
-        const message = data?.error === 'rate_limited'
+        const message = data?.error === 'analysis_rate_limited'
           ? 'You have reached the website-analysis limit for now. Continue by entering the details manually.'
-          : data?.error === 'ai_spend_limit_reached'
-            ? 'AI analysis is temporarily at capacity. Continue by entering the details manually.'
-            : 'We could not analyze this website right now. Check the URL or continue by entering the details manually.'
+          : 'We could not analyze this website right now. Check the URL or continue by entering the details manually.'
         toast.error(message)
         return
       }
@@ -171,7 +169,7 @@ export default function OnboardingWizard({
       const suggestedTargets = validSuggestedTargets.length > 0
         ? validSuggestedTargets.slice(0, targetLimit)
         : redditTargets
-      const shouldAutoApplySuggestions = data.source === 'ai'
+      const shouldAutoApplySuggestions = data.source === 'ai' || data.source === 'website'
       if (shouldAutoApplySuggestions && validSuggestedTargets.length > 0) {
         setRedditTargets(suggestedTargets)
       }
@@ -198,8 +196,8 @@ export default function OnboardingWizard({
           : 'Website details added. Suggestions are ready for your review.',
       )
     } catch (err) {
-      console.error('[onboarding] AI analyze failed:', err)
-      toast.error('Auto-fill failed. Check the URL and try again.')
+      console.error('[onboarding] Website analysis failed:', err)
+      toast.error('Website analysis failed. Check the URL and try again.')
     } finally {
       setAnalyzingUrl(false)
     }
@@ -410,7 +408,7 @@ export default function OnboardingWizard({
                     />
                     <button
                       type="button"
-                      onClick={handleAiAnalyze}
+                      onClick={handleWebsiteAnalyze}
                       disabled={analyzingUrl || !businessUrl.trim()}
                       aria-busy={analyzingUrl}
                       className="h-[50px] shrink-0 rounded-xl border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 shadow-sm transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-surface-elevated disabled:text-text-secondary disabled:opacity-60 sm:w-auto"

@@ -20,6 +20,7 @@ import { evaluateIntentPreflight } from '../src/lib/intent-preflight'
 import { buildIntentScoringPrompt } from '../src/lib/intent-scorer'
 import {
   buildFallbackSuggestions,
+  extractWebsiteProfile,
   sanitizeOnboardingSuggestions,
 } from '../src/lib/onboarding-intelligence'
 import {
@@ -396,6 +397,19 @@ describe('attribution URLs', () => {
 })
 
 describe('onboarding intelligence', () => {
+  it('extracts website context without requiring an AI provider', () => {
+    const profile = extractWebsiteProfile(`
+      <html><head>
+        <meta content="Lead generation for founders" name="description">
+        <meta property="og:title" content="SignalFlow">
+      </head><body><h1>Find qualified buyers</h1><script>ignore me</script></body></html>
+    `)
+    expect(profile.title).toBe('SignalFlow')
+    expect(profile.description).toBe('Lead generation for founders')
+    expect(profile.content).toContain('Find qualified buyers')
+    expect(profile.content).not.toContain('ignore me')
+  })
+
   it('deduplicates and bounds untrusted provider suggestions', () => {
     const result = sanitizeOnboardingSuggestions({
       businessName: '  BuyerWatch  ',
@@ -420,6 +434,19 @@ describe('onboarding intelligence', () => {
     })
     expect(result.competitorKeywords).not.toContain('alternative to BuyerWatch')
     expect(result.buyerKeywords).toContain('looking for a tool')
+  })
+
+  it('builds tailored website suggestions deterministically', () => {
+    const result = buildFallbackSuggestions({
+      businessName: 'SignalFlow',
+      description: '',
+      webpageTitle: 'SignalFlow',
+      webpageDescription: 'Lead generation and buyer intent monitoring for sales teams.',
+      webpageContent: 'Find qualified leads from relevant online conversations.',
+    })
+    expect(result.source).toBe('website')
+    expect(result.subreddits).toContain('sales')
+    expect(result.buyerKeywords).toContain('best lead generation tool')
   })
 })
 
