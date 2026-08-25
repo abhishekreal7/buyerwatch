@@ -83,9 +83,9 @@ export default async function RootLayout({
     description: 'A social intent monitoring and reply-drafting platform for finding relevant Reddit and Bluesky conversations.',
     offers: {
       '@type': 'Offer',
-      price: '0',
+      price: '19',
       priceCurrency: 'USD',
-      category: 'Free plan',
+      category: 'Limited-time Starter subscription offer',
       url: 'https://www.buyerwatch.co/pricing',
     },
   }

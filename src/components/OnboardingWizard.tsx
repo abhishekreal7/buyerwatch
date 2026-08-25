@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { completeOnboardingAction } from '@/app/actions/onboarding'
@@ -10,7 +10,18 @@ import {
 } from 'lucide-react'
 import { springs } from '@/lib/motion'
 import { getPlanLimits, type PlanTier } from '@/lib/plan-limits'
-import { normalizeWebsiteUrl, validateProductContext } from '@/lib/onboarding-validation'
+import {
+  normalizeRedditUsername,
+  normalizeWebsiteUrl,
+  validateProductContext,
+  validateRedditUsername,
+} from '@/lib/onboarding-validation'
+import {
+  countRequestedMonitoringRules,
+  normalizeRedditTarget,
+  redditTargetKey,
+  validateRedditTarget,
+} from '@/lib/onboarding-capacity'
 import type { SelectedBillingCadence, SelectedBillingPlan } from '@/lib/billing-selection'
 
 const BUSINESS_TYPES = [
@@ -37,7 +48,10 @@ export default function OnboardingWizard({
   const [loading, setLoading] = useState(false)
   const [analyzingUrl, setAnalyzingUrl] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const keywordLimit = getPlanLimits(plan).keywords
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null)
+  const planLimits = getPlanLimits(plan)
+  const keywordLimit = planLimits.keywords
+  const targetLimit = planLimits.monitoredTargets
 
   // Form State
   const [businessName, setBusinessName] = useState('')
@@ -64,6 +78,10 @@ export default function OnboardingWizard({
   const [writingStyle, setWritingStyle] = useState('')
   const [redditUsername, setRedditUsername] = useState('')
 
+  useEffect(() => {
+    stepHeadingRef.current?.focus()
+  }, [step])
+
   const handleNext = () => {
     setSubmitError('')
     if (step === 1) {
@@ -73,17 +91,39 @@ export default function OnboardingWizard({
         return
       }
     }
-    if (step === 2 && !keywords.some(keyword => keyword.term.trim())) {
-      setSubmitError('Select or add at least one monitoring phrase.')
-      return
+    if (step === 2) {
+      if (!keywords.some(keyword => keyword.term.trim())) {
+        setSubmitError('Select or add at least one monitoring phrase.')
+        return
+      }
+      const ruleCount = countRequestedMonitoringRules(keywords, redditTargets, blueskyTargets)
+      if (ruleCount > keywordLimit) {
+        setSubmitError(`This setup creates ${ruleCount} rules, but your current access supports ${keywordLimit}. Remove a phrase before continuing.`)
+        return
+      }
     }
-    if (step === 3 && redditTargets.length === 0) {
-      setSubmitError('Select or add at least one community to monitor.')
-      return
+    if (step === 3) {
+      if (redditTargets.length === 0) {
+        setSubmitError('Select or add at least one community to monitor.')
+        return
+      }
+      const invalidTarget = redditTargets.find(target => validateRedditTarget(target))
+      if (invalidTarget) {
+        setSubmitError(`r/${invalidTarget} is not a valid subreddit name.`)
+        return
+      }
+      const ruleCount = countRequestedMonitoringRules(keywords, redditTargets, blueskyTargets)
+      if (ruleCount > keywordLimit) {
+        setSubmitError(`This setup creates ${ruleCount} rules, but your current access supports ${keywordLimit}. Remove a phrase or community before continuing.`)
+        return
+      }
     }
     setStep(current => Math.min(4, current + 1))
   }
-  const handlePrev = () => setStep(s => Math.max(1, s - 1))
+  const handlePrev = () => {
+    setSubmitError('')
+    setStep(s => Math.max(1, s - 1))
+  }
 
   // AI Auto-Analyze URL or Inputs
   const handleAiAnalyze = async () => {
@@ -109,16 +149,29 @@ export default function OnboardingWizard({
       })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data) {
-        toast.error(data?.error || 'Auto-fill failed. Try again in a moment.')
+        const message = data?.error === 'rate_limited' || data?.error === 'ai_spend_limit_reached'
+          ? 'Website analysis is temporarily unavailable. You can continue by entering the details manually.'
+          : data?.error || 'Website analysis failed. Try again in a moment.'
+        toast.error(message)
         return
       }
 
       if (data.businessName && !businessName) setBusinessName(data.businessName)
       if (data.description && !businessDescription) setBusinessDescription(data.description)
-      const suggestedTargets = data.subreddits?.length > 0 ? data.subreddits : redditTargets
+      const validSuggestedTargets = Array.isArray(data.subreddits)
+        ? data.subreddits
+            .map((target: string) => normalizeRedditTarget(target))
+            .filter((target: string, index: number, values: string[]) => (
+              !validateRedditTarget(target)
+              && values.findIndex(value => redditTargetKey(value) === redditTargetKey(target)) === index
+            ))
+        : []
+      const suggestedTargets = validSuggestedTargets.length > 0
+        ? validSuggestedTargets.slice(0, targetLimit)
+        : redditTargets
       const shouldAutoApplySuggestions = data.source === 'ai'
-      if (shouldAutoApplySuggestions && data.subreddits?.length > 0) {
-        setRedditTargets(data.subreddits)
+      if (shouldAutoApplySuggestions && validSuggestedTargets.length > 0) {
+        setRedditTargets(suggestedTargets)
       }
 
       const suggestedKeywords: { term: string; platforms: string[] }[] = []
@@ -132,7 +185,7 @@ export default function OnboardingWizard({
       }
 
       setAiSuggestions({
-        subreddits: data.subreddits || [],
+        subreddits: validSuggestedTargets,
         buyer: data.buyerKeywords || [],
         competitor: data.competitorKeywords || [],
         painPoint: data.painPointKeywords || [],
@@ -153,17 +206,41 @@ export default function OnboardingWizard({
   const toggleKeywordTerm = (term: string) => {
     const exists = keywords.some(k => k.term.toLowerCase() === term.toLowerCase())
     if (exists) {
+      setSubmitError('')
       setKeywords(keywords.filter(k => k.term.toLowerCase() !== term.toLowerCase()))
     } else {
+      const nextRuleCount = countRequestedMonitoringRules(
+        [...keywords, { term, platforms: ['reddit'] }],
+        redditTargets,
+        blueskyTargets,
+      )
+      if (nextRuleCount > keywordLimit) {
+        setSubmitError(`Your current access supports ${keywordLimit} monitoring ${keywordLimit === 1 ? 'rule' : 'rules'}. Remove a phrase or community before adding another.`)
+        return
+      }
+      setSubmitError('')
       setKeywords([...keywords, { term, platforms: ['reddit'] }])
     }
   }
 
   const toggleSubreddit = (sub: string) => {
-    if (redditTargets.includes(sub)) {
-      setRedditTargets(redditTargets.filter(s => s !== sub))
+    const key = redditTargetKey(sub)
+    const existing = redditTargets.some(target => redditTargetKey(target) === key)
+    if (existing) {
+      setSubmitError('')
+      setRedditTargets(redditTargets.filter(target => redditTargetKey(target) !== key))
     } else {
-      setRedditTargets([...redditTargets, sub])
+      if (redditTargets.length >= targetLimit) {
+        setSubmitError(`Your current access supports ${targetLimit} monitored ${targetLimit === 1 ? 'community' : 'communities'}. Remove one before adding another.`)
+        return
+      }
+      const nextTargets = [...redditTargets, normalizeRedditTarget(sub)]
+      if (countRequestedMonitoringRules(keywords, nextTargets, blueskyTargets) > keywordLimit) {
+        setSubmitError(`Adding this community would exceed your ${keywordLimit}-rule monitoring limit.`)
+        return
+      }
+      setSubmitError('')
+      setRedditTargets(nextTargets)
     }
   }
 
@@ -184,7 +261,18 @@ export default function OnboardingWizard({
         targets.forEach(t => requestedRules.push({ term: k.term, platform: 'bluesky', target: t }))
       }
     }
-    const dbKeywords = requestedRules.slice(0, keywordLimit)
+    if (requestedRules.length > keywordLimit) {
+      setSubmitError(`This setup creates ${requestedRules.length} monitoring rules, but your current access supports ${keywordLimit}. Remove a phrase or community to continue.`)
+      setLoading(false)
+      return
+    }
+
+    const usernameError = validateRedditUsername(redditUsername)
+    if (usernameError) {
+      setSubmitError(usernameError)
+      setLoading(false)
+      return
+    }
     const normalizedBusinessUrl = normalizeWebsiteUrl(businessUrl)
 
     try {
@@ -194,8 +282,8 @@ export default function OnboardingWizard({
         business_url: normalizedBusinessUrl,
         business_type: businessType,
         writing_style: writingStyle,
-        reddit_username: redditUsername,
-        keywords: dbKeywords
+        reddit_username: normalizeRedditUsername(redditUsername),
+        keywords: requestedRules
       }, selectedPlan, selectedBilling)
 
       if (res?.error) {
@@ -209,39 +297,76 @@ export default function OnboardingWizard({
     }
   }
 
-  const addKeyword = () => setKeywords([...keywords, { term: '', platforms: ['reddit'] }])
+  const addKeyword = () => {
+    if (countRequestedMonitoringRules([...keywords, { term: 'new phrase', platforms: ['reddit'] }], redditTargets, blueskyTargets) > keywordLimit) {
+      setSubmitError(`Your current access supports ${keywordLimit} monitoring ${keywordLimit === 1 ? 'rule' : 'rules'}. Remove a phrase or community before adding another.`)
+      return
+    }
+    setSubmitError('')
+    setKeywords([...keywords, { term: '', platforms: ['reddit'] }])
+  }
   const updateKeywordTerm = (index: number, term: string) => {
     const newK = [...keywords]
     newK[index] = { ...newK[index], term }
     setKeywords(newK)
   }
   const removeKeyword = (index: number) => {
+    setSubmitError('')
     setKeywords(keywords.filter((_, i) => i !== index))
   }
 
   const addTarget = () => {
-    if (!targetInput.trim()) return
-    const clean = targetInput.trim().replace(/^r\//, '').toLowerCase()
-    if (activeTab === 'reddit' && !redditTargets.includes(clean)) {
-      setRedditTargets([...redditTargets, clean])
+    const targetError = validateRedditTarget(targetInput)
+    if (targetError) {
+      setSubmitError(targetError)
+      return
     }
+    const clean = normalizeRedditTarget(targetInput)
+    if (redditTargets.some(target => redditTargetKey(target) === redditTargetKey(clean))) {
+      setSubmitError(`r/${clean} is already selected.`)
+      return
+    }
+    if (redditTargets.length >= targetLimit) {
+      setSubmitError(`Your current access supports ${targetLimit} monitored ${targetLimit === 1 ? 'community' : 'communities'}.`)
+      return
+    }
+    const nextTargets = [...redditTargets, clean]
+    if (countRequestedMonitoringRules(keywords, nextTargets, blueskyTargets) > keywordLimit) {
+      setSubmitError(`Adding this community would exceed your ${keywordLimit}-rule monitoring limit.`)
+      return
+    }
+    if (activeTab === 'reddit') {
+      setRedditTargets(nextTargets)
+    }
+    setSubmitError('')
     setTargetInput('')
   }
 
-  const selectedRuleCount = keywords.filter((keyword) => keyword.term.trim()).length * Math.max(1, redditTargets.length)
-  const activeRuleCount = Math.min(keywordLimit, selectedRuleCount)
-  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
+  const selectedRuleCount = countRequestedMonitoringRules(keywords, redditTargets, blueskyTargets)
+  const selectedPlanLimits = selectedPlan ? getPlanLimits(selectedPlan) : null
+  const selectedPlanLabel = selectedPlan === 'pro'
+    ? 'Professional'
+    : selectedPlan === 'growth'
+      ? 'Growth'
+      : 'Starter'
+  const pollingDescription = planLimits.pollingIntervalMinutes <= 5
+    ? 'Monitoring checks run about every 5 minutes.'
+    : 'Monitoring checks run about hourly.'
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-col">
       {/* Progress Steps */}
-      <div className="flex items-center justify-center gap-2 mb-6">
+      <div className="mb-6" aria-label={`Onboarding progress: step ${step} of 4`}>
+        <p className="mb-2 text-center text-xs font-semibold text-gray-500">Step {step} of 4</p>
+        <div className="flex items-center justify-center gap-2">
         {[1, 2, 3, 4].map(i => (
           <div
             key={i}
+            aria-current={step === i ? 'step' : undefined}
             className={`h-1.5 rounded-full transition-all duration-300 ${step >= i ? 'bg-[#0A84FF] w-12' : 'bg-black/10 w-4'}`}
           />
         ))}
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -257,14 +382,15 @@ export default function OnboardingWizard({
           {step === 1 && (
             <div className="space-y-5">
               <div>
-                <h2 className="text-xl font-extrabold mb-1.5 tracking-tight text-gray-900">What is your product?</h2>
+                <h2 ref={stepHeadingRef} tabIndex={-1} className="text-xl font-extrabold mb-1.5 tracking-tight text-gray-900 outline-none">What is your product?</h2>
                 <p className="text-text-secondary text-sm">Add your website to extract product context and prepare monitoring suggestions for your review.</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Business Name *</label>
+                  <label htmlFor="business-name" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Business Name *</label>
                   <input
+                    id="business-name" maxLength={120}
                     value={businessName} onChange={e => setBusinessName(e.target.value)}
                     type="text" placeholder="e.g. BuyerWatch"
                     className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
@@ -272,10 +398,10 @@ export default function OnboardingWizard({
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700">Website URL</label>
+                  <label htmlFor="business-url" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700">Website URL</label>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <input
-                      value={businessUrl} onChange={e => setBusinessUrl(e.target.value)}
+                      id="business-url" maxLength={2048} value={businessUrl} onChange={e => setBusinessUrl(e.target.value)}
                       type="url" inputMode="url" autoCapitalize="none" autoCorrect="off"
                       placeholder="yourproduct.com"
                       className="min-w-0 flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
@@ -293,8 +419,9 @@ export default function OnboardingWizard({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">What problem do you solve?</label>
+                  <label htmlFor="business-description" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">What problem do you solve? *</label>
                   <textarea
+                    id="business-description" maxLength={5000}
                     value={businessDescription} onChange={e => setBusinessDescription(e.target.value)}
                     placeholder="e.g. We monitor Reddit for buying intent signals and automatically draft tailored replies for SaaS founders..." rows={3}
                     className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors resize-none"
@@ -303,10 +430,12 @@ export default function OnboardingWizard({
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Category</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div role="radiogroup" aria-label="Business category" className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {BUSINESS_TYPES.map(type => (
                       <button
                         type="button"
+                        role="radio"
+                        aria-checked={businessType === type.id}
                         key={type.id}
                         onClick={() => setBusinessType(type.id)}
                         className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all cursor-pointer ${businessType === type.id ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF] font-semibold' : 'bg-surface-elevated border-border text-text-secondary hover:border-border-hover'}`}
@@ -325,8 +454,8 @@ export default function OnboardingWizard({
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">3-Tier Buyer Intent Keywords</h2>
-                <p className="text-text-secondary text-sm">Select intent triggers to monitor. Click any phrase to toggle it on/off.</p>
+                <h2 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900 outline-none">Choose buying signals</h2>
+                <p className="text-text-secondary text-sm">Add phrases buyers use when they are actively evaluating a solution.</p>
               </div>
 
               {/* AI Suggested 3-Tier Badges */}
@@ -411,11 +540,14 @@ export default function OnboardingWizard({
 
               {/* Active Custom Keyword Input List */}
               <div className="space-y-3">
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Active Monitoring Phrases ({keywords.length})</label>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-700">Monitoring phrases</p>
+                  <p className="mt-1 text-xs text-gray-500">{selectedRuleCount} of {keywordLimit} rules configured. One phrase in one community creates one rule.</p>
+                </div>
                 {keywords.map((kw, i) => (
                   <div key={i} className="flex gap-2">
                     <input
-                      value={kw.term} onChange={e => updateKeywordTerm(i, e.target.value)}
+                      aria-label={`Monitoring phrase ${i + 1}`} maxLength={160} value={kw.term} onChange={e => updateKeywordTerm(i, e.target.value)}
                       type="text" placeholder="e.g. alternative to competitor"
                       className="flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF]"
                     />
@@ -443,17 +575,17 @@ export default function OnboardingWizard({
           {step === 3 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">Target Communities</h2>
-                <p className="text-text-secondary text-sm">Choose subreddits to monitor. Click any suggested subreddit to toggle it.</p>
+                <h2 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900 outline-none">Choose communities</h2>
+                <p className="text-text-secondary text-sm">Select the Reddit communities where your buyers already ask questions.</p>
               </div>
 
               {/* AI Suggested Subreddits */}
               {aiSuggestions?.subreddits && aiSuggestions.subreddits.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">AI Suggested Subreddits</label>
+                  <p className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Suggested communities</p>
                   <div className="flex flex-wrap gap-2">
                     {aiSuggestions.subreddits.map(sub => {
-                      const active = redditTargets.includes(sub)
+                      const active = redditTargets.some(target => redditTargetKey(target) === redditTargetKey(sub))
                       return (
                         <button
                           type="button"
@@ -472,12 +604,12 @@ export default function OnboardingWizard({
 
               {/* Add Custom Subreddit */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Add Custom Subreddit</label>
+                <label htmlFor="subreddit-target" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Add a community</label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="relative flex-1">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">r/</span>
                     <input
-                      value={targetInput}
+                      id="subreddit-target" maxLength={23} value={targetInput}
                       onChange={e => setTargetInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTarget())}
                       type="text"
@@ -493,7 +625,7 @@ export default function OnboardingWizard({
 
               {/* Selected Subreddits List */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Active Targets ({redditTargets.length})</label>
+                <p className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Monitored communities ({redditTargets.length}/{targetLimit})</p>
                 <div className="flex flex-wrap gap-2">
                   {redditTargets.map(sub => (
                     <span key={sub} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-800">
@@ -512,14 +644,15 @@ export default function OnboardingWizard({
           {step === 4 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900">Brand Voice & Final Confirmation</h2>
-                <p className="text-text-secondary text-sm">Tell us how you want AI drafts to sound, then launch your monitoring pipeline.</p>
+                <h2 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-extrabold mb-2 tracking-tight text-gray-900 outline-none">Review and activate</h2>
+                <p className="text-text-secondary text-sm">Set an optional writing style and confirm exactly what will start.</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Writing Style & Tone</label>
+                  <label htmlFor="writing-style" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Writing style & tone (optional)</label>
                   <textarea
+                    id="writing-style" maxLength={2000}
                     value={writingStyle} onChange={e => setWritingStyle(e.target.value)}
                     placeholder="Direct, helpful, no hype. Lead with genuine value before mentioning our product..." rows={3}
                     className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors resize-none text-sm"
@@ -527,25 +660,30 @@ export default function OnboardingWizard({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Reddit Username (optional)</label>
+                  <label htmlFor="reddit-username" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Reddit username (optional)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">u/</span>
                     <input
-                      value={redditUsername} onChange={e => setRedditUsername(e.target.value)}
+                      id="reddit-username" aria-describedby="reddit-username-help" maxLength={22} value={redditUsername} onChange={e => setRedditUsername(e.target.value)}
                       type="text" placeholder="username"
                       className="w-full bg-surface-elevated border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-[#0A84FF]"
                     />
                   </div>
+                  <p id="reddit-username-help" className="mt-1.5 text-xs text-gray-500">Used only to personalize drafts. This does not connect your Reddit account; connect securely later in Settings.</p>
                 </div>
 
                 {/* Instant Signal Summary Card */}
                 <div className="p-4 bg-[#0A84FF]/5 border border-[#0A84FF]/20 rounded-2xl space-y-2">
                   <div className="text-xs font-bold text-[#0A84FF] uppercase tracking-wider">
-                    Ready to launch
+                    Setup summary
                   </div>
-                  <p className="text-xs text-gray-600">
-                    Your {planLabel} plan will activate <span className="font-semibold text-gray-900">{activeRuleCount} monitoring {activeRuleCount === 1 ? 'rule' : 'rules'}</span>. High-scoring leads will automatically draft replies and notify you in real time.
-                  </p>
+                  <div className="space-y-1.5 text-xs leading-5 text-gray-600">
+                    <p><span className="font-semibold text-gray-900">{selectedRuleCount} monitoring {selectedRuleCount === 1 ? 'rule' : 'rules'}</span> will be activated for this workspace.</p>
+                    <p>{pollingDescription} Qualified matches appear in your dashboard and can use your monthly AI-draft allowance.</p>
+                    {selectedPlanLimits && selectedPlan !== plan && (
+                      <p>After checkout, {selectedPlanLabel} supports up to {selectedPlanLimits.keywords} rules, {selectedPlanLimits.monitoredTargets} communities, and {selectedPlanLimits.aiDraftsPerMonth} AI drafts per month.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -554,7 +692,7 @@ export default function OnboardingWizard({
       </AnimatePresence>
 
       {submitError && (
-        <p role="alert" aria-live="polite" className="mt-4 text-right text-xs font-medium text-red-600">
+        <p role="alert" aria-live="assertive" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm font-medium text-red-700">
           {submitError}
         </p>
       )}
@@ -575,7 +713,6 @@ export default function OnboardingWizard({
           <button
             type="button"
             onClick={handleNext}
-            disabled={step === 1 && (!businessName.trim() || businessDescription.trim().length < 12)}
             className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-gray-800 disabled:opacity-50 sm:px-8"
           >
             Continue <ArrowRight className="w-4 h-4" />
@@ -586,9 +723,10 @@ export default function OnboardingWizard({
               type="button"
               onClick={handleSubmit}
               disabled={loading}
+              aria-busy={loading}
               className="inline-flex min-h-11 items-center justify-center gap-2 bg-[#0A84FF] hover:bg-[#0071E3] text-white px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer disabled:cursor-wait disabled:opacity-60"
             >
-              {loading ? 'Launching...' : 'Launch monitoring'}
+              {loading ? 'Activating...' : 'Activate monitoring'}
             </button>
           </div>
         )}

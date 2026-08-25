@@ -10,6 +10,7 @@ import { publishMonitoringRun } from '@/lib/qstash'
 import { afterAuthenticationDestination } from '@/lib/billing-selection'
 import {
   normalizeWebsiteUrl,
+  normalizeRedditUsername,
   validateOnboardingData,
   type OnboardingData,
   type OnboardingKeyword,
@@ -126,7 +127,11 @@ export async function completeOnboardingAction(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  data = { ...data, business_url: normalizeWebsiteUrl(data.business_url) }
+  data = {
+    ...data,
+    business_url: normalizeWebsiteUrl(data.business_url),
+    reddit_username: normalizeRedditUsername(data.reddit_username),
+  }
   const validationError = validateOnboardingData(data)
   if (validationError) return { error: validationError }
 

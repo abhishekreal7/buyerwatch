@@ -39,8 +39,8 @@ export default function RedditLeadGenerationPage() {
           BuyerWatch helps SaaS founders and marketers discover relevant Reddit conversations, understand buying intent, and prepare thoughtful replies without spending every day scrolling.
         </p>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0A0A0A] px-6 py-3.5 text-sm font-semibold text-white hover:bg-[#222]">
-            Start with the free plan <ArrowRight className="h-4 w-4" />
+          <Link href="/signup?plan=starter&billing=monthly" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0A0A0A] px-6 py-3.5 text-sm font-semibold text-white hover:bg-[#222]">
+            Start 7-day Starter trial <ArrowRight className="h-4 w-4" />
           </Link>
           <Link href="/#how-it-works" className="inline-flex items-center justify-center rounded-full border border-black/10 px-6 py-3.5 text-sm font-semibold hover:bg-black/[0.03]">
             See how it works
@@ -86,7 +86,7 @@ export default function RedditLeadGenerationPage() {
 
       <section className="bg-[#0A0A0A] px-6 py-16 text-center text-white">
         <h2 className="text-3xl font-extrabold tracking-tight">Turn relevant conversations into your next opportunity.</h2>
-        <p className="mx-auto mt-4 max-w-xl text-[#b8b8b8]">Start free, configure your signals, and review the first matches before you commit to a paid plan.</p>
+        <p className="mx-auto mt-4 max-w-xl text-[#b8b8b8]">Configure your signals and use the full Starter workflow during the 7-day trial.</p>
         <Link href="/signup" className="mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-black hover:bg-[#f0f0f0]">Create your account <ArrowRight className="h-4 w-4" /></Link>
       </section>
     </main>

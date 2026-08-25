@@ -23,11 +23,19 @@ import {
   sanitizeOnboardingSuggestions,
 } from '../src/lib/onboarding-intelligence'
 import {
+  normalizeRedditUsername,
   normalizeWebsiteUrl,
   validateOnboardingData,
   validateProductContext,
+  validateRedditUsername,
   validateWebsiteUrl,
 } from '../src/lib/onboarding-validation'
+import {
+  countRequestedMonitoringRules,
+  normalizeRedditTarget,
+  redditTargetKey,
+  validateRedditTarget,
+} from '../src/lib/onboarding-capacity'
 import { cleanDraftOutput, evaluateReplyQuality } from '../src/lib/reply-quality'
 
 describe('buying-signal evidence', () => {
@@ -428,6 +436,27 @@ describe('onboarding validation', () => {
     expect(normalizeWebsiteUrl('example.com/product')).toBe('https://example.com/product')
     expect(validateWebsiteUrl('https://user:pass@example.com')).toMatch(/valid public/i)
     expect(validateWebsiteUrl('javascript:alert(1)')).toMatch(/valid public/i)
+  })
+
+  it('counts the actual phrase-by-community monitoring rules', () => {
+    expect(countRequestedMonitoringRules([
+      { term: 'looking for a tool', platforms: ['reddit'] },
+      { term: 'alternative to', platforms: ['reddit'] },
+    ], ['SaaS', 'startups'])).toBe(4)
+  })
+
+  it('normalizes and validates subreddit names without accepting URLs or spaces', () => {
+    expect(normalizeRedditTarget(' r/SaaS ')).toBe('SaaS')
+    expect(redditTargetKey('SaaS')).toBe(redditTargetKey('r/saas'))
+    expect(validateRedditTarget('r/SaaS')).toBeNull()
+    expect(validateRedditTarget('https://reddit.com/r/SaaS')).toMatch(/without spaces or a URL/i)
+    expect(validateRedditTarget('small business')).toMatch(/without spaces or a URL/i)
+  })
+
+  it('normalizes Reddit usernames and rejects malformed values', () => {
+    expect(normalizeRedditUsername(' u/Founder_Name ')).toBe('Founder_Name')
+    expect(validateRedditUsername('u/Founder_Name')).toBeNull()
+    expect(validateRedditUsername('bad username')).toMatch(/valid Reddit username/i)
   })
 
   it('validates the complete server payload without provider credentials', () => {

@@ -33,6 +33,19 @@ export function normalizeWebsiteUrl(value: string): string {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
 }
 
+export function normalizeRedditUsername(value: string): string {
+  return value.trim().replace(/^u\//i, '')
+}
+
+export function validateRedditUsername(value: string): string | null {
+  const username = normalizeRedditUsername(value)
+  if (!username) return null
+  if (!/^[A-Za-z0-9_-]{3,20}$/.test(username)) {
+    return 'Enter a valid Reddit username using 3–20 letters, numbers, hyphens, or underscores.'
+  }
+  return null
+}
+
 export function validateProductContext(input: {
   businessName: string
   businessDescription: string
@@ -71,7 +84,8 @@ export function validateOnboardingData(data: OnboardingData): string | null {
   const websiteError = validateWebsiteUrl(data.business_url)
   if (websiteError) return websiteError
   if (data.writing_style?.trim().length > 2000) return 'Writing style is too long.'
-  if (data.reddit_username?.trim().length > 100) return 'Reddit username is too long.'
+  const redditUsernameError = validateRedditUsername(data.reddit_username)
+  if (redditUsernameError) return redditUsernameError
   if (!BUSINESS_TYPES.has(data.business_type)) return 'Select a valid business category.'
   if (!Array.isArray(data.keywords) || data.keywords.length === 0) {
     return 'Add at least one monitoring rule before launching.'
@@ -88,6 +102,7 @@ export function validateOnboardingData(data: OnboardingData): string | null {
     || keyword.term.trim().length > 200
     || keyword.target.trim().length > 200
     || !ALLOWED_PLATFORMS.has(keyword.platform)
+    || (keyword.platform === 'reddit' && !/^[A-Za-z0-9_]{2,21}$/.test(keyword.target.trim().replace(/^r\//i, '')))
   ))
   return invalidKeyword
     ? 'One or more monitoring rules are invalid. Go back and review your selections.'
