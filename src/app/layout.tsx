@@ -57,9 +57,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   icons: {
     icon: [
-      { url: '/buyerwatch-favicon.svg?v=7', type: 'image/svg+xml', sizes: 'any' },
+      { url: '/buyerwatch-favicon.svg?v=8', type: 'image/svg+xml', sizes: 'any' },
     ],
-    shortcut: [{ url: '/buyerwatch-favicon.svg?v=7', type: 'image/svg+xml' }],
+    shortcut: [{ url: '/buyerwatch-favicon.svg?v=8', type: 'image/svg+xml' }],
     apple: [{ url: '/buyerwatch-icon.png?v=3', type: 'image/png', sizes: '128x128' }],
   },
 };
