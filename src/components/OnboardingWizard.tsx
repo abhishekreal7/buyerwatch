@@ -149,9 +149,11 @@ export default function OnboardingWizard({
       })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data) {
-        const message = data?.error === 'rate_limited' || data?.error === 'ai_spend_limit_reached'
-          ? 'Website analysis is temporarily unavailable. You can continue by entering the details manually.'
-          : data?.error || 'Website analysis failed. Try again in a moment.'
+        const message = data?.error === 'rate_limited'
+          ? 'You have reached the website-analysis limit for now. Continue by entering the details manually.'
+          : data?.error === 'ai_spend_limit_reached'
+            ? 'AI analysis is temporarily at capacity. Continue by entering the details manually.'
+            : 'We could not analyze this website right now. Check the URL or continue by entering the details manually.'
         toast.error(message)
         return
       }
@@ -354,10 +356,10 @@ export default function OnboardingWizard({
     : 'Monitoring checks run about hourly.'
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-col">
+    <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col overflow-hidden">
       {/* Progress Steps */}
-      <div className="mb-6" aria-label={`Onboarding progress: step ${step} of 4`}>
-        <p className="mb-2 text-center text-xs font-semibold text-gray-500">Step {step} of 4</p>
+      <div className="mb-4 shrink-0" aria-label={`Onboarding progress: step ${step} of 4`}>
+        <p className="sr-only">Step {step} of 4</p>
         <div className="flex items-center justify-center gap-2">
         {[1, 2, 3, 4].map(i => (
           <div
@@ -376,24 +378,24 @@ export default function OnboardingWizard({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={springs.smooth}
-          className="glass min-h-0 flex-1 overflow-y-visible rounded-2xl border border-border p-5 sm:p-7 md:p-8"
+          className="glass min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border border-border p-5 sm:p-6"
         >
           {/* STEP 1: PRODUCT INFO + INSTANT AI EXTRACT */}
           {step === 1 && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div>
                 <h2 ref={stepHeadingRef} tabIndex={-1} className="text-xl font-extrabold mb-1.5 tracking-tight text-gray-900 outline-none">What is your product?</h2>
                 <p className="text-text-secondary text-sm">Add your website to extract product context and prepare monitoring suggestions for your review.</p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
                   <label htmlFor="business-name" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Business Name *</label>
                   <input
                     id="business-name" maxLength={120}
                     value={businessName} onChange={e => setBusinessName(e.target.value)}
                     type="text" placeholder="e.g. BuyerWatch"
-                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
+                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
                   />
                 </div>
 
@@ -404,7 +406,7 @@ export default function OnboardingWizard({
                       id="business-url" maxLength={2048} value={businessUrl} onChange={e => setBusinessUrl(e.target.value)}
                       type="url" inputMode="url" autoCapitalize="none" autoCorrect="off"
                       placeholder="yourproduct.com"
-                      className="min-w-0 flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
+                      className="min-w-0 flex-1 bg-surface-elevated border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors"
                     />
                     <button
                       type="button"
@@ -423,8 +425,8 @@ export default function OnboardingWizard({
                   <textarea
                     id="business-description" maxLength={5000}
                     value={businessDescription} onChange={e => setBusinessDescription(e.target.value)}
-                    placeholder="e.g. We monitor Reddit for buying intent signals and automatically draft tailored replies for SaaS founders..." rows={3}
-                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors resize-none"
+                    placeholder="e.g. We monitor Reddit for buying intent signals and draft tailored replies for SaaS founders..." rows={2}
+                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-[#8E8E93] focus:outline-none focus:border-[#0A84FF] transition-colors resize-none"
                   />
                 </div>
 
@@ -438,7 +440,7 @@ export default function OnboardingWizard({
                         aria-checked={businessType === type.id}
                         key={type.id}
                         onClick={() => setBusinessType(type.id)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all cursor-pointer ${businessType === type.id ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF] font-semibold' : 'bg-surface-elevated border-border text-text-secondary hover:border-border-hover'}`}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${businessType === type.id ? 'bg-[#0A84FF]/10 border-[#0A84FF] text-[#0A84FF] font-semibold' : 'bg-surface-elevated border-border text-text-secondary hover:border-border-hover'}`}
                       >
                         <type.icon className="w-4 h-4 mb-1.5" />
                         <span className="text-xs">{type.label}</span>
@@ -698,7 +700,7 @@ export default function OnboardingWizard({
       )}
 
       {/* Navigation Buttons */}
-      <div className="mt-5 flex shrink-0 items-center justify-between gap-3">
+      <div className="mt-4 flex shrink-0 items-center justify-between gap-3">
         {step > 1 ? (
           <button
             type="button"

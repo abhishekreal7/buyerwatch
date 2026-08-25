@@ -37,8 +37,8 @@ export default async function OnboardingPage({
   }
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-background px-4 pb-8 pt-5 md:pb-10 md:pt-6">
-      <header className="mx-auto mb-5 flex w-full max-w-[600px] items-center justify-between">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background px-4 pb-4 pt-4 md:pb-6 md:pt-5">
+      <header className="mx-auto mb-4 flex w-full max-w-[600px] shrink-0 items-center justify-between">
         <BrandLogo size="sm" />
         <OnboardingHeaderActions selectedPlan={selectedPlan} selectedBilling={selectedBilling} />
       </header>

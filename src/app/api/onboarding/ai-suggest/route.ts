@@ -100,9 +100,21 @@ export async function POST(req: NextRequest) {
     if (!url && !businessName) {
       return NextResponse.json({ error: 'Enter a website URL or business name.' }, { status: 400 })
     }
-    const rate = await aiRateLimit.limit(`onboarding-ai:${user.id}:${await getIp()}`)
-    if (!rate.success) {
-      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+    try {
+      const rate = await aiRateLimit.limit(`onboarding-ai:${user.id}:${await getIp()}`)
+      if (!rate.success) {
+        return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+      }
+    } catch (rateLimitError) {
+      // The rate-limit store must not make first-run setup unusable. We skip
+      // network analysis below and return bounded deterministic suggestions.
+      console.warn('[ai-suggest] Rate limiter unavailable; using fallback suggestions', rateLimitError)
+      return NextResponse.json(buildFallbackSuggestions({
+        businessName: deriveBusinessName(url, businessName),
+        description: businessDescription,
+        webpageTitle: '',
+        webpageDescription: '',
+      }))
     }
 
     let webpageText = ''
@@ -163,25 +175,26 @@ Rules:
 
     const anthropicKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
     let aiResponse = ''
-    const admin = getServiceRoleClient()
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('plan')
-      .eq('id', user.id)
-      .single()
-
     if (anthropicKey) {
-      const reservation = await reserveAiSpend(admin, {
-        userId: user.id,
-        // Onboarding is bounded and accounted within the same generative-AI
-        // budget as drafts, without consuming a monthly draft allowance.
-        purpose: 'draft',
-        plan: profile?.plan,
-      })
-      if (!reservation) {
-        return NextResponse.json({ error: 'ai_spend_limit_reached' }, { status: 429 })
-      }
+      let reservation: { id: string; reservedMicrousd: number } | null = null
+      let admin: ReturnType<typeof getServiceRoleClient> | null = null
       try {
+        admin = getServiceRoleClient()
+        const { data: profile } = await admin
+          .from('profiles')
+          .select('plan')
+          .eq('id', user.id)
+          .single()
+        reservation = await reserveAiSpend(admin, {
+          userId: user.id,
+          // Onboarding is bounded and accounted within the same generative-AI
+          // budget as drafts, without consuming a monthly draft allowance.
+          purpose: 'draft',
+          plan: profile?.plan,
+        })
+        if (!reservation) {
+          return NextResponse.json({ error: 'ai_spend_limit_reached' }, { status: 429 })
+        }
         const anthropic = new Anthropic({
           apiKey: anthropicKey,
           timeout: 30_000,
@@ -212,7 +225,9 @@ Rules:
           usage: calculateAnthropicUsage(response.model, response.usage),
         })
       } catch (anthropicErr) {
-        await releaseAiSpend(admin, reservation.id).catch(() => undefined)
+        if (admin && reservation) {
+          await releaseAiSpend(admin, reservation.id).catch(() => undefined)
+        }
         console.warn('[ai-suggest] Anthropic failed, using fallback suggestions:', anthropicErr)
       }
     }
