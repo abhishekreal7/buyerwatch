@@ -4,9 +4,13 @@ import { createClient } from '@/utils/supabase/server'
 import { getAppUrl } from '@/lib/app-url'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { getDodoEnvironment } from '@/lib/dodo'
+import { isTrustedSameOriginMutation } from '@/lib/request'
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    if (!isTrustedSameOriginMutation(request)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

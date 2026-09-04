@@ -289,6 +289,31 @@ export async function saveHyperbrowserRedditConnection(input: {
   }
 }
 
+export async function savePendingHyperbrowserRedditConnection(input: {
+  userId: string
+  username: string
+  profileId: string
+}): Promise<void> {
+  const stored: StoredHyperbrowserSession = {
+    version: 5,
+    provider: 'hyperbrowser',
+    username: input.username,
+    profileId: input.profileId,
+  }
+  const sessionCiphertext = encrypt(JSON.stringify(stored))
+  const { data, error } = await getServiceRoleClient().rpc(
+    'save_pending_hyperbrowser_reddit_connection_v1',
+    {
+      p_user_id: input.userId,
+      p_username: input.username,
+      p_session_ciphertext: sessionCiphertext,
+    },
+  )
+  if (error || !data) {
+    throw new RedditConnectionStateError('reddit_connection_save_failed')
+  }
+}
+
 export async function getActiveRedditSession(userId: string): Promise<ActiveRedditSession> {
   const admin = getServiceRoleClient()
   const { data, error } = await admin
@@ -428,6 +453,8 @@ export async function getRedditConnectionSummary(userId: string): Promise<Reddit
     ? 'reauth_required'
     : secret.status === 'active' || secret.status === 'reauth_required' || secret.status === 'error'
       ? secret.status
+      : secret.status === 'disconnected'
+        ? 'missing'
       : 'error'
 
   return {

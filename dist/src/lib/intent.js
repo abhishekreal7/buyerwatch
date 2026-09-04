@@ -1,9 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.INTENT_LABELS = void 0;
+exports.ACTIONABLE_INTENT_THRESHOLD = exports.LOW_RELEVANCE_THRESHOLD = exports.INTENT_LABELS = void 0;
 exports.parseIntentResult = parseIntentResult;
 exports.getIntentDisplayLabel = getIntentDisplayLabel;
+exports.isLowRelevanceScore = isLowRelevanceScore;
 exports.INTENT_LABELS = ['buying', 'researching', 'complaining', 'other'];
+exports.LOW_RELEVANCE_THRESHOLD = 40;
+exports.ACTIONABLE_INTENT_THRESHOLD = 60;
 function parseIntentResult(value) {
     if (!value || typeof value !== 'object') {
         throw new Error('Intent provider returned a non-object response');
@@ -57,4 +60,9 @@ function getIntentDisplayLabel(label, score) {
     if (score >= 60)
         return 'Researching';
     return 'Low relevance';
+}
+function isLowRelevanceScore(score) {
+    return typeof score === 'number'
+        && Number.isFinite(score)
+        && score < exports.LOW_RELEVANCE_THRESHOLD;
 }

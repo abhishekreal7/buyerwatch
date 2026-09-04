@@ -1,0 +1,16 @@
+[
+  "<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22><path d=%22m1.5 8 7-7M9 5.5l-3 3%22 stroke=%22%23999%22 stroke-width=%221.5%22 stroke-linecap=%22round%22></path></svg>",
+  "<svg xmlns=%22http://www.w3.org/2000/svg%22 transform=%22scale(-1, 1)%22 width=%2214%22 height=%2214%22><path d=%22m1.5 8 7-7M9 5.5l-3 3%22 stroke=%22%23999%22 stroke-width=%221.5%22 stroke-linecap=%22round%22></path></svg>",
+  "<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22><path fill=%22rgb(153, 153, 153)%22 d=%22M3 5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2H3Z%22 opacity=%22.3%22/><path fill=%22transparent%22 stroke=%22rgb(153, 153, 153)%22 stroke-width=%221.5%22 d=%22M3.25 5.25a2 2 0 0 1 2-2h5.5a2 2 0 0 1 2 2v5.5a2 2 0 0 1-2 2h-5.5a2 2 0 0 1-2-2ZM3 6.75h9.5%22/></svg>",
+  "<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22><path fill=%22rgb(153, 153, 153)%22 d=%22M3 5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2H3Z%22 opacity=%22.3%22/><path fill=%22transparent%22 stroke=%22rgb(153, 153, 153)%22 stroke-width=%221.5%22 d=%22M3.25 5.25a2 2 0 0 1 2-2h5.5a2 2 0 0 1 2 2v5.5a2 2 0 0 1-2 2h-5.5a2 2 0 0 1-2-2ZM3 6.75h9.5%22/></svg>",
+  "<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22><path fill=%22transparent%22 stroke=%22rgb(153, 153, 153)%22 stroke-width=%221.5%22 d=%22M2.5 8a5.5 5.5 0 1 1 11 0 5.5 5.5 0 1 1-11 0Z%22/><path fill=%22transparent%22 stroke=%22rgb(153, 153, 153)%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%221.5%22 d=%22M7.75 8.25v-3m0 3h2%22/></svg>",
+  "<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22><path fill=%22transparent%22 stroke=%22rgb(153, 153, 153)%22 stroke-width=%221.5%22 d=%22M2.5 8a5.5 5.5 0 1 1 11 0 5.5 5.5 0 1 1-11 0Z%22/><path fill=%22transparent%22 stroke=%22rgb(153, 153, 153)%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%221.5%22 d=%22M7.75 8.25v-3m0 3h2%22/></svg>",
+  "<svg style=\"width:100%;height:100%;\"><use href=\"#svg1964730494_366\"/></svg>",
+  "<svg style=\"width:100%;height:100%;\"><use href=\"#svg1964730494_366\"/></svg>",
+  "<svg style=\"width:100%;height:100%;\"><use href=\"#svg1272817631_364\"/></svg>",
+  "<svg style=\"width:100%;height:100%;\"><use href=\"#svg1272817631_364\"/></svg>",
+  "<svg style=\"width:100%;height:100%;\"><use href=\"#svg1272817631_364\"/></svg>",
+  "<svg style=\"width:100%;height:100%;\"><use href=\"#svg1272817631_364\"/></svg>",
+  "<svg viewBox=\"0 0 4 4\" overflow=\"visible\" id=\"svg1964730494_366\"><path d=\"M 2 0 C 3.105 0 4 0.895 4 2 C 4 3.105 3.105 4 2 4 C 0.895 4 0 3.105 0 2 C 0 0.895 0.895 0 2 0 Z\" fill=\"var(--token-266fdce9-56d4-4feb-abf8-f155a80e3785, rgb(183, 188, 188)) /* {&quot;name&quot;:&quot;Dark bg body&quot;} */\"/></svg>",
+  "<svg viewBox=\"0 0 4 4\" overflow=\"visible\" id=\"svg1272817631_364\"><path d=\"M 2 0 C 3.105 0 4 0.895 4 2 C 4 3.105 3.105 4 2 4 C 0.895 4 0 3.105 0 2 C 0 0.895 0.895 0 2 0 Z\" fill=\"var(--token-75c7b632-30cc-45f8-a82e-7ef5d732cf27, rgb(106, 110, 110)) /* {&quot;name&quot;:&quot;Body Color&quot;} */\"/></svg>"
+]

@@ -12,6 +12,7 @@ import {
   RequestInputError,
 } from '@/lib/request'
 import type { SendReplyData } from '@/lib/send-reply'
+import { getRedditDeliveryFlowControl } from '@/lib/reddit-delivery-concurrency'
 import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
 import { recordEngagementEvent } from '@/lib/automation-audit'
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/lib/reddit-community-policy'
 import { hasActiveRedditConnection } from '@/lib/reddit-session'
 import { canMonitorPlatform } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 
 function safeRedditUrl(value: string | null): string | null {
   if (!value) return null
@@ -78,13 +80,13 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('business_name, business_url, plan')
+      .select('business_name, business_url, plan, billing_status, billing_subscription_id')
       .eq('id', user.id)
       .single()
     if (!profile?.business_name) {
       return NextResponse.json({ error: 'Profile is incomplete' }, { status: 409 })
     }
-    if (!canMonitorPlatform(profile.plan, thread.platform)) {
+    if (!canMonitorPlatform(getEntitledPlan(profile), thread.platform)) {
       return NextResponse.json({ error: 'platform_requires_professional_plan' }, { status: 403 })
     }
 
@@ -193,6 +195,7 @@ export async function POST(request: Request) {
     const messageId = await publishQStashJson('/api/jobs/send', message, {
       retries: 4,
       timeout: '4m',
+      flowControl: getRedditDeliveryFlowControl(message.platform),
     })
     if (!messageId) {
       return NextResponse.json({ error: 'reply_delivery_unavailable' }, { status: 503 })

@@ -26,6 +26,11 @@ describe.each(deploymentScripts)('$path', ({ source }) => {
     expect(source).not.toContain('--set-env-vars')
   })
 
+  it('deploys with an explicit bounded Hyperbrowser concurrency cap', () => {
+    expect(source).toContain('HYPERBROWSER_REDDIT_MAX_CONCURRENCY')
+    expect(source).toMatch(/HYPERBROWSER_REDDIT_MAX_CONCURRENCY[^\n]*1|HyperbrowserMaxConcurrency\s*=\s*1/)
+  })
+
   it('configures process, readiness, and liveness checks', () => {
     expect(source).toContain('--startup-probe')
     expect(source).toContain('--readiness-probe')

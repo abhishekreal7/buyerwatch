@@ -3,21 +3,24 @@ import { createClient } from '@/utils/supabase/server'
 import {
   normalizeSelectedBillingCadence,
   normalizeSelectedBillingPlan,
+  selectedPlanForSignup,
   withSelectedPlan,
 } from '@/lib/billing-selection'
 
 export const dynamic = 'force-dynamic'
 
-function errorRedirect(requestUrl: URL, destination: 'login' | 'signup') {
+function errorRedirect(requestUrl: URL) {
   return NextResponse.redirect(
-    new URL(`/${destination}?error=google_oauth_unavailable`, requestUrl),
+    new URL('/login?error=google_oauth_unavailable', requestUrl),
   )
 }
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const destination = requestUrl.searchParams.get('next') === 'signup' ? 'signup' : 'login'
-  const selectedPlan = normalizeSelectedBillingPlan(requestUrl.searchParams.get('plan'))
+  const selectedPlan = destination === 'signup'
+    ? selectedPlanForSignup(requestUrl.searchParams.get('plan'))
+    : normalizeSelectedBillingPlan(requestUrl.searchParams.get('plan'))
   const selectedBilling = normalizeSelectedBillingCadence(requestUrl.searchParams.get('billing'))
 
   try {
@@ -33,12 +36,12 @@ export async function GET(request: Request) {
 
     if (error || !data.url) {
       console.error('[auth] Google OAuth start failed:', error?.message || 'Missing provider URL')
-      return errorRedirect(requestUrl, destination)
+      return errorRedirect(requestUrl)
     }
 
     return NextResponse.redirect(data.url)
   } catch (error) {
     console.error('[auth] Google OAuth route failed:', error)
-    return errorRedirect(requestUrl, destination)
+    return errorRedirect(requestUrl)
   }
 }

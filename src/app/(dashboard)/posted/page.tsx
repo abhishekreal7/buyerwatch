@@ -34,6 +34,7 @@ interface PostedReply {
   title: string
   body: string
   discoveredAt: string
+  sentAtIso: string
   sentAt: string
   reply: string
   threadUrl: string | null
@@ -94,7 +95,42 @@ function formatRelativeDate(dateString: string) {
 }
 
 function formatSentDate(dateString: string) {
-  return new Date(dateString).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  const date = new Date(dateString)
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' as const } : {}),
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatTimelineDate(dateString: string) {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() !== new Date().getFullYear() ? { year: '2-digit' as const } : {}),
+  })
+}
+
+function formatTimelineTime(dateString: string) {
+  return new Date(dateString).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatExactSentDate(dateString: string) {
+  return new Date(dateString).toLocaleString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  })
 }
 
 function formatRedditTarget(value: string) {
@@ -126,6 +162,8 @@ function parsePostedThreads(data: any[]): PostedReply[] {
       ? thread.reply_attribution[0]
       : thread.reply_attribution
 
+    const sentAtIso = analytics?.sent_at || thread.created_at
+
     return {
       id: thread.id,
       platform,
@@ -135,7 +173,8 @@ function parsePostedThreads(data: any[]): PostedReply[] {
       title,
       body,
       discoveredAt: formatRelativeDate(thread.source_created_at || thread.created_at),
-      sentAt: formatSentDate(analytics?.sent_at || thread.created_at),
+      sentAtIso,
+      sentAt: formatSentDate(sentAtIso),
       reply: analytics?.edited_text || analytics?.draft_text || 'Reply logged.',
       threadUrl: thread.url || null,
       replyUrl: successfulSend?.permalink || null,
@@ -144,7 +183,10 @@ function parsePostedThreads(data: any[]): PostedReply[] {
       revenueUsd: Number(attribution?.revenue_usd) || 0,
       score: Math.round(Number(thread.intent_score) || 0),
     }
-  })
+  }).sort((left, right) => (
+    new Date(right.sentAtIso).getTime() - new Date(left.sentAtIso).getTime()
+    || right.id.localeCompare(left.id)
+  ))
 }
 
 // ─── Posted Reply Card ─────────────────────────────────────────────────────────
@@ -162,7 +204,7 @@ function PostedReplyCard({ item, replyEngagement }: {
     <div className="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden transition-all">
       {/* Card header — always visible */}
       <div
-        className="flex items-start justify-between gap-3 px-5 py-4 cursor-pointer select-none hover:bg-gray-50/40 transition-colors"
+        className="flex cursor-pointer select-none flex-col items-stretch gap-3 px-4 py-4 transition-colors hover:bg-gray-50/40 sm:flex-row sm:items-start sm:justify-between sm:px-5"
         onClick={() => setExpanded(v => !v)}
         role="button"
         tabIndex={0}
@@ -195,7 +237,7 @@ function PostedReplyCard({ item, replyEngagement }: {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 pt-0.5">
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 pl-11 pt-0.5 sm:w-auto sm:flex-nowrap sm:pl-0">
           {hasAttribution && (
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold border ${
               hasConversion
@@ -214,7 +256,13 @@ function PostedReplyCard({ item, replyEngagement }: {
               {replyEngagement.replyCount} {replyEngagement.replyCount === 1 ? 'reply' : 'replies'} received
             </span>
           )}
-          <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">{item.sentAt}</span>
+          <time
+            dateTime={item.sentAtIso}
+            title={formatExactSentDate(item.sentAtIso)}
+            className="hidden whitespace-nowrap text-[11px] font-medium text-gray-400 sm:inline"
+          >
+            {item.sentAt}
+          </time>
           <IntentBadge score={item.score} />
           <div className="p-0.5 text-gray-400">
             {expanded
@@ -240,10 +288,11 @@ function PostedReplyCard({ item, replyEngagement }: {
             </div>
           )}
 
-          <div className="px-5 py-4 space-y-4">
-            {/* Original Thread — preserved exactly */}
-            <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85] mb-2">Original thread</p>
+          <div className="px-5 py-4">
+            <div className="relative space-y-5">
+              {/* Original Thread */}
+              <div>
+                <p className="mb-2 pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85]">Original thread</p>
               <div className="rounded-[16px] border border-[#E8E8E5] bg-[#F7F7F5] px-4 py-3.5">
                 <div className="flex items-center gap-2 mb-2 text-[11px] font-medium text-[#8C8C85]">
                   <PlatformIcon platform={item.platform} />
@@ -270,15 +319,21 @@ function PostedReplyCard({ item, replyEngagement }: {
                   </a>
                 )}
               </div>
-            </div>
-
-            {/* Your Reply — preserved exactly */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply</p>
-                <span className="text-[11px] text-[#8C8C85]">Sent {item.sentAt}</span>
               </div>
-              <div className="rounded-[16px] border border-emerald-200 bg-[#F2FCF7] px-4 py-3.5">
+
+              {/* Your Reply */}
+              <div>
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <p className="pt-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#8C8C85]">Your reply</p>
+                <time
+                  dateTime={item.sentAtIso}
+                  title={formatExactSentDate(item.sentAtIso)}
+                  className="max-w-[132px] text-right text-[11px] leading-4 text-[#8C8C85] sm:max-w-none"
+                >
+                  Sent {item.sentAt}
+                </time>
+                </div>
+                <div className="rounded-[16px] border border-emerald-200 bg-[#F2FCF7] px-4 py-3.5">
                 <div className="flex items-center gap-2 mb-2.5">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
                     <MessageSquare className="h-3 w-3 text-emerald-600" strokeWidth={2.3} />
@@ -286,18 +341,19 @@ function PostedReplyCard({ item, replyEngagement }: {
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[#3A6B50]">BuyerWatch reply</span>
                 </div>
                 <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#1C1C1A]">{item.reply}</p>
+                </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-2 pt-1">
+            <div className="flex flex-col items-stretch justify-end gap-2 pt-4 sm:flex-row sm:items-center">
               {item.threadUrl && (
                 <a
                   href={item.threadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+                  className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-[12px] font-medium text-gray-700 shadow-2xs transition-colors hover:bg-gray-50 cursor-pointer"
                 >
                   <ExternalLink className="h-3.5 w-3.5 text-gray-400" />
                   View conversation
@@ -309,7 +365,7 @@ function PostedReplyCard({ item, replyEngagement }: {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="h-8 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-gray-900 text-[12px] font-medium text-white hover:bg-gray-700 transition-colors cursor-pointer shadow-xs"
+                  className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-gray-900 px-3.5 text-[12px] font-medium text-white shadow-xs transition-colors hover:bg-gray-700 cursor-pointer"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   View live reply
@@ -379,6 +435,7 @@ export default function PostedPage() {
             .eq('user_id', userId)
             .eq('status', 'replied')
             .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
             .range(0, PAGE_SIZE - 1),
           supabase
             .from('monitored_threads')
@@ -435,10 +492,14 @@ export default function PostedPage() {
         .eq('user_id', userId)
         .eq('status', 'replied')
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .range(from, from + PAGE_SIZE - 1)
       if (error) throw error
 
-      setPosted(current => [...current, ...parsePostedThreads(data ?? [])])
+      setPosted(current => [...current, ...parsePostedThreads(data ?? [])].sort((left, right) => (
+        new Date(right.sentAtIso).getTime() - new Date(left.sentAtIso).getTime()
+        || right.id.localeCompare(left.id)
+      )))
       setHasMore((data?.length ?? 0) === PAGE_SIZE)
     } catch (error) {
       console.error('[posted] Unable to load more posted replies', error)
@@ -583,15 +644,58 @@ export default function PostedPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {filtered.map((item) => (
-                    <PostedReplyCard
-                      key={item.id}
-                      item={item}
-                      replyEngagement={replyEngagementByThread[item.id]}
-                    />
-                  ))}
-                </div>
+                <section aria-labelledby="reply-history-heading">
+                  <div className="mb-4 flex items-end justify-between gap-4 pl-[54px] sm:pl-[76px]">
+                    <div>
+                      <h2 id="reply-history-heading" className="text-[14px] font-bold text-gray-900">Reply history</h2>
+                      <p className="mt-0.5 text-[11.5px] text-gray-500">Newest posted reply first</p>
+                    </div>
+                    <span className="text-[11px] font-medium tabular-nums text-gray-400">
+                      Showing {filtered.length} of {totalCount}
+                    </span>
+                  </div>
+
+                  <ol className="relative space-y-4" aria-label={`${filtered.length} posted replies shown`}>
+                    {filtered.map((item, filteredIndex) => {
+                      const chronologicalIndex = posted.findIndex(postedItem => postedItem.id === item.id)
+                      const sequenceNumber = Math.max(1, totalCount - chronologicalIndex)
+
+                      return (
+                        <li key={item.id} className="relative grid grid-cols-[42px_minmax(0,1fr)] gap-3 sm:grid-cols-[64px_minmax(0,1fr)] sm:gap-4">
+                          <div className="relative flex min-h-full flex-col items-center">
+                            {filteredIndex < filtered.length - 1 && (
+                              <span
+                                className="absolute left-1/2 top-7 bottom-[-17px] w-px -translate-x-1/2 bg-[#DCDCD7]"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <div className="relative z-10 mt-3 flex h-8 min-w-8 items-center justify-center rounded-full border border-[#D5D5D0] bg-white px-1.5 text-[11px] font-bold tabular-nums text-[#55554F] shadow-[0_2px_6px_rgba(17,24,39,0.06)]">
+                              <span className="sr-only">Posted reply </span>#{sequenceNumber}
+                            </div>
+                            <time
+                              dateTime={item.sentAtIso}
+                              title={formatExactSentDate(item.sentAtIso)}
+                              className="relative z-10 mt-2 bg-[#F7F7F5] px-1 text-center text-[9.5px] font-semibold leading-[1.35] tabular-nums text-[#777770]"
+                            >
+                              <span className="block whitespace-nowrap">{formatTimelineDate(item.sentAtIso)}</span>
+                              <span className="block whitespace-nowrap text-[#9A9A93]">{formatTimelineTime(item.sentAtIso)}</span>
+                            </time>
+                            <span className="relative z-10 mt-1 hidden bg-[#F7F7F5] px-1 text-center text-[9px] text-[#A0A09A] sm:block">
+                              {formatRelativeDate(item.sentAtIso)}
+                            </span>
+                          </div>
+
+                          <div className="relative min-w-0 before:absolute before:-left-4 before:top-7 before:h-px before:w-4 before:bg-[#DCDCD7] sm:before:-left-5 sm:before:w-5">
+                            <PostedReplyCard
+                              item={item}
+                              replyEngagement={replyEngagementByThread[item.id]}
+                            />
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ol>
+                </section>
               )}
 
               {!loading && hasMore && (

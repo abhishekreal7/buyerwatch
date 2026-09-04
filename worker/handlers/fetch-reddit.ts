@@ -32,10 +32,12 @@ export async function redditFetchHandler(job: Job) {
     if (!keywordMappings) {
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term, profiles!inner(competitors)')
+        .select('id, user_id, term, profiles!inner(competitors, billing_status, billing_subscription_id)')
         .eq('platform', 'reddit')
         .eq('target', target)
         .eq('is_active', true)
+        .eq('profiles.billing_status', 'active')
+        .not('profiles.billing_subscription_id', 'is', null)
 
       if (error) {
         throw new Error(`Failed to load Reddit keyword mappings: ${error.message}`)
@@ -45,8 +47,10 @@ export async function redditFetchHandler(job: Job) {
       const ids = keywordMappings.map(({ id }) => id)
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term, profiles!inner(competitors)')
+        .select('id, user_id, term, profiles!inner(competitors, billing_status, billing_subscription_id)')
         .in('id', ids)
+        .eq('profiles.billing_status', 'active')
+        .not('profiles.billing_subscription_id', 'is', null)
       if (error) {
         throw new Error(`Failed to validate Reddit keyword mappings: ${error.message}`)
       }

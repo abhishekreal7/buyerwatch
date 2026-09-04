@@ -1,4 +1,4 @@
-import { Hyperbrowser, HyperbrowserError } from '@hyperbrowser/sdk'
+import { createHash } from 'node:crypto'
 import { chromium, type Browser, type Page } from 'playwright-core'
 import {
   normalizeRedditUsername,
@@ -7,14 +7,32 @@ import {
 } from './redditapis-contract'
 import { AUTO_REPLY_MAX_AGE_MS, evaluateContentFreshness } from './content-freshness'
 import { recordHyperbrowserHealth } from './reddit-delivery-health'
+import { logger } from './logger'
 import { redis } from './redis'
-import { withRedisLock } from './redis-lock'
+import { withRedisLock, withRedisSemaphore } from './redis-lock'
+import { getHyperbrowserRedditMaxConcurrency } from './reddit-delivery-concurrency'
+import { HyperbrowserClient, HyperbrowserClientError } from './hyperbrowser-client'
+
+export { getHyperbrowserRedditMaxConcurrency } from './reddit-delivery-concurrency'
 
 const SESSION_TIMEOUT_MINUTES = 5
 const NAVIGATION_TIMEOUT_MS = 45_000
 const UI_TIMEOUT_MS = 15_000
-const SESSION_LOCK_KEY = 'lock:hyperbrowser-reddit-session:v1'
 const SESSION_LOCK_TTL_MS = 6 * 60_000
+const SESSION_SEMAPHORE_KEY = 'semaphore:hyperbrowser-reddit-session:v1'
+const SESSION_QUEUE_WAIT_MS = 90_000
+
+function diagnosticsEnabled(): boolean {
+  return process.env.HYPERBROWSER_DIAGNOSTICS_ENABLED?.trim().toLowerCase() !== 'false'
+}
+
+export function getHyperbrowserRedditProfileLockKey(profileId: string) {
+  if (!isHyperbrowserProfileId(profileId)) {
+    throw new HyperbrowserRedditError('hyperbrowser_profile_invalid', false)
+  }
+  const digest = createHash('sha256').update(profileId.trim()).digest('hex').slice(0, 24)
+  return `lock:hyperbrowser-reddit-profile:v1:${digest}`
+}
 
 export type HyperbrowserRedditPostSnapshot = {
   id: string
@@ -30,6 +48,10 @@ export type HyperbrowserRedditAccountProfile = {
   createdAt: string
   linkKarma: number
   commentKarma: number
+}
+
+type HyperbrowserRedditAuthenticatedAccount = HyperbrowserRedditAccountProfile & {
+  username: string
 }
 
 export class HyperbrowserRedditError extends Error {
@@ -61,9 +83,13 @@ export function getHyperbrowserSessionOptions(profileId: string) {
     adblock: false,
     trackers: false,
     annoyances: false,
-    enableWebRecording: false,
+    // rrweb and console capture give operators a short-lived replay for
+    // selector/provider failures. Video remains disabled and no credentials
+    // are entered during delivery sessions. Hyperbrowser's free plan retains
+    // these diagnostics for seven days.
+    enableWebRecording: diagnosticsEnabled(),
     enableVideoWebRecording: false,
-    enableLogCapture: false,
+    enableLogCapture: diagnosticsEnabled(),
     acceptCookies: false,
     saveDownloads: false,
     disablePasswordManager: true,
@@ -77,15 +103,15 @@ export function getHyperbrowserSessionOptions(profileId: string) {
   } as const
 }
 
-function getClient(): Hyperbrowser {
+function getClient(): HyperbrowserClient {
   const apiKey = process.env.HYPERBROWSER_API_KEY?.trim()
   if (!apiKey) throw new HyperbrowserRedditError('hyperbrowser_not_configured', false)
-  return new Hyperbrowser({ apiKey })
+  return new HyperbrowserClient(apiKey)
 }
 
 function providerFailure(error: unknown): HyperbrowserRedditError {
   if (error instanceof HyperbrowserRedditError) return error
-  if (error instanceof HyperbrowserError) {
+  if (error instanceof HyperbrowserClientError) {
     const providerAuthenticationFailed = error.statusCode === 401 || error.statusCode === 403
     const creditsExhausted = error.statusCode === 402
     return new HyperbrowserRedditError(
@@ -109,29 +135,56 @@ async function withRedditPage<T>(
   operation: (page: Page) => Promise<T>,
 ): Promise<T> {
   try {
-    const result = await withRedisLock(redis, SESSION_LOCK_KEY, SESSION_LOCK_TTL_MS, async () => {
-      const client = getClient()
-      let sessionId: string | null = null
-      let browser: Browser | null = null
-      try {
-        const session = await client.sessions.create(getHyperbrowserSessionOptions(profileId))
-        sessionId = session.id
-        browser = await chromium.connectOverCDP(session.wsEndpoint, {
-          timeout: NAVIGATION_TIMEOUT_MS,
-        })
-        const context = browser.contexts()[0]
-        if (!context) throw new HyperbrowserRedditError('hyperbrowser_browser_context_missing', true)
-        const page = context.pages()[0] ?? await context.newPage()
-        page.setDefaultTimeout(UI_TIMEOUT_MS)
-        page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS)
-        const value = await operation(page)
-        await recordHyperbrowserHealth({ status: 'ok' }).catch(() => undefined)
-        return value
-      } finally {
-        await browser?.close().catch(() => undefined)
-        if (sessionId) await client.sessions.stop(sessionId).catch(() => undefined)
-      }
-    })
+    const result = await withRedisLock(
+      redis,
+      getHyperbrowserRedditProfileLockKey(profileId),
+      SESSION_LOCK_TTL_MS,
+      async () => withRedisSemaphore(
+        redis,
+        SESSION_SEMAPHORE_KEY,
+        getHyperbrowserRedditMaxConcurrency(),
+        SESSION_LOCK_TTL_MS,
+        async () => {
+          const client = getClient()
+          let sessionId: string | null = null
+          let browser: Browser | null = null
+          try {
+            const session = await client.createSession(getHyperbrowserSessionOptions(profileId))
+            sessionId = session.id
+            if (!session.wsEndpoint) {
+              throw new HyperbrowserRedditError('hyperbrowser_session_unavailable', true)
+            }
+            browser = await chromium.connectOverCDP(session.wsEndpoint, {
+              timeout: NAVIGATION_TIMEOUT_MS,
+            })
+            const context = browser.contexts()[0]
+            if (!context) throw new HyperbrowserRedditError('hyperbrowser_browser_context_missing', true)
+            const page = context.pages()[0] ?? await context.newPage()
+            page.setDefaultTimeout(UI_TIMEOUT_MS)
+            page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS)
+            const value = await operation(page)
+            await recordHyperbrowserHealth({ status: 'ok' }).catch(() => undefined)
+            return value
+          } catch (error) {
+            const errorCode = error instanceof HyperbrowserRedditError
+              ? error.code
+              : error instanceof HyperbrowserClientError
+                ? `hyperbrowser_http_${error.statusCode ?? 'unknown'}`
+                : 'hyperbrowser_operation_failed'
+            logger.error({
+              errorCode,
+              ...(sessionId ? { diagnosticSessionId: sessionId } : {}),
+            }, 'Hyperbrowser Reddit operation failed; retained diagnostics are available')
+            throw error
+          } finally {
+            await browser?.close().catch(() => undefined)
+            if (sessionId) await client.stopSession(sessionId).catch(() => undefined)
+          }
+        },
+        { waitMs: SESSION_QUEUE_WAIT_MS, minRetryDelayMs: 250, maxRetryDelayMs: 900 },
+      ),
+      { waitMs: SESSION_QUEUE_WAIT_MS, minRetryDelayMs: 250, maxRetryDelayMs: 900 },
+    )
     if (result === null) throw new HyperbrowserRedditError('hyperbrowser_session_busy', true)
     return result
   } catch (error) {
@@ -141,7 +194,7 @@ async function withRedditPage<T>(
 
 export async function fetchHyperbrowserCreditInfo() {
   try {
-    return await getClient().team.getCreditInfo()
+    return await getClient().getCreditInfo()
   } catch (error) {
     throw providerFailure(error)
   }
@@ -158,9 +211,61 @@ export function parseRedditProfileUsername(href: unknown): string | null {
   }
 }
 
-async function verifyRedditIdentity(page: Page, expectedUsername: string): Promise<void> {
+export function parseRedditAuthenticatedAccount(
+  value: unknown,
+): HyperbrowserRedditAuthenticatedAccount | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const root = value as Record<string, unknown>
+  const candidate = root.data && typeof root.data === 'object' && !Array.isArray(root.data)
+    ? root.data as Record<string, unknown>
+    : root
+  const username = normalizeRedditUsername(candidate.name)
+  const createdUtc = Number(candidate.created_utc)
+  const linkKarma = Number(candidate.link_karma)
+  const commentKarma = Number(candidate.comment_karma)
+  if (
+    !username
+    || !Number.isFinite(createdUtc)
+    || createdUtc <= 0
+    || !Number.isSafeInteger(linkKarma)
+    || !Number.isSafeInteger(commentKarma)
+  ) return null
+  return {
+    username,
+    createdAt: new Date(createdUtc * 1_000).toISOString(),
+    linkKarma,
+    commentKarma,
+  }
+}
+
+export async function readAuthenticatedRedditAccount(
+  page: Page,
+): Promise<HyperbrowserRedditAuthenticatedAccount | null> {
+  const payload = await page.evaluate(async () => {
+    const response = await fetch('/api/me.json?raw_json=1', {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) return null
+    return response.json() as Promise<unknown>
+  }).catch(() => null)
+  return parseRedditAuthenticatedAccount(payload)
+}
+
+export async function verifyRedditIdentity(
+  page: Page,
+  expectedUsername: string,
+): Promise<HyperbrowserRedditAuthenticatedAccount | null> {
   const username = normalizeRedditUsername(expectedUsername)
   if (!username) throw new HyperbrowserRedditError('reddit_username_invalid', false)
+
+  const authenticatedAccount = await readAuthenticatedRedditAccount(page)
+  if (authenticatedAccount) {
+    if (authenticatedAccount.username.toLowerCase() !== username.toLowerCase()) {
+      throw new HyperbrowserRedditError('reddit_account_identity_mismatch', false, false, true)
+    }
+    return authenticatedAccount
+  }
 
   const profileLinks = page
     .locator('a[href^="/user/"]')
@@ -178,8 +283,8 @@ async function verifyRedditIdentity(page: Page, expectedUsername: string): Promi
   let visibleUsernames = await readVisibleUsernames()
   if (visibleUsernames.length === 0) {
     const menuButton = page
-      .locator('button')
-      .filter({ hasText: 'Expand user menu', visible: true })
+      .getByRole('button', { name: /Expand user menu/i })
+      .filter({ visible: true })
       .first()
     if (!await menuButton.isVisible().catch(() => false)) {
       throw new HyperbrowserRedditError('reddit_reconnect_required', false, false, true)
@@ -197,8 +302,15 @@ async function verifyRedditIdentity(page: Page, expectedUsername: string): Promi
   if (visibleUsernames.length === 0) {
     throw new HyperbrowserRedditError('reddit_reconnect_required', false, false, true)
   }
-  if (!visibleUsernames.some(value => value.toLowerCase() === username.toLowerCase())) {
+  const matched = visibleUsernames.find(value => value.toLowerCase() === username.toLowerCase())
+  if (!matched) {
     throw new HyperbrowserRedditError('reddit_account_identity_mismatch', false, false, true)
+  }
+  return {
+    username: matched,
+    createdAt: new Date().toISOString(),
+    linkKarma: 1,
+    commentKarma: 1,
   }
 }
 
@@ -280,7 +392,14 @@ export async function fetchHyperbrowserRedditAccountProfile(input: {
   if (!username) throw new HyperbrowserRedditError('reddit_username_invalid', false)
   return withRedditPage(input.profileId, async (page) => {
     await page.goto('https://www.reddit.com/', { waitUntil: 'domcontentloaded' })
-    await verifyRedditIdentity(page, username)
+    const authenticatedAccount = await verifyRedditIdentity(page, username)
+    if (authenticatedAccount) {
+      return {
+        createdAt: authenticatedAccount.createdAt,
+        linkKarma: authenticatedAccount.linkKarma,
+        commentKarma: authenticatedAccount.commentKarma,
+      }
+    }
     const payload = await page.evaluate(async requestedUsername => {
       const response = await fetch(`/user/${encodeURIComponent(requestedUsername)}/about.json`, {
         credentials: 'include',
@@ -331,6 +450,74 @@ function confirmedCommentPermalink(
   } catch {
     return null
   }
+}
+
+function normalizeCommentBody(value: unknown): string {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
+}
+
+async function findReplyInRecentComments(
+  page: Page,
+  target: RedditPostTarget,
+  username: string,
+  text: string,
+): Promise<string | null> {
+  const rows = await page.evaluate(async requestedUsername => {
+    const response = await fetch(
+      `/user/${encodeURIComponent(requestedUsername)}/comments.json?limit=25&raw_json=1`,
+      { credentials: 'include', headers: { Accept: 'application/json' } },
+    )
+    if (!response.ok) return []
+    const payload = await response.json() as {
+      data?: { children?: Array<{ data?: Record<string, unknown> }> }
+    }
+    return (payload.data?.children ?? []).map(child => ({
+      author: child.data?.author,
+      body: child.data?.body,
+      linkId: child.data?.link_id,
+      permalink: child.data?.permalink,
+    }))
+  }, username)
+
+  const expectedBody = normalizeCommentBody(text)
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    const candidate = row as Record<string, unknown>
+    const author = normalizeRedditUsername(candidate.author)
+    const linkId = typeof candidate.linkId === 'string'
+      ? candidate.linkId.trim().replace(/^t3_/i, '').toLowerCase()
+      : ''
+    if (
+      author?.toLowerCase() !== username.toLowerCase()
+      || linkId !== target.postId
+      || normalizeCommentBody(candidate.body) !== expectedBody
+    ) continue
+    return confirmedCommentPermalink(
+      typeof candidate.permalink === 'string' ? candidate.permalink : null,
+      target,
+    )
+  }
+  return null
+}
+
+export async function findHyperbrowserRedditReply(input: {
+  postUrl: string
+  text: string
+  username: string
+  profileId: string
+}): Promise<{ permalink: string } | null> {
+  const target = parseRedditPostTarget(input.postUrl)
+  const username = normalizeRedditUsername(input.username)
+  const text = input.text.trim()
+  if (!target || !username || !text || text.length > 10_000) {
+    throw new HyperbrowserRedditError('reddit_reply_invalid', false)
+  }
+  return withRedditPage(input.profileId, async (page) => {
+    await page.goto('https://www.reddit.com/', { waitUntil: 'domcontentloaded' })
+    await verifyRedditIdentity(page, username)
+    const permalink = await findReplyInRecentComments(page, target, username, text)
+    return permalink ? { permalink } : null
+  })
 }
 
 export async function postHyperbrowserRedditReply(input: {
@@ -435,6 +622,15 @@ export async function postHyperbrowserRedditReply(input: {
       if (linkedPermalink) return { permalink: linkedPermalink }
       throw new HyperbrowserRedditError('hyperbrowser_delivery_outcome_unknown', false, true)
     } catch (error) {
+      if (writeStarted) {
+        const confirmedPermalink = await findReplyInRecentComments(
+          page,
+          target,
+          username,
+          text,
+        ).catch(() => null)
+        if (confirmedPermalink) return { permalink: confirmedPermalink }
+      }
       if (error instanceof HyperbrowserRedditError) throw error
       throw new HyperbrowserRedditError(
         writeStarted ? 'hyperbrowser_delivery_outcome_unknown' : 'reddit_comment_submit_failed',

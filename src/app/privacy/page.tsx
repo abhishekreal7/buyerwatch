@@ -53,11 +53,11 @@ export default function PrivacyPage() {
               2. Reddit Account Connection
             </h2>
             <p>
-              Reddit connections can use a user-authorized MCP agent, the BuyerWatch Chrome connector, an organization&apos;s Sprinklr integration, or the legacy RedditAPIs connection path. The MCP agent and Chrome connector verify the username already signed in to Reddit without BuyerWatch reading or transmitting the Reddit password or cookies. BuyerWatch stores only a hash of each MCP access key, and the key can be revoked from Settings. With Sprinklr, Reddit authorization is managed in Sprinklr and BuyerWatch stores only an encrypted account mapping. With RedditAPIs, your Reddit username, password, and optional two-factor setup secret are sent once through BuyerWatch&apos;s encrypted HTTPS endpoint to establish a session; BuyerWatch encrypts the returned session cookies at rest and does not save the submitted password or two-factor secret. RedditAPIs is an independent third party and is not affiliated with Reddit.
+              Reddit delivery uses a secured BuyerWatch connection and approved infrastructure providers. BuyerWatch stores only the encrypted connection metadata required to verify the account and deliver authorized replies. Provider access is restricted to the server-side delivery process and is covered by the same safeguards described in this policy.
             </p>
             <ul className="list-disc pl-5 space-y-2">
-              <li>Connection credentials are held only in request memory for the login attempt and are not written to BuyerWatch&apos;s database or application logs.</li>
-              <li>Encrypted session cookies are accessible only to BuyerWatch&apos;s server-side delivery process.</li>
+              <li>BuyerWatch does not store a plaintext Reddit password or two-factor authentication secret.</li>
+              <li>Encrypted connection data is accessible only to the server-side delivery process.</li>
               <li>If Reddit expires the session, automatic Reddit delivery is paused until you reconnect.</li>
               <li>You can disconnect Reddit at any time to delete the stored session.</li>
             </ul>
@@ -71,7 +71,7 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 space-y-2">
               <li><strong>Social Listening:</strong> We monitor public posts and comments matching your specified keywords.</li>
               <li><strong>AI Processing:</strong> Matching posts are analyzed by the AI providers configured for the service. We do not use your customer data, profiles, or private templates to train our own general-purpose public model.</li>
-              <li><strong>Gated Posting Flow:</strong> Manual review is the default. Paid accounts may explicitly enable confidence-gated auto-send after completing the required trust-building reviews, and may disable it at any time.</li>
+              <li><strong>Gated Posting Flow:</strong> Manual review is the default. A card-required 7-day Starter trial may explicitly activate one confidence-gated automatic reply; ongoing automation requires the trust-building reviews and may be disabled at any time.</li>
             </ul>
 
             <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-4" style={{ fontFamily: 'var(--font-jakarta), sans-serif' }}>

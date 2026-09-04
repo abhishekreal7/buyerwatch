@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import {
   AiUsageError,
   calculateAnthropicUsage,
@@ -6,7 +5,8 @@ import {
   mergeAiUsage,
   type AiUsage,
 } from './ai-usage'
-import { getConfiguredSecret, isDevelopmentMockEnabled } from './env'
+import { createAnthropicClient } from './anthropic-client'
+import { isDevelopmentMockEnabled } from './env'
 import {
   cleanDraftOutput,
   evaluateReplyQuality,
@@ -145,23 +145,16 @@ Before writing, silently identify whether the author is asking/seeking or offeri
     usage: AiUsage
   }>) | null = null
 
-  const apiKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not configured')
-  }
-  const anthropic = new Anthropic({
-    apiKey,
-    timeout: 30_000,
-    maxRetries: options.maxRetries ?? 2,
-  })
+  const anthropic = createAnthropicClient({ maxRetries: options.maxRetries })
   const modelName = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5'
   generateText = async (instruction: string) => {
     const response = await anthropic.messages.create({
       model: modelName,
-      max_tokens: 1000,
-      output_config: {
-        effort: 'high',
-      },
+      // Social replies are short and deterministic. Sonnet 5 enables adaptive
+      // thinking by default, which can consume this output budget before a
+      // usable reply is produced, so explicitly disable it for this workflow.
+      max_tokens: 1_200,
+      thinking: { type: 'disabled' },
       system: systemPrompt,
       messages: [{ role: 'user', content: instruction }],
     })
@@ -169,6 +162,12 @@ Before writing, silently identify whether the author is asking/seeking or offeri
     if (response.stop_reason === 'max_tokens') {
       throw new AiUsageError(
         'Anthropic drafting response was truncated',
+        responseUsage,
+      )
+    }
+    if (response.stop_reason === 'refusal') {
+      throw new AiUsageError(
+        'Anthropic refused the drafting request',
         responseUsage,
       )
     }

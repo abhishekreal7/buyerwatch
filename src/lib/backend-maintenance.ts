@@ -2,6 +2,7 @@ import DodoPayments from 'dodopayments'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { logger } from './logger'
 import { publishQStashJson } from './qstash'
+import { getRedditDeliveryFlowControl } from './reddit-delivery-concurrency'
 import { getDodoEnvironment, getDodoPlanFromProductId } from './dodo'
 export { withRedisLock } from './redis-lock'
 
@@ -45,6 +46,7 @@ export async function dispatchPendingOutbox(
       const messageId = await publishQStashJson('/api/jobs/send', payload, {
         retries: 4,
         timeout: '4m',
+        flowControl: getRedditDeliveryFlowControl(payload.platform),
       })
       if (!messageId) throw new Error('QStash reply delivery is not configured')
       const { error: updateError } = await supabase

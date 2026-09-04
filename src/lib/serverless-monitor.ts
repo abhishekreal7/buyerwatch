@@ -25,6 +25,7 @@ import {
   recordKeywordPollSuccess,
 } from './keyword-poll-health'
 import { DISCOVERY_MAX_AGE_MS } from './content-freshness'
+import { getEntitledPlan, hasActiveSubscription } from './billing-entitlements'
 
 type MonitorPlatform = 'reddit' | 'bluesky' | 'x'
 
@@ -34,8 +35,8 @@ type KeywordRow = SocialKeywordMapping & {
   last_success_at?: string | null
   next_poll_at?: string | null
   profiles:
-    | { plan?: string; last_polled_at?: string | null; competitors?: string[] | null }
-    | Array<{ plan?: string; last_polled_at?: string | null; competitors?: string[] | null }>
+    | { plan?: string; billing_status?: string; billing_subscription_id?: string | null; last_polled_at?: string | null; competitors?: string[] | null }
+    | Array<{ plan?: string; billing_status?: string; billing_subscription_id?: string | null; last_polled_at?: string | null; competitors?: string[] | null }>
 }
 
 type TargetWork = {
@@ -84,11 +85,11 @@ async function reserveXCapacity(
   for (const userId of new Set(mappings.map(mapping => mapping.user_id))) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan')
+      .select('plan, billing_status, billing_subscription_id')
       .eq('id', userId)
       .single()
     if (profileError) throw new Error(`Unable to load X plan: ${profileError.message}`)
-    const dailyLimit = getPlanLimits((profile as { plan?: string } | null)?.plan).xDailySpendLimitCents
+    const dailyLimit = getPlanLimits(getEntitledPlan(profile)).xDailySpendLimitCents
     if (dailyLimit === 0) continue
     const { data: reserved, error: reserveError } = await (supabase.rpc as unknown as (
       functionName: string,
@@ -123,7 +124,7 @@ async function loadDueSocialWork(
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
       .from('keywords')
-      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, last_polled_at, competitors)')
+      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, billing_status, billing_subscription_id, last_polled_at, competitors)')
       .in('platform', ['reddit', 'bluesky', 'x'])
       .eq('is_active', true)
       .order('id', { ascending: true })
@@ -137,6 +138,7 @@ async function loadDueSocialWork(
   const relevantRows = rows.filter((row) =>
     (!forceUserId || row.user_id === forceUserId)
     && (!forcePlatform || row.platform === forcePlatform)
+    && hasActiveSubscription(profileFor(row))
     && canMonitorPlatform(normalizePlan(profileFor(row)?.plan), row.platform)
     && (row.platform !== 'x' || isXDiscoveryConfigured()),
   )
@@ -191,10 +193,13 @@ async function loadPendingSocialCheckpoints(
   )
   let query = supabase
     .from('monitored_threads')
-    .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, source_created_at, created_at, keywords!inner(target)')
+    .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, source_created_at, created_at, keywords!inner(target), profiles!monitored_threads_user_id_fkey!inner(plan, billing_status, billing_subscription_id)')
     .in('platform', ['reddit', 'bluesky', 'x'])
     .eq('status', 'pending')
     .gte('source_created_at', new Date(Date.now() - DISCOVERY_MAX_AGE_MS).toISOString())
+    .eq('profiles.billing_status', 'active')
+    .not('profiles.billing_subscription_id', 'is', null)
+    .neq('profiles.plan', 'free')
     .order('created_at', { ascending: true })
     .limit(25)
   if (forceUserId) query = query.eq('user_id', forceUserId)
@@ -202,7 +207,11 @@ async function loadPendingSocialCheckpoints(
   const { data, error } = await query
   if (error) throw error
 
-  return (data ?? []).map((row) => {
+  return (data ?? []).filter((row) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+    return hasActiveSubscription(profile)
+      && canMonitorPlatform(getEntitledPlan(profile), row.platform)
+  }).map((row) => {
     const keyword = Array.isArray(row.keywords) ? row.keywords[0] : row.keywords
     return {
       userId: row.user_id,

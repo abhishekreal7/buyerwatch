@@ -30,9 +30,18 @@ export default async function StatusPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="font-bold">Reddit reply delivery</h2>
-              <p className="mt-1 text-sm text-neutral-500">Cloud browser session and safety circuit</p>
+              <p className="mt-1 text-sm text-neutral-500">Secure connection and delivery safeguards</p>
             </div>
             <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${service.redditDelivery === 'operational' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{service.redditDelivery}</span>
+          </div>
+        </div>
+        <div className="mt-3 rounded-2xl border border-neutral-200 p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-bold">Conversation monitoring</h2>
+              <p className="mt-1 text-sm text-neutral-500">Source checks and lead discovery freshness</p>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${service.conversationMonitoring === 'operational' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{service.conversationMonitoring}</span>
           </div>
         </div>
         <div className="mt-3 rounded-2xl border border-neutral-200 p-5">

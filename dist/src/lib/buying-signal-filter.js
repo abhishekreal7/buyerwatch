@@ -1,4 +1,9 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.analyzeBuyingSignals = analyzeBuyingSignals;
+exports.hasBuyingSignal = hasBuyingSignal;
+exports.matchedSignals = matchedSignals;
+const phrase_match_1 = require("./phrase-match");
 /**
  * Buying-signal pre-filter
  *
@@ -12,10 +17,6 @@
  *   - This list is a product decision, not a technical one. Edit freely.
  *   - All matching is case-insensitive, whole-word where marked with \b.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.analyzeBuyingSignals = analyzeBuyingSignals;
-exports.hasBuyingSignal = hasBuyingSignal;
-exports.matchedSignals = matchedSignals;
 /** Phrases that indicate a person is actively seeking a solution or product */
 const SEEKING_SIGNALS = [
     'looking for',
@@ -27,6 +28,7 @@ const SEEKING_SIGNALS = [
     'searching for',
     'anyone know of',
     'does anyone know',
+    'point me to',
     'where can i',
     'how do i',
     'how can i',
@@ -50,7 +52,6 @@ const RESEARCH_SIGNALS = [
     ' vs ',
     'alternative to',
     'alternatives to',
-    'competitor',
     'comparison',
     'best tool',
     'best app',
@@ -77,7 +78,6 @@ const PAIN_SIGNALS = [
     'annoyed by',
     'switching from',
     'switched from',
-    'leaving',
     'canceling',
     'cancelled my',
     'too expensive',
@@ -89,6 +89,11 @@ const PAIN_SIGNALS = [
     'stopped working',
     'broken',
     'buggy',
+    'by hand',
+    'manually',
+    'too late',
+    'already replied',
+    'missing out',
 ];
 /** Phrases that indicate purchase intent or evaluation */
 const PURCHASE_SIGNALS = [
@@ -108,6 +113,15 @@ const PURCHASE_SIGNALS = [
     'should i buy',
     'should i pay',
     'roi',
+    'evaluating vendors',
+    'evaluating providers',
+    'request for proposal',
+    'approved budget',
+    'approved a budget',
+    'monthly budget',
+    'annual budget',
+    'vendor shortlist',
+    'select a vendor',
 ];
 const SIGNAL_GROUPS = [
     { category: 'seeking', signals: SEEKING_SIGNALS },
@@ -116,11 +130,10 @@ const SIGNAL_GROUPS = [
     { category: 'purchase', signals: PURCHASE_SIGNALS },
 ];
 function analyzeBuyingSignals(text) {
-    const lower = text.toLocaleLowerCase();
     const matches = [];
     const categories = [];
     for (const group of SIGNAL_GROUPS) {
-        const groupMatches = group.signals.filter(signal => lower.includes(signal));
+        const groupMatches = group.signals.filter(signal => (0, phrase_match_1.containsConfiguredPhrase)(text, signal));
         if (groupMatches.length === 0)
             continue;
         categories.push(group.category);

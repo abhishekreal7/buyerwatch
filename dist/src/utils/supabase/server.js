@@ -6,6 +6,7 @@ const headers_1 = require("next/headers");
 async function createClient() {
     const cookieStore = await (0, headers_1.cookies)();
     return (0, ssr_1.createServerClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+        cookieOptions: { secure: process.env.NODE_ENV === 'production' },
         cookies: {
             getAll() {
                 return cookieStore.getAll();

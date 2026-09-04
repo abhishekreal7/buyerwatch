@@ -70,6 +70,9 @@ function ratesForModel(model: string): { input: number; output: number } {
   if (model.includes('haiku')) {
     return { input: 1, output: 5 }
   }
+  if (model.includes('sonnet-5')) {
+    return { input: 2, output: 10 }
+  }
   return { input: 3, output: 15 }
 }
 
@@ -110,6 +113,29 @@ export function mergeAiUsage(left: AiUsage, right: AiUsage): AiUsage {
 
 export function getAiUsageFromError(error: unknown): AiUsage {
   return error instanceof AiUsageError ? error.usage : emptyAiUsage()
+}
+
+export function getAiErrorTelemetry(error: unknown): {
+  code: string
+  providerStatus?: number
+  providerRequestId?: string
+} {
+  const rootCause = error instanceof AiUsageError ? error.cause : error
+  const providerError = rootCause && typeof rootCause === 'object'
+    ? rootCause as { name?: unknown; status?: unknown; request_id?: unknown }
+    : null
+  const providerStatus = typeof providerError?.status === 'number'
+    ? providerError.status
+    : undefined
+  const providerRequestId = typeof providerError?.request_id === 'string'
+    ? providerError.request_id
+    : undefined
+
+  return {
+    code: error instanceof Error ? error.name : 'unknown',
+    ...(providerStatus === undefined ? {} : { providerStatus }),
+    ...(providerRequestId ? { providerRequestId } : {}),
+  }
 }
 
 export function getAiSpendConfig(

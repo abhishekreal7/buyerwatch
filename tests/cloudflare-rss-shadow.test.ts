@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   hasCloudflareRssShadowConfiguration,
@@ -86,9 +88,37 @@ describe('Cloudflare RSS shadow monitor contract', () => {
     expect(config).toContain('*/5 * * * *')
     expect(worker).toContain('/api/cron/enqueue')
     expect(worker).toContain('BUYERWATCH_RSS_SHADOW_SECRET')
+    expect(worker).toContain("body: '{}'")
+    expect(worker).toContain('assertMonitorResponse(payload)')
+    expect(worker).toContain('monitor_canary_result_missing')
+    expect(worker).toContain('monitor_canary_failed:')
     expect(worker).not.toContain('reddit.com')
     expect(worker).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
     expect(enqueueRoute).toContain('isAuthorizedCloudflareMonitoringRequest')
     expect(enqueueRoute).toContain('runServerlessMonitoring')
+    expect(enqueueRoute).toMatch(
+      /executeMonitor\(\s*forceUserId,\s*forcePlatform,\s*forceTarget,\s*isCloudflareScheduler,\s*\)/,
+    )
+    expect(enqueueRoute).not.toContain('forceTarget, !body.trim()')
+  })
+
+  it('fails the worker run when the monitor omits or fails the delivery canary', async () => {
+    const workerUrl = pathToFileURL(
+      join(process.cwd(), 'cloudflare/rss-shadow-monitor.mjs'),
+    ).href
+    const { assertMonitorResponse } = await import(workerUrl) as {
+      assertMonitorResponse: (payload: unknown) => void
+    }
+
+    expect(() => assertMonitorResponse({
+      redditDeliveryCanary: { status: 'ok', checkedUser: true },
+    })).not.toThrow()
+    expect(() => assertMonitorResponse({
+      redditDeliveryCanary: { status: 'skipped', code: 'not_due' },
+    })).not.toThrow()
+    expect(() => assertMonitorResponse({})).toThrow('monitor_canary_result_missing')
+    expect(() => assertMonitorResponse({
+      redditDeliveryCanary: { status: 'failed', code: 'hyperbrowser_canary_failed' },
+    })).toThrow('monitor_canary_failed:hyperbrowser_canary_failed')
   })
 })

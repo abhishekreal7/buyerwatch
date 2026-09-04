@@ -16,6 +16,8 @@ describe('serverless reply delivery contracts', () => {
   it('dispatches manual and automatic sends through signed QStash jobs', () => {
     expect(sendRoute).toContain("publishQStashJson('/api/jobs/send'")
     expect(outbox).toContain("publishQStashJson('/api/jobs/send'")
+    expect(sendRoute).toContain('flowControl: getRedditDeliveryFlowControl(message.platform)')
+    expect(outbox).toContain('flowControl: getRedditDeliveryFlowControl(payload.platform)')
     expect(sendRoute).not.toContain('sendReplyQueue')
     expect(outbox).not.toContain('sendReplyQueue')
     expect(sendJobRoute).toContain('verifyQStashRequest')

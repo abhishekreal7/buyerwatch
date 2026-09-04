@@ -8,7 +8,7 @@ export default function Loading() {
       aria-live="polite"
     >
       <div className="flex flex-col items-center">
-        <BrandLogo size="xl" />
+        <BrandLogo size="lg" />
         <div
           className="mt-7 h-px w-44 overflow-hidden bg-[#DFDFDB]"
           aria-hidden="true"

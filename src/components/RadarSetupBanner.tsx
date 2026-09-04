@@ -29,27 +29,27 @@ export function RadarSetupBanner({
   const steps = [
     {
       id: 'keyword',
-      title: 'Topic Monitored',
-      desc: 'Add at least 1 keyword',
+      title: 'Monitoring Active',
+      desc: 'At least one rule is checking conversations',
       done: keywordsCount > 0,
       link: '/keywords',
     },
     {
       id: 'inspect',
-      title: 'Inspect First Lead',
-      desc: 'Click a lead to view intent reasoning',
+      title: 'Review First Match',
+      desc: 'Check the context and intent evidence',
       done: hasInspectedLead,
     },
     {
       id: 'reply',
-      title: 'Copy / Approve Reply',
-      desc: 'Copy or approve an AI draft',
+      title: 'Prepare First Reply',
+      desc: 'Copy or approve a generated draft',
       done: hasCopiedOrApproved,
     },
     {
       id: 'autosend',
-      title: 'Auto-send Ready',
-      desc: 'Toggle Auto-send in topbar',
+      title: 'Delivery Controls Ready',
+      desc: 'Review and enable automatic delivery',
       done: autoSendEnabled,
     },
   ]
@@ -80,13 +80,13 @@ export function RadarSetupBanner({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-gray-900 tracking-tight">Signal Setup Progress</h3>
+              <h3 className="text-xs font-bold text-gray-900 tracking-tight">First-result progress</h3>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#0A84FF]">
                 {completedCount} of {steps.length} complete
               </span>
             </div>
             <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-              Complete these steps to improve your buyer-intent monitoring.
+              Verify the core workflow from monitoring to delivery.
             </p>
           </div>
         </div>

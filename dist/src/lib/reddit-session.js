@@ -1,0 +1,399 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RedditConnectionStateError = void 0;
+exports.saveRedditApisConnection = saveRedditApisConnection;
+exports.saveSprinklrRedditConnection = saveSprinklrRedditConnection;
+exports.saveBrowserRelayRedditConnection = saveBrowserRelayRedditConnection;
+exports.saveMcpAgentRedditConnection = saveMcpAgentRedditConnection;
+exports.saveHyperbrowserRedditConnection = saveHyperbrowserRedditConnection;
+exports.getActiveRedditSession = getActiveRedditSession;
+exports.hasActiveRedditConnection = hasActiveRedditConnection;
+exports.getHyperbrowserRedditConnectionForVerification = getHyperbrowserRedditConnectionForVerification;
+exports.updateRedditConnectionAccountProfile = updateRedditConnectionAccountProfile;
+exports.getRedditConnectionSummary = getRedditConnectionSummary;
+exports.markRedditConnectionHealthy = markRedditConnectionHealthy;
+exports.markRedditConnectionReauthRequired = markRedditConnectionReauthRequired;
+exports.recordRedditConnectionFailure = recordRedditConnectionFailure;
+const supabase_js_1 = require("@supabase/supabase-js");
+const encryption_1 = require("./encryption");
+const redditapis_contract_1 = require("./redditapis-contract");
+class RedditConnectionStateError extends Error {
+    code;
+    constructor(code) {
+        super(code);
+        this.code = code;
+        this.name = 'RedditConnectionStateError';
+    }
+}
+exports.RedditConnectionStateError = RedditConnectionStateError;
+// This module is shared by the Next.js request runtime and the standalone
+// worker, so it cannot import Next's `server-only` marker or the web-only admin
+// helper. It still creates a service-role client exclusively from server-side
+// environment variables and is never exposed through a client entry point.
+function getServiceRoleClient() {
+    return (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+function validateStoredSession(value, expectedProvider) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new RedditConnectionStateError('reddit_session_invalid');
+    }
+    const candidate = value;
+    if (candidate.version === 5) {
+        const username = typeof candidate.username === 'string'
+            ? candidate.username.trim().replace(/^u\//i, '')
+            : '';
+        const profileId = typeof candidate.profileId === 'string' ? candidate.profileId.trim() : '';
+        if (expectedProvider !== 'hyperbrowser'
+            || candidate.provider !== 'hyperbrowser'
+            || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+            || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId))
+            throw new RedditConnectionStateError('reddit_session_invalid');
+        return { version: 5, provider: 'hyperbrowser', username, profileId };
+    }
+    if (candidate.version === 4) {
+        const username = typeof candidate.username === 'string'
+            ? candidate.username.trim().replace(/^u\//i, '')
+            : '';
+        const clientId = typeof candidate.clientId === 'string' ? candidate.clientId.trim() : '';
+        if (expectedProvider !== 'mcp_agent'
+            || candidate.provider !== 'mcp_agent'
+            || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+            || !clientId
+            || clientId.length > 120)
+            throw new RedditConnectionStateError('reddit_session_invalid');
+        return { version: 4, provider: 'mcp_agent', username, clientId };
+    }
+    if (candidate.version === 3) {
+        const username = typeof candidate.username === 'string'
+            ? candidate.username.trim().replace(/^u\//i, '')
+            : '';
+        const connectorId = typeof candidate.connectorId === 'string' ? candidate.connectorId.trim() : '';
+        if (expectedProvider !== 'browser_relay'
+            || candidate.provider !== 'browser_relay'
+            || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+            || !/^[a-p]{32}$/.test(connectorId))
+            throw new RedditConnectionStateError('reddit_session_invalid');
+        return { version: 3, provider: 'browser_relay', username, connectorId };
+    }
+    if (candidate.version === 2) {
+        const username = typeof candidate.username === 'string'
+            ? candidate.username.trim().replace(/^u\//i, '')
+            : '';
+        const accountId = Number(candidate.accountId);
+        const channelId = typeof candidate.channelId === 'string' ? candidate.channelId.trim() : '';
+        if (expectedProvider !== 'sprinklr'
+            || candidate.provider !== 'sprinklr'
+            || !/^[A-Za-z0-9_-]{3,32}$/.test(username)
+            || !Number.isSafeInteger(accountId)
+            || accountId <= 0
+            || !channelId
+            || channelId.length > 200)
+            throw new RedditConnectionStateError('reddit_session_invalid');
+        return { version: 2, provider: 'sprinklr', username, accountId, channelId };
+    }
+    if (candidate.version !== 1 || expectedProvider !== 'redditapis') {
+        throw new RedditConnectionStateError('reddit_session_version_unsupported');
+    }
+    try {
+        const parsed = (0, redditapis_contract_1.parseRedditLoginResponse)({
+            success: true,
+            username: candidate.username,
+            cookies: candidate.cookies,
+        });
+        return { version: 1, provider: 'redditapis', username: parsed.username, cookies: parsed.cookies };
+    }
+    catch {
+        throw new RedditConnectionStateError('reddit_session_invalid');
+    }
+}
+async function saveRedditApisConnection(input) {
+    const stored = {
+        version: 1,
+        provider: 'redditapis',
+        username: input.login.username,
+        cookies: input.login.cookies,
+    };
+    const sessionCiphertext = (0, encryption_1.encrypt)(JSON.stringify(stored));
+    const { data, error } = await getServiceRoleClient().rpc('save_redditapis_connection_v1', {
+        p_user_id: input.userId,
+        p_username: input.login.username,
+        p_session_ciphertext: sessionCiphertext,
+        p_account_created_at: input.accountCreatedAt ?? null,
+        p_link_karma: input.linkKarma ?? input.login.linkKarma,
+        p_comment_karma: input.commentKarma ?? input.login.commentKarma,
+    });
+    if (error || !data) {
+        throw new RedditConnectionStateError('reddit_connection_save_failed');
+    }
+}
+async function saveSprinklrRedditConnection(input) {
+    const stored = {
+        version: 2,
+        provider: 'sprinklr',
+        username: input.username,
+        accountId: input.accountId,
+        channelId: input.channelId,
+    };
+    const sessionCiphertext = (0, encryption_1.encrypt)(JSON.stringify(stored));
+    const { data, error } = await getServiceRoleClient().rpc('save_sprinklr_reddit_connection_v1', {
+        p_user_id: input.userId,
+        p_username: input.username,
+        p_session_ciphertext: sessionCiphertext,
+        p_account_created_at: input.accountCreatedAt ?? null,
+        p_link_karma: input.linkKarma ?? null,
+        p_comment_karma: input.commentKarma ?? null,
+    });
+    if (error || !data) {
+        throw new RedditConnectionStateError('reddit_connection_save_failed');
+    }
+}
+async function saveBrowserRelayRedditConnection(input) {
+    const stored = {
+        version: 3,
+        provider: 'browser_relay',
+        username: input.username,
+        connectorId: input.connectorId,
+    };
+    const sessionCiphertext = (0, encryption_1.encrypt)(JSON.stringify(stored));
+    const { data, error } = await getServiceRoleClient().rpc('save_browser_relay_reddit_connection_v1', {
+        p_user_id: input.userId,
+        p_username: input.username,
+        p_session_ciphertext: sessionCiphertext,
+    });
+    if (error || !data) {
+        throw new RedditConnectionStateError('reddit_connection_save_failed');
+    }
+}
+async function saveMcpAgentRedditConnection(input) {
+    const stored = {
+        version: 4,
+        provider: 'mcp_agent',
+        username: input.username,
+        clientId: input.clientId,
+    };
+    const sessionCiphertext = (0, encryption_1.encrypt)(JSON.stringify(stored));
+    const { data, error } = await getServiceRoleClient().rpc('save_mcp_agent_reddit_connection_v1', {
+        p_user_id: input.userId,
+        p_username: input.username,
+        p_session_ciphertext: sessionCiphertext,
+    });
+    if (error || !data) {
+        throw new RedditConnectionStateError('reddit_connection_save_failed');
+    }
+}
+async function saveHyperbrowserRedditConnection(input) {
+    const stored = {
+        version: 5,
+        provider: 'hyperbrowser',
+        username: input.username,
+        profileId: input.profileId,
+    };
+    const sessionCiphertext = (0, encryption_1.encrypt)(JSON.stringify(stored));
+    const { data, error } = await getServiceRoleClient().rpc('save_hyperbrowser_reddit_connection_v1', {
+        p_user_id: input.userId,
+        p_username: input.username,
+        p_session_ciphertext: sessionCiphertext,
+        p_account_created_at: input.accountCreatedAt ?? null,
+        p_link_karma: input.linkKarma ?? null,
+        p_comment_karma: input.commentKarma ?? null,
+    });
+    if (error || !data) {
+        throw new RedditConnectionStateError('reddit_connection_save_failed');
+    }
+}
+async function getActiveRedditSession(userId) {
+    const admin = getServiceRoleClient();
+    const { data, error } = await admin
+        .from('reddit_connection_secrets')
+        .select('provider, session_ciphertext, status, account_created_at, link_karma, comment_karma')
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (error || !data) {
+        throw new RedditConnectionStateError('reddit_connection_required');
+    }
+    if (data.status === 'reauth_required') {
+        throw new RedditConnectionStateError('reddit_reconnect_required');
+    }
+    if (data.status !== 'active') {
+        throw new RedditConnectionStateError('reddit_connection_unavailable');
+    }
+    try {
+        return {
+            ...validateStoredSession(JSON.parse((0, encryption_1.decrypt)(data.session_ciphertext)), data.provider),
+            accountCreatedAt: data.account_created_at ?? null,
+            linkKarma: Number.isSafeInteger(data.link_karma) ? data.link_karma : null,
+            commentKarma: Number.isSafeInteger(data.comment_karma) ? data.comment_karma : null,
+        };
+    }
+    catch (error) {
+        await admin
+            .from('reddit_connection_secrets')
+            .update({
+            status: 'error',
+            last_error_code: 'reddit_session_decryption_failed',
+            updated_at: new Date().toISOString(),
+        })
+            .eq('user_id', userId);
+        if (error instanceof RedditConnectionStateError)
+            throw error;
+        throw new RedditConnectionStateError('reddit_session_decryption_failed');
+    }
+}
+async function hasActiveRedditConnection(userId) {
+    const { data, error } = await getServiceRoleClient()
+        .from('reddit_connection_secrets')
+        .select('connection_id, provider')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+    // Local browser and MCP agents establish identity and perform delivery on
+    // the user's device. Hyperbrowser is a server-side provider, so it is active.
+    if (error || !data)
+        return false;
+    return data.provider !== 'browser_relay' && data.provider !== 'mcp_agent';
+}
+async function getHyperbrowserRedditConnectionForVerification(userId) {
+    const { data, error } = await getServiceRoleClient()
+        .from('reddit_connection_secrets')
+        .select('provider, session_ciphertext')
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (error || !data || data.provider !== 'hyperbrowser') {
+        throw new RedditConnectionStateError('hyperbrowser_profile_connection_required');
+    }
+    try {
+        const session = validateStoredSession(JSON.parse((0, encryption_1.decrypt)(data.session_ciphertext)), data.provider);
+        if (session.provider !== 'hyperbrowser') {
+            throw new RedditConnectionStateError('reddit_session_invalid');
+        }
+        return session;
+    }
+    catch (error) {
+        if (error instanceof RedditConnectionStateError)
+            throw error;
+        throw new RedditConnectionStateError('reddit_session_decryption_failed');
+    }
+}
+async function updateRedditConnectionAccountProfile(userId, profile) {
+    const { data, error } = await getServiceRoleClient()
+        .from('reddit_connection_secrets')
+        .update({
+        account_created_at: profile.accountCreatedAt,
+        link_karma: profile.linkKarma,
+        comment_karma: profile.commentKarma,
+        updated_at: new Date().toISOString(),
+    })
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .select('connection_id')
+        .maybeSingle();
+    if (error || !data) {
+        throw new RedditConnectionStateError('reddit_account_profile_save_failed');
+    }
+}
+async function getRedditConnectionSummary(userId) {
+    const admin = getServiceRoleClient();
+    const [{ data: connection, error: connectionError }, { data: secret, error: secretError }] = await Promise.all([
+        admin
+            .from('platform_connections')
+            .select('external_username')
+            .eq('user_id', userId)
+            .eq('platform', 'reddit')
+            .maybeSingle(),
+        admin
+            .from('reddit_connection_secrets')
+            .select('provider, status, last_verified_at, last_used_at, account_created_at, link_karma, comment_karma, last_error_code')
+            .eq('user_id', userId)
+            .maybeSingle(),
+    ]);
+    if (connectionError)
+        throw connectionError;
+    if (!connection) {
+        return {
+            provider: null,
+            username: null,
+            status: 'missing',
+            lastVerifiedAt: null,
+            lastUsedAt: null,
+            accountCreatedAt: null,
+            linkKarma: null,
+            commentKarma: null,
+            lastErrorCode: null,
+        };
+    }
+    const status = secretError || !secret
+        ? 'reauth_required'
+        : secret.status === 'active' || secret.status === 'reauth_required' || secret.status === 'error'
+            ? secret.status
+            : 'error';
+    return {
+        provider: secret?.provider === 'redditapis'
+            || secret?.provider === 'sprinklr'
+            || secret?.provider === 'browser_relay'
+            || secret?.provider === 'mcp_agent'
+            || secret?.provider === 'hyperbrowser'
+            ? secret.provider
+            : null,
+        username: connection.external_username,
+        status,
+        lastVerifiedAt: secret?.last_verified_at ?? null,
+        lastUsedAt: secret?.last_used_at ?? null,
+        accountCreatedAt: secret?.account_created_at ?? null,
+        linkKarma: secret?.link_karma ?? null,
+        commentKarma: secret?.comment_karma ?? null,
+        lastErrorCode: secret?.last_error_code ?? null,
+    };
+}
+async function markRedditConnectionHealthy(userId) {
+    const now = new Date().toISOString();
+    const admin = getServiceRoleClient();
+    const { error } = await admin
+        .from('reddit_connection_secrets')
+        .update({
+        status: 'active',
+        last_verified_at: now,
+        last_used_at: now,
+        consecutive_failures: 0,
+        last_error_code: null,
+        updated_at: now,
+    })
+        .eq('user_id', userId);
+    if (error)
+        throw error;
+    const resolved = await admin.rpc('resolve_reddit_user_incidents_v1', {
+        p_user_id: userId,
+    });
+    if (resolved.error)
+        throw resolved.error;
+}
+async function markRedditConnectionReauthRequired(userId, errorCode = 'reddit_reconnect_required') {
+    const admin = getServiceRoleClient();
+    const now = new Date().toISOString();
+    await Promise.all([
+        admin
+            .from('reddit_connection_secrets')
+            .update({
+            status: 'reauth_required',
+            last_error_code: errorCode,
+            updated_at: now,
+        })
+            .eq('user_id', userId),
+        admin
+            .from('job_outbox')
+            .update({
+            status: 'cancelled',
+            dispatched_at: now,
+            last_error: 'Automatic delivery cancelled: Reddit reconnect required',
+        })
+            .eq('user_id', userId)
+            .eq('kind', 'auto_send')
+            .in('status', ['pending', 'dispatched'])
+            .contains('payload', { platform: 'reddit' }),
+    ]);
+}
+async function recordRedditConnectionFailure(userId, errorCode) {
+    const { data, error } = await getServiceRoleClient().rpc('increment_reddit_connection_failure_v1', { p_user_id: userId, p_error_code: errorCode });
+    if (error)
+        throw error;
+    return Number(data) || 0;
+}

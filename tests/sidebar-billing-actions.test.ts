@@ -8,17 +8,15 @@ const layout = readFileSync(
 ).replace(/\r\n/g, '\n')
 
 describe('sidebar billing actions', () => {
-  it('keeps current-plan credit packs separate from subscription upgrades', () => {
-    expect(layout).toContain('CreditPackPicker')
-    expect(layout).toContain('initialType="drafts"')
-    expect(layout).toContain("openCheckout({ plan: plan === 'free'")
-    expect(layout).not.toContain("handleBuyAddon('drafts')")
-    expect(layout).toContain("'Upgrade'")
-    expect(layout).not.toContain('draftAddonAvailable')
+  it('uses one permanent route to plan, usage, and billing controls', () => {
+    expect(layout).not.toContain('CreditPackPicker')
+    expect(layout).toContain('href="/settings?section=plan"')
+    expect(layout).toContain('Plan &amp; usage')
+    expect(layout).not.toContain('handleUpgradePlan')
   })
 
-  it('shows independent checkout progress for each action', () => {
-    expect(layout).toContain("openingCheckout === 'upgrade'")
-    expect(layout).toContain('disabled={Boolean(openingCheckout)}')
+  it('keeps the current plan visible without embedding another purchase prompt', () => {
+    expect(layout).toContain('{plan} Plan')
+    expect(layout).not.toContain("openingCheckout === 'upgrade'")
   })
 })

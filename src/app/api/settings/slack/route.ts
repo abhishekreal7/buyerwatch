@@ -4,8 +4,9 @@ import { getServiceRoleClient } from '@/lib/admin'
 import { encrypt } from '@/lib/encryption'
 import { isAllowedSlackWebhookUrl } from '@/lib/security/outbound-url'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
-import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
+import { boundedString, isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 import { getPlanLimits } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 
 export async function GET() {
   try {
@@ -15,12 +16,12 @@ export async function GET() {
 
     const { data, error } = await getServiceRoleClient()
       .from('profiles')
-      .select('plan, slack_webhook_ciphertext, slack_webhook_url, slack_notify_threshold')
+      .select('plan, billing_status, billing_subscription_id, slack_webhook_ciphertext, slack_webhook_url, slack_notify_threshold')
       .eq('id', user.id)
       .single()
     if (error) throw error
 
-    const available = getPlanLimits(data?.plan).slackNotifications
+    const available = getPlanLimits(getEntitledPlan(data)).slackNotifications
     return NextResponse.json({
       available,
       configured: Boolean(data?.slack_webhook_ciphertext || data?.slack_webhook_url),
@@ -34,6 +35,9 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
+    if (!isTrustedSameOriginMutation(request)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -59,11 +63,11 @@ export async function PATCH(request: Request) {
 
     const { data: profile, error: profileError } = await getServiceRoleClient()
       .from('profiles')
-      .select('plan')
+      .select('plan, billing_status, billing_subscription_id')
       .eq('id', user.id)
       .single()
     if (profileError) throw profileError
-    if (!getPlanLimits(profile?.plan).slackNotifications) {
+    if (!getPlanLimits(getEntitledPlan(profile)).slackNotifications) {
       return NextResponse.json({ error: 'plan_feature_unavailable', feature: 'slack_notifications' }, { status: 403 })
     }
 

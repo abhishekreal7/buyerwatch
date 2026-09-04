@@ -11,6 +11,7 @@ import {
   calculateAutomationDecision,
   evaluateAutoSendContentPolicy,
   evaluateAutoSendIntentPolicy,
+  evaluateInstantAutopilot,
 } from '../src/lib/confidence-engine'
 import {
   getIntentDisplayLabel,
@@ -310,8 +311,16 @@ describe('auto-send policy', () => {
     })?.reason).toBe('auto_send_requires_paid_plan')
     expect(evaluateAutoSendContentPolicy(safeDraft, {
       plan: 'pro',
+      billing_status: 'active',
+      billing_subscription_id: 'sub_test',
       auto_send_enabled: false,
     })?.reason).toBe('auto_send_disabled')
+    expect(evaluateAutoSendContentPolicy(safeDraft, {
+      plan: 'starter',
+      billing_status: 'active',
+      billing_subscription_id: 'sub_test',
+      auto_send_enabled: true,
+    })).toBeNull()
   })
 
   it('requires a verified score at or above the configured high-intent threshold', () => {
@@ -327,6 +336,8 @@ describe('auto-send policy', () => {
       flagged: true,
     }, {
       plan: 'pro',
+      billing_status: 'active',
+      billing_subscription_id: 'sub_test',
       auto_send_enabled: true,
     })?.reason).toBe('reply_quality_blocked')
   })
@@ -334,6 +345,8 @@ describe('auto-send policy', () => {
   it('requires disclosure only for a commercial reference', () => {
     expect(evaluateAutoSendContentPolicy(safeDraft, {
       plan: 'pro',
+      billing_status: 'active',
+      billing_subscription_id: 'sub_test',
       auto_send_enabled: true,
     })).toBeNull()
     expect(evaluateAutoSendContentPolicy({
@@ -341,6 +354,8 @@ describe('auto-send policy', () => {
       mentionedProduct: true,
     }, {
       plan: 'pro',
+      billing_status: 'active',
+      billing_subscription_id: 'sub_test',
       auto_send_enabled: true,
     })?.reason).toBe('missing_disclosure')
   })
@@ -363,6 +378,64 @@ describe('auto-send policy', () => {
     })
     expect(learned.dynamicThreshold).toBe(90)
     expect(learned.approved).toBe(true)
+  })
+
+  it('allows exactly the strict cold-start decision used by Instant Autopilot', () => {
+    const now = Date.parse('2026-08-27T01:00:00.000Z')
+    expect(evaluateInstantAutopilot({
+      plan: 'starter',
+      activatedAt: '2026-08-27T00:00:00.000Z',
+      expiresAt: '2026-09-03T00:00:00.000Z',
+      usedAt: null,
+      intentScore: 90,
+      totalDraftsReviewed: 0,
+      now,
+    })?.reason).toBe('instant_autopilot_eligible')
+    expect(evaluateInstantAutopilot({
+      plan: 'pro',
+      activatedAt: '2026-08-27T00:00:00.000Z',
+      expiresAt: '2026-09-03T00:00:00.000Z',
+      usedAt: null,
+      intentScore: 90,
+      totalDraftsReviewed: 0,
+      now,
+    })?.reason).toBe('instant_autopilot_eligible')
+    expect(evaluateInstantAutopilot({
+      plan: 'growth',
+      activatedAt: '2026-08-27T00:00:00.000Z',
+      expiresAt: '2026-09-03T00:00:00.000Z',
+      usedAt: null,
+      intentScore: 90,
+      totalDraftsReviewed: 0,
+      now,
+    })?.reason).toBe('instant_autopilot_eligible')
+    expect(evaluateInstantAutopilot({
+      plan: 'starter',
+      activatedAt: '2026-08-27T00:00:00.000Z',
+      expiresAt: '2026-09-03T00:00:00.000Z',
+      usedAt: null,
+      intentScore: 89,
+      totalDraftsReviewed: 0,
+      now,
+    })?.reason).toBe('instant_autopilot_below_threshold')
+    expect(evaluateInstantAutopilot({
+      plan: 'starter',
+      activatedAt: '2026-08-27T00:00:00.000Z',
+      expiresAt: '2026-09-03T00:00:00.000Z',
+      usedAt: '2026-08-27T01:00:00.000Z',
+      intentScore: 100,
+      totalDraftsReviewed: 0,
+      now,
+    })).toBeNull()
+    expect(evaluateInstantAutopilot({
+      plan: 'starter',
+      activatedAt: '2026-08-20T00:00:00.000Z',
+      expiresAt: '2026-08-27T00:00:00.000Z',
+      usedAt: null,
+      intentScore: 100,
+      totalDraftsReviewed: 0,
+      now,
+    })).toBeNull()
   })
 })
 
@@ -438,6 +511,7 @@ describe('onboarding validation', () => {
       business_type: 'saas',
       writing_style: 'Direct and helpful.',
       reddit_username: '',
+      discovery_source: 'prefer_not_to_say',
       keywords: [{ term: 'looking for a tool', platform: 'reddit', target: 'SaaS' }],
     })).toBeNull()
   })

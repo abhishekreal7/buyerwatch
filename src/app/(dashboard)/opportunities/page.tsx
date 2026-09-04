@@ -146,8 +146,8 @@ function LeadRow({
       onClick={onClick}
       className={`w-full text-left rounded-xl p-3.5 transition-all duration-150 relative group ${
         isActive
-          ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-black/[0.08] border-l-[3.5px] border-l-[#0A84FF]'
-          : 'bg-white/60 hover:bg-white hover:shadow-xs ring-1 ring-black/[0.04] border-l-[3.5px] border-l-transparent'
+          ? 'bg-white shadow-[0_4px_14px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] ring-2 ring-neutral-900'
+          : 'bg-white/70 hover:bg-white hover:shadow-xs ring-1 ring-black/[0.05]'
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">

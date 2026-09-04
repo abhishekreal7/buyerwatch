@@ -13,6 +13,7 @@ const WEB_RUNTIME_ENV = [
   'NEXT_PUBLIC_APP_URL',
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'UPSTASH_REDIS_URL',
 ] as const
 
 const WORKER_PRODUCTION_ENV = [
@@ -231,6 +232,7 @@ function validateOptionalProviders(): void {
   ) {
     throw new Error('Hyperbrowser posting is enabled but HYPERBROWSER_API_KEY is missing')
   }
+  assertOptionalInteger('HYPERBROWSER_REDDIT_MAX_CONCURRENCY', 1, 25)
   assertOptionalInteger('HYPERBROWSER_CREDIT_ALERT_PERCENT', 1, 100)
   assertCompleteOptionalGroup(SPRINKLR_REDDIT_REQUIRED_ENV, 'Sprinklr Reddit')
   assertOptionalBoolean('SPRINKLR_REDDIT_DISCOVERY_ENABLED')

@@ -50,3 +50,6 @@ next-env.d.ts
 # temp / artifacts
 /tmp/
 /artifacts/
+
+# Cloudflare Wrangler local state
+/cloudflare/.wrangler/

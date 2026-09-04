@@ -21,7 +21,17 @@ enabled = false
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://127.0.0.1:3000/auth/callback"]
+additional_redirect_urls = [
+  "http://127.0.0.1:3000/auth/callback",
+  "http://127.0.0.1:3000/auth/confirm",
+  "http://127.0.0.1:3000/auth/recovery",
+  "https://buyerwatch.co/auth/callback",
+  "https://buyerwatch.co/auth/confirm",
+  "https://buyerwatch.co/auth/recovery",
+  "https://www.buyerwatch.co/auth/callback",
+  "https://www.buyerwatch.co/auth/confirm",
+  "https://www.buyerwatch.co/auth/recovery",
+]
 jwt_expiry = 3600
 enable_signup = true
 

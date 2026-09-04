@@ -52,7 +52,7 @@ export default function AboutPage() {
                 <div>
                   <h3 className="font-semibold text-neutral-900 mb-1">Authentic Human Connection</h3>
                   <p className="text-[14px] text-neutral-500">
-                    Manual review is the default. Guarded auto-send is optional on eligible paid plans and unlocks only after trust-building reviews, with confidence and content safeguards applied to every reply.
+                    Manual review is the default. The card-required 7-day Starter trial can explicitly activate one strictly guarded automatic reply; ongoing auto-send unlocks after trust-building reviews, with confidence and content safeguards applied to every reply.
                   </p>
                 </div>
               </div>

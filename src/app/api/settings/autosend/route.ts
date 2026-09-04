@@ -9,6 +9,7 @@ import { isRedditDirectPostingConfigured } from '@/lib/reddit-post'
 import { hasActiveRedditConnection } from '@/lib/reddit-session'
 import { getRedditDeliveryControl } from '@/lib/reddit-service-safety'
 import { isXPostingConfigured } from '@/lib/x-post'
+import { getEntitledPlan, hasActiveSubscription } from '@/lib/billing-entitlements'
 
 export async function PATCH(req: Request) {
   try {
@@ -35,12 +36,14 @@ export async function PATCH(req: Request) {
 
     const body = await readJsonBody<Record<string, unknown>>(req, 4_096)
     const enabled = body.auto_send_enabled
-    const threshold = typeof body.auto_send_threshold === 'number'
+    let threshold = typeof body.auto_send_threshold === 'number'
       ? body.auto_send_threshold
       : undefined
-    const dailyLimit = typeof body.auto_send_daily_limit === 'number'
+    let dailyLimit = typeof body.auto_send_daily_limit === 'number'
       ? body.auto_send_daily_limit
       : undefined
+    const instantAutopilotRequested = body.instant_autopilot === true
+    let instantAutopilotActivation = false
     const platforms = Array.isArray(body.auto_send_platforms)
       ? body.auto_send_platforms.filter((value): value is string => typeof value === 'string')
       : undefined
@@ -83,16 +86,17 @@ export async function PATCH(req: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('plan, auto_send_enabled, auto_send_platforms')
+      .select('plan, billing_status, billing_subscription_id, auto_send_enabled, auto_send_platforms, instant_autopilot_granted_at, instant_autopilot_expires_at, instant_autopilot_activated_at, instant_autopilot_used_at')
       .eq('id', user.id)
       .single()
     if (!profile) return NextResponse.json({ error: 'profile_not_found' }, { status: 404 })
 
+    const entitledPlan = getEntitledPlan(profile)
     const isActivating = enabled && profile.auto_send_enabled !== true
-    if (enabled && !getPlanLimits(profile.plan).autoSend) {
+    if (enabled && !getPlanLimits(entitledPlan).autoSend) {
       return NextResponse.json({ error: 'auto_send_requires_paid_plan' }, { status: 403 })
     }
-    if (platforms?.some(platform => !canMonitorPlatform(profile.plan, platform))) {
+    if (platforms?.some(platform => !canMonitorPlatform(entitledPlan, platform))) {
       return NextResponse.json({ error: 'platform_requires_professional_plan' }, { status: 403 })
     }
     if (isActivating) {
@@ -102,11 +106,21 @@ export async function PATCH(req: Request) {
         .eq('user_id', user.id)
         .maybeSingle()
       const reviewed = Number(trust?.total_drafts_reviewed) || 0
-      if (reviewed < 10) {
+      const instantAutopilotAvailable = instantAutopilotRequested
+        && hasActiveSubscription(profile)
+        && Boolean(profile.instant_autopilot_granted_at)
+        && Date.parse(profile.instant_autopilot_expires_at ?? '') > Date.now()
+        && !profile.instant_autopilot_used_at
+      if (reviewed < 10 && !instantAutopilotAvailable) {
         return NextResponse.json(
           { error: 'auto_send_trust_gate_incomplete', reviewed, required: 10 },
           { status: 409 },
         )
+      }
+      if (instantAutopilotAvailable) {
+        instantAutopilotActivation = true
+        threshold = Math.max(90, threshold ?? 90)
+        dailyLimit = 1
       }
       if (body.activation_acknowledged !== true) {
         return NextResponse.json(
@@ -168,6 +182,9 @@ export async function PATCH(req: Request) {
     if (platforms !== undefined) update.auto_send_platforms = platforms
     if (communities !== undefined) update.auto_send_communities = communities
     if (isActivating) update.auto_send_activated_at = new Date().toISOString()
+    if (instantAutopilotActivation) {
+      update.instant_autopilot_activated_at = new Date().toISOString()
+    }
 
     const { error } = await admin.from('profiles').update(update).eq('id', user.id)
     if (error) return NextResponse.json({ error: 'settings_update_failed' }, { status: 500 })
@@ -179,6 +196,7 @@ export async function PATCH(req: Request) {
       auto_send_daily_limit: dailyLimit,
       auto_send_platforms: platforms,
       auto_send_communities: communities,
+      instant_autopilot: instantAutopilotActivation,
     })
   } catch (error) {
     if (error instanceof RequestInputError) {

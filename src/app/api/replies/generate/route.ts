@@ -3,25 +3,34 @@ import { randomBytes } from 'node:crypto'
 import { createClient } from '@/utils/supabase/server'
 import { draftReply } from '@/lib/draft-reply'
 import { NormalizedPost } from '@/lib/types'
-import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { getPlanLimits } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 import { buildAttributionShortUrl } from '@/lib/attribution'
 import { ensureAttributionMapping } from '@/lib/attribution-store'
 import { getAppUrl } from '@/lib/app-url'
 import { getServiceRoleClient } from '@/lib/admin'
 import {
+  getAiErrorTelemetry,
   getAiUsageFromError,
-  recordAiUsage,
-  releaseAiSpend,
   reserveAiSpend,
 } from '@/lib/ai-usage'
+import {
+  releaseAiSpendDurably,
+  releaseMonthlyDraftDurably,
+  settleAiUsageDurably,
+} from '@/lib/ai-settlement'
 import { aiRateLimit, getIp } from '@/lib/ratelimit'
-import { isUuid, readJsonBody, RequestInputError } from '@/lib/request'
+import { isTrustedSameOriginMutation, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 import { recordEngagementEvent } from '@/lib/automation-audit'
 import { BILLING_ADDONS } from '@/lib/billing-addons'
 import { getConfiguredSecret, isDevelopmentMockEnabled } from '@/lib/env'
+import { logger } from '@/lib/logger'
 
 export async function POST(req: Request) {
   try {
+    if (!isTrustedSameOriginMutation(req)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -69,14 +78,14 @@ export async function POST(req: Request) {
 
     const { data: extendedProfile } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, tone_examples, plan, referral_tracking_enabled')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, tone_examples, plan, billing_status, billing_subscription_id, referral_tracking_enabled')
       .eq('id', user.id)
       .single()
     let profile = extendedProfile
     if (!profile) {
       const { data: legacyProfile } = await supabase
         .from('profiles')
-        .select('business_name, business_description, business_url, business_type, writing_style, tone_examples, plan, referral_tracking_enabled')
+        .select('business_name, business_description, business_url, business_type, writing_style, tone_examples, plan, billing_status, billing_subscription_id, referral_tracking_enabled')
         .eq('id', user.id)
         .single()
       profile = legacyProfile
@@ -88,8 +97,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    const plan = normalizePlan(profile.plan)
+    const plan = getEntitledPlan(profile)
     const limits = getPlanLimits(plan)
+    if (plan === 'free') {
+      return NextResponse.json(
+        {
+          error: 'trial_required',
+          message: 'Start your card-verified 7-day Starter trial to generate AI replies.',
+        },
+        { status: 403 },
+      )
+    }
 
     // 2. Map thread to NormalizedPost format for drafting.
     const post: NormalizedPost = {
@@ -153,11 +171,17 @@ export async function POST(req: Request) {
       },
     )
     if (reserveError) {
-      await releaseAiSpend(admin, aiSpend.id)
+      await releaseAiSpendDurably(admin, {
+        reservationId: aiSpend.id,
+        userId: user.id,
+      })
       return NextResponse.json({ error: 'draft_usage_check_failed' }, { status: 500 })
     }
     if (!reserved) {
-      await releaseAiSpend(admin, aiSpend.id)
+      await releaseAiSpendDurably(admin, {
+        reservationId: aiSpend.id,
+        userId: user.id,
+      })
       return NextResponse.json(
         {
           error: 'plan_limit_reached',
@@ -172,12 +196,16 @@ export async function POST(req: Request) {
     try {
       draftResult = await draftReply(post, profile, thread.intent_score || 0, trackingUrl)
       try {
-        await recordAiUsage(admin, {
+        await settleAiUsageDurably(admin, {
           reservationId: aiSpend.id,
+          userId: user.id,
           usage: draftResult.usage,
         })
       } catch (usageError) {
-        console.error('Failed to record manual draft AI usage:', usageError)
+        logger.error(
+          { usageError, reservationId: aiSpend.id },
+          'Failed to durably settle manual draft AI usage',
+        )
       }
     } catch (draftError) {
       const failedUsage = getAiUsageFromError(draftError)
@@ -187,21 +215,33 @@ export async function POST(req: Request) {
           || failedUsage.outputTokens > 0
           || failedUsage.estimatedCostMicrousd > 0
         ) {
-          await recordAiUsage(admin, {
+          await settleAiUsageDurably(admin, {
             reservationId: aiSpend.id,
+            userId: user.id,
             usage: failedUsage,
           })
         } else {
-          await releaseAiSpend(admin, aiSpend.id)
+          await releaseAiSpendDurably(admin, {
+            reservationId: aiSpend.id,
+            userId: user.id,
+          })
         }
       } catch (usageError) {
-        console.error('Failed to settle failed manual draft usage:', usageError)
+        logger.error(
+          { usageError, reservationId: aiSpend.id },
+          'Failed to durably settle failed manual draft usage',
+        )
       }
-      const { error: releaseError } = await admin.rpc('release_monthly_draft', {
-        p_user_id: user.id,
-      })
-      if (releaseError) {
-        console.error('Failed to release manual draft allowance:', releaseError)
+      try {
+        await releaseMonthlyDraftDurably(admin, {
+          reservationId: aiSpend.id,
+          userId: user.id,
+        })
+      } catch (releaseError) {
+        logger.error(
+          { releaseError, reservationId: aiSpend.id },
+          'Failed to durably release manual draft allowance',
+        )
       }
       throw draftError
     }
@@ -213,11 +253,16 @@ export async function POST(req: Request) {
       p_draft_text: draftResult.text,
     })
     if (saveError) {
-      const { error: releaseError } = await admin.rpc('release_monthly_draft', {
-        p_user_id: user.id,
-      })
-      if (releaseError) {
-        console.error('Failed to release manual draft allowance after save failure:', releaseError)
+      try {
+        await releaseMonthlyDraftDurably(admin, {
+          reservationId: aiSpend.id,
+          userId: user.id,
+        })
+      } catch (releaseError) {
+        logger.error(
+          { releaseError, reservationId: aiSpend.id },
+          'Failed to durably release manual draft allowance after save failure',
+        )
       }
       return NextResponse.json({ error: 'draft_save_failed' }, { status: 500 })
     }
@@ -235,7 +280,10 @@ export async function POST(req: Request) {
       },
       idempotencyKey: `${threadId}:draft-generated:${aiSpend.id}`,
     }).catch((auditError) => {
-      console.error('[replies/generate] Draft audit failed', auditError)
+      logger.error(
+        { code: auditError instanceof Error ? auditError.name : 'unknown' },
+        'Draft audit recording failed',
+      )
     })
 
     return NextResponse.json({ success: true, draft: draftResult.text })
@@ -243,7 +291,7 @@ export async function POST(req: Request) {
     if (error instanceof RequestInputError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
-    console.error('Error generating draft:', error)
+    logger.error(getAiErrorTelemetry(error), 'Draft generation request failed')
     return NextResponse.json(
       {
         error: 'draft_generation_failed',

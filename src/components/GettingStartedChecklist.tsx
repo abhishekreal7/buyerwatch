@@ -25,27 +25,27 @@ export function GettingStartedChecklist({
   const steps = [
     {
       id: 'keyword',
-      title: 'Topic Monitored',
-      desc: 'Set up at least 1 keyword',
+      title: 'Monitoring Active',
+      desc: 'At least one rule is checking conversations',
       done: keywordsCount > 0,
       link: '/keywords',
     },
     {
       id: 'inspect',
-      title: 'First Lead Inspected',
-      desc: 'Clicked a thread to view intent details',
+      title: 'First Match Reviewed',
+      desc: 'Review the context and intent evidence',
       done: hasInspectedLead,
     },
     {
       id: 'reply',
-      title: 'Reply Copied / Approved',
-      desc: 'Copied or approved an AI draft',
+      title: 'First Reply Prepared',
+      desc: 'Copy or approve a generated draft',
       done: hasCopiedOrApproved,
     },
     {
       id: 'autosend',
-      title: 'Auto-send Enabled',
-      desc: 'Toggled Auto-send in topbar',
+      title: 'Delivery Controls Ready',
+      desc: 'Review and enable automatic delivery',
       done: autoSendEnabled,
     },
   ]
@@ -97,7 +97,7 @@ export function GettingStartedChecklist({
         <div className="w-5 h-5 rounded-full bg-blue-50 text-[#0A84FF] flex items-center justify-center font-extrabold text-[11px] border border-blue-100">
           {completedCount}
         </div>
-        <span>Setup {completedCount}/{steps.length}</span>
+        <span>Activation {completedCount}/{steps.length}</span>
       </button>
 
       {/* Smooth Pop-Up Animated Toast Modal */}
@@ -120,14 +120,14 @@ export function GettingStartedChecklist({
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
-                      Step Accomplished!
+                      Activation progress
                     </span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
                       {completedCount}/{steps.length}
                     </span>
                   </div>
                   <h4 className="text-xs font-bold text-gray-900 tracking-tight mt-0.5">
-                    {justCompletedStep || 'Signal Setup Progress'}
+                    {justCompletedStep || 'First-result progress'}
                   </h4>
                 </div>
               </div>
@@ -178,7 +178,7 @@ export function GettingStartedChecklist({
 
             {isAllComplete && (
               <div className="p-3 bg-emerald-500 text-white rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm">
-                <Sparkles className="w-4 h-4" /> Your signal radar is ready
+                <Sparkles className="w-4 h-4" /> Core workflow verified
               </div>
             )}
           </motion.div>

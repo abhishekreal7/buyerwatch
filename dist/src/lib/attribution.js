@@ -20,11 +20,12 @@ function buildAttributionShortUrl(appUrl, token) {
 }
 function buildAttributionDestinationUrl(businessUrl, token) {
     const safeToken = assertAttributionToken(token);
-    const url = new URL(businessUrl);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+    const url = (0, outbound_url_1.getSafeAttributionRedirectUrl)(businessUrl);
+    if (!url) {
         throw new Error('Invalid attribution destination');
     }
     url.searchParams.set('ref', 'buyerwatch');
     url.searchParams.set('sid', safeToken);
     return url.toString();
 }
+const outbound_url_1 = require("./security/outbound-url");

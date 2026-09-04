@@ -6,9 +6,15 @@ REGION="us-central1"
 SERVICE_NAME="buyerwatch-worker"
 MIN_INSTANCES="${MIN_INSTANCES:-1}"
 MAX_INSTANCES="${MAX_INSTANCES:-2}"
+HYPERBROWSER_REDDIT_MAX_CONCURRENCY="${HYPERBROWSER_REDDIT_MAX_CONCURRENCY:-1}"
 
 if (( MAX_INSTANCES < MIN_INSTANCES )); then
   echo "MAX_INSTANCES must be greater than or equal to MIN_INSTANCES." >&2
+  exit 1
+fi
+
+if (( HYPERBROWSER_REDDIT_MAX_CONCURRENCY < 1 || HYPERBROWSER_REDDIT_MAX_CONCURRENCY > 25 )); then
+  echo "HYPERBROWSER_REDDIT_MAX_CONCURRENCY must be between 1 and 25." >&2
   exit 1
 fi
 
@@ -44,7 +50,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --readiness-probe "httpGet.path=/readyz,httpGet.port=3001,initialDelaySeconds=5,timeoutSeconds=5,periodSeconds=10,failureThreshold=3" \
   --liveness-probe "httpGet.path=/healthz,httpGet.port=3001,initialDelaySeconds=30,timeoutSeconds=5,periodSeconds=30,failureThreshold=3" \
   --allow-unauthenticated \
-  --update-env-vars "NODE_ENV=production,GCP_PROJECT=$PROJECT_ID,GCP_LOCATION=$REGION"
+  --update-env-vars "NODE_ENV=production,GCP_PROJECT=$PROJECT_ID,GCP_LOCATION=$REGION,HYPERBROWSER_REDDIT_MAX_CONCURRENCY=$HYPERBROWSER_REDDIT_MAX_CONCURRENCY"
 
 SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" \
   --region "$REGION" \

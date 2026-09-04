@@ -11,8 +11,9 @@ import { AppPage } from '@/components/AppPage'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { canMonitorPlatform, getPlanLimits, normalizePlan, PLAN_POLL_INTERVAL_MINUTES } from '@/lib/plan-limits'
+import { getEntitledPlan, hasActiveSubscription } from '@/lib/billing-entitlements'
 import { useDashboardSession } from '@/components/DashboardContext'
-import { fetchAllPages } from '@/lib/supabase-pagination'
+import { fetchAllByKey } from '@/lib/supabase-pagination'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
 import { DataLoadError } from '@/components/DataLoadError'
 import { getKeywordPollIssueLabel, isKeywordPollDelayed } from '@/lib/monitoring-health'
@@ -51,7 +52,7 @@ const PLATFORM_META: Record<Platform, { label: string; color: string; bg: string
 }
 
 /* ─── Tiny primitives ────────────────────────────────────────────── */
-function StatusPill({ active, onClick }: { active: boolean; onClick: () => void }) {
+function StatusPill({ active, waitingForTrial, onClick }: { active: boolean; waitingForTrial: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -60,13 +61,15 @@ function StatusPill({ active, onClick }: { active: boolean; onClick: () => void 
         onClick()
       }}
       className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[12px] font-medium transition-all duration-150 cursor-pointer ${
-        active
+        active && !waitingForTrial
           ? 'bg-[#EAF7F2] text-[#0F8A50] border border-[#C5EFE0] hover:bg-[#DDF3EA]'
+          : active && waitingForTrial
+            ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
           : 'bg-[#F2F2F0] text-[#5C5C56] border border-[#E2E2DE] hover:bg-[#E7E7E3]'
       }`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-[#0F8A50]' : 'bg-[#7E7E78]'}`} />
-      {active ? 'Active' : 'Paused'}
+      <span className={`w-1.5 h-1.5 rounded-full ${active && !waitingForTrial ? 'bg-[#0F8A50]' : active ? 'bg-amber-500' : 'bg-[#7E7E78]'}`} />
+      {active ? waitingForTrial ? 'Waiting for trial' : 'Active' : 'Paused'}
     </button>
   )
 }
@@ -121,6 +124,8 @@ export default function KeywordsPage() {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<Record<string, { total: number; replied: number }>>({})
   const [userPlan, setUserPlan] = useState<string>('free')
+  const [subscriptionActive, setSubscriptionActive] = useState(false)
+  const [openingTrial, setOpeningTrial] = useState(false)
   const [redditScheduledDiscovery, setRedditScheduledDiscovery] = useState(false)
   const termRef = useRef<HTMLInputElement>(null)
   const [supabase] = useState(createClient)
@@ -162,16 +167,30 @@ export default function KeywordsPage() {
             return payload as { capabilities?: { redditScheduledDiscovery?: boolean } }
           })
         const [profileResult, keywordsResult, threadsResult, providerResult] = await Promise.all([
-          supabase.from('profiles').select('plan').eq('id', userId).single(),
+          supabase.from('profiles').select('plan, billing_status, billing_subscription_id').eq('id', userId).single(),
           supabase.from('keywords').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-          fetchAllPages((from, to) => supabase.from('monitored_threads').select('keyword_id, status').eq('user_id', userId).not('intent_score', 'is', null).range(from, to)),
+          fetchAllByKey(
+            (afterId, limit) => {
+              let query = supabase
+                .from('monitored_threads')
+                .select('id, keyword_id, status')
+                .eq('user_id', userId)
+                .not('intent_score', 'is', null)
+                .order('id', { ascending: true })
+                .limit(limit)
+              if (afterId) query = query.gt('id', afterId)
+              return query
+            },
+            row => row.id,
+          ),
           capabilitiesPromise,
         ])
         const queryError = [profileResult, keywordsResult, threadsResult]
           .find(result => result.error)?.error
         if (queryError) throw queryError
 
-        setUserPlan(normalizePlan(profileResult.data?.plan))
+        setUserPlan(getEntitledPlan(profileResult.data))
+        setSubscriptionActive(hasActiveSubscription(profileResult.data))
         setRedditScheduledDiscovery(Boolean(providerResult.capabilities?.redditScheduledDiscovery))
         setKeywords(keywordsResult.data || [])
 
@@ -313,8 +332,31 @@ export default function KeywordsPage() {
     PLAN_POLL_INTERVAL_MINUTES[normalizePlan(userPlan)] * 3 + 10
   ) * 60_000
   const delayedCount = keywords.filter(keyword => (
-    keyword.is_active && isKeywordPollDelayed(keyword, staleAfterMs)
+    subscriptionActive && keyword.is_active && isKeywordPollDelayed(keyword, staleAfterMs)
   )).length
+
+  const handleStartTrial = async () => {
+    if (openingTrial) return
+    setOpeningTrial(true)
+    try {
+      const response = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify({ plan: 'starter', billing: 'monthly' }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.url) throw new Error(payload?.error || 'checkout_failed')
+      window.location.assign(payload.url)
+    } catch (error) {
+      console.error('[keywords] Unable to open Starter checkout', error)
+      toast.error('Could not open secure checkout. Please try again.')
+      setOpeningTrial(false)
+    }
+  }
 
   if (loadFailed) {
     return (
@@ -344,7 +386,9 @@ export default function KeywordsPage() {
               <p className="page-subtitle">
                 {keywords.length === 0
                   ? 'No rules yet — add one to start monitoring conversations.'
-                  : `${activeCount} active · ${pausedCount} paused`}
+                  : subscriptionActive
+                    ? `${activeCount} active · ${pausedCount} paused`
+                    : `${activeCount} ready · ${pausedCount} paused`}
               </p>
             )}
           </div>
@@ -360,7 +404,20 @@ export default function KeywordsPage() {
           </motion.button>
         </div>
 
-        {!loading && delayedCount > 0 && (
+        {!loading && !subscriptionActive && activeCount > 0 && (
+          <div role="status" className="mb-6 flex flex-col items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950 sm:flex-row sm:items-center sm:px-5">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13.5px] font-semibold">Your trial has not started</p>
+              <p className="mt-0.5 text-[12.5px] leading-5 text-amber-800">Your rules are saved, but monitoring will begin only after the card-required Starter trial is active.</p>
+            </div>
+            <button type="button" onClick={() => void handleStartTrial()} disabled={openingTrial} className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-[#101828] px-4 text-[12.5px] font-semibold text-white disabled:opacity-60">
+              {openingTrial ? 'Opening checkout…' : 'Start 7-day trial'}
+            </button>
+          </div>
+        )}
+
+        {!loading && subscriptionActive && delayedCount > 0 && (
           <a
             href="#monitoring-rules"
             role="alert"
@@ -526,14 +583,7 @@ export default function KeywordsPage() {
         <div id="monitoring-rules" className="w-full scroll-mt-6 bg-white rounded-[20px] border border-[#E6E6E3] p-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
           
           {/* Header Row Bar */}
-          <div className="hidden xl:grid grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 rounded-[16px] bg-[#F5F5F3] border border-[#ECECE9] px-6 py-3.5 mb-1.5 text-[13px] font-medium text-[#8C8C86]">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                className="w-5 h-5 rounded-[7px] border border-[#DDDCD8] bg-white text-gray-900 focus:ring-0 cursor-pointer shadow-2xs"
-                aria-label="Select all rules"
-              />
-            </div>
+          <div className="hidden xl:grid grid-cols-[50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 rounded-[16px] bg-[#F5F5F3] border border-[#ECECE9] px-6 py-3.5 mb-1.5 text-[13px] font-medium text-[#8C8C86]">
             <span>#</span>
             <span>Keyword</span>
             <span>Community</span>
@@ -582,24 +632,15 @@ export default function KeywordsPage() {
             {filtered.map((kw, index) => {
               const threadStats = metrics[kw.id] || { total: 0, replied: 0 }
               const successRate = getSuccessRate(threadStats.total, threadStats.replied)
-              const sourceDelayed = kw.is_active && isKeywordPollDelayed(kw, staleAfterMs)
+              const sourceDelayed = subscriptionActive && kw.is_active && isKeywordPollDelayed(kw, staleAfterMs)
               const usingRedditFallback = kw.last_check_status === 'success'
                 && kw.last_check_error === 'reddit_rss_fallback'
 
               return (
                 <div
                   key={kw.id}
-                  className="group grid grid-cols-[1fr_auto] xl:grid-cols-[40px_50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 px-4 py-4 sm:px-6 transition-colors duration-150 hover:bg-[#F9F9F8] rounded-xl"
+                  className="group grid grid-cols-[1fr_auto] xl:grid-cols-[50px_1fr_220px_160px_120px_120px_44px] items-center gap-3 px-4 py-4 sm:px-6 transition-colors duration-150 hover:bg-[#F9F9F8] rounded-xl"
                 >
-                  {/* Checkbox column */}
-                  <div className="hidden xl:flex items-center">
-                    <input
-                      type="checkbox"
-                      className="w-5 h-5 rounded-[7px] border border-[#DDDCD8] bg-white text-gray-900 focus:ring-0 cursor-pointer shadow-2xs hover:border-[#B5B5B0]"
-                      aria-label={`Select rule ${kw.term}`}
-                    />
-                  </div>
-
                   {/* ID column */}
                   <span className="hidden xl:block text-[13.5px] font-medium text-[#6E6E68] tabular-nums">
                     {String(index + 1).padStart(2, '0')}
@@ -614,13 +655,17 @@ export default function KeywordsPage() {
                       className={`mt-0.5 truncate text-[11px] font-medium ${
                         sourceDelayed ? 'text-amber-700' : usingRedditFallback ? 'text-amber-700' : 'text-[#92928C]'
                       }`}
-                      title={sourceDelayed
+                      title={!subscriptionActive && kw.is_active
+                        ? 'Monitoring begins after your Starter trial is active'
+                        : sourceDelayed
                         ? `${getKeywordPollIssueLabel(kw.last_check_error)}; retrying automatically`
                         : usingRedditFallback
                           ? 'Reddit is temporarily using its resilient fallback source'
                           : 'Last successful source check'}
                     >
-                    {sourceDelayed
+                    {!subscriptionActive && kw.is_active
+                      ? 'Trial not started'
+                      : sourceDelayed
                       ? `${getKeywordPollIssueLabel(kw.last_check_error)} · attempted ${relativeCheckTime(kw.last_checked_at).replace('Checked ', '')}`
                         : usingRedditFallback
                           ? `${getKeywordPollIssueLabel(kw.last_check_error)} · ${relativeCheckTime(kw.last_success_at).replace('Checked ', '')}`
@@ -658,7 +703,7 @@ export default function KeywordsPage() {
 
                   {/* Source / Status column */}
                   <div>
-                    <StatusPill active={kw.is_active} onClick={() => handleToggle(kw)} />
+                    <StatusPill active={kw.is_active} waitingForTrial={!subscriptionActive} onClick={() => handleToggle(kw)} />
                   </div>
 
                   {/* Actions */}

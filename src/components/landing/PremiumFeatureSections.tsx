@@ -89,56 +89,92 @@ function IntentFilterVisual() {
 
 function CommunityRadarVisual() {
   return (
-    <div className="relative mt-5 h-[230px] overflow-hidden rounded-[17px] border border-white/60 bg-[linear-gradient(180deg,#b9def8_0%,#dff2ff_54%,#a8cf91_55%,#74ad65_100%)] shadow-[0_15px_38px_rgba(52,105,141,0.18)]">
-      <motion.div
-        className="absolute -left-10 top-3 h-12 w-40 rounded-full bg-white/40 blur-xl"
-        animate={{ x: [0, 34, 0] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute -right-8 top-12 h-10 w-32 rounded-full bg-white/35 blur-xl"
-        animate={{ x: [0, -28, 0] }}
-        transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-      />
+    <div className="mt-5 overflow-hidden rounded-[14px] border border-black/[0.08] bg-white px-4 pb-3 pt-4 shadow-[0_12px_32px_rgba(31,35,38,0.06)] sm:px-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-5 w-5 items-center justify-center bg-[#111] text-white" aria-hidden="true">
+            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none">
+              <path d="M2 11.5 5.2 8.3l2 1.8 3.1-4.2L14 7.2" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span className="font-[var(--font-jakarta)] text-[13px] font-semibold tracking-[-0.025em] text-[#171717]">Intent activity</span>
+        </div>
+        <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/35">7 days</span>
+      </div>
 
-      <div className="absolute inset-x-7 top-14 h-[135px] rounded-[15px] border border-white/70 bg-white/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_12px_30px_rgba(57,99,126,0.12)] backdrop-blur-[8px]">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="rounded-full bg-[#0a84ff] px-2 py-1 text-[9px] font-bold text-white">LIVE</span>
-          <span className="rounded-full bg-black/80 px-2 py-1 text-[9px] font-semibold text-white">12 matches</span>
-        </div>
-        <svg viewBox="0 0 260 78" className="h-[78px] w-full overflow-visible" aria-hidden="true">
-          <path
-            d="M0 59 C18 55 20 33 38 40 S58 62 75 47 S93 23 108 39 S130 58 145 21 S169 6 180 37 S205 60 220 42 S244 27 260 34"
-            fill="none"
-            stroke="rgba(10,132,255,0.25)"
-            strokeWidth="8"
-            strokeLinecap="round"
-          />
+      <div className="mt-3 h-[165px] w-full" role="img" aria-label="Seven-day intent activity with Wednesday highlighted at 18 qualified signals">
+        <svg viewBox="0 0 340 165" className="h-full w-full" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="communityFocus" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ff5a1f" stopOpacity="0.72" />
+              <stop offset="100%" stopColor="#ff5a1f" stopOpacity="0.04" />
+            </linearGradient>
+          </defs>
+
+          {[54, 88, 122].map((y) => (
+            <line key={y} x1="8" y1={y} x2="332" y2={y} stroke="#d9dcdf" strokeWidth="1" strokeDasharray="3 4" />
+          ))}
+
+          <rect x="104" y="34" width="38" height="99" rx="5" fill="url(#communityFocus)" />
+
           <motion.path
-            d="M0 59 C18 55 20 33 38 40 S58 62 75 47 S93 23 108 39 S130 58 145 21 S169 6 180 37 S205 60 220 42 S244 27 260 34"
+            d="M14 90 L48 92 L62 108 L91 73 L123 73 L158 110 L194 110 L228 110 L267 75 L300 126 L328 126"
             fill="none"
-            stroke="#0a84ff"
-            strokeWidth="2.4"
+            stroke="#151515"
+            strokeWidth="1.35"
             strokeLinecap="round"
-            initial={{ pathLength: 0 }}
-            whileInView={{ pathLength: 1 }}
+            strokeLinejoin="round"
+            initial={{ pathLength: 0, opacity: 0 }}
+            whileInView={{ pathLength: 1, opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ duration: 1.8, ease: 'easeOut' }}
+            transition={{ duration: 1.05, ease: [0.16, 1, 0.3, 1] }}
           />
-          <motion.circle
-            r="5"
-            fill="#ff5101"
-            stroke="white"
-            strokeWidth="3"
-            animate={{ cx: [38, 108, 165, 220], cy: [40, 39, 23, 42] }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-          />
+
+          {[
+            [28, 92],
+            [123, 73],
+            [194, 110],
+            [228, 110],
+            [300, 126],
+          ].map(([cx, cy], index) => (
+            <motion.circle
+              key={`${cx}-${cy}`}
+              cx={cx}
+              cy={cy}
+              r="3.8"
+              fill="#151515"
+              stroke="#fff"
+              strokeWidth="1.2"
+              initial={{ opacity: 0, scale: 0 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.36 + index * 0.08, duration: 0.25 }}
+            />
+          ))}
+
+          <circle cx="123" cy="73" r="4.2" fill="#151515" stroke="#fff" strokeWidth="1.4" />
+
+          <g transform="translate(104 5)">
+            <rect width="38" height="24" rx="12" fill="#ff5a1f" />
+            <path d="M17 24h5l-2.5 5z" fill="#ff5a1f" />
+            <text x="19" y="16" textAnchor="middle" fill="#fff" fontSize="10" fontWeight="700">18</text>
+          </g>
+
+          <line x1="8" y1="145" x2="332" y2="145" stroke="#d7dadd" strokeWidth="1" />
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => (
+            <text
+              key={day}
+              x={15 + index * 51.5}
+              y="160"
+              textAnchor="middle"
+              fill={day === 'Wed' ? '#151515' : '#8a8f94'}
+              fontSize="9"
+              fontWeight={day === 'Wed' ? '700' : '500'}
+            >
+              {day}
+            </text>
+          ))}
         </svg>
-        <div className="flex justify-between text-[8px] font-semibold uppercase tracking-[0.08em] text-[#4b6676]/60">
-          <span>Reddit</span>
-          <span>Bluesky</span>
-          <span>Qualified</span>
-        </div>
       </div>
     </div>
   )
@@ -204,18 +240,9 @@ function OpportunityWorkspaceVisual() {
   return (
     <div className="relative mt-5 min-h-[245px] overflow-hidden">
       <div className="absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full border border-[#0a84ff]/20" />
-      <motion.div
-        className="absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full border border-[#ff5101]/20"
-        animate={{ scale: [0.72, 1.08], opacity: [0.7, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeOut' }}
-      />
       <div className="absolute left-1/2 top-[130px] h-24 w-24 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,#fff_0%,#aadaff_22%,#0a84ff_65%,#0457a9_100%)] shadow-[0_24px_45px_rgba(10,132,255,0.3),inset_-10px_-14px_25px_rgba(0,42,104,0.32)]" />
 
-      <motion.div
-        className="absolute bottom-[-16px] left-[8%] w-[235px] rotate-[-7deg] rounded-[18px] border border-white/80 bg-white p-4 shadow-[0_22px_55px_rgba(38,86,117,0.2)]"
-        animate={{ y: [4, -6, 4], rotate: [-7, -5.5, -7] }}
-        transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut' }}
-      >
+      <div className="absolute bottom-[-16px] left-[8%] w-[235px] rotate-[-7deg] rounded-[18px] border border-white/80 bg-white p-4 shadow-[0_22px_55px_rgba(38,86,117,0.2)]">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ffebe1] text-[#ff5101]">
@@ -230,13 +257,9 @@ function OpportunityWorkspaceVisual() {
         </div>
         <div className="h-2 w-[88%] rounded-full bg-[#e7edf1]" />
         <div className="mt-2 h-2 w-[62%] rounded-full bg-[#edf1f4]" />
-      </motion.div>
+      </div>
 
-      <motion.div
-        className="absolute bottom-[-24px] right-[7%] w-[250px] rotate-[8deg] rounded-[18px] border border-white/80 bg-white p-4 shadow-[0_22px_55px_rgba(38,86,117,0.22)]"
-        animate={{ y: [-3, 7, -3], rotate: [8, 6.5, 8] }}
-        transition={{ duration: 5.7, repeat: Infinity, ease: 'easeInOut' }}
-      >
+      <div className="absolute bottom-[-24px] right-[7%] w-[250px] rotate-[8deg] rounded-[18px] border border-white/80 bg-white p-4 shadow-[0_22px_55px_rgba(38,86,117,0.22)]">
         <div className="mb-4 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e7f3ff] text-[#0a84ff]">
             <MousePointerClick className="h-4 w-4" />
@@ -250,7 +273,7 @@ function OpportunityWorkspaceVisual() {
           <span className="rounded-full bg-[#0a84ff] px-3 py-1 text-[9px] font-bold text-white">Review</span>
           <span className="rounded-full bg-[#edf1f4] px-3 py-1 text-[9px] font-semibold text-[#56636d]">Open thread</span>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RequestInputError = void 0;
+exports.isTrustedSameOriginMutation = isTrustedSameOriginMutation;
 exports.readJsonBody = readJsonBody;
 exports.readTextBody = readTextBody;
 exports.isUuid = isUuid;
@@ -12,6 +13,25 @@ class RequestInputError extends Error {
     }
 }
 exports.RequestInputError = RequestInputError;
+/**
+ * Protect cookie-authenticated browser mutations from cross-site submission.
+ * Production callers must provide a same-origin Origin header; development
+ * keeps headerless CLI smoke checks possible.
+ */
+function isTrustedSameOriginMutation(request) {
+    const fetchSite = request.headers.get('sec-fetch-site');
+    if (fetchSite && fetchSite !== 'same-origin')
+        return false;
+    const origin = request.headers.get('origin');
+    if (!origin)
+        return process.env.NODE_ENV !== 'production';
+    try {
+        return new URL(origin).origin === new URL(request.url).origin;
+    }
+    catch {
+        return false;
+    }
+}
 async function readJsonBody(request, maxBytes = 16_384) {
     const text = await readTextBody(request, maxBytes);
     if (!text.trim())

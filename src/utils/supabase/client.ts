@@ -7,6 +7,7 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       isSingleton: true,
+      cookieOptions: { secure: process.env.NODE_ENV === 'production' },
       global: { fetch: cachedSupabaseFetch },
     },
   )

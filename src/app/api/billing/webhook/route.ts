@@ -112,6 +112,7 @@ export async function POST(req: Request) {
   const eventType = typeof event.type === 'string' ? event.type : ''
   const data = event.data ?? {}
   const metadata = data.metadata ?? {}
+  const trialDays = Number(data.trial_period_days ?? metadata.trial_days)
   let userId = typeof metadata.user_id === 'string' ? metadata.user_id : null
   const subscriptionId =
     typeof data.subscription_id === 'string' ? data.subscription_id : null
@@ -276,6 +277,26 @@ export async function POST(req: Request) {
       code: error.code,
     })
     return NextResponse.json({ error: 'billing_event_failed' }, { status: 500 })
+  }
+
+  if (
+    ['starter', 'pro', 'growth'].includes(plan)
+    && providerStatus === 'active'
+    && Number.isFinite(trialDays)
+    && trialDays >= 7
+  ) {
+    const { error: instantAutopilotError } = await getSupabase().rpc(
+      'grant_instant_autopilot_trial',
+      { p_user_id: userId, p_event_id: eventId },
+    )
+    if (instantAutopilotError) {
+      console.error('[billing/webhook] Instant Autopilot grant failed', {
+        eventId,
+        eventType,
+        code: instantAutopilotError.code,
+      })
+      return NextResponse.json({ error: 'instant_autopilot_grant_failed' }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ received: true, result })

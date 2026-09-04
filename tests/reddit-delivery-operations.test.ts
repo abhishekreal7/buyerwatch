@@ -24,23 +24,35 @@ describe('Reddit delivery production operations', () => {
     expect(parseHyperbrowserHealthSnapshot('not-json')).toBeNull()
   })
 
-  it('serializes every Hyperbrowser session with one distributed lock', () => {
+  it('isolates each Reddit profile while enforcing bounded global Hyperbrowser concurrency', () => {
     const provider = source('src/lib/hyperbrowser-reddit.ts')
-    expect(provider).toContain("SESSION_LOCK_KEY = 'lock:hyperbrowser-reddit-session:v1'")
-    expect(provider).toContain('withRedisLock(redis, SESSION_LOCK_KEY')
+    const capacity = source('src/lib/reddit-delivery-concurrency.ts')
+    expect(provider).not.toContain("SESSION_LOCK_KEY = 'lock:hyperbrowser-reddit-session:v1'")
+    expect(provider).toContain('getHyperbrowserRedditProfileLockKey(profileId)')
+    expect(provider).toContain("SESSION_SEMAPHORE_KEY = 'semaphore:hyperbrowser-reddit-session:v1'")
+    expect(provider).toContain('withRedisSemaphore(')
+    expect(provider).toContain('getHyperbrowserRedditMaxConcurrency()')
+    expect(capacity).toContain('HYPERBROWSER_REDDIT_MAX_CONCURRENCY')
+    expect(provider).toContain('minRetryDelayMs: 250, maxRetryDelayMs: 900')
     expect(provider).toContain("'hyperbrowser_session_busy'")
-    expect(provider.indexOf('withRedisLock(redis, SESSION_LOCK_KEY'))
-      .toBeLessThan(provider.indexOf('client.sessions.create'))
+    expect(provider.indexOf('getHyperbrowserRedditProfileLockKey(profileId)'))
+      .toBeLessThan(provider.indexOf('client.createSession'))
   })
 
-  it('runs a low-frequency read-only identity canary and checks credits', () => {
+  it('checks stale accounts in bounded batches and checks credits separately', () => {
     const canary = source('src/lib/reddit-delivery-canary.ts')
     const route = source('src/app/api/cron/enqueue/route.ts')
-    expect(canary).toContain('SUCCESS_INTERVAL_SECONDS = 6 * 60 * 60')
+    expect(canary).toContain('ACCOUNT_RECHECK_INTERVAL_MS = 6 * 60 * 60_000')
+    expect(canary).toContain('CREDIT_INTERVAL_SECONDS = 15 * 60')
+    expect(canary).toContain('getRedditCanaryBatchSize')
+    expect(canary).toContain(".order('last_verified_at'")
     expect(canary).toContain('fetchHyperbrowserCreditInfo()')
     expect(canary).toContain('fetchHyperbrowserRedditAccountProfile')
     expect(canary).not.toContain('postHyperbrowserRedditReply')
     expect(route).toContain('runRedditDeliveryCanary()')
+    expect(route).toMatch(
+      /executeMonitor\(\s*forceUserId,\s*forcePlatform,\s*forceTarget,\s*isCloudflareScheduler,\s*\)/,
+    )
   })
 
   it('checks the free RedditAPIs balance endpoint on the scheduler and alerts only on threshold transitions', () => {
@@ -51,6 +63,10 @@ describe('Reddit delivery production operations', () => {
     expect(monitor).toContain("kind: 'credits_low'")
     expect(monitor).toContain('CHECK_INTERVAL_SECONDS = 15 * 60')
     expect(monitor).toContain('REDDITAPIS_LOW_BALANCE_USD')
+    const capacity = source('src/lib/reddit-discovery-capacity.ts')
+    expect(capacity).toContain("balanceState === 'depleted'")
+    expect(capacity).toContain("reason: 'provider_balance_depleted'")
+    expect(capacity).toContain("mode: 'rss_only'")
   })
 
   it('alerts on every high-signal delivery failure class with deduplication', () => {

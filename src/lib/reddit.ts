@@ -22,6 +22,10 @@ export function buildSubredditRssUrl(subreddit: string): string {
   return `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/new/.rss`
 }
 
+export function buildSubredditRssUrls(subreddit: string): string[] {
+  return [buildSubredditRssUrl(subreddit)]
+}
+
 export function shouldBackoffRedditRssStatus(status: number): boolean {
   return status === 403 || status === 429
 }
@@ -278,11 +282,12 @@ export async function fetchSubredditNewWithSource(
     && providerKind !== null
 
   // ── Redis cache key ────────────────────────────────────────────────
-  // Each upstream has an independent cache. When the paid provider is enabled,
-  // its cache is authoritative: a successful RSS response must never mask a
-  // later provider result just because it arrived first.
+  // Each upstream has an independent cache. RSS is intentionally the primary
+  // discovery source; the managed provider is reserved for RSS degradation.
   let redisClient: import('ioredis').default | null = null
-  const cacheKey = `rss:r:v2:${normalizedSubreddit}:${boundedLimit}`
+  // Reddit returns one bounded newest-post feed. Cache that feed once per
+  // subreddit and slice per caller so different limits reuse the same fetch.
+  const cacheKey = `rss:r:v3:${normalizedSubreddit}`
   const providerCacheKey = `${providerKind ?? 'none'}:r:v3:${normalizedSubreddit}:${boundedLimit}`
   const rssBackoffKey = `backoff:rss:r:${normalizedSubreddit}`
   const CACHE_TTL = 300 // 5 minutes
@@ -297,31 +302,103 @@ export async function fetchSubredditNewWithSource(
 
   try {
     redisClient = redis
-    const preferredCacheKey = providerDiscoveryEnabled ? providerCacheKey : cacheKey
-    const cached = await redis.get(preferredCacheKey)
+    const cached = await redis.get(cacheKey)
     if (cached) {
       const posts = parseCachedRedditPosts(cached, normalizedSubreddit, boundedLimit)
       if (posts) {
-        console.log(
-          `[reddit] ${providerDiscoveryEnabled ? providerKind : 'RSS'} cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`,
-        )
-        return { posts, source: providerDiscoveryEnabled ? 'provider' : 'rss' }
+        console.log(`[reddit] RSS cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`)
+        return { posts, source: 'rss' }
       }
-      await redis.del(preferredCacheKey).catch(() => undefined)
+      await redis.del(cacheKey).catch(() => undefined)
     }
   } catch (cacheErr) {
     console.warn(`[reddit] Redis cache unavailable, continuing without cache:`, cacheErr)
   }
 
-  // ── PRIMARY: managed discovery provider (when explicitly enabled) ─────────
-  // This generalizes the previous RedditAPIs primary discovery contract while
-  // preserving its provider-first behavior for existing deployments.
-  // RSS is useful as a free best-effort feed, but it is not reliable enough to
-  // be the production source of truth once the managed provider is configured.
+  // The managed provider is retained as a bounded fallback when RSS is
+  // unavailable. It is deliberately not attempted before the free feed.
   let providerFailure: unknown
+  // ── PRIMARY: Reddit public RSS feed ───────────────────────────────────────
+  let rssBackoffActive = false
+  try {
+    rssBackoffActive = Boolean(await redis.get(rssBackoffKey))
+  } catch {
+    // A missing backoff cache is not a reason to skip the bounded source call.
+  }
+
+  if (!rssBackoffActive) {
+    let retryAfterSeconds: number | null = null
+    let shouldBackoff = false
+    for (const rssUrl of buildSubredditRssUrls(normalizedSubreddit)) {
+      try {
+        const rssHost = new URL(rssUrl).hostname
+        console.log(`[reddit] RSS fetch via ${rssHost} for r/${normalizedSubreddit}`)
+        const rssResponse = await fetchWithTimeout(rssUrl, {
+          headers: {
+            'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatch/1.0 (support@buyerwatch.co)',
+            'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+          }
+        }, 10_000)
+
+        if (rssResponse.ok) {
+          const xml = await readResponseText(rssResponse, MAX_REDDIT_SOURCE_BYTES)
+          if (!/<feed(?:\s|>)/i.test(xml)) throw new Error('reddit_rss_invalid_feed')
+
+          const feedPosts = parseRedditRss(xml, normalizedSubreddit)
+          const posts = feedPosts.slice(0, boundedLimit)
+          console.log(`[reddit] RSS: ${posts.length} posts from r/${normalizedSubreddit} via ${rssHost}`)
+          if (redisClient) {
+            // Cache a valid empty listing too. Quiet communities are successful
+            // checks and must not be retried every scheduler tick.
+            await Promise.all([
+              redisClient.set(cacheKey, JSON.stringify(feedPosts), 'EX', CACHE_TTL),
+              redisClient.del(rssBackoffKey),
+            ]).catch(() => {})
+          }
+          return { posts, source: 'rss' }
+        }
+
+        console.warn(`[reddit] RSS ${rssResponse.status} via ${rssHost} for r/${normalizedSubreddit}`)
+        if (shouldBackoffRedditRssStatus(rssResponse.status)) {
+          shouldBackoff = true
+          const retryAfterHeader = rssResponse.headers.get('retry-after')
+          const hostRetryAfter = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader)
+          if (Number.isFinite(hostRetryAfter) && hostRetryAfter >= 0) {
+            retryAfterSeconds = Math.max(retryAfterSeconds ?? 0, hostRetryAfter)
+          }
+        }
+      } catch (rssErr) {
+        console.warn(`[reddit] RSS failed via ${new URL(rssUrl).hostname} for r/${normalizedSubreddit}:`, rssErr)
+      }
+    }
+
+    // The canonical feed is the only currently healthy endpoint. Respect its
+    // throttle signal instead of multiplying blocked requests across dead URLs.
+    if (shouldBackoff) {
+      const backoffSeconds = retryAfterSeconds !== null
+        ? Math.min(60 * 60, Math.max(5 * 60, Math.ceil(retryAfterSeconds)))
+        : 15 * 60
+      await redis.set(rssBackoffKey, '1', 'EX', backoffSeconds).catch(() => {})
+    }
+  }
+
+  // ── FALLBACK: managed discovery provider (when explicitly enabled) ───────
   if (providerDiscoveryEnabled) {
     try {
-      console.log(`[reddit] ${providerKind} primary discovery for r/${normalizedSubreddit}`)
+      if (redisClient) {
+        const cached = await redisClient.get(providerCacheKey)
+        if (cached) {
+          const posts = parseCachedRedditPosts(cached, normalizedSubreddit, boundedLimit)
+          if (posts) {
+            console.log(`[reddit] ${providerKind} fallback cache HIT for r/${normalizedSubreddit} (${posts.length} posts)`)
+            return { posts, source: 'provider' }
+          }
+          await redisClient.del(providerCacheKey).catch(() => undefined)
+        }
+      }
+
+      console.log(`[reddit] ${providerKind} fallback discovery for r/${normalizedSubreddit}`)
       const normalized = providerKind === 'sprinklr'
         ? await fetchSprinklrRedditPosts(normalizedSubreddit, boundedLimit)
         : normalizeRedditApisPosts(
@@ -330,7 +407,7 @@ export async function fetchSubredditNewWithSource(
           )
       if (redisClient) {
         // Cache empty responses too. A quiet subreddit must not consume another
-        // paid read on every scheduler tick.
+        // paid read on every scheduler tick after an RSS incident.
         await redisClient.set(
           providerCacheKey,
           JSON.stringify(normalized),
@@ -342,60 +419,9 @@ export async function fetchSubredditNewWithSource(
     } catch (providerError) {
       providerFailure = providerError
       console.warn(
-        `[reddit] ${providerKind} primary discovery failed for r/${normalizedSubreddit}; trying RSS fallback:`,
+        `[reddit] ${providerKind} fallback discovery failed for r/${normalizedSubreddit}:`,
         providerError,
       )
-    }
-  }
-
-  // ── FALLBACK: Reddit public RSS feed ──────────────────────────────────────
-  let rssBackoffActive = false
-  try {
-    rssBackoffActive = Boolean(await redis.get(rssBackoffKey))
-  } catch {
-    // A missing backoff cache is not a reason to skip the bounded source call.
-  }
-
-  if (!rssBackoffActive) {
-    try {
-      const rssUrl = buildSubredditRssUrl(normalizedSubreddit)
-      console.log(`[reddit] RSS fetch for r/${normalizedSubreddit}`)
-      const rssResponse = await fetchWithTimeout(rssUrl, {
-        headers: {
-          'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatch/1.0 (support@buyerwatch.co)',
-          'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-        }
-      }, 10_000)
-
-      if (rssResponse.ok) {
-        const xml = await readResponseText(rssResponse, MAX_REDDIT_SOURCE_BYTES)
-        if (!/<feed(?:\s|>)/i.test(xml)) {
-          throw new Error('reddit_rss_invalid_feed')
-        }
-        const posts = parseRedditRss(xml, normalizedSubreddit).slice(0, boundedLimit)
-        console.log(`[reddit] RSS: ${posts.length} posts from r/${normalizedSubreddit}`)
-        if (redisClient) {
-          // Cache a valid empty listing too. Quiet communities are successful
-          // checks and must not be retried every scheduler tick.
-          await Promise.all([
-            redisClient.set(cacheKey, JSON.stringify(posts), 'EX', CACHE_TTL),
-            redisClient.del(rssBackoffKey),
-          ]).catch(() => {})
-        }
-        return { posts, source: 'rss' }
-      } else if (shouldBackoffRedditRssStatus(rssResponse.status)) {
-        console.warn(`[reddit] RSS ${rssResponse.status} for r/${normalizedSubreddit} — backing off the public feed`)
-        const retryAfterSeconds = Number(rssResponse.headers.get('retry-after'))
-        const backoffSeconds = Number.isFinite(retryAfterSeconds)
-          ? Math.min(60 * 60, Math.max(5 * 60, Math.ceil(retryAfterSeconds)))
-          : 15 * 60
-        await redis.set(rssBackoffKey, '1', 'EX', backoffSeconds).catch(() => {})
-      } else {
-        console.warn(`[reddit] RSS ${rssResponse.status} for r/${normalizedSubreddit}`)
-      }
-    } catch (rssErr) {
-      console.warn(`[reddit] RSS failed for r/${normalizedSubreddit}:`, rssErr)
     }
   }
 

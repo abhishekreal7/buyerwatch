@@ -14,6 +14,7 @@ import {
   HYPERBROWSER_HEALTH_MAX_AGE_MS,
   readHyperbrowserHealth,
 } from './reddit-delivery-health'
+import { hasActiveSubscription } from './billing-entitlements'
 
 const REDDIT_PROVIDER_HEALTH_KEY = 'health:redditapis:v1'
 const REDDIT_PROVIDER_HEALTH_LOCK_KEY = 'lock:health:redditapis:v1'
@@ -44,7 +45,9 @@ type KeywordHealthRow = {
   last_success_at: string | null
   last_check_status: string
   consecutive_failures: number
-  profiles: { plan?: string } | Array<{ plan?: string }>
+  profiles:
+    | { plan?: string; billing_status?: string; billing_subscription_id?: string | null }
+    | Array<{ plan?: string; billing_status?: string; billing_subscription_id?: string | null }>
 }
 
 async function timedCheck(
@@ -69,6 +72,122 @@ async function timedCheck(
         : error instanceof Error
           ? error.message.slice(0, 160)
           : `${label} failed`,
+    }
+  }
+}
+
+export async function checkMonitoringReadiness(): Promise<ReadinessCheck> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  return timedCheck('monitoring readiness', async () => {
+    if (!hasQStashConfiguration()) {
+      throw new ReadinessError('QStash configuration missing', 'qstash_missing')
+    }
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new ReadinessError('database configuration missing', 'database_missing')
+    }
+
+    const client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const keywordRows: KeywordHealthRow[] = []
+    const pageSize = 500
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await client
+        .from('keywords')
+        .select('id, platform, last_success_at, last_check_status, consecutive_failures, profiles!inner(plan, billing_status, billing_subscription_id)')
+        .in('platform', ['reddit', 'bluesky'])
+        .eq('is_active', true)
+        .eq('profiles.billing_status', 'active')
+        .not('profiles.billing_subscription_id', 'is', null)
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+      if (error) {
+        throw new ReadinessError(
+          'monitoring freshness query failed',
+          'monitoring_query_failed',
+        )
+      }
+      keywordRows.push(...((data ?? []) as KeywordHealthRow[]))
+      if ((data?.length ?? 0) < pageSize) break
+    }
+
+    const now = Date.now()
+    const staleKeywords: KeywordHealthRow[] = []
+    for (const row of keywordRows) {
+      const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+      const lastPolledAt = Date.parse(row.last_success_at ?? '')
+      const interval = PLAN_POLL_INTERVAL_MINUTES[normalizePlan(profile?.plan)]
+      const staleAfterMs = (interval * 3 + 10) * 60_000
+      if (!Number.isFinite(lastPolledAt) || now - lastPolledAt > staleAfterMs) {
+        staleKeywords.push(row)
+      }
+    }
+    if (staleKeywords.length > 0) {
+      const byPlatform = staleKeywords.reduce<Record<string, number>>((counts, row) => {
+        counts[row.platform] = (counts[row.platform] ?? 0) + 1
+        return counts
+      }, {})
+      throw new ReadinessError(
+        `monitoring heartbeat stale: ${JSON.stringify(byPlatform)}`,
+        'monitoring_stale',
+        Object.keys(byPlatform).sort(),
+      )
+    }
+  })
+}
+
+/**
+ * Customer-facing monitoring state is intentionally reported separately from
+ * infrastructure readiness. Saved rules on an account whose trial has not
+ * started are not a provider outage, but they must never disappear from the
+ * health response or be presented to the customer as actively retrying.
+ */
+export async function checkCustomerMonitoringVisibility(): Promise<ReadinessCheck> {
+  const startedAt = Date.now()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { status: 'error', latencyMs: 0, code: 'database_missing', detail: 'customer monitoring state unavailable' }
+  }
+
+  try {
+    const client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const rows: KeywordHealthRow[] = []
+    const pageSize = 500
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await client
+        .from('keywords')
+        .select('id, platform, last_success_at, last_check_status, consecutive_failures, profiles!inner(plan, billing_status, billing_subscription_id)')
+        .eq('is_active', true)
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+      if (error) throw error
+      rows.push(...((data ?? []) as KeywordHealthRow[]))
+      if ((data?.length ?? 0) < pageSize) break
+    }
+
+    const waitingForTrial = rows.filter(row => {
+      const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+      return !hasActiveSubscription(profile)
+    }).length
+    const scheduled = rows.length - waitingForTrial
+
+    return {
+      status: 'ok',
+      latencyMs: Date.now() - startedAt,
+      ...(waitingForTrial > 0 ? { code: 'rules_waiting_for_trial' } : {}),
+      detail: `${rows.length} enabled rule${rows.length === 1 ? '' : 's'}: ${scheduled} scheduled, ${waitingForTrial} waiting for trial`,
+    }
+  } catch {
+    return {
+      status: 'error',
+      latencyMs: Date.now() - startedAt,
+      code: 'customer_monitoring_query_failed',
+      detail: 'customer monitoring state unavailable',
     }
   }
 }
@@ -240,60 +359,10 @@ export async function checkApplicationReadiness() {
     if (result !== 'PONG') throw new Error('redis ping failed')
   })
 
-  const monitoring = await timedCheck('monitoring readiness', async () => {
-    if (!hasQStashConfiguration()) {
-      throw new ReadinessError('QStash configuration missing', 'qstash_missing')
-    }
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new ReadinessError('database configuration missing', 'database_missing')
-    }
-
-    const client = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-    const keywordRows: KeywordHealthRow[] = []
-    const pageSize = 500
-    for (let offset = 0; ; offset += pageSize) {
-      const { data, error } = await client
-        .from('keywords')
-        .select('id, platform, last_success_at, last_check_status, consecutive_failures, profiles!inner(plan)')
-        .in('platform', ['reddit', 'bluesky'])
-        .eq('is_active', true)
-        .order('id', { ascending: true })
-        .range(offset, offset + pageSize - 1)
-      if (error) {
-        throw new ReadinessError(
-          'monitoring freshness query failed',
-          'monitoring_query_failed',
-        )
-      }
-      keywordRows.push(...((data ?? []) as KeywordHealthRow[]))
-      if ((data?.length ?? 0) < pageSize) break
-    }
-
-    const now = Date.now()
-    const staleKeywords: KeywordHealthRow[] = []
-    for (const row of keywordRows) {
-      const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
-      const lastPolledAt = Date.parse(row.last_success_at ?? '')
-      const interval = PLAN_POLL_INTERVAL_MINUTES[normalizePlan(profile?.plan)]
-      const staleAfterMs = (interval * 3 + 10) * 60_000
-      if (!Number.isFinite(lastPolledAt) || now - lastPolledAt > staleAfterMs) {
-        staleKeywords.push(row)
-      }
-    }
-    if (staleKeywords.length > 0) {
-      const byPlatform = staleKeywords.reduce<Record<string, number>>((counts, row) => {
-        counts[row.platform] = (counts[row.platform] ?? 0) + 1
-        return counts
-      }, {})
-      throw new ReadinessError(
-        `monitoring heartbeat stale: ${JSON.stringify(byPlatform)}`,
-        'monitoring_stale',
-        Object.keys(byPlatform).sort(),
-      )
-    }
-  })
+  const [monitoring, customerMonitoring] = await Promise.all([
+    checkMonitoringReadiness(),
+    checkCustomerMonitoringVisibility(),
+  ])
 
   const redditProvider = cache.status === 'ok'
     ? await checkRedditProviderReadiness(redditProviderRequired)
@@ -304,8 +373,9 @@ export async function checkApplicationReadiness() {
       database.status === 'ok'
       && cache.status === 'ok'
       && monitoring.status === 'ok'
+      && customerMonitoring.status === 'ok'
       && (!redditProviderRequired || redditProvider.status === 'ok'),
-    checks: { database, cache, monitoring, redditProvider },
+    checks: { database, cache, monitoring, customerMonitoring, redditProvider },
     redditProviderRequired,
   }
 }

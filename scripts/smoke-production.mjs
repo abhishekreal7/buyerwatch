@@ -37,7 +37,7 @@ await check('/api/health/ready', async (response) => {
     allowRedditOnlyDegraded,
   })
   if (result.degraded) {
-    console.warn('WARN readiness is degraded only by unfunded Reddit monitoring')
+    console.warn('WARN readiness is degraded only by stale Reddit monitoring')
   }
 })
 

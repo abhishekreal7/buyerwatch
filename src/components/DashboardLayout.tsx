@@ -10,6 +10,7 @@ import {
   FolderIcon,
   Cog6ToothIcon,
   QuestionMarkCircleIcon,
+  CreditCardIcon,
 } from '@heroicons/react/24/solid'
 import {
   AlertTriangle,
@@ -27,7 +28,6 @@ import {
   getPlanLimitsWithAddons,
   sumMonthlyAddonCredits,
 } from '@/lib/billing-addons'
-import { CreditPackPicker } from '@/components/CreditPackPicker'
 import { BrandLogo } from '@/components/BrandLogo'
 import { DashboardSessionProvider } from '@/components/DashboardContext'
 import { clearSupabaseReadCache } from '@/utils/supabase/read-cache'
@@ -140,7 +140,6 @@ function DashboardShell({
   const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
-  const [openingCheckout, setOpeningCheckout] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [redditConnectionAttention, setRedditConnectionAttention] = useState<
     'reauth_required' | 'error' | null
@@ -316,50 +315,6 @@ function DashboardShell({
     }
   }
 
-  async function openCheckout(body: Record<string, string>, checkoutKey: string) {
-    if (openingCheckout) return
-
-    setOpeningCheckout(checkoutKey)
-    try {
-      // Unique per intentional click so repeat add-on buys are not collapsed
-      // by the server's short fallback bucket.
-      const idempotencyKey = crypto.randomUUID()
-      const response = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: JSON.stringify(body),
-      })
-      const payload = await response.json().catch(() => null)
-      if (!response.ok || !payload?.url) {
-        throw new Error(payload?.error || 'checkout_failed')
-      }
-      window.location.href = payload.url
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : ''
-      setOpeningCheckout(null)
-      if (msg === 'addon_billing_not_configured') {
-        toast.error('This add-on is temporarily unavailable. No charge was created.')
-      } else if (msg === 'billing_provider_unauthorized') {
-        toast.error('Dodo Payments API key is invalid or unauthorized')
-      } else if (msg === 'billing_not_configured') {
-        toast.error('Billing setup incomplete (missing API key or product IDs)')
-      } else {
-        toast.error('Billing checkout is not available yet')
-      }
-    }
-  }
-
-  async function handleUpgradePlan() {
-    if (plan === 'growth') {
-      window.location.href = '/pricing'
-      return
-    }
-    await openCheckout({ plan: plan === 'free' ? 'starter' : plan === 'starter' ? 'pro' : 'growth' }, 'upgrade')
-  }
-
   const creditsRemaining = credits ? Math.max(credits.limit - credits.used, 0) : null
   const creditsPercent = credits && credits.limit > 0
     ? Math.max(0, Math.min(100, ((credits.limit - credits.used) / credits.limit) * 100))
@@ -429,7 +384,7 @@ function DashboardShell({
               })}
             </nav>
 
-            {/* Bottom Group (Settings + Help Center + Profile Card) */}
+            {/* Bottom Group (Settings + Plan & usage + Help Center + Profile Card) */}
             <div className="mt-auto flex flex-col gap-3 pt-4">
               <div className="space-y-1">
                 {/* Settings Nav Item */}
@@ -437,15 +392,31 @@ function DashboardShell({
                   href="/settings"
                   prefetch
                   onMouseEnter={() => prepareRoute('/settings')}
-                  aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
+                  aria-current={pathname.startsWith('/settings') && !pathname.includes('section=plan') ? 'page' : undefined}
                   className={
-                    pathname.startsWith('/settings')
+                    pathname.startsWith('/settings') && !pathname.includes('section=plan')
                       ? 'group flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
                       : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
                   }
                 >
-                  <Cog6ToothIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.startsWith('/settings') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
+                  <Cog6ToothIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.startsWith('/settings') && !pathname.includes('section=plan') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
                   <span>Settings</span>
+                </Link>
+
+                {/* Plan & usage Nav Item */}
+                <Link
+                  href="/settings?section=plan"
+                  prefetch
+                  onMouseEnter={() => prepareRoute('/settings?section=plan')}
+                  aria-current={pathname.includes('section=plan') ? 'page' : undefined}
+                  className={
+                    pathname.includes('section=plan')
+                      ? 'group flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-sm'
+                      : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-[#3A3A3A] font-normal text-sm hover:bg-zinc-50 hover:text-zinc-900 transition-colors'
+                  }
+                >
+                  <CreditCardIcon className={`h-5 w-5 shrink-0 transition-colors ${pathname.includes('section=plan') ? 'text-zinc-900' : 'text-[#9E9E9E] group-hover:text-[#3A3A3A]'}`} />
+                  <span>Plan &amp; usage</span>
                 </Link>
 
                 {/* Help center */}
@@ -464,7 +435,7 @@ function DashboardShell({
               </div>
 
               {/* Restyled Profile Card */}
-              <div className="rounded-xl border border-zinc-200 p-3 space-y-2">
+              <div className="rounded-xl border border-zinc-200 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <img
@@ -491,45 +462,6 @@ function DashboardShell({
                       <LogOut className="h-4 w-4" />
                     </button>
                   </form>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span>Usage</span>
-                    <span className="font-medium text-zinc-700">
-                      {credits ? `${creditsRemaining} left` : ''}
-                    </span>
-                  </div>
-                  <div
-                    className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100"
-                    role="progressbar"
-                    aria-label="Monthly drafts remaining"
-                    aria-valuemin={0}
-                    aria-valuemax={credits?.limit || 100}
-                    aria-valuenow={creditsRemaining || 0}
-                  >
-                    <div
-                      className="h-full rounded-full bg-zinc-900 transition-all duration-300"
-                      style={{ width: `${creditsPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-1.5">
-                  <CreditPackPicker
-                    initialType="drafts"
-                    className="min-h-9 rounded-lg border border-zinc-300 bg-white px-2 text-[11px] font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 cursor-pointer"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleUpgradePlan()}
-                    disabled={Boolean(openingCheckout)}
-                    className="min-h-9 rounded-lg bg-zinc-900 px-2 text-[11px] font-semibold text-white transition-colors hover:bg-zinc-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {openingCheckout === 'upgrade'
-                      ? 'Opening…'
-                      : plan === 'growth' ? 'View plans' : 'Upgrade'}
-                  </button>
                 </div>
               </div>
             </div>
@@ -625,18 +557,20 @@ function DashboardShell({
             {(primaryIncident || redditConnectionAttention) && (
               <div
                 role="alert"
-                className={`mb-4 flex items-start gap-3 rounded-xl border px-3.5 py-3 text-sm ${primaryIncident?.severity === 'critical' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}
+                className={`mb-3 flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-xs ${
+                  primaryIncident?.severity === 'critical' ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50/90 text-amber-950'
+                }`}
               >
-                <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${primaryIncident?.severity === 'critical' ? 'text-red-600' : 'text-amber-600'}`} aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{primaryIncident?.title ?? 'Reddit automation is paused'}</p>
-                  <p className={`mt-0.5 text-xs leading-5 ${primaryIncident?.severity === 'critical' ? 'text-red-800' : 'text-amber-800'}`}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <AlertTriangle className={`h-4 w-4 shrink-0 ${primaryIncident?.severity === 'critical' ? 'text-red-600' : 'text-amber-600'}`} aria-hidden="true" />
+                  <span className="font-semibold shrink-0">{primaryIncident?.title ?? 'Reddit automation is paused'}:</span>
+                  <span className={`truncate text-xs ${primaryIncident?.severity === 'critical' ? 'text-red-800' : 'text-amber-800'}`}>
                     {primaryIncident?.message ?? 'The saved Reddit session needs attention. Reconnect once to resume future automation safely.'}
-                  </p>
+                  </span>
                 </div>
                 <Link
                   href={primaryIncident?.actionPath ?? '/settings?section=connections'}
-                  className="shrink-0 rounded-lg border border-current/25 bg-white px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/60"
+                  className="shrink-0 rounded-lg border border-current/20 bg-white px-2.5 py-1 text-[11px] font-semibold transition-colors hover:bg-white/80 shadow-2xs"
                 >
                   {primaryIncident?.actionPath === '/status' ? 'View status' : 'Review'}
                 </Link>
@@ -703,6 +637,7 @@ function DashboardShell({
                 {[
                   { name: 'Dashboard', href: '/dashboard', icon: CustomDashboardIcon, isHeroicon: true },
                   { name: 'Posted replies', href: '/posted', icon: FolderIcon, isHeroicon: true },
+                  { name: 'Plan & usage', href: '/settings?section=plan', icon: CreditCardIcon, isHeroicon: true },
                   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon, isHeroicon: true },
                 ].map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)

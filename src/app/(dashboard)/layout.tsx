@@ -1,5 +1,5 @@
 import DashboardLayout, { type DashboardBootstrap } from '@/components/DashboardLayout'
-import { normalizePlan } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 import {
   getCurrentUsageMonth,
   getPlanLimitsWithAddons,
@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [profileResult, addonCreditsResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('auto_send_enabled, plan, draft_count, draft_month, business_name')
+      .select('auto_send_enabled, plan, billing_status, billing_subscription_id, draft_count, draft_month, business_name')
       .eq('id', userId)
       .single(),
     supabase
@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ])
 
   const profile = profileResult.data
-  const plan = normalizePlan(profile?.plan)
+  const plan = getEntitledPlan(profile)
   const addonCredits = sumMonthlyAddonCredits(addonCreditsResult.data)
   const limit = getPlanLimitsWithAddons(plan, addonCredits).aiDraftsPerMonth
   const currentMonth = usageMonth
@@ -44,7 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const email = typeof claims.email === 'string' ? claims.email : undefined
   const userName = userMetadata.full_name || userMetadata.name || profile?.business_name || (email ? email.split('@')[0] : 'Account')
   const bootstrap: DashboardBootstrap = {
-    autoSend: profile?.auto_send_enabled ?? false,
+    autoSend: plan !== 'free' && (profile?.auto_send_enabled ?? false),
     plan,
     credits: { used, limit },
     user: {

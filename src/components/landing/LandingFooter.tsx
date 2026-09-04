@@ -11,11 +11,11 @@ import { BrandLogo } from '@/components/BrandLogo'
 
 const faqs = [
   { q: 'What is BuyerWatch?', a: 'It monitors Reddit and Bluesky for people looking for solutions like yours, scores their intent, and drafts a reply for review.' },
-  { q: 'Does BuyerWatch post automatically?', a: 'Manual review is the default. Paid accounts can explicitly enable guarded auto-send only after completing the required trust-building reviews.' },
+  { q: 'Does BuyerWatch post automatically?', a: 'Manual review is the default. The card-required 7-day Starter trial includes one explicitly activated guarded automatic reply; ongoing auto-send unlocks after the required trust-building reviews.' },
   { q: 'Does it work for non-SaaS businesses?', a: 'Yes. You can monitor configured Reddit communities and Bluesky searches for conversations relevant to any product or service.' },
   { q: 'How is this different from Google Alerts?', a: 'Google Alerts finds mentions of your brand. BuyerWatch finds active buying intent from people who don\'t know you yet.' },
   { q: 'How does intent scoring work?', a: 'We classify posts into Buying, Researching, Complaining, and Other, then attach a 0–100 confidence score for review.' },
-  { q: 'What does the Starter plan include?', a: 'Monthly Starter is $39/month after a 7-day full-access trial. Annual Starter is billed $372 upfront. Both include 5 keyword rules, up to 250 conversations per month, and manual review before anything is posted.' },
+  { q: 'What does the Starter plan include?', a: 'Starter begins with a card-required 7-day trial and one Instant Autopilot send. During the limited-time offer, the first paid month is $19, then $39/month. Annual billing starts after the trial.' },
   { q: 'Does this violate platform terms of service?', a: 'BuyerWatch uses public-feed access and authenticated connections where configured. Manual review is the default, and you remain responsible for each platform\'s rules.' },
   { q: 'How does BuyerWatch reduce promotional replies?', a: 'Drafts include an affiliation disclosure, are checked for promotional phrasing, and stay in manual review until the confidence engine has enough trust evidence.' }
 ]

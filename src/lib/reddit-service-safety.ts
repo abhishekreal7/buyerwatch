@@ -132,7 +132,6 @@ export async function createIncidentForRedditAlert(input: {
   const isGlobal = input.kind === 'selector_changed'
     || input.kind === 'canary_failed'
   const mustOpenCircuit = input.kind === 'selector_changed'
-    || input.kind === 'delivery_uncertain'
     || input.kind === 'canary_failed'
     || providerIsExhausted
 
@@ -144,18 +143,6 @@ export async function createIncidentForRedditAlert(input: {
       p_requires_manual_reset: input.kind !== 'canary_failed',
     })
     if (error) throw error
-    if (input.userId && input.kind === 'delivery_uncertain') {
-      const userIncident = await admin.rpc('create_reddit_user_incident_v1', {
-        p_user_id: input.userId,
-        p_kind: input.kind,
-        p_severity: safe.severity,
-        p_reason_code: input.code.slice(0, 160),
-        p_title: safe.title,
-        p_message: safe.message,
-        p_action_path: actionPath,
-      })
-      if (userIncident.error) throw userIncident.error
-    }
     return data as string
   }
 

@@ -56,19 +56,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (attribution.converted_at && replace !== true) {
-      return NextResponse.json({ success: true, idempotent: true })
-    }
-
-    const { error } = await supabase
+    let update = supabase
       .from('reply_attribution')
       .update({
         converted_at: new Date().toISOString(),
         revenue_usd: revenue_usd ?? attribution.revenue_usd ?? 0,
       })
       .eq('id', attribution.id)
+    if (replace !== true) {
+      update = update.is('converted_at', null)
+    }
+    const { data: updated, error } = await update.select('id').maybeSingle()
     if (error) {
       return NextResponse.json({ error: 'conversion_update_failed' }, { status: 500 })
+    }
+    if (!updated) {
+      return NextResponse.json({ success: true, idempotent: true })
     }
 
     await recordEngagementEvent(supabase, {

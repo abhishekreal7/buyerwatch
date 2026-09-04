@@ -5,6 +5,7 @@ exports.emptyAiUsage = emptyAiUsage;
 exports.calculateAnthropicUsage = calculateAnthropicUsage;
 exports.mergeAiUsage = mergeAiUsage;
 exports.getAiUsageFromError = getAiUsageFromError;
+exports.getAiErrorTelemetry = getAiErrorTelemetry;
 exports.getAiSpendConfig = getAiSpendConfig;
 exports.reserveAiSpend = reserveAiSpend;
 exports.recordAiUsage = recordAiUsage;
@@ -27,11 +28,13 @@ const EMPTY_AI_USAGE = {
 };
 const USER_MONTHLY_LIMIT_MICROUSD = {
     free: 1_000_000,
+    starter: 1_000_000,
     pro: 10_000_000,
     growth: 40_000_000,
 };
 const USER_LIMIT_ENV = {
     free: 'ANTHROPIC_FREE_MONTHLY_SPEND_LIMIT_USD',
+    starter: 'ANTHROPIC_FREE_MONTHLY_SPEND_LIMIT_USD',
     pro: 'ANTHROPIC_PRO_MONTHLY_SPEND_LIMIT_USD',
     growth: 'ANTHROPIC_GROWTH_MONTHLY_SPEND_LIMIT_USD',
 };
@@ -84,6 +87,23 @@ function mergeAiUsage(left, right) {
 }
 function getAiUsageFromError(error) {
     return error instanceof AiUsageError ? error.usage : emptyAiUsage();
+}
+function getAiErrorTelemetry(error) {
+    const rootCause = error instanceof AiUsageError ? error.cause : error;
+    const providerError = rootCause && typeof rootCause === 'object'
+        ? rootCause
+        : null;
+    const providerStatus = typeof providerError?.status === 'number'
+        ? providerError.status
+        : undefined;
+    const providerRequestId = typeof providerError?.request_id === 'string'
+        ? providerError.request_id
+        : undefined;
+    return {
+        code: error instanceof Error ? error.name : 'unknown',
+        ...(providerStatus === undefined ? {} : { providerStatus }),
+        ...(providerRequestId ? { providerRequestId } : {}),
+    };
 }
 function getAiSpendConfig(plan, purpose) {
     const normalizedPlan = (0, plan_limits_1.normalizePlan)(plan);

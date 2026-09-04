@@ -37,7 +37,7 @@ describe('high-intent threshold preference', () => {
     expect(dashboard).toContain('normalizeHighIntentThreshold')
     expect(analytics).toContain('normalizeHighIntentThreshold')
     expect(searchRoute).toContain('normalizeHighIntentThreshold')
-    expect(searchRoute).toContain("threadsQuery.gte('intent_score', threshold)")
+    expect(searchRoute).toContain("p_min_intent: tab === 'high-intent' ? threshold : null")
     expect(searchRoute).not.toContain('Number.isFinite(threshold)')
     expect(dashboard).not.toMatch(/\.gte\('intent_score',\s*80\)/)
     expect(scorer).toContain("if (score >= 80) return 'buying'")

@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
-import DodoPayments from 'dodopayments'
-import { getDodoEnvironment } from '@/lib/dodo'
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { authRateLimit, getIp } from '@/lib/ratelimit'
-import { readJsonBody, RequestInputError } from '@/lib/request'
+import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
+import { processAccountDeletion } from '@/lib/account-deletion'
+import { publishQStashJson } from '@/lib/qstash'
+import { logger } from '@/lib/logger'
 
 export async function DELETE(request: Request) {
   try {
+    if (!isTrustedSameOriginMutation(request)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,44 +35,46 @@ export async function DELETE(request: Request) {
       .single()
     if (profileError) throw profileError
 
-    if (profile.billing_subscription_id) {
-      const apiKey = process.env.DODO_PAYMENTS_API_KEY
-      if (!apiKey) {
-        return NextResponse.json(
-          { error: 'billing_cancellation_not_configured' },
-          { status: 409 },
-        )
-      }
-      let environment: ReturnType<typeof getDodoEnvironment>
-      try {
-        environment = getDodoEnvironment()
-      } catch {
-        return NextResponse.json(
-          { error: 'billing_cancellation_not_configured' },
-          { status: 409 },
-        )
-      }
-      const dodo = new DodoPayments({
-        bearerToken: apiKey,
-        environment,
-        timeout: 15_000,
-        maxRetries: 2,
-      })
-      await dodo.subscriptions.update(profile.billing_subscription_id, {
-        status: 'cancelled',
-        cancel_reason: 'cancelled_by_customer',
-        cancellation_comment: 'Account deleted by customer',
-      })
-    }
+    const now = new Date().toISOString()
+    const { error: requestError } = await admin
+      .from('account_deletion_requests')
+      .upsert({
+        user_id: user.id,
+        subscription_id: profile.billing_subscription_id,
+        status: 'pending',
+        updated_at: now,
+      }, { onConflict: 'user_id', ignoreDuplicates: true })
+    if (requestError) throw requestError
 
-    const { error } = await admin.auth.admin.deleteUser(user.id)
-    if (error) throw error
+    try {
+      await processAccountDeletion(user.id)
+    } catch (deletionError) {
+      const messageId = await publishQStashJson(
+        '/api/jobs/account-deletion',
+        { userId: user.id },
+        { retries: 6, timeout: '2m' },
+      ).catch(() => null)
+      logger.warn(
+        {
+          code: deletionError instanceof Error ? deletionError.name : 'unknown',
+          retryQueued: Boolean(messageId),
+        },
+        'Account deletion remains pending',
+      )
+      return NextResponse.json(
+        { success: false, pending: true },
+        { status: messageId ? 202 : 503 },
+      )
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof RequestInputError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
-    console.error('[account] Account deletion failed', error)
+    logger.error(
+      { code: error instanceof Error ? error.name : 'unknown' },
+      'Account deletion request failed',
+    )
     return NextResponse.json({ error: 'account_deletion_failed' }, { status: 500 })
   }
 }

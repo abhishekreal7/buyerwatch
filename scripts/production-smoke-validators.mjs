@@ -32,7 +32,10 @@ export async function validateReadinessResponse(
     && checks.database?.status === 'ok'
     && checks.cache?.status === 'ok'
     && redditOnlyMonitoringFailure
-    && body?.dependencies?.redditProviderRequired === false
+    && (
+      body?.dependencies?.redditProviderRequired === false
+      || checks.redditProvider?.status === 'ok'
+    )
 
   if (!acceptableDegradation) {
     throw new Error(

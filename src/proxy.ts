@@ -23,9 +23,30 @@ function isSessionRoute(pathname: string): boolean {
   return SESSION_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
 }
 
+function staticHomepageContentSecurityPolicy(): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self'",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    'upgrade-insecure-requests',
+  ].join('; ')
+}
+
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
-  const contentSecurityPolicy = strictContentSecurityPolicy(nonce)
+  const isStaticHomepage = request.nextUrl.pathname === '/'
+    || request.nextUrl.pathname.startsWith('/homepage-prototype/')
+  const contentSecurityPolicy = isStaticHomepage
+    ? staticHomepageContentSecurityPolicy()
+    : strictContentSecurityPolicy(nonce)
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('content-security-policy', contentSecurityPolicy)

@@ -5,11 +5,15 @@ import { decrypt } from '@/lib/encryption'
 import { fetchWithTimeout } from '@/lib/http'
 import { isAllowedSlackWebhookUrl } from '@/lib/security/outbound-url'
 import { getPlanLimits } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
-import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
+import { boundedString, isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 
 export async function POST(req: NextRequest) {
   try {
+  if (!isTrustedSameOriginMutation(req)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  }
   // Auth check
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -30,11 +34,11 @@ export async function POST(req: NextRequest) {
 
   const { data: profile, error } = await getServiceRoleClient()
     .from('profiles')
-    .select('plan, slack_webhook_ciphertext, slack_webhook_url')
+    .select('plan, billing_status, billing_subscription_id, slack_webhook_ciphertext, slack_webhook_url')
     .eq('id', user.id)
     .single()
   if (error) throw error
-  if (!getPlanLimits(profile?.plan).slackNotifications) {
+  if (!getPlanLimits(getEntitledPlan(profile)).slackNotifications) {
     return NextResponse.json({ error: 'plan_feature_unavailable', feature: 'slack_notifications' }, { status: 403 })
   }
 

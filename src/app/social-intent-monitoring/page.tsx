@@ -34,7 +34,7 @@ export default function SocialIntentMonitoringPage() {
         <p className="mb-5 text-sm font-semibold uppercase tracking-[0.16em] text-[#0A84FF]">Social intent monitoring</p>
         <h1 className="text-4xl font-extrabold tracking-[-0.04em] sm:text-6xl">One focused queue for the conversations that matter.</h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-[#606060]">BuyerWatch brings relevant public conversations from Reddit and Bluesky—and eligible X workspaces—into one place to score, review, and respond thoughtfully.</p>
-        <Link href="/signup" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#0A0A0A] px-6 py-3.5 text-sm font-semibold text-white hover:bg-[#222]">Start with the free plan <ArrowRight className="h-4 w-4" /></Link>
+        <Link href="/signup?plan=starter&billing=monthly" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#0A0A0A] px-6 py-3.5 text-sm font-semibold text-white hover:bg-[#222]">Start your 7-day trial <ArrowRight className="h-4 w-4" /></Link>
       </section>
 
       <section className="border-y border-black/[0.06] bg-[#fafafa]">

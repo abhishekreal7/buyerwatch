@@ -44,6 +44,7 @@ import {
   enqueueDueMonitoring,
   enqueueWeeklyDigests,
 } from '../src/lib/scheduler-jobs'
+import { dispatchPendingFollowUps } from '../src/lib/follow-up-outbox'
 
 type WorkerMetric = {
   completed: number
@@ -225,7 +226,10 @@ export async function startWorkerRuntime() {
         redis,
         `scheduler:outbox:${minute}`,
         55_000,
-        () => dispatchPendingOutbox(),
+        async () => {
+          await dispatchPendingOutbox()
+          await dispatchPendingFollowUps()
+        },
       )
 
       if (minute % 5 === 0) {

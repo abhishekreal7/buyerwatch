@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isPrivateOrReservedIp = isPrivateOrReservedIp;
 exports.isAllowedSlackWebhookUrl = isAllowedSlackWebhookUrl;
 exports.getSafeHttpUrl = getSafeHttpUrl;
+exports.getSafeAttributionRedirectUrl = getSafeAttributionRedirectUrl;
 exports.assertPublicHttpUrl = assertPublicHttpUrl;
 exports.fetchPublicText = fetchPublicText;
 const promises_1 = require("node:dns/promises");
@@ -85,6 +86,29 @@ function getSafeHttpUrl(value) {
         return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password
             ? url
             : null;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Redirect-only trust boundary for BuyerWatch-branded attribution links.
+ * Unlike generic HTTP parsing, branded redirects require HTTPS and reject
+ * private/reserved literals and local hostnames.
+ */
+function getSafeAttributionRedirectUrl(value) {
+    try {
+        const url = new URL(value);
+        const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+        if (url.protocol !== 'https:'
+            || url.username
+            || url.password
+            || BLOCKED_HOSTNAMES.has(hostname)
+            || hostname.endsWith('.localhost')
+            || ((0, node_net_1.isIP)(hostname) !== 0 && isPrivateOrReservedIp(hostname))) {
+            return null;
+        }
+        return url;
     }
     catch {
         return null;

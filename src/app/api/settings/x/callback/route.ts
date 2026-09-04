@@ -4,6 +4,7 @@ import { encrypt } from '@/lib/encryption'
 import { fetchWithTimeout, readResponseText } from '@/lib/http'
 import { redis } from '@/lib/redis'
 import { canMonitorPlatform } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 
 const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL || 'https://www.buyerwatch.co'
 const redirect = (status: string) => NextResponse.redirect(new URL(`/settings?section=connections&x=${status}`, siteUrl()))
@@ -13,8 +14,8 @@ export async function GET(request: Request) {
   const rawState = await redis.get(`x-oauth:${state}`); await redis.del(`x-oauth:${state}`)
   if (!rawState || !process.env.X_OAUTH_CLIENT_ID || !process.env.X_OAUTH_CLIENT_SECRET) return redirect('expired')
   let stateData: { userId: string; verifier: string }; try { stateData = JSON.parse(rawState) } catch { return redirect('expired') }
-  const { data: profile } = await getServiceRoleClient().from('profiles').select('plan').eq('id', stateData.userId).maybeSingle()
-  if (!canMonitorPlatform(profile?.plan, 'x')) return redirect('plan_required')
+  const { data: profile } = await getServiceRoleClient().from('profiles').select('plan, billing_status, billing_subscription_id').eq('id', stateData.userId).maybeSingle()
+  if (!canMonitorPlatform(getEntitledPlan(profile), 'x')) return redirect('plan_required')
   const callback = new URL('/api/settings/x/callback', siteUrl()).toString()
   const auth = Buffer.from(`${process.env.X_OAUTH_CLIENT_ID}:${process.env.X_OAUTH_CLIENT_SECRET}`).toString('base64')
   const tokenResponse = await fetchWithTimeout('https://api.x.com/2/oauth2/token', { method: 'POST', headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code, grant_type: 'authorization_code', redirect_uri: callback, code_verifier: stateData.verifier }).toString() }, 15_000)

@@ -6,10 +6,13 @@ import { BskyAgent } from '@atproto/api'
 import { createTimeoutFetch } from '@/lib/http'
 import { getServiceRoleClient } from '@/lib/admin'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
-import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
+import { boundedString, isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 
 export async function POST(req: Request) {
   try {
+  if (!isTrustedSameOriginMutation(req)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  }
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

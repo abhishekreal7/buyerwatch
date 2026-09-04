@@ -3,12 +3,14 @@ import 'server-only'
 import { getRedditDeliveryControl } from './reddit-service-safety'
 import { readHyperbrowserHealth, HYPERBROWSER_HEALTH_MAX_AGE_MS } from './reddit-delivery-health'
 import { createClient } from '@supabase/supabase-js'
+import { checkMonitoringReadiness } from './health'
 
 export type PublicServiceStatus = {
   status: 'operational' | 'degraded' | 'outage'
   message: string
   checkedAt: string
   redditDelivery: 'operational' | 'paused' | 'degraded'
+  conversationMonitoring: 'operational' | 'degraded'
   customerNotifications: 'operational' | 'attention_required'
 }
 
@@ -22,9 +24,10 @@ function getServiceRoleClient() {
 export async function getPublicServiceStatus(): Promise<PublicServiceStatus> {
   const checkedAt = new Date().toISOString()
   try {
-    const [control, health, failedNotifications] = await Promise.all([
+    const [control, health, monitoring, failedNotifications] = await Promise.all([
       getRedditDeliveryControl(),
       readHyperbrowserHealth().catch(() => null),
+      checkMonitoringReadiness(),
       getServiceRoleClient()
         .from('incident_deliveries')
         .select('id, service_incidents!inner(status)', { count: 'exact', head: true })
@@ -39,6 +42,7 @@ export async function getPublicServiceStatus(): Promise<PublicServiceStatus> {
         message: 'A customer notification requires operator attention. In-app incident notices remain available.',
         checkedAt,
         redditDelivery: control.state === 'open' ? 'paused' : 'operational',
+        conversationMonitoring: monitoring.status === 'ok' ? 'operational' : 'degraded',
         customerNotifications: 'attention_required',
       }
     }
@@ -48,6 +52,7 @@ export async function getPublicServiceStatus(): Promise<PublicServiceStatus> {
         message: 'Reddit delivery is paused safely while we verify the service.',
         checkedAt,
         redditDelivery: 'paused',
+        conversationMonitoring: monitoring.status === 'ok' ? 'operational' : 'degraded',
         customerNotifications: 'operational',
       }
     }
@@ -59,6 +64,17 @@ export async function getPublicServiceStatus(): Promise<PublicServiceStatus> {
         message: 'Reddit delivery is available, but a recent verification is delayed.',
         checkedAt,
         redditDelivery: 'degraded',
+        conversationMonitoring: monitoring.status === 'ok' ? 'operational' : 'degraded',
+        customerNotifications: 'operational',
+      }
+    }
+    if (monitoring.status === 'error') {
+      return {
+        status: 'degraded',
+        message: 'Conversation monitoring is delayed for one or more sources. Reply delivery remains available.',
+        checkedAt,
+        redditDelivery: 'operational',
+        conversationMonitoring: 'degraded',
         customerNotifications: 'operational',
       }
     }
@@ -67,6 +83,7 @@ export async function getPublicServiceStatus(): Promise<PublicServiceStatus> {
       message: 'All monitored delivery systems are operating normally.',
       checkedAt,
       redditDelivery: 'operational',
+      conversationMonitoring: 'operational',
       customerNotifications: 'operational',
     }
   } catch {
@@ -75,6 +92,7 @@ export async function getPublicServiceStatus(): Promise<PublicServiceStatus> {
       message: 'Service status cannot be verified. Delivery is treated as paused for safety.',
       checkedAt,
       redditDelivery: 'paused',
+      conversationMonitoring: 'degraded',
       customerNotifications: 'attention_required',
     }
   }

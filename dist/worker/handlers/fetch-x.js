@@ -41,12 +41,16 @@ const logger_1 = require("../../src/lib/logger");
 const x_1 = require("../../src/lib/x");
 const queues_1 = require("../../src/lib/queues");
 const plan_limits_1 = require("../../src/lib/plan-limits");
+const keyword_poll_health_1 = require("../../src/lib/keyword-poll-health");
+const reddit_candidates_1 = require("../../src/lib/reddit-candidates");
 const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 async function xFetchHandler(job) {
     const { target, keywordMappings: preloadedMappings } = job.data;
+    let keywordIds = preloadedMappings?.map(({ id }) => id) ?? [];
+    let sourceFetchRecorded = false;
     try {
         // Find all users watching this specific X target
         let keywordMappings = preloadedMappings;
@@ -57,7 +61,7 @@ async function xFetchHandler(job) {
             for (let offset = 0;; offset += pageSize) {
                 const result = await supabase_1.supabaseWorker
                     .from('keywords')
-                    .select('id, user_id, term')
+                    .select('id, user_id, term, profiles!inner(competitors)')
                     .eq('platform', 'x')
                     .eq('target', target)
                     .eq('is_active', true)
@@ -67,7 +71,7 @@ async function xFetchHandler(job) {
                     error = result.error;
                     break;
                 }
-                keywordMappings.push(...(result.data ?? []));
+                keywordMappings.push(...(0, reddit_candidates_1.withProfileCompetitors)(result.data ?? []));
                 if ((result.data?.length ?? 0) < pageSize)
                     break;
             }
@@ -77,6 +81,7 @@ async function xFetchHandler(job) {
         }
         if (!keywordMappings || keywordMappings.length === 0)
             return;
+        keywordIds = keywordMappings.map(({ id }) => id);
         // Reserve paid X search capacity before making the provider request. One
         // reservation per customer covers this shared target fetch, not every post.
         const affordableUsers = new Set();
@@ -90,25 +95,31 @@ async function xFetchHandler(job) {
             return;
         }
         const posts = await (0, x_1.fetchXPosts)(target);
+        await (0, keyword_poll_health_1.recordKeywordPollSuccess)(keywordMappings.map(({ id }) => id));
+        sourceFetchRecorded = true;
         if (!posts || posts.length === 0)
             return;
-        for (const post of posts) {
-            const postText = `${post.text || ''}`.toLowerCase();
-            for (const mapping of keywordMappings) {
-                if (postText.includes(mapping.term.toLowerCase())) {
-                    // Push to score queue
-                    await queues_1.scorePostQueue.add('score', {
-                        userId: mapping.user_id,
-                        keywordId: mapping.id,
-                        post,
-                    }, {
-                        jobId: `score-${mapping.user_id}-${post.externalId}`
-                    });
-                }
-            }
+        const discovery = (0, reddit_candidates_1.buildSocialScoreCandidates)(posts, keywordMappings);
+        for (const candidate of discovery.candidates) {
+            const safeJobId = candidate.post.externalId.replace(/:/g, '_');
+            await queues_1.scorePostQueue.add('score', candidate, {
+                jobId: `score-${candidate.userId}-${safeJobId}`,
+            });
         }
+        logger_1.logger.info({
+            target,
+            posts: posts.length,
+            enqueued: discovery.candidates.length,
+            skipped: discovery.skipped,
+            users: discovery.users,
+        }, `X target ${target}: ${discovery.candidates.length} enqueued`);
     }
     catch (error) {
+        if (!sourceFetchRecorded) {
+            await (0, keyword_poll_health_1.recordKeywordPollFailure)(keywordIds, error).catch((healthError) => {
+                logger_1.logger.error({ healthError, target }, 'Failed to record X keyword poll failure');
+            });
+        }
         logger_1.logger.error({ error }, `Failed to fetch X target ${target}:`);
         throw error;
     }
@@ -123,7 +134,7 @@ async function checkXSpendBudget(userId) {
         throw new Error(`Failed to load X budget profile: ${profileError.message}`);
     if (!profile)
         return false;
-    const limit = plan_limits_1.X_DAILY_SPEND_LIMIT_CENTS[profile.plan] || 0;
+    const limit = (0, plan_limits_1.getPlanLimits)(profile.plan).xDailySpendLimitCents;
     if (limit === 0)
         return false;
     // Cost per search in cents. Live value is ~5 cents depending on operation.
