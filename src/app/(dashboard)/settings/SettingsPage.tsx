@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   CircleUserRound, Bell, CreditCard, Check, Loader2,
   Globe, AtSign, Shield,
-  Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info, ShieldCheck, ChevronDown,
-  Copy, ExternalLink, Link2
+  Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info, ShieldCheck, ChevronDown
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { createClient } from '@/utils/supabase/client'
@@ -2014,109 +2013,36 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                           Reply attribution is available on Professional and Growth. Existing links remain measurable, while new Starter replies are published without tracking links.
                           <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
                         </div>
-                      ) : <>
-                      <div className="flex items-start justify-between gap-6">
-                        <div className="flex-1">
-                          <p className="text-[14px] font-semibold text-gray-900">Track visits from relevant replies</p>
-                          <p className="mt-1 max-w-[580px] text-[13px] leading-5 text-gray-500">
-                            When a product link is appropriate, BuyerWatch adds a unique attribution link so visits and conversions appear in Analytics.
-                          </p>
-                        </div>
-                        <Toggle
-                          label="Toggle referral tracking"
-                          checked={profile.referralTrackingEnabled}
-                          onChange={v => setProfile(p => ({ ...p, referralTrackingEnabled: v }))}
-                        />
-                      </div>
-                      {(() => {
-                        const cleanDomain = profile.businessUrl
-                          ? profile.businessUrl.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
-                          : 'yourdomain.com'
-                        const previewUrl = `https://${cleanDomain}?ref=buyerwatch&sid=abc123`
-
-                        return (
-                          <div className="mt-5 overflow-hidden rounded-2xl border border-[#E4E7EC] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)]">
-                            <div className="p-4 sm:p-5">
-                              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                                <div className="flex items-start gap-3">
-                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0A84FF] border border-blue-100">
-                                    <Link2 className="h-4.5 w-4.5 stroke-[2.2]" />
-                                  </div>
-                                  <div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <h4 className="text-[13.5px] font-semibold text-[#101828]">Smart Attribution Link</h4>
-                                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        Direct 302 Redirect
-                                      </span>
-                                    </div>
-                                    <p className="mt-1 text-[12px] leading-relaxed text-[#667085]">
-                                      Visitors are redirected to your website instantly while BuyerWatch preserves visit source and conversion telemetry. Links are added only when relevant with full disclosure.
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Interactive URL Inspector Card */}
-                              <div className="mt-4 rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] p-3.5">
-                                <div className="flex items-center justify-between gap-2 pb-2">
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#667085]">
-                                    Generated URL Structure
-                                  </span>
-                                  <div className="flex items-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => void copySettingValue(previewUrl, 'Sample attribution link')}
-                                      className="inline-flex items-center gap-1 rounded-md border border-[#D0D5DD] bg-white px-2 py-1 text-[11px] font-semibold text-[#344054] shadow-2xs transition-colors hover:bg-gray-50 hover:text-black cursor-pointer"
-                                    >
-                                      <Copy className="h-3 w-3" />
-                                      Copy sample
-                                    </button>
-                                    {profile.businessUrl && (
-                                      <a
-                                        href={previewUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 rounded-md border border-[#D0D5DD] bg-white px-2 py-1 text-[11px] font-semibold text-[#344054] shadow-2xs transition-colors hover:bg-gray-50 hover:text-black"
-                                      >
-                                        <ExternalLink className="h-3 w-3" />
-                                        Test link
-                                      </a>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* URL Pill */}
-                                <div className="flex items-center gap-1 rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 font-mono text-[12px] text-[#1E293B] shadow-2xs overflow-x-auto">
-                                  <span className="text-gray-400 select-none">https://</span>
-                                  <span className="font-semibold text-gray-900">{cleanDomain}</span>
-                                  <span className="text-[#0A84FF] font-semibold">?ref=buyerwatch</span>
-                                  <span className="text-emerald-600 font-semibold">&amp;sid=abc123</span>
-                                </div>
-
-                                {/* Telemetry Parameters Legend */}
-                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                                  <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-2 text-blue-950">
-                                    <span className="font-mono font-bold text-[#0A84FF] shrink-0">?ref=buyerwatch</span>
-                                    <span className="text-blue-900/80 leading-snug">Preserves referral campaign source in Google Analytics, Plausible, or Mixpanel</span>
-                                  </div>
-                                  <div className="flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 p-2 text-emerald-950">
-                                    <span className="font-mono font-bold text-emerald-600 shrink-0">&amp;sid=abc123</span>
-                                    <span className="text-emerald-900/80 leading-snug">Unique opportunity token for 1-click conversion matching in Analytics</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Policy disclosure */}
-                              <div className="mt-3.5 flex items-center gap-2 text-[11.5px] text-[#475467]">
-                                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                                <span>Compliant with Reddit and Bluesky link policies: includes natural affiliation context and zero deceptive affiliate wrappers.</span>
-                              </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-[13.5px] font-medium text-[#101828]">Track visits from replies</p>
+                              <p className="text-[12px] text-[#667085]">Appends attribution parameters to relevant links so clicks appear in Analytics.</p>
                             </div>
+                            <Toggle
+                              label="Toggle referral tracking"
+                              checked={profile.referralTrackingEnabled}
+                              onChange={v => setProfile(p => ({ ...p, referralTrackingEnabled: v }))}
+                            />
                           </div>
-                        )
-                      })()}
-                      </>}
+
+                          {profile.referralTrackingEnabled && (
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] px-3.5 py-2.5">
+                              <span className="truncate font-mono text-[12px] text-[#344054]">
+                                {profile.businessUrl || 'https://yoursite.com'}?ref=buyerwatch&amp;sid=abc123
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => void copySettingValue(`${profile.businessUrl || 'https://yoursite.com'}?ref=buyerwatch&sid=abc123`, 'Attribution link')}
+                                className="shrink-0 text-[11.5px] font-medium text-[#0A84FF] hover:underline cursor-pointer"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </SectionCard>
 
                     <div className="flex justify-end pt-2">
