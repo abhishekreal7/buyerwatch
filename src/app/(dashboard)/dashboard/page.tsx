@@ -902,17 +902,17 @@ export default function DashboardPage() {
             {keywordsCount > 0 && (
               <a
                 href="/keywords"
-                className={`inline-flex items-center text-[12.5px] font-medium transition-colors sm:mr-1 ${
+                className={
                   pollHealth.delayedRules > 0
-                    ? 'text-amber-700 hover:text-amber-800 underline decoration-amber-300 underline-offset-2'
-                    : 'text-[#8C8C86] hover:text-[#1C1C1A]'
-                }`}
+                    ? 'inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-amber-200/90 bg-amber-50 px-3 py-1.5 text-[12px] font-semibold text-amber-800 shadow-xs transition-colors hover:bg-amber-100 sm:min-h-0'
+                    : 'inline-flex items-center text-[12.5px] font-medium text-[#8C8C86] transition-colors hover:text-[#1C1C1A] sm:mr-1'
+                }
                 title={pollHealth.delayedRules > 0
                   ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active monitoring rules failed their latest successful-source check. Open Monitoring Rules for details.`
                   : 'The most recent successful active-source check. Open Monitoring Rules for details.'}
               >
                 {pollHealth.delayedRules > 0 && (
-                  <AlertTriangle className="mr-1.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden="true" />
                 )}
                 <span>
                   {pollHealth.delayedRules > 0
