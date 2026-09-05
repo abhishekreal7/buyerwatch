@@ -77,16 +77,137 @@ function SettingsNavItem({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       aria-label={`${section.label}: ${section.description}`}
-      className={`group flex min-h-[40px] w-full shrink-0 cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-left outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-neutral-400/40 ${active
-        ? 'bg-neutral-100 text-neutral-950 font-semibold border border-neutral-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)]'
-        : 'text-neutral-600 font-medium hover:bg-neutral-50 hover:text-neutral-900 border border-transparent'
+      className={`group flex min-h-[42px] w-full shrink-0 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-neutral-400/40 ${
+        active
+          ? 'bg-white text-neutral-950 font-semibold border border-neutral-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06),0_1px_2px_rgba(16,24,40,0.04)]'
+          : 'text-neutral-600 font-medium hover:bg-neutral-100/70 hover:text-neutral-900 border border-transparent'
       }`}
     >
-      <span className={`grid h-5 w-5 shrink-0 place-items-center transition-colors ${active ? 'text-neutral-950' : 'text-neutral-400 group-hover:text-neutral-700'}`}>
-        <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.75} />
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all ${
+          active
+            ? 'bg-neutral-900 text-white shadow-2xs'
+            : 'bg-neutral-100 text-neutral-500 group-hover:bg-neutral-200/80 group-hover:text-neutral-800'
+        }`}
+      >
+        <Icon className="h-4 w-4" strokeWidth={active ? 2.25 : 1.75} />
       </span>
-      <span className="whitespace-nowrap text-[13.5px] leading-5 tracking-[-0.01em]">{section.label}</span>
+      <span className="whitespace-nowrap text-[13px] leading-5 tracking-[-0.01em]">{section.label}</span>
     </button>
+  )
+}
+
+function SettingsSlider({
+  label,
+  description,
+  value,
+  min,
+  max,
+  step = 1,
+  unit = '',
+  onChange,
+  disabled = false,
+  minLabel,
+  maxLabel,
+  badgeText,
+}: {
+  label: string
+  description?: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  unit?: string
+  onChange: (value: number) => void
+  disabled?: boolean
+  minLabel?: string
+  maxLabel?: string
+  badgeText?: string
+}) {
+  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <label className="text-[13px] font-semibold text-[#101828]">{label}</label>
+          {description && (
+            <p className="mt-0.5 text-[12px] leading-5 text-[#667085]">{description}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {badgeText && (
+            <span className="rounded-md border border-[#E4E7EC] bg-white px-2 py-0.5 text-[11px] font-medium text-[#475467]">
+              {badgeText}
+            </span>
+          )}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={disabled || value <= min}
+              onClick={() => onChange(Math.max(min, value - step))}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#D0D5DD] bg-white text-[13px] font-semibold text-[#344054] shadow-2xs transition-all hover:bg-[#F9FAFB] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={`Decrease ${label}`}
+            >
+              −
+            </button>
+            <div className="flex min-w-[54px] items-center justify-center rounded-lg border border-[#E4E7EC] bg-[#F8FAFC] px-2 py-1 text-center font-mono text-[12.5px] font-bold tabular-nums text-[#101828]">
+              {value}{unit}
+            </div>
+            <button
+              type="button"
+              disabled={disabled || value >= max}
+              onClick={() => onChange(Math.min(max, value + step))}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#D0D5DD] bg-white text-[13px] font-semibold text-[#344054] shadow-2xs transition-all hover:bg-[#F9FAFB] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={`Increase ${label}`}
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative pt-1 pb-1">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          disabled={disabled}
+          aria-label={label}
+          onChange={e => onChange(Number(e.target.value))}
+          style={{
+            background: `linear-gradient(to right, #101828 0%, #101828 ${percentage}%, #E4E7EC ${percentage}%, #E4E7EC 100%)`
+          }}
+          className="h-2 w-full appearance-none rounded-full cursor-pointer outline-none transition-all disabled:cursor-not-allowed disabled:opacity-50
+            [&::-webkit-slider-thumb]:appearance-none
+            [&::-webkit-slider-thumb]:h-4.5
+            [&::-webkit-slider-thumb]:w-4.5
+            [&::-webkit-slider-thumb]:rounded-full
+            [&::-webkit-slider-thumb]:bg-white
+            [&::-webkit-slider-thumb]:border-[1.5px]
+            [&::-webkit-slider-thumb]:border-[#344054]
+            [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(16,24,40,0.15)]
+            [&::-webkit-slider-thumb]:transition-transform
+            hover:[&::-webkit-slider-thumb]:scale-110
+            active:[&::-webkit-slider-thumb]:scale-95
+            [&::-moz-range-thumb]:h-4.5
+            [&::-moz-range-thumb]:w-4.5
+            [&::-moz-range-thumb]:rounded-full
+            [&::-moz-range-thumb]:bg-white
+            [&::-moz-range-thumb]:border-[1.5px]
+            [&::-moz-range-thumb]:border-[#344054]
+            [&::-moz-range-thumb]:shadow-[0_1px_3px_rgba(16,24,40,0.15)]"
+        />
+        {(minLabel || maxLabel) && (
+          <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#98A2B3]">
+            <span>{minLabel}</span>
+            <span>{maxLabel}</span>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1705,7 +1826,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                         ? ` (${connections.redditAutoSendEligibility.daysRemaining} days and ${connections.redditAutoSendEligibility.karmaRemaining} karma remaining).`
                                         : '.'}
                                     </p>
-                                  </div>
+                                </div>
                                 ) : redditDirectConnected ? (
                                   <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
                                     <Shield className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
@@ -1722,39 +1843,38 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                   </div>
                                 )}
 
-                                <div>
-                                  <div className="mb-2 flex items-center justify-between">
-                                    <label className="text-[13px] font-medium text-gray-700">Minimum confidence threshold</label>
-                                    <span className="text-[13px] font-bold tabular-nums text-gray-900">{profile.autoSendThreshold}</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={instantAutopilotMode ? 90 : 70}
-                                    max="99"
+                                <div className="space-y-5 rounded-2xl border border-[#EAECF0] bg-[#F9FAFB]/60 p-4 sm:p-5">
+                                  <SettingsSlider
+                                    label="Minimum confidence threshold"
+                                    description="BuyerWatch only publishes automatically when confidence meets or clears this threshold."
                                     value={instantAutopilotMode ? Math.max(90, profile.autoSendThreshold) : profile.autoSendThreshold}
-                                    onChange={event => setProfile(current => ({ ...current, autoSendThreshold: Number(event.target.value) }))}
-                                    className="w-full cursor-pointer accent-gray-900"
-                                  />
-                                  <div className="mt-1 flex justify-between text-[11px] text-gray-400">
-                                    <span>{instantAutopilotMode ? '90, Instant Autopilot floor' : '70, learned floor still applies'}</span>
-                                    <span>99, strict</span>
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <div className="mb-2 flex items-center justify-between">
-                                    <label className="text-[13px] font-medium text-gray-700">Maximum automated replies per day</label>
-                                    <span className="text-[13px] font-bold tabular-nums text-gray-900">{profile.autoSendDailyLimit}</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="1"
-                                    max="10"
-                                    value={instantAutopilotMode ? 1 : profile.autoSendDailyLimit}
-                                    onChange={event => setProfile(current => ({ ...current, autoSendDailyLimit: Number(event.target.value) }))}
+                                    min={instantAutopilotMode ? 90 : 70}
+                                    max={99}
+                                    step={1}
+                                    unit="%"
                                     disabled={instantAutopilotMode}
-                                    className="w-full cursor-pointer accent-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                    minLabel={instantAutopilotMode ? '90% floor (Trial autopilot)' : '70% floor (Standard)'}
+                                    maxLabel="99% (Strict conviction)"
+                                    badgeText={profile.autoSendThreshold >= 90 ? 'High confidence' : 'Balanced'}
+                                    onChange={val => setProfile(current => ({ ...current, autoSendThreshold: val }))}
                                   />
+
+                                  <div className="border-t border-[#EAECF0] pt-4">
+                                    <SettingsSlider
+                                      label="Maximum automated replies per day"
+                                      description="Caps automated replies published across all connected platforms per 24 hours."
+                                      value={instantAutopilotMode ? 1 : profile.autoSendDailyLimit}
+                                      min={1}
+                                      max={10}
+                                      step={1}
+                                      unit=" / day"
+                                      disabled={instantAutopilotMode}
+                                      minLabel="1 / day (Conservative)"
+                                      maxLabel="10 / day (High volume)"
+                                      badgeText={instantAutopilotMode ? 'Trial locked' : `${profile.autoSendDailyLimit} max / day`}
+                                      onChange={val => setProfile(current => ({ ...current, autoSendDailyLimit: val }))}
+                                    />
+                                  </div>
                                 </div>
 
                                 <div className="space-y-2">
@@ -1890,42 +2010,19 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                         <div className="space-y-6">
                           {/* Alert Sensitivity Slider */}
                           <div className="rounded-xl border border-[#EAECF0] bg-[#F9FAFB]/70 p-4 sm:p-5">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Activity className="h-4 w-4 text-[#101828]" />
-                                  <p className="text-[13.5px] font-semibold text-[#101828]">Minimum dashboard intent score</p>
-                                </div>
-                                <p className="mt-1 text-[12px] leading-5 text-[#667085]">
-                                  Controls dashboard filters and high-intent alerts without rescoring opportunities.
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="rounded-lg bg-[#101828] px-3 py-1 font-mono text-[14px] font-bold tabular-nums text-white">
-                                  {highIntentThreshold}%
-                                </span>
-                                <span className="rounded-md border border-[#EAECF0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#475467]">
-                                  {highIntentThreshold >= 85 ? 'High conviction' : highIntentThreshold >= 75 ? 'Balanced' : 'Broad reach'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="mt-4">
-                              <input
-                                type="range"
-                                min={HIGH_INTENT_THRESHOLD_MIN}
-                                max={HIGH_INTENT_THRESHOLD_MAX}
-                                step="1"
-                                value={highIntentThreshold}
-                                aria-label="Minimum high-intent dashboard score"
-                                onChange={event => setHighIntentThreshold(normalizeHighIntentThreshold(event.target.value))}
-                                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#E4E7EC] accent-[#101828]"
-                              />
-                              <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#98A2B3]">
-                                <span>{HIGH_INTENT_THRESHOLD_MIN}% — Broader reach</span>
-                                <span>{HIGH_INTENT_THRESHOLD_MAX}% — Strongest buyer intent only</span>
-                              </div>
-                            </div>
+                            <SettingsSlider
+                              label="Minimum dashboard intent score"
+                              description="Controls dashboard filters and high-intent alerts without rescoring opportunities."
+                              value={highIntentThreshold}
+                              min={HIGH_INTENT_THRESHOLD_MIN}
+                              max={HIGH_INTENT_THRESHOLD_MAX}
+                              step={1}
+                              unit="%"
+                              minLabel={`${HIGH_INTENT_THRESHOLD_MIN}% — Broader reach`}
+                              maxLabel={`${HIGH_INTENT_THRESHOLD_MAX}% — Strongest buyer intent only`}
+                              badgeText={highIntentThreshold >= 85 ? 'High conviction' : highIntentThreshold >= 75 ? 'Balanced' : 'Broad reach'}
+                              onChange={val => setHighIntentThreshold(normalizeHighIntentThreshold(val))}
+                            />
                           </div>
 
                           {/* Delivery Channels (Inbox) */}
@@ -2000,28 +2097,20 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
 
                             {/* Threshold slider */}
                             {(slackConfigured || slack.webhookUrl) && (
-                              <div className="rounded-xl border border-[#EAECF0] bg-[#F9FAFB]/70 p-4">
-                                <div className="flex items-center justify-between gap-4 mb-3">
-                                  <div>
-                                    <p className="text-[13px] font-semibold text-[#101828]">Minimum intent score to notify Slack</p>
-                                    <p className="text-[11.5px] text-[#667085]">Opportunities below this score will not trigger Slack channel alerts.</p>
-                                  </div>
-                                  <span className="rounded-lg bg-[#101828] px-2.5 py-1 font-mono text-[13px] font-bold tabular-nums text-white">
-                                    {slack.threshold}%
-                                  </span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="60"
-                                  max="95"
+                              <div className="rounded-xl border border-[#EAECF0] bg-[#F9FAFB]/70 p-4 sm:p-5">
+                                <SettingsSlider
+                                  label="Minimum intent score to notify Slack"
+                                  description="Opportunities below this score will not trigger Slack channel alerts."
                                   value={slack.threshold}
-                                  onChange={e => setSlack(s => ({ ...s, threshold: parseInt(e.target.value) }))}
-                                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#E4E7EC] accent-[#101828]"
+                                  min={60}
+                                  max={95}
+                                  step={1}
+                                  unit="%"
+                                  minLabel="60% — Catch more"
+                                  maxLabel="95% — High conviction only"
+                                  badgeText={slack.threshold >= 85 ? 'High conviction' : 'Standard'}
+                                  onChange={val => setSlack(s => ({ ...s, threshold: val }))}
                                 />
-                                <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#98A2B3]">
-                                  <span>60% — Catch more</span>
-                                  <span>95% — High conviction only</span>
-                                </div>
                               </div>
                             )}
 
