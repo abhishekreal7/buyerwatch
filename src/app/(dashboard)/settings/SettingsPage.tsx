@@ -1626,7 +1626,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                               ? 'Your included auto-send is ready for one eligible reply—no draft approval required.'
                                   : draftsReviewed < 10
                                   ? `${draftsReviewed} of 10 required reviews completed. This review period helps BuyerWatch learn your standards before ongoing automation is enabled.`
-                                  : 'Review period complete. Confirm your delivery settings to activate ongoing auto-send.'}
+                                  : 'Enable ongoing auto-send so eligible high-intent replies can publish automatically after every safeguard passes. You can pause automation at any time.'}
                             </p>
                             {!instantAutopilotMode && draftsReviewed < 10 && (
                               <div className="mt-3 max-w-[420px]" aria-label={`${draftsReviewed} of 10 required reviews completed`}>
@@ -1648,14 +1648,11 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                               label="Toggle earned auto-send"
                               checked={profile.autoSendEnabled}
                               onChange={value => {
-                                if (value && !activationAcknowledged) {
-                                  toast.info('Confirm the activation acknowledgement first.')
-                                  return
-                                }
                                 if (value && !hasSelectedDirectConnection) {
                                   toast.info('Connect and select at least one direct-delivery platform first.')
                                   return
                                 }
+                                setActivationAcknowledged(true)
                                 setProfile(current => ({
                                   ...current,
                                   autoSendEnabled: value,
@@ -1663,6 +1660,9 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                     ? { autoSendThreshold: Math.max(90, current.autoSendThreshold), autoSendDailyLimit: 1 }
                                     : {}),
                                 }))
+                                if (value) {
+                                  toast.success('Auto-send enabled! Remember to click Save changes.')
+                                }
                               }}
                             />
                           ) : (
@@ -1686,22 +1686,6 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                               : 'After the review period, every reply must meet your confidence threshold, quality checks, platform requirements, target scope, and daily limit.'}
                           </p>
                         </div>
-
-                        {canActivateAutomation && !profile.autoSendEnabled && (
-                          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#DFDFDB] bg-white p-3.5">
-                            <input
-                              type="checkbox"
-                              checked={activationAcknowledged}
-                              onChange={event => setActivationAcknowledged(event.target.checked)}
-                              className="mt-0.5 h-4 w-4 accent-gray-900"
-                            />
-                            <span className="text-[12.5px] leading-5 text-gray-600">
-                              {instantAutopilotMode
-                                ? 'Enable auto-send for one eligible trial reply. It may publish without individual approval after every safeguard passes, and I can pause it at any time.'
-                                : 'Enable ongoing auto-send. Eligible replies may publish without individual approval, and I can pause automation at any time.'}
-                            </span>
-                          </label>
-                        )}
 
                         <AnimatePresence>
                           {(profile.autoSendEnabled || canActivateAutomation) && (
@@ -2269,27 +2253,77 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                           />
                         </div>
                       )}
-                      {usageItems.filter(item => item.max > 0).map(item => {
-                        const atLimit = item.used >= item.max
-                        const displayedUsed = Math.min(item.used, item.max)
-                        const percentage = Math.min((item.used / item.max) * 100, 100)
-                        return (
-                          <div key={item.label} className="mb-5 last:mb-0">
-                            <div className="mb-1.5 flex items-center justify-between text-[13px]">
-                              <span className="font-medium text-gray-700">{item.label}</span>
-                              <span className="tabular-nums text-gray-500">
-                                {displayedUsed} <span className="text-gray-300">/</span> {item.max}
-                              </span>
+                      <div className="space-y-3">
+                        {usageItems.filter(item => item.max > 0).map(item => {
+                          const atLimit = item.used >= item.max
+                          const displayedUsed = Math.min(item.used, item.max)
+                          const percentage = Math.min((item.used / item.max) * 100, 100)
+                          const Icon = item.label.includes('Threads')
+                            ? Activity
+                            : item.label.includes('Drafts')
+                              ? Sparkles
+                              : Send
+
+                          return (
+                            <div
+                              key={item.label}
+                              className="group rounded-xl border border-[#EAECF0] bg-white p-3.5 transition-all duration-150 hover:border-[#D0D5DD] hover:shadow-[0_2px_8px_rgba(16,24,40,0.04)]"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#EAECF0] bg-[#F9FAFB] text-[#475467] group-hover:text-[#101828]">
+                                    <Icon className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-[13px] font-semibold text-[#101828]">{item.label}</p>
+                                    <p className="text-[11px] text-[#667085]">
+                                      {item.max - displayedUsed > 0
+                                        ? `${(item.max - displayedUsed).toLocaleString()} remaining`
+                                        : 'Monthly limit reached'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <div className="text-right">
+                                    <span className="font-mono text-[13px] font-bold tabular-nums text-[#101828]">
+                                      {displayedUsed.toLocaleString()}
+                                    </span>
+                                    <span className="text-[11.5px] font-medium text-[#98A2B3]">
+                                      {' '}/ {item.max.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
+                                      atLimit
+                                        ? 'border border-red-200 bg-red-50 text-red-700'
+                                        : percentage >= 80
+                                          ? 'border border-amber-200 bg-amber-50 text-amber-700'
+                                          : 'border border-[#EAECF0] bg-[#F8FAFC] text-[#475467]'
+                                    }`}
+                                  >
+                                    {Math.round(percentage)}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mt-2.5">
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-[#F2F4F7]">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                      atLimit
+                                        ? 'bg-red-600'
+                                        : percentage >= 80
+                                          ? 'bg-amber-500'
+                                          : 'bg-[#101828]'
+                                    }`}
+                                    style={{ width: `${Math.max(percentage, percentage > 0 ? 3 : 0)}%` }}
+                                  />
+                                </div>
+                              </div>
                             </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                              <div
-                                className={`h-full rounded-full transition-all ${atLimit ? 'bg-[#101828]' : 'bg-[#475467]'}`}
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
                       {usageItems.every(item => item.max <= 0) && (
                         <p className="text-[12.5px] leading-5 text-[#667085]">Monthly capacity becomes available when your trial or subscription starts.</p>
                       )}
