@@ -10,7 +10,11 @@ import {
 } from './reddit-candidates'
 import { searchBlueskyPosts } from './bluesky'
 import { fetchXPosts, isXDiscoveryConfigured } from './x'
-import { fetchSubredditNewWithSource, type RedditDiscoverySource } from './reddit'
+import {
+  fetchSubredditNewWithSource,
+  prefetchRedditSubreddits,
+  type RedditDiscoverySource,
+} from './reddit'
 import { getRedditDiscoveryCapacity } from './reddit-discovery-capacity'
 import { dispatchPendingOutbox, recoverStaleSends, withRedisLock } from './backend-maintenance'
 import {
@@ -355,6 +359,16 @@ async function runLockedMonitor(
       reason: redditCapacity.reason,
       readBudget: redditCapacity.readBudget,
     }, 'Reddit discovery is using the RSS fallback; paid provider reads are paused safely')
+  }
+
+  const redditTargets = work
+    .filter(t => t.platform === 'reddit')
+    .map(t => t.target.trim().toLowerCase())
+  const uniqueRedditSubs = [...new Set(redditTargets)]
+  if (uniqueRedditSubs.length > 0) {
+    await prefetchRedditSubreddits(uniqueRedditSubs).catch(err => {
+      logger.warn({ err }, 'Reddit multi-target prefetch failed, continuing with direct fetches')
+    })
   }
 
   for (let index = 0; index < work.length; index += 6) {

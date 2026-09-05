@@ -335,7 +335,7 @@ export async function fetchSubredditNewWithSource(
         console.log(`[reddit] RSS fetch via ${rssHost} for r/${normalizedSubreddit}`)
         const rssResponse = await fetchWithTimeout(rssUrl, {
           headers: {
-            'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatch/1.0 (support@buyerwatch.co)',
+            'User-Agent': process.env.REDDIT_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
           }
@@ -361,12 +361,17 @@ export async function fetchSubredditNewWithSource(
 
         console.warn(`[reddit] RSS ${rssResponse.status} via ${rssHost} for r/${normalizedSubreddit}`)
         if (rssResponse.status === 429) {
-          // Attempt a fast 1.5s staggered retry with browser headers before backing off
-          await new Promise(r => setTimeout(r, 1500))
+          const resetHeader = rssResponse.headers.get('x-ratelimit-reset')
+          const resetSeconds = Number(resetHeader)
+          const waitMs = Number.isFinite(resetSeconds) && resetSeconds > 0
+            ? Math.min(15000, Math.max(3000, Math.ceil(resetSeconds + 1) * 1000))
+            : 8000
+          console.warn(`[reddit] RSS rate limited for r/${normalizedSubreddit}, waiting ${waitMs}ms before retry...`)
+          await new Promise(r => setTimeout(r, waitMs))
           try {
             const retryResponse = await fetchWithTimeout(rssUrl, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
                 'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
               }
@@ -499,3 +504,105 @@ export async function fetchSubredditNew(
 ): Promise<NormalizedPost[]> {
   return (await fetchSubredditNewWithSource(subreddit, limit)).posts
 }
+
+/**
+ * Efficiently pre-fetch multiple Reddit subreddits in a single bounded Atom RSS
+ * request using Reddit's native multi-feed URL (`/r/sub1+sub2+.../new/.rss`).
+ *
+ * Reddit edge rate limits to 1 unauthenticated request per ~10s per IP. By
+ * bundling up to 10 subreddits into one request, we fetch all active targets
+ * without triggering Reddit's 429 edge limiter, and seed the Redis cache
+ * (`rss:r:v3:${subreddit}`) so subsequent keyword mappings resolve instantly.
+ */
+export async function prefetchRedditSubreddits(subreddits: string[]): Promise<void> {
+  const normalized = [...new Set(
+    subreddits
+      .map(s => s.trim().replace(/^r\//i, '').toLowerCase())
+      .filter(s => /^[a-z0-9_]{2,50}$/.test(s))
+  )]
+  if (normalized.length === 0) return
+
+  let redisClient: import('ioredis').default | null = null
+  try {
+    redisClient = redis
+  } catch {
+    // Redis unavailable
+  }
+
+  const missing: string[] = []
+  if (redisClient) {
+    try {
+      const keys = normalized.map(s => `rss:r:v3:${s}`)
+      const cachedValues = await redisClient.mget(...keys)
+      for (let i = 0; i < normalized.length; i++) {
+        if (!cachedValues[i]) {
+          missing.push(normalized[i])
+        } else {
+          console.log(`[reddit] Multi-prefetch: r/${normalized[i]} already fresh in cache`)
+        }
+      }
+    } catch {
+      missing.push(...normalized)
+    }
+  } else {
+    missing.push(...normalized)
+  }
+
+  if (missing.length === 0) return
+
+  const CHUNK_SIZE = 10
+  const CACHE_TTL = 300 // 5 minutes
+
+  for (let i = 0; i < missing.length; i += CHUNK_SIZE) {
+    const chunk = missing.slice(i, i + CHUNK_SIZE)
+    const multiUrl = `https://www.reddit.com/r/${chunk.join('+')}/new/.rss?limit=100`
+    console.log(`[reddit] Multi-feed prefetch for ${chunk.length} subreddits: ${chunk.join(', ')}`)
+
+    const fetchHeaders = {
+      'User-Agent': process.env.REDDIT_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    try {
+      let response = await fetchWithTimeout(multiUrl, { headers: fetchHeaders }, 12_000)
+      if (response.status === 429) {
+        const resetHeader = response.headers.get('x-ratelimit-reset')
+        const resetSeconds = Number(resetHeader)
+        const waitMs = Number.isFinite(resetSeconds) && resetSeconds > 0
+          ? Math.min(15000, Math.max(3000, Math.ceil(resetSeconds + 1) * 1000))
+          : 8000
+        console.warn(`[reddit] Multi-feed 429, waiting ${waitMs}ms before retry...`)
+        await new Promise(r => setTimeout(r, waitMs))
+        response = await fetchWithTimeout(multiUrl, { headers: fetchHeaders }, 12_000)
+      }
+
+      if (response.ok) {
+        const xml = await readResponseText(response, MAX_REDDIT_SOURCE_BYTES * 2)
+        if (/<feed(?:\s|>)/i.test(xml)) {
+          for (const sub of chunk) {
+            const posts = parseRedditRss(xml, sub)
+            console.log(`[reddit] Multi-feed prefetch: parsed ${posts.length} posts for r/${sub}`)
+            if (redisClient) {
+              const cacheKey = `rss:r:v3:${sub}`
+              const rssBackoffKey = `backoff:rss:r:${sub}`
+              await Promise.all([
+                redisClient.set(cacheKey, JSON.stringify(posts), 'EX', CACHE_TTL),
+                redisClient.del(rssBackoffKey),
+              ]).catch(() => {})
+            }
+          }
+        }
+      } else {
+        console.warn(`[reddit] Multi-feed prefetch returned status ${response.status}`)
+      }
+    } catch (err) {
+      console.warn(`[reddit] Multi-feed prefetch chunk failed:`, err)
+    }
+
+    if (i + CHUNK_SIZE < missing.length) {
+      await new Promise(r => setTimeout(r, 8000))
+    }
+  }
+}
+
