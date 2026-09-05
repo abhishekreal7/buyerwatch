@@ -328,10 +328,10 @@ function DashboardShell({
 
   return (
     <DashboardSessionProvider userId={userId}>
-      <div className="h-dvh w-full overflow-hidden bg-[#F7F7F7] p-2 lg:p-2.5 flex gap-2 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
+      <div className="h-dvh w-full overflow-hidden bg-[#F7F7F7] p-0 lg:pt-2.5 lg:pl-2.5 lg:pb-0 lg:pr-0 flex gap-0 lg:gap-2.5 text-gray-900 font-sans selection:bg-accent/20 selection:text-accent">
 
         {/* Desktop Sidebar sitting directly on background */}
-        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F7F7F7] px-2 py-2.5 h-full lg:flex select-none">
+        <aside className="hidden w-[205px] shrink-0 flex-col bg-[#F7F7F7] px-2 pb-2.5 h-full lg:flex select-none">
           <div className="flex flex-col h-full">
             {/* Logo Header */}
             <div className="mb-2 flex h-9 shrink-0 items-center px-3.5">
@@ -468,8 +468,8 @@ function DashboardShell({
           </div>
         </aside>
 
-        {/* Main Content App Panel (Untouched) */}
-        <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-white rounded-2xl border border-[#E2E2DE] shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+        {/* Main Content App Panel */}
+        <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-white rounded-none lg:rounded-tl-2xl border-0 lg:border-t lg:border-l border-[#E2E2DE] shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
           {/* Header Bar */}
           <header className="flex h-14 shrink-0 items-center justify-between bg-white px-4 lg:px-6">
             <div className="flex items-center gap-3">
