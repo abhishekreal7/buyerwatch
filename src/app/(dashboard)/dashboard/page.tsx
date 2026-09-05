@@ -965,25 +965,25 @@ export default function DashboardPage() {
       {/* ElevenLabs Style 4 Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Conversations Found */}
-        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Conversations Found</span>
+        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">Conversations Found</span>
             <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#0A84FF]">
               <MessageCircle className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.threadsFound}
             </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
+            <span className="text-[11px] font-medium text-[#667085]">{metricPeriodLabel}</span>
           </div>
         </div>
 
         {/* Metric 2: High Intent */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">High Intent</span>
             <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-emerald-600">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
@@ -994,16 +994,16 @@ export default function DashboardPage() {
               </svg>
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.highIntent}
             </span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold ${
               stats.highIntentToday > 0
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-[#F1F2F3] text-[#667085]'
             }`}>
-              {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-3 w-3" strokeWidth={2.25} />}
+              {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-2.5 w-2.5" strokeWidth={2.25} />}
               {metricsAreLoading
                 ? 'Updating'
                 : stats.highIntentToday > 0
@@ -1014,45 +1014,45 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 3: Drafts Ready */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">
               Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>
             </span>
             <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#0A84FF]">
               <FileText className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.draftsReady}
             </span>
             {stats.draftsReady > 0 ? (
               <a
                 href="/opportunities/replies"
-                className="text-[11.5px] font-semibold text-[#0A84FF] hover:underline underline-offset-2 transition-colors"
+                className="text-[11px] font-semibold text-[#0A84FF] hover:underline underline-offset-2 transition-colors"
               >
                 Review Now →
               </a>
             ) : (
-              <span className="text-[11.5px] font-medium text-[#667085]">Up to date</span>
+              <span className="text-[11px] font-medium text-[#667085]">Up to date</span>
             )}
           </div>
         </div>
 
         {/* Metric 4: Replies sent in the selected period */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">Replies Sent</span>
             <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#F06A22]">
               <Send className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.repliesSent}
             </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
+            <span className="text-[11px] font-medium text-[#667085]">{metricPeriodLabel}</span>
           </div>
         </div>
       </div>
