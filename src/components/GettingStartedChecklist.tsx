@@ -27,7 +27,6 @@ export function GettingStartedChecklist({
     {
       id: 'keyword',
       title: 'Monitoring Active',
-      desc: 'At least one rule is checking conversations',
       done: keywordsCount > 0,
       link: '/keywords',
       actionLabel: 'Add keyword',
@@ -35,7 +34,6 @@ export function GettingStartedChecklist({
     {
       id: 'inspect',
       title: 'First Match Reviewed',
-      desc: 'Review lead context and intent signals',
       done: hasInspectedLead,
       link: '/dashboard#opportunities',
       actionLabel: 'Review',
@@ -43,7 +41,6 @@ export function GettingStartedChecklist({
     {
       id: 'reply',
       title: 'First Reply Prepared',
-      desc: 'Copy or approve a generated draft',
       done: hasCopiedOrApproved,
       link: '/drafts',
       actionLabel: 'Drafts',
@@ -51,7 +48,6 @@ export function GettingStartedChecklist({
     {
       id: 'autosend',
       title: 'Delivery Controls Ready',
-      desc: 'Configure auto-delivery rules and channels',
       done: autoSendEnabled,
       link: '/settings?section=connections',
       actionLabel: 'Settings',
@@ -212,14 +208,9 @@ export function GettingStartedChecklist({
                         {idx + 1}
                       </div>
                     )}
-                    <div className="min-w-0">
-                      <p className={`truncate text-[12px] ${s.done ? 'font-semibold text-gray-900' : 'font-medium text-gray-800'}`}>
-                        {s.title}
-                      </p>
-                      <p className="truncate text-[10.5px] text-gray-500">
-                        {s.desc}
-                      </p>
-                    </div>
+                    <span className={`truncate text-[12px] ${s.done ? 'font-semibold text-gray-900' : 'font-medium text-gray-800'}`}>
+                      {s.title}
+                    </span>
                   </div>
 
                   {!s.done && s.link && (

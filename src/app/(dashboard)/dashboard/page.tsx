@@ -965,15 +965,13 @@ export default function DashboardPage() {
       {/* ElevenLabs Style 4 Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Conversations Found */}
-        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">Conversations Found</span>
-            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
-              <MessageCircle className="w-4 h-4" strokeWidth={2} />
-            </div>
+            <MessageCircle className="w-4 h-4 text-[#0A84FF] shrink-0" strokeWidth={2} />
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-none">
               {metricsAreLoading ? '—' : stats.threadsFound}
             </span>
             <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
@@ -981,21 +979,19 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 2: High Intent */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
-            <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
-                <path d="M12 7a5 5 0 1 0 5 5" />
-                <path d="M13 3.055a9 9 0 1 0 7.941 7.945" />
-                <path d="M15 6v3h3l3 -3h-3v-3z" />
-                <path d="M15 9l-3 3" />
-              </svg>
-            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="text-emerald-600 shrink-0">
+              <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+              <path d="M12 7a5 5 0 1 0 5 5" />
+              <path d="M13 3.055a9 9 0 1 0 7.941 7.945" />
+              <path d="M15 6v3h3l3 -3h-3v-3z" />
+              <path d="M15 9l-3 3" />
+            </svg>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-none">
               {metricsAreLoading ? '—' : stats.highIntent}
             </span>
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
@@ -1014,17 +1010,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 3: Drafts Ready */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">
               Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>
             </span>
-            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
-              <FileText className="w-4 h-4" strokeWidth={2} />
-            </div>
+            <FileText className="w-4 h-4 text-[#0A84FF] shrink-0" strokeWidth={2} />
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-none">
               {metricsAreLoading ? '—' : stats.draftsReady}
             </span>
             {stats.draftsReady > 0 ? (
@@ -1041,15 +1035,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Metric 4: Replies sent in the selected period */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#F06A22]">
-              <Send className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-            </div>
+            <Send className="w-4 h-4 text-[#F06A22] shrink-0" strokeWidth={2} aria-hidden="true" />
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-none">
               {metricsAreLoading ? '—' : stats.repliesSent}
             </span>
             <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
