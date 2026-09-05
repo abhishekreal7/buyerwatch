@@ -42,7 +42,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     : 0
   const userMetadata = (claims.user_metadata ?? {}) as Record<string, string | undefined>
   const email = typeof claims.email === 'string' ? claims.email : undefined
-  const userName = userMetadata.full_name || userMetadata.name || profile?.business_name || (email ? email.split('@')[0] : 'Account')
+  const userName = userMetadata.custom_name || userMetadata.full_name || userMetadata.name || profile?.business_name || (email ? email.split('@')[0] : 'Account')
+  const avatarUrl = userMetadata.custom_avatar_url || userMetadata.avatar_url || userMetadata.picture
   const bootstrap: DashboardBootstrap = {
     autoSend: plan !== 'free' && (profile?.auto_send_enabled ?? false),
     plan,
@@ -50,7 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     user: {
       name: userName,
       email,
-      avatarUrl: userMetadata.avatar_url || userMetadata.picture,
+      avatarUrl,
     },
   }
 

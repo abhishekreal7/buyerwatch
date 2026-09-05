@@ -110,6 +110,7 @@ export async function PATCH(request: Request) {
     const currentMetadata = (user.user_metadata ?? {}) as Record<string, unknown>
     const updatedMetadata = {
       ...currentMetadata,
+      custom_name: name,
       full_name: name,
       name: name,
     }

@@ -37,6 +37,30 @@ export async function GET(request: Request) {
 
       const user = data?.user
       if (user) {
+        // Prevent OAuth provider identity data from wiping user's custom avatar or name
+        const userMeta = (user.user_metadata ?? {}) as Record<string, unknown>
+        if (userMeta.custom_avatar_url || userMeta.custom_name) {
+          try {
+            const { getServiceRoleClient } = await import('@/lib/admin')
+            const admin = getServiceRoleClient()
+            await admin.auth.admin.updateUserById(user.id, {
+              user_metadata: {
+                ...userMeta,
+                ...(userMeta.custom_avatar_url ? {
+                  avatar_url: userMeta.custom_avatar_url,
+                  picture: userMeta.custom_avatar_url,
+                } : {}),
+                ...(userMeta.custom_name ? {
+                  full_name: userMeta.custom_name,
+                  name: userMeta.custom_name,
+                } : {}),
+              },
+            })
+          } catch (metaErr) {
+            logger.warn({ err: metaErr }, 'Failed to persist custom metadata during OAuth sign-in')
+          }
+        }
+
         // Check if user has completed onboarding profile
         const { data: profile } = await supabase
           .from('profiles')

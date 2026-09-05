@@ -166,9 +166,9 @@ export default async function SettingsServerPage() {
       expiresAt: p.instant_autopilot_expires_at ?? null,
     },
     user: {
-      name: (user.user_metadata?.full_name || user.user_metadata?.name || p.business_name || (user.email ? user.email.split('@')[0] : 'User')) as string,
+      name: (user.user_metadata?.custom_name || user.user_metadata?.full_name || user.user_metadata?.name || p.business_name || (user.email ? user.email.split('@')[0] : 'User')) as string,
       email: user.email,
-      avatarUrl: ((user.user_metadata?.avatar_url || user.user_metadata?.picture) as string) || '',
+      avatarUrl: ((user.user_metadata?.custom_avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture) as string) || '',
     },
   }
 

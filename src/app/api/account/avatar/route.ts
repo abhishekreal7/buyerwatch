@@ -77,10 +77,11 @@ export async function POST(request: Request) {
 
     const avatarUrl = publicUrlData.publicUrl
 
-    // Update user metadata in Supabase Auth
+    // Update user metadata in Supabase Auth with custom_avatar_url to prevent OAuth provider resets
     const currentMetadata = (user.user_metadata ?? {}) as Record<string, unknown>
     const updatedMetadata = {
       ...currentMetadata,
+      custom_avatar_url: avatarUrl,
       avatar_url: avatarUrl,
       picture: avatarUrl,
     }
@@ -122,6 +123,7 @@ export async function DELETE(request: Request) {
     const currentMetadata = (user.user_metadata ?? {}) as Record<string, unknown>
     const updatedMetadata = {
       ...currentMetadata,
+      custom_avatar_url: null,
       avatar_url: null,
       picture: null,
     }
