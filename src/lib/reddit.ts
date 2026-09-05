@@ -1,4 +1,4 @@
-﻿import { NormalizedPost } from './types'
+import { NormalizedPost } from './types'
 import { fetchWithTimeout, readResponseText } from './http'
 import { redis } from './redis'
 import { getRedditDiscoveryProviderKind, hasRedditDiscoveryProvider } from './env'
@@ -374,11 +374,12 @@ export async function fetchSubredditNewWithSource(
     }
 
     // The canonical feed is the only currently healthy endpoint. Respect its
-    // throttle signal instead of multiplying blocked requests across dead URLs.
+    // throttle signal with a short cool-down (45s) rather than a 15-minute freeze,
+    // so rules recover rapidly as soon as the rolling window resets.
     if (shouldBackoff) {
-      const backoffSeconds = retryAfterSeconds !== null
-        ? Math.min(60 * 60, Math.max(5 * 60, Math.ceil(retryAfterSeconds)))
-        : 15 * 60
+      const backoffSeconds = retryAfterSeconds !== null && Number.isFinite(retryAfterSeconds)
+        ? Math.min(5 * 60, Math.max(15, Math.ceil(retryAfterSeconds)))
+        : 45
       await redis.set(rssBackoffKey, '1', 'EX', backoffSeconds).catch(() => {})
     }
   }
