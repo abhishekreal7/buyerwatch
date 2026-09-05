@@ -53,3 +53,4 @@ next-env.d.ts
 
 # Cloudflare Wrangler local state
 /cloudflare/.wrangler/
+/scratch/

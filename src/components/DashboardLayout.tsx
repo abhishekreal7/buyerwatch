@@ -138,6 +138,7 @@ function DashboardShell({
   const [togglingAutoSend, setTogglingAutoSend] = useState(false)
   const [plan, setPlan] = useState<PlanTier>(initialData.plan)
   const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | undefined>(initialData.user?.avatarUrl)
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -149,6 +150,21 @@ function DashboardShell({
   const { conversationSearch, setConversationSearch } = useConversationSearch()
   const searchInputRef = useRef<HTMLInputElement>(null)
   const showConversationSearch = pathname === '/dashboard'
+
+  useEffect(() => {
+    setUserAvatarUrl(initialData.user?.avatarUrl)
+  }, [initialData.user?.avatarUrl])
+
+  useEffect(() => {
+    const handleAvatarUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ avatarUrl?: string }>
+      setUserAvatarUrl(customEvent.detail?.avatarUrl || '')
+    }
+    window.addEventListener('buyerwatch:avatar-updated', handleAvatarUpdate)
+    return () => {
+      window.removeEventListener('buyerwatch:avatar-updated', handleAvatarUpdate)
+    }
+  }, [])
 
   useEffect(() => {
     const focusSearch = () => searchInputRef.current?.focus()
@@ -466,11 +482,17 @@ function DashboardShell({
               <div className="rounded-xl border border-zinc-200 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={initialData.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                      alt={initialData.user?.name || 'User'}
-                      className="h-8 w-8 shrink-0 rounded-full object-cover border border-zinc-200"
-                    />
+                    {userAvatarUrl ? (
+                      <img
+                        src={userAvatarUrl}
+                        alt={initialData.user?.name || 'User'}
+                        className="h-8 w-8 shrink-0 rounded-full object-cover border border-zinc-200"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#101828] text-[13px] font-semibold text-white select-none">
+                        {(initialData.user?.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium text-zinc-900 leading-tight">
                         {initialData.user?.name || 'User'}

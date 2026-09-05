@@ -39,12 +39,17 @@ class UnavailableLimiter implements Limiter {
   }
 }
 
-const redisClient = process.env.UPSTASH_REDIS_URL
-  ? new IORedis(process.env.UPSTASH_REDIS_URL, {
+let redisClient: IORedis | null = null
+if (process.env.UPSTASH_REDIS_URL) {
+  try {
+    redisClient = new IORedis(process.env.UPSTASH_REDIS_URL, {
       lazyConnect: true,
       tls: process.env.UPSTASH_REDIS_URL.startsWith('rediss://') ? {} : undefined,
     })
-  : null
+  } catch (err) {
+    console.warn('[ratelimit] Could not parse UPSTASH_REDIS_URL, using fallback limiter:', err)
+  }
+}
 
 const redisAdapter = redisClient
   ? {

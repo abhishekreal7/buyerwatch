@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CircleUserRound, Bell, CreditCard, Check, Loader2,
-  Globe, AtSign, Shield,
+  Globe, AtSign, Shield, Camera, X as XIcon2,
   Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info, ShieldCheck, ChevronDown
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
@@ -378,11 +379,13 @@ export type SettingsInitialData = {
   }
   draftsReviewed: number
   instantAutopilot: { available: boolean; used: boolean; expiresAt: string | null }
+  user?: { name: string; email?: string; avatarUrl: string }
 }
 
 /* ─── Main component ─────────────────────────────────────────────── */
 
 export default function SettingsPage({ initialData }: { initialData?: SettingsInitialData }) {
+  const router = useRouter()
   const [activeSection, setActiveSection] = useState('profile')
   const [saving, setSaving] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(!initialData)
@@ -427,6 +430,9 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
     autoSendCommunities: '',
     referralTrackingEnabled: true,
   })
+  const [avatarUrl, setAvatarUrl] = useState<string>(initialData?.user?.avatarUrl || '')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [activationAcknowledged, setActivationAcknowledged] = useState(false)
   const [instantAutopilot, setInstantAutopilot] = useState(initialData?.instantAutopilot ?? {
     available: false,
@@ -1375,6 +1381,104 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                 {/* ── PROFILE ─────────────────────────────────────── */}
                 {activeSection === 'profile' && (
                   <>
+                    {/* ── Account Avatar ─────────────────────────── */}
+                    <SectionCard title="Profile picture" description="Shows in your sidebar and team views.">
+                      <div className="flex items-center gap-5">
+                        <div className="relative shrink-0">
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt="Profile picture"
+                              className="h-16 w-16 rounded-full object-cover border border-[#E4E7EC]"
+                            />
+                          ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#101828] text-[22px] font-semibold text-white select-none">
+                              {(initialData?.user?.name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => avatarInputRef.current?.click()}
+                            disabled={avatarUploading}
+                            className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-[#E4E7EC] bg-white shadow-sm hover:bg-[#F9FAFB] transition-colors cursor-pointer disabled:opacity-50"
+                            aria-label="Change profile picture"
+                          >
+                            {avatarUploading ? <Loader2 className="h-3 w-3 animate-spin text-[#667085]" /> : <Camera className="h-3 w-3 text-[#667085]" />}
+                          </button>
+                          <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                            className="sr-only"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              e.target.value = ''
+                              if (!file) return
+                              setAvatarUploading(true)
+                              try {
+                                const fd = new FormData()
+                                fd.append('file', file)
+                                const res = await fetch('/api/account/avatar', { method: 'POST', body: fd })
+                                const data = await res.json()
+                                if (!res.ok) throw new Error(data.error || 'Upload failed')
+                                setAvatarUrl(data.avatarUrl)
+                                window.dispatchEvent(new CustomEvent('buyerwatch:avatar-updated', { detail: { avatarUrl: data.avatarUrl } }))
+                                void supabase.auth.refreshSession().catch(() => {})
+                                router.refresh()
+                                toast.success('Profile picture updated')
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Upload failed')
+                              } finally {
+                                setAvatarUploading(false)
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-[#101828]">{initialData?.user?.name || 'User'}</p>
+                          {initialData?.user?.email && (
+                            <p className="mt-0.5 text-[12px] text-[#667085] truncate">{initialData.user.email}</p>
+                          )}
+                          <div className="mt-2.5 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => avatarInputRef.current?.click()}
+                              disabled={avatarUploading}
+                              className="text-[12px] font-medium text-[#344054] border border-[#D0D5DD] bg-white rounded-lg px-2.5 py-1 hover:bg-[#F9FAFB] transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {avatarUrl ? 'Change photo' : 'Upload photo'}
+                            </button>
+                            {avatarUrl && (
+                              <button
+                                type="button"
+                                disabled={avatarUploading}
+                                onClick={async () => {
+                                  setAvatarUploading(true)
+                                  try {
+                                    const res = await fetch('/api/account/avatar', { method: 'DELETE' })
+                                    if (!res.ok) throw new Error('Remove failed')
+                                    setAvatarUrl('')
+                                    window.dispatchEvent(new CustomEvent('buyerwatch:avatar-updated', { detail: { avatarUrl: '' } }))
+                                    void supabase.auth.refreshSession().catch(() => {})
+                                    router.refresh()
+                                    toast.success('Profile picture removed')
+                                  } catch {
+                                    toast.error('Could not remove profile picture')
+                                  } finally {
+                                    setAvatarUploading(false)
+                                  }
+                                }}
+                                className="text-[12px] text-[#D92D20] hover:underline cursor-pointer disabled:opacity-50"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                          <p className="mt-1.5 text-[11.5px] text-[#98A2B3]">PNG, JPG, WebP or GIF &middot; max 5 MB</p>
+                        </div>
+                      </div>
+                    </SectionCard>
+
                     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_272px]">
                       <SectionCard title="Business profile" description="The context BuyerWatch uses to understand your product.">
                         <div className="space-y-4">
