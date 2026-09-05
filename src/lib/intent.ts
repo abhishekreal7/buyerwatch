@@ -1,6 +1,7 @@
 export const INTENT_LABELS = ['buying', 'researching', 'complaining', 'other'] as const
 export const LOW_RELEVANCE_THRESHOLD = 40
 export const ACTIONABLE_INTENT_THRESHOLD = 60
+export const DISMISSED_NOISE_FLOOR = 25
 
 export type IntentLabel = (typeof INTENT_LABELS)[number]
 
@@ -17,27 +18,12 @@ export function parseIntentResult(value: unknown): IntentResult {
   }
 
   const candidate = value as Record<string, unknown>
-  const score = candidate.score
-  const label = candidate.label
-  const reasoning = candidate.reasoning
-  const flag = candidate.flag
-
-  if (
-    typeof score !== 'number'
-    || !Number.isFinite(score)
-    || score < 0
-    || score > 100
-    || typeof label !== 'string'
-    || !INTENT_LABELS.includes(label as IntentLabel)
-    || typeof reasoning !== 'string'
-    || reasoning.trim().length < 8
-    || reasoning.trim().length > 500
-    || (flag !== undefined && flag !== null && flag !== 'COMPETITOR_RISK')
-  ) {
+  const rawScore = Number(candidate.score)
+  if (!Number.isFinite(rawScore) || rawScore < 0 || rawScore > 100) {
     throw new Error('Intent provider returned an invalid response')
   }
 
-  const roundedScore = Math.round(score)
+  const roundedScore = Math.max(0, Math.min(100, Math.round(rawScore)))
   const expectedLabel: IntentLabel = roundedScore >= 80
     ? 'buying'
     : roundedScore >= 60
@@ -45,15 +31,19 @@ export function parseIntentResult(value: unknown): IntentResult {
       : roundedScore >= 40
         ? 'complaining'
         : 'other'
-  if (label !== expectedLabel) {
-    throw new Error('Intent provider returned an inconsistent score and label')
-  }
+
+  const rawReasoning = typeof candidate.reasoning === 'string' ? candidate.reasoning.trim() : ''
+  const reasoning = rawReasoning.length >= 8
+    ? rawReasoning.slice(0, 500)
+    : 'Intent analysis completed based on post context.'
+
+  const flag = candidate.flag === 'COMPETITOR_RISK' ? 'COMPETITOR_RISK' : undefined
 
   return {
     score: roundedScore,
-    label: label as IntentLabel,
-    reasoning: reasoning.trim(),
-    ...(flag === 'COMPETITOR_RISK' ? { flag } : {}),
+    label: expectedLabel,
+    reasoning,
+    ...(flag ? { flag } : {}),
   }
 }
 

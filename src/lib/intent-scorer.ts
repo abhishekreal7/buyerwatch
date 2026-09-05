@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { createAnthropicClient } from './anthropic-client'
 import {
   AiUsageError,
   calculateAnthropicUsage,
@@ -150,17 +150,13 @@ export async function scoreIntent(
     }
   }
 
-  const apiKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
-  if (!apiKey) {
+  let anthropic: ReturnType<typeof createAnthropicClient>
+  try {
+    anthropic = createAnthropicClient({ maxRetries: options.maxRetries ?? 2 })
+  } catch {
     logger.warn('Anthropic is not configured; using deterministic intent scoring')
     return scoreWithoutProvider(post, userProfile, options)
   }
-
-  const anthropic = new Anthropic({
-    apiKey,
-    timeout: 30_000,
-    maxRetries: options.maxRetries ?? 2,
-  })
   const model = process.env.ANTHROPIC_INTENT_MODEL
     || process.env.ANTHROPIC_MODEL
     || 'claude-sonnet-5'

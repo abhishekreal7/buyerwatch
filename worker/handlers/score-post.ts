@@ -9,7 +9,7 @@ import path from 'path'
 import { randomBytes } from 'crypto'
 import { buildAttributionShortUrl } from '../../src/lib/attribution'
 import { getAppUrl } from '../../src/lib/app-url'
-import { ACTIONABLE_INTENT_THRESHOLD, type IntentLabel } from '../../src/lib/intent'
+import { ACTIONABLE_INTENT_THRESHOLD, DISMISSED_NOISE_FLOOR, type IntentLabel } from '../../src/lib/intent'
 import { evaluateIntentPreflight } from '../../src/lib/intent-preflight'
 import { getIntentDailyLimit, getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
 import { getEntitledPlan, hasActiveSubscription } from '../../src/lib/billing-entitlements'
@@ -364,7 +364,20 @@ export async function processScorePost(
         await safelyReleaseMonthlySignal(userId)
         signalReserved = false
       }
-      const isPreservable = scoreResult.score >= 20
+
+      // Completely drop posts below the noise floor (e.g. < 25) so they never pollute any feed
+      if (scoreResult.score < DISMISSED_NOISE_FLOOR) {
+        logger.info({ userId, score: scoreResult.score, externalId: post.externalId }, 'Discarded low-relevance post below noise floor')
+        await supabase
+          .from('monitored_threads')
+          .delete()
+          .eq('user_id', userId)
+          .eq('platform', post.platform)
+          .eq('external_id', post.externalId)
+        return
+      }
+
+      const isPreservable = scoreResult.score >= 40
       await saveThread({
         userId,
         keywordId,

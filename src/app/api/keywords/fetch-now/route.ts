@@ -21,10 +21,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await readJsonBody<Record<string, unknown>>(req)
-    const { keywordId } = body
-    if (!isUuid(keywordId)) {
-      return NextResponse.json({ error: 'Missing keywordId' }, { status: 400 })
+    const body = await readJsonBody<{ keywordId?: unknown }>(req).catch(() => ({} as { keywordId?: unknown }))
+    const keywordId = body?.keywordId
+
+    if (keywordId !== undefined && keywordId !== null && !isUuid(keywordId)) {
+      return NextResponse.json({ error: 'Invalid keywordId' }, { status: 400 })
     }
 
     const rate = await fetchNowRateLimit.limit(
@@ -32,6 +33,34 @@ export async function POST(req: Request) {
     )
     if (!rate.success) {
       return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+    }
+
+    if (!keywordId) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('plan, billing_status, billing_subscription_id')
+        .eq('id', user.id)
+        .single()
+      if (profileError || !profile) {
+        return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
+      }
+      if (!hasActiveSubscription(profile)) {
+        return NextResponse.json({ error: 'trial_required' }, { status: 403 })
+      }
+
+      const messageId = await publishMonitoringRun(user.id)
+      if (!messageId) {
+        return NextResponse.json(
+          { error: 'monitoring_not_configured' },
+          { status: 503 },
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        queued: true,
+        messageId,
+      }, { status: 202 })
     }
 
     const { data: keyword, error } = await supabase

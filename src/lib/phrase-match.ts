@@ -56,10 +56,7 @@ export function containsConfiguredPhraseOrAlias(
   // Strip conversational intent wrappers and articles so users who enter
   // "looking for digital marketing agency" or "recommend a marketing agency"
   // match the underlying service phrase (downstream hasBuyingSignal still guarantees commercial intent).
-  const corePhrase = normalizedPhrase
-    .replace(INTENT_PREFIX_REGEX, '')
-    .replace(/\b(?:our|my|the|a|an)\s+/g, '')
-    .trim()
+  const corePhrase = extractCoreSearchPhrase(phrase)
   if (corePhrase && corePhrase !== normalizedPhrase && corePhrase.length >= 3) {
     if (containsConfiguredPhrase(text, corePhrase)) return true
     const coreAliases = CONTROLLED_PHRASE_ALIASES[corePhrase] ?? []
@@ -67,5 +64,14 @@ export function containsConfiguredPhraseOrAlias(
   }
 
   return false
+}
+
+export function extractCoreSearchPhrase(phrase: string | null | undefined): string {
+  const normalized = normalize(phrase)
+  const core = normalized
+    .replace(INTENT_PREFIX_REGEX, '')
+    .replace(/\b(?:our|my|the|a|an)\s+/g, '')
+    .trim()
+  return core && core.length >= 3 ? core : normalized
 }
 

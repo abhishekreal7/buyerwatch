@@ -32,6 +32,7 @@ import {
 } from './keyword-poll-health'
 import { DISCOVERY_MAX_AGE_MS } from './content-freshness'
 import { getEntitledPlan, hasActiveSubscription } from './billing-entitlements'
+import { extractCoreSearchPhrase } from './phrase-match'
 
 type MonitorPlatform = 'reddit' | 'bluesky' | 'x'
 
@@ -393,20 +394,48 @@ async function runLockedMonitor(
         if (candidates.length === 0 && forceUserId) {
           const searchTerms = [...new Set(target.mappings.map(m => m.term.trim()).filter(Boolean))]
           const searchPosts: NormalizedPost[] = []
+          const BACKFILL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days matching dashboard default
+
           for (const term of searchTerms.slice(0, 3)) {
+            const coreTerm = extractCoreSearchPhrase(term)
             try {
-              const searchResult = await fetchSubredditSearchWithSource(target.target, term, 25, {
+              const searchResult = await fetchSubredditSearchWithSource(target.target, coreTerm, 25, {
                 mode: redditCapacity.mode,
               })
               searchPosts.push(...searchResult.posts)
             } catch (err) {
-              logger.warn({ err, target: target.target, term }, 'Backfill search failed for subreddit target')
+              logger.warn({ err, target: target.target, term: coreTerm }, 'Backfill search failed for subreddit target')
             }
           }
           if (searchPosts.length > 0) {
-            const searchDiscovery = buildSocialScoreCandidates(searchPosts, target.mappings)
+            const searchDiscovery = buildSocialScoreCandidates(searchPosts, target.mappings, {
+              maxAgeMs: BACKFILL_MAX_AGE_MS,
+            })
             if (searchDiscovery.candidates.length > 0) {
               candidates = searchDiscovery.candidates
+            }
+          }
+
+          // If still 0 candidates from this specific subreddit, search globally across Reddit
+          if (candidates.length === 0) {
+            for (const term of searchTerms.slice(0, 2)) {
+              const coreTerm = extractCoreSearchPhrase(term)
+              try {
+                const globalResult = await fetchSubredditSearchWithSource('all', coreTerm, 25, {
+                  mode: redditCapacity.mode,
+                })
+                if (globalResult.posts.length > 0) {
+                  const globalDiscovery = buildSocialScoreCandidates(globalResult.posts, target.mappings, {
+                    maxAgeMs: BACKFILL_MAX_AGE_MS,
+                  })
+                  if (globalDiscovery.candidates.length > 0) {
+                    candidates = globalDiscovery.candidates
+                    break
+                  }
+                }
+              } catch (err) {
+                logger.warn({ err, term: coreTerm }, 'Global backfill search failed')
+              }
             }
           }
         }

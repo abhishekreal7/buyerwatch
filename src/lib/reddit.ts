@@ -97,8 +97,12 @@ export function parseRedditRss(xml: string, subreddit: string): NormalizedPost[]
     const contentMatch = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)
     let bodyText = ''
     if (contentMatch?.[1]) {
-      bodyText = truncate(decodeXmlEntities(contentMatch[1])
+      let rawContent = contentMatch[1]
+      // Strip standard Reddit RSS boilerplate footer ("submitted by /u/... to r/... [link] [comments]")
+      rawContent = rawContent.replace(/(?:&#32;|\s)*submitted by[\s\S]*$/i, '')
+      bodyText = truncate(decodeXmlEntities(rawContent)
         .replace(/<[^>]+>/g, ' ')  // strip all HTML tags
+        .replace(/\bsubmitted by\s+\/u\/[^\s]+[\s\S]*$/i, '')
         .replace(/\s+/g, ' ')      // collapse whitespace
         .trim(), MAX_POST_TEXT_LENGTH)
     }
@@ -124,7 +128,7 @@ export function parseRedditRss(xml: string, subreddit: string): NormalizedPost[]
       text,
       url: target.canonicalUrl,
       createdAt,
-      sourceTarget: subreddit.toLowerCase() === 'all' ? target.subreddit : subreddit,
+      sourceTarget: target.subreddit || subreddit,
     })
   }
 

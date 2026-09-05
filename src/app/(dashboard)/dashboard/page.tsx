@@ -17,8 +17,8 @@ import {
 } from '@/lib/billing-addons'
 import { CreditPackPicker } from '@/components/CreditPackPicker'
 import { useDashboardSession } from '@/components/DashboardContext'
-import { getIntentDisplayLabel, isLowRelevanceScore, type IntentLabel } from '@/lib/intent'
-import { getSafeThreadUrl } from '@/lib/thread-url'
+import { getIntentDisplayLabel, isLowRelevanceScore, DISMISSED_NOISE_FLOOR, type IntentLabel } from '@/lib/intent'
+import { getSafeThreadUrl, extractSubredditFromRedditUrl } from '@/lib/thread-url'
 import { IntentBadge } from '@/components/IntentBadge'
 import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
 import { copyAndOpenRedditReply } from '@/lib/reddit-handoff-client'
@@ -102,10 +102,14 @@ function mapThread(thread: any): Thread {
     ? null
     : Number(thread.intent_score)
 
+  const actualTarget = (thread.platform === 'reddit' && extractSubredditFromRedditUrl(thread.url))
+    || (thread.keywords as { target?: string } | null)?.target
+    || thread.platform
+
   return {
     id: thread.id,
     platform: thread.platform,
-    target: (thread.keywords as { target?: string } | null)?.target || thread.platform,
+    target: actualTarget,
     timeAgo: formatTimeAgo(sourceCreatedAt),
     title: thread.title || '',
     content: thread.text_content || '',
@@ -252,6 +256,7 @@ export default function DashboardPage() {
         .eq('user_id', userId)
         .eq('status', 'dismissed')
         .not('intent_score', 'is', null)
+        .gte('intent_score', DISMISSED_NOISE_FLOOR)
         .order('source_created_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(60),
@@ -717,32 +722,20 @@ export default function DashboardPage() {
     setCheckingNow(true)
     toast.info('Checking for new posts...')
     try {
-      const { data: keywords, error } = await supabase
-        .from('keywords')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .limit(1)
-      if (error) throw error
-      const keyword = keywords?.[0]
-      if (!keyword) throw new Error('no_active_keyword')
-
       const response = await fetch('/api/keywords/fetch-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywordId: keyword.id }),
+        body: JSON.stringify({}),
       })
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
         throw new Error(payload?.message || payload?.error || 'scan_request_failed')
       }
-      toast.success('Check requested. Refreshing...')
+      toast.success('Check requested for all active topics. Refreshing...')
       window.setTimeout(() => void loadData(), 3000)
     } catch (error) {
       console.error('[dashboard] Unable to request a monitoring check', error)
-      toast.error(error instanceof Error && error.message === 'no_active_keyword'
-        ? 'Activate a monitoring rule before checking now.'
-        : 'Could not request a new scan. Try again.')
+      toast.error('Could not request a new scan. Try again.')
     } finally {
       setCheckingNow(false)
     }
@@ -853,7 +846,7 @@ export default function DashboardPage() {
     : threads
 
   const filtered = filterTab === 'dismissed'
-    ? searchableThreads.filter(t => t.status === 'dismissed')
+    ? searchableThreads.filter(t => t.status === 'dismissed' && (t.score === null || t.score >= DISMISSED_NOISE_FLOOR))
     : filterTab === 'high-intent'
       ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score !== null && t.score >= highIntentThreshold)
       : searchableThreads.filter(t => t.status !== 'dismissed' && t.score !== null)
@@ -1483,9 +1476,9 @@ export default function DashboardPage() {
                                     Done
                                   </button>
                                 </div>
-                                <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                                <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xs transition-colors focus-within:border-gray-300">
                                   <textarea
-                                    className="min-h-[190px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                                    className="min-h-[190px] w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
                                     value={thread.draft || ''}
                                     placeholder="Write your reply..."
                                     onChange={(event) => {
@@ -1666,9 +1659,9 @@ export default function DashboardPage() {
                                     Done
                                   </button>
                                 </div>
-                                <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                                <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xs transition-colors focus-within:border-gray-300">
                                   <textarea
-                                    className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                                    className="min-h-[220px] w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
                                     value={thread.draft || ''}
                                     placeholder="Write your reply..."
                                     onChange={(event) => {
@@ -1895,9 +1888,9 @@ export default function DashboardPage() {
                               Done
                             </button>
                           </div>
-                          <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                          <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xs transition-colors focus-within:border-gray-300">
                             <textarea
-                              className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                              className="min-h-[220px] w-full resize-none bg-transparent p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
                               value={selectedThread.draft || ''}
                               placeholder="Write your reply..."
                               onChange={(e) => {
