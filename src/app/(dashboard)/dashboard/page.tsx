@@ -902,23 +902,25 @@ export default function DashboardPage() {
             {keywordsCount > 0 && (
               <a
                 href="/keywords"
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11.5px] font-semibold sm:min-h-0 ${
+                className={`inline-flex items-center text-[12.5px] font-medium transition-colors sm:mr-1 ${
                   pollHealth.delayedRules > 0
-                    ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-[#DDE2E8] bg-white text-[#667085]'
+                    ? 'text-amber-700 hover:text-amber-800 underline decoration-amber-300 underline-offset-2'
+                    : 'text-[#8C8C86] hover:text-[#1C1C1A]'
                 }`}
                 title={pollHealth.delayedRules > 0
-                  ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active monitoring rules failed their latest successful-source check. Last attempt ${pollHealth.lastAttemptAt ? formatTimeAgo(pollHealth.lastAttemptAt) : 'not recorded'}. Open Monitoring Rules for details.`
-                  : 'The most recent successful active-source check'}
+                  ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active monitoring rules failed their latest successful-source check. Open Monitoring Rules for details.`
+                  : 'The most recent successful active-source check. Open Monitoring Rules for details.'}
               >
-                {pollHealth.delayedRules > 0
-                  ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                  : <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />}
-                {pollHealth.delayedRules > 0
-                  ? `${pollHealth.delayedRules} monitoring rule${pollHealth.delayedRules === 1 ? '' : 's'} failing`
-                  : pollHealth.lastSuccessfulAt
-                    ? `Sources updated ${formatTimeAgo(pollHealth.lastSuccessfulAt)}`
-                    : 'Waiting for first successful check'}
+                {pollHealth.delayedRules > 0 && (
+                  <AlertTriangle className="mr-1.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                )}
+                <span>
+                  {pollHealth.delayedRules > 0
+                    ? `${pollHealth.delayedRules} monitoring rule${pollHealth.delayedRules === 1 ? '' : 's'} failing`
+                    : pollHealth.lastSuccessfulAt
+                      ? `Sources updated ${formatTimeAgo(pollHealth.lastSuccessfulAt)}`
+                      : 'Waiting for first check'}
+                </span>
               </a>
             )}
             <div className="relative">
