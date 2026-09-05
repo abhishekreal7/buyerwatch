@@ -1927,12 +1927,12 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                       description="Caps automated replies published across all connected platforms per 24 hours."
                                       value={instantAutopilotMode ? 1 : profile.autoSendDailyLimit}
                                       min={1}
-                                      max={10}
+                                      max={25}
                                       step={1}
                                       unit=" / day"
                                       disabled={instantAutopilotMode}
                                       minLabel="1 / day (Conservative)"
-                                      maxLabel="10 / day (High volume)"
+                                      maxLabel="25 / day (High volume)"
                                       badgeText={instantAutopilotMode ? 'Trial locked' : `${profile.autoSendDailyLimit} max / day`}
                                       onChange={val => setProfile(current => ({ ...current, autoSendDailyLimit: val }))}
                                     />
