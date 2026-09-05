@@ -2028,14 +2028,14 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                           </div>
 
                           {profile.referralTrackingEnabled && (
-                            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] px-3.5 py-2.5">
-                              <span className="truncate font-mono text-[12px] text-[#344054]">
-                                {profile.businessUrl || 'https://yoursite.com'}?ref=buyerwatch&amp;sid=abc123
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] px-3.5 py-2">
+                              <span className="truncate font-mono text-[12px] text-[#475467]">
+                                {`${profile.businessUrl || 'https://yoursite.com'}?ref=buyerwatch&sid=abc123`}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => void copySettingValue(`${profile.businessUrl || 'https://yoursite.com'}?ref=buyerwatch&sid=abc123`, 'Attribution link')}
-                                className="shrink-0 text-[11.5px] font-medium text-[#0A84FF] hover:underline cursor-pointer"
+                                className="shrink-0 rounded-lg border border-[#D0D5DD] bg-white px-2.5 py-1 text-[11.5px] font-medium text-[#344054] transition hover:bg-[#F2F4F7] cursor-pointer"
                               >
                                 Copy
                               </button>
