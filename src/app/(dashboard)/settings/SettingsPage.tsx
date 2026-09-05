@@ -1672,17 +1672,17 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
 
                         <div className="flex items-start justify-between gap-6">
                           <div className="flex-1">
-                            <p className="text-[14px] font-semibold text-gray-900">
+                            <p className="text-[14px] font-semibold text-neutral-900">
                               {instantAutopilotMode ? 'Activate trial auto-send' : 'Ongoing auto-send'}
                             </p>
-                            <p className="mt-1 max-w-[580px] text-[13px] leading-5 text-gray-500">
+                            <p className="mt-1 max-w-[580px] text-[12.5px] leading-relaxed text-neutral-500">
                               {!getPlanLimits(planState.plan).autoSend
                                 ? `Available on Starter and above. ${draftsReviewed} of 10 required reviews completed.`
                                 : instantAutopilotMode
-                              ? 'Your included auto-send is ready for one eligible reply—no draft approval required.'
+                                  ? 'Your included auto-send is ready for one eligible reply—no draft approval required.'
                                   : draftsReviewed < 10
-                                  ? `${draftsReviewed} of 10 required reviews completed. This review period helps BuyerWatch learn your standards before ongoing automation is enabled.`
-                                  : 'Review period complete. Confirm your delivery settings to activate ongoing auto-send.'}
+                                    ? `${draftsReviewed} of 10 required reviews completed. This review period helps BuyerWatch learn your standards before ongoing automation is enabled.`
+                                    : 'Enable ongoing auto-send so eligible high-intent replies can publish automatically after every safeguard passes. You can pause automation at any time.'}
                             </p>
                             {!instantAutopilotMode && draftsReviewed < 10 && (
                               <div className="mt-3 max-w-[420px]" aria-label={`${draftsReviewed} of 10 required reviews completed`}>
@@ -1704,14 +1704,11 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                               label="Toggle earned auto-send"
                               checked={profile.autoSendEnabled}
                               onChange={value => {
-                                if (value && !activationAcknowledged) {
-                                  toast.info('Confirm the activation acknowledgement first.')
-                                  return
-                                }
                                 if (value && !hasSelectedDirectConnection) {
                                   toast.info('Connect and select at least one direct-delivery platform first.')
                                   return
                                 }
+                                setActivationAcknowledged(true)
                                 setProfile(current => ({
                                   ...current,
                                   autoSendEnabled: value,
@@ -1719,6 +1716,9 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                     ? { autoSendThreshold: Math.max(90, current.autoSendThreshold), autoSendDailyLimit: 1 }
                                     : {}),
                                 }))
+                                if (value) {
+                                  toast.success('Auto-send enabled! Remember to click Save changes.')
+                                }
                               }}
                             />
                           ) : (
@@ -1762,27 +1762,6 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                             </div>
                           </div>
                         </div>
-
-                        {canActivateAutomation && !profile.autoSendEnabled && (
-                          <label className="flex cursor-pointer items-start gap-3.5 rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-2xs transition-all hover:border-neutral-300 hover:bg-neutral-50/40">
-                            <div className="relative mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={activationAcknowledged}
-                                onChange={event => setActivationAcknowledged(event.target.checked)}
-                                className="peer absolute inset-0 cursor-pointer opacity-0"
-                              />
-                              <div className={`flex h-5 w-5 items-center justify-center rounded-md transition-colors ${activationAcknowledged ? 'bg-neutral-900 text-white' : 'text-transparent'}`}>
-                                <Check className="h-3.5 w-3.5 stroke-[3]" />
-                              </div>
-                            </div>
-                            <span className="text-[12.5px] leading-relaxed text-neutral-700 select-none">
-                              {instantAutopilotMode
-                                ? 'Enable auto-send for one eligible trial reply. It may publish without individual approval after every safeguard passes, and I can pause it at any time.'
-                                : 'Enable ongoing auto-send. Eligible replies may publish without individual approval, and I can pause automation at any time.'}
-                            </span>
-                          </label>
-                        )}
 
                         <AnimatePresence>
                           {(profile.autoSendEnabled || canActivateAutomation) && (
