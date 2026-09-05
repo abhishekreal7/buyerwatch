@@ -112,18 +112,6 @@ function parseDrafts(data: any[]) {
   })
 }
 
-function ActiveOpportunityCount({ count }: { count: number }) {
-  if (count === 0) return null
-  return (
-    <div className="flex items-center gap-2 rounded-full bg-gray-900 px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm ring-1 ring-black/5">
-      <span className="relative flex h-2 w-2 items-center justify-center">
-        <span className="absolute inset-0 animate-ping rounded-full bg-[#0A84FF] opacity-50" />
-        <span className="h-1.5 w-1.5 rounded-full bg-[#0A84FF]" aria-hidden="true" />
-      </span>
-      {count} {count === 1 ? 'opportunity' : 'opportunities'}
-    </div>
-  )
-}
 
 type ReplyQueueWorkspaceProps = {
   initialThreadId?: string
@@ -539,10 +527,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
     return (
       <AppPage>
         <div className="flex w-full flex-col">
-          <PageHeader
-            title="Opportunities"
-            action={<ActiveOpportunityCount count={reviewCount + totalCount} />}
-          />
+          <PageHeader title="Opportunities" />
           <DataLoadError
             title="Couldn’t load the reply queue"
             description="Your saved replies are still safe. Check your connection and try loading them again."
@@ -557,10 +542,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
   return (
     <AppPage>
       <div className="flex w-full flex-col">
-        <PageHeader
-          title="Opportunities"
-          action={<ActiveOpportunityCount count={reviewCount + totalCount} />}
-        />
+        <PageHeader title="Opportunities" />
 
         <OpportunityStageNav activeStage="replies" reviewCount={reviewCount} replyCount={totalCount} />
 
