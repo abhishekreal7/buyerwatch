@@ -985,7 +985,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[12px] font-semibold text-[#4F5865]">High Intent</span>
             <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-emerald-600">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <svg width="18" height="18" className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
                 <path d="M12 7a5 5 0 1 0 5 5" />
                 <path d="M13 3.055a9 9 0 1 0 7.941 7.945" />
@@ -1020,7 +1020,7 @@ export default function DashboardPage() {
               Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>
             </span>
             <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#0A84FF]">
-              <FileText className="w-4 h-4" strokeWidth={2} />
+              <FileText className="w-[18px] h-[18px]" strokeWidth={2} />
             </div>
           </div>
           <div className="flex items-baseline justify-between leading-tight">
@@ -1045,7 +1045,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[12px] font-semibold text-[#4F5865]">Replies Sent</span>
             <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#F06A22]">
-              <Send className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              <Send className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
             </div>
           </div>
           <div className="flex items-baseline justify-between leading-tight">
