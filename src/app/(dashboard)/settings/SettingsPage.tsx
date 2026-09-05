@@ -36,6 +36,8 @@ import { connectRedditThroughChrome } from '@/lib/browser-connector-client'
 import type { RedditAutoSendEligibility } from '@/lib/reddit-auto-send-eligibility'
 import { getLowCapacityNotice } from '@/lib/capacity-notices'
 import { getCurrentUsageMonth } from '@/lib/billing-addons'
+import { PremiumSlider } from '@/components/ui/PremiumSlider'
+import { PlatformToggleCard } from '@/components/ui/PlatformToggleCard'
 
 /* ─── Nav sections ────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -104,18 +106,19 @@ function Field({ label, hint, children }: { label: string; hint?: React.ReactNod
 
 const inputCls = "min-h-11 w-full rounded-xl border border-[#DDE2E8] bg-[#FBFCFD] px-3.5 py-2.5 text-[13px] text-[#101828] shadow-[inset_0_1px_2px_rgba(16,24,40,0.025)] outline-none transition-all duration-150 placeholder:text-[#98A2B3] hover:border-[#C9D0D8] focus:border-[#0A84FF] focus:bg-white focus:ring-4 focus:ring-[#0A84FF]/10"
 
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({ checked, onChange, label, disabled = false }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      onClick={() => onChange(!checked)}
-      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl outline-none focus-visible:ring-4 focus-visible:ring-[#0A84FF]/15"
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      className="group relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      <span className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${checked ? 'bg-[#0A84FF]' : 'bg-[#D0D5DD]'}`}>
-        <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_1px_3px_rgba(16,24,40,0.24)] transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
+      <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent transition-colors duration-200 ease-in-out ${checked ? 'bg-neutral-900' : 'bg-neutral-200 group-hover:bg-neutral-300'}`}>
+        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
       </span>
     </button>
   )
@@ -1238,23 +1241,66 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                     </div>
 
                     <SectionCard title="Reply voice" description="Choose the default voice for generated replies.">
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                         {(Object.entries(TONE_ARCHETYPES) as [ToneArchetype, (typeof TONE_ARCHETYPES)[ToneArchetype]][]).map(([id, archetype]) => {
                           const selected = profile.toneArchetype === id
                           return (
-                            <button key={id} type="button" onClick={() => setProfile(p => ({ ...p, toneArchetype: p.toneArchetype === id ? null : id }))} className={`min-h-[88px] cursor-pointer rounded-2xl border p-3.5 text-left transition-all ${selected ? 'border-[#101828] bg-[#101828] shadow-[0_4px_12px_rgba(16,24,40,0.14)]' : 'border-[#E4E7EC] bg-[#FBFCFD] hover:border-[#C9D0D8] hover:bg-white'}`}>
-                              <span className={`block text-[12px] font-semibold ${selected ? 'text-white' : 'text-[#101828]'}`}>{archetype.label}</span>
-                              <span className={`mt-1 block text-[10.5px] leading-4 ${selected ? 'text-white/65' : 'text-[#667085]'}`}>{archetype.description}</span>
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => setProfile(p => ({ ...p, toneArchetype: p.toneArchetype === id ? null : id }))}
+                              className={`group relative flex min-h-[96px] flex-col justify-between rounded-2xl border p-4 text-left transition-all duration-150 cursor-pointer ${
+                                selected
+                                  ? 'border-neutral-900 bg-neutral-900 text-white shadow-[0_4px_16px_rgba(16,24,40,0.16)] ring-1 ring-neutral-900'
+                                  : 'border-neutral-200/80 bg-[#FBFCFD] hover:border-neutral-300 hover:bg-white shadow-2xs'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className={`text-[13px] font-semibold tracking-[-0.01em] ${selected ? 'text-white' : 'text-neutral-900'}`}>
+                                  {archetype.label}
+                                </span>
+                                <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                                  selected ? 'border-white bg-white text-neutral-900' : 'border-neutral-300 bg-white text-transparent group-hover:border-neutral-400'
+                                }`}>
+                                  <Check className="h-2.5 w-2.5 stroke-[3]" />
+                                </span>
+                              </div>
+                              <span className={`mt-2 block text-[11px] leading-4.5 ${selected ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                                {archetype.description}
+                              </span>
                             </button>
                           )
                         })}
                       </div>
-                      <div className="mt-5 border-t border-[#EAECF0] pt-4">
-                        <p className="mb-2 text-[12.5px] font-semibold text-[#344054]">Guardrails</p>
+
+                      <div className="mt-6 border-t border-neutral-100 pt-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-[13px] font-semibold text-neutral-900">Guardrails</p>
+                          <span className="text-[11px] text-neutral-400">Enforced during draft generation</span>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {(Object.entries(STYLE_GUARDRAILS) as [StyleGuardrail, (typeof STYLE_GUARDRAILS)[StyleGuardrail]][]).map(([id, guardrail]) => {
                             const active = profile.styleGuardrails.includes(id)
-                            return <button key={id} type="button" onClick={() => setProfile(p => ({ ...p, styleGuardrails: p.styleGuardrails.includes(id) ? p.styleGuardrails.filter(item => item !== id) : [...p.styleGuardrails, id] }))} className={`min-h-8 cursor-pointer rounded-lg border px-3 py-1 text-[11px] font-semibold transition-all ${active ? 'border-[#101828] bg-[#101828] text-white' : 'border-[#E4E7EC] bg-white text-[#475467] hover:border-[#C9D0D8]'}`}>{active ? `✓ ${guardrail.label}` : guardrail.label}</button>
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => setProfile(p => ({
+                                  ...p,
+                                  styleGuardrails: p.styleGuardrails.includes(id)
+                                    ? p.styleGuardrails.filter(item => item !== id)
+                                    : [...p.styleGuardrails, id],
+                                }))}
+                                className={`flex min-h-8 cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11.5px] font-semibold transition-all duration-150 ${
+                                  active
+                                    ? 'border-neutral-900 bg-neutral-900 text-white shadow-xs'
+                                    : 'border-neutral-200/80 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 shadow-2xs'
+                                }`}
+                              >
+                                {active ? <Check className="h-3 w-3 stroke-[2.5]" /> : null}
+                                <span>{guardrail.label}</span>
+                              </button>
+                            )
                           })}
                         </div>
                       </div>
@@ -1571,21 +1617,31 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
 
                     <SectionCard title="Automation" description="Control when BuyerWatch may publish without individual approval.">
                       <div className="space-y-5">
-                        <div className={`rounded-xl border p-4 sm:p-5 ${
+                        <div className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 transition-all shadow-2xs ${
                           instantAutopilot.available
-                            ? 'border-emerald-200 bg-emerald-50'
-                            : 'border-black/5 bg-[#F8F9FA]'
+                            ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white'
+                            : 'border-neutral-200/80 bg-neutral-50/60'
                         }`}>
                           <div className="flex items-start justify-between gap-4">
-                            <div className="flex min-w-0 items-start gap-3">
-                              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-white ${
-                                instantAutopilot.available ? 'border-emerald-200 text-emerald-600' : 'border-black/5 text-gray-500'
+                            <div className="flex min-w-0 items-start gap-3.5">
+                              <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-2xs ${
+                                instantAutopilot.available
+                                  ? 'border-emerald-200 bg-white text-emerald-600 shadow-[0_2px_8px_rgba(16,185,129,0.12)]'
+                                  : 'border-neutral-200/80 bg-white text-neutral-500'
                               }`}>
-                                <Sparkles className="h-4 w-4" />
+                                <Sparkles className="h-4.5 w-4.5" />
                               </span>
                               <div className="min-w-0">
-                                <p className="text-[14px] font-semibold text-gray-900">Trial auto-send</p>
-                                <p className="mt-1 max-w-[560px] text-[13px] leading-5 text-gray-600">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-[13.5px] font-semibold tracking-[-0.01em] text-neutral-900">Trial auto-send</p>
+                                  {instantAutopilot.available && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-500/20">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                      Active Spotlight
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-1 max-w-[560px] text-[12.5px] leading-relaxed text-neutral-600">
                                   {instantAutopilot.available
                                     ? 'One automatic reply is ready. BuyerWatch will send it only after every safety check passes.'
                                     : instantAutopilot.used
@@ -1596,15 +1652,15 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                 </p>
                               </div>
                             </div>
-                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide ${
                               instantAutopilot.available
-                                ? 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-emerald-600 text-white shadow-xs'
                                 : instantAutopilot.used
-                                  ? 'bg-gray-200 text-gray-600'
-                                  : 'bg-white text-gray-600 ring-1 ring-black/5'
+                                  ? 'bg-neutral-200 text-neutral-600'
+                                  : 'bg-white text-neutral-600 border border-neutral-200 shadow-2xs'
                             }`}>
                               {instantAutopilot.available
-                                ? 'Ready'
+                                ? 'Ready to Send'
                                 : instantAutopilot.used
                                   ? 'Completed'
                                   : instantAutopilot.expiresAt
@@ -1675,27 +1731,52 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                           )}
                         </div>
 
-                        <div className={`rounded-xl border p-4 ${instantAutopilotMode ? 'border-emerald-200 bg-emerald-50' : 'border-black/5 bg-[#F8F9FA]'}`}>
-                          <p className="flex items-center gap-2 text-[12.5px] font-semibold text-gray-900">
-                            <ShieldCheck className={`h-4 w-4 ${instantAutopilotMode ? 'text-emerald-600' : 'text-blue-600'}`} />
-                            Built-in safeguards
-                          </p>
-                          <p className={`mt-1.5 text-[12.5px] leading-5 ${instantAutopilotMode ? 'text-emerald-800' : 'text-gray-600'}`}>
+                        <div className="rounded-2xl border border-neutral-200/80 bg-neutral-50/60 p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 text-[13px] font-semibold text-neutral-900">
+                            <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${instantAutopilotMode ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                            </div>
+                            Built-in safeguards & policy gates
+                          </div>
+                          <p className="mt-2 text-[12px] leading-relaxed text-neutral-600">
                             {instantAutopilotMode
                               ? 'BuyerWatch sends only when intent is 90 or higher, the reply is fresh and unique, the account is connected, and platform requirements are satisfied. Auto-send pauses after this reply.'
-                              : 'After the review period, every reply must meet your confidence threshold, quality checks, platform requirements, target scope, and daily limit.'}
+                              : 'Every automated reply must clear confidence thresholds, deduplication, platform karma/rate limits, target subreddit rules, and your daily ceiling.'}
                           </p>
+                          <div className="mt-3.5 grid grid-cols-2 gap-2 text-[11.5px] font-medium sm:grid-cols-4">
+                            <div className="flex items-center gap-1.5 rounded-xl border border-neutral-200/70 bg-white px-2.5 py-1.5 text-neutral-700 shadow-2xs">
+                              <Check className="h-3 w-3 text-emerald-600 shrink-0 stroke-[2.5]" />
+                              <span>Score {instantAutopilotMode ? '90+' : `${profile.autoSendThreshold}+`}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 rounded-xl border border-neutral-200/70 bg-white px-2.5 py-1.5 text-neutral-700 shadow-2xs">
+                              <Check className="h-3 w-3 text-emerald-600 shrink-0 stroke-[2.5]" />
+                              <span>Deduplicated</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 rounded-xl border border-neutral-200/70 bg-white px-2.5 py-1.5 text-neutral-700 shadow-2xs">
+                              <Check className="h-3 w-3 text-emerald-600 shrink-0 stroke-[2.5]" />
+                              <span>Daily limit</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 rounded-xl border border-neutral-200/70 bg-white px-2.5 py-1.5 text-neutral-700 shadow-2xs">
+                              <Check className="h-3 w-3 text-emerald-600 shrink-0 stroke-[2.5]" />
+                              <span>Instant pause</span>
+                            </div>
+                          </div>
                         </div>
 
                         {canActivateAutomation && !profile.autoSendEnabled && (
-                          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#DFDFDB] bg-white p-3.5">
-                            <input
-                              type="checkbox"
-                              checked={activationAcknowledged}
-                              onChange={event => setActivationAcknowledged(event.target.checked)}
-                              className="mt-0.5 h-4 w-4 accent-gray-900"
-                            />
-                            <span className="text-[12.5px] leading-5 text-gray-600">
+                          <label className="flex cursor-pointer items-start gap-3.5 rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-2xs transition-all hover:border-neutral-300 hover:bg-neutral-50/40">
+                            <div className="relative mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={activationAcknowledged}
+                                onChange={event => setActivationAcknowledged(event.target.checked)}
+                                className="peer absolute inset-0 cursor-pointer opacity-0"
+                              />
+                              <div className={`flex h-5 w-5 items-center justify-center rounded-md transition-colors ${activationAcknowledged ? 'bg-neutral-900 text-white' : 'text-transparent'}`}>
+                                <Check className="h-3.5 w-3.5 stroke-[3]" />
+                              </div>
+                            </div>
+                            <span className="text-[12.5px] leading-relaxed text-neutral-700 select-none">
                               {instantAutopilotMode
                                 ? 'Enable auto-send for one eligible trial reply. It may publish without individual approval after every safeguard passes, and I can pause it at any time.'
                                 : 'Enable ongoing auto-send. Eligible replies may publish without individual approval, and I can pause automation at any time.'}
@@ -1711,11 +1792,11 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                               exit={{ opacity: 0, height: 0 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <div className="space-y-5 border-t border-gray-100 pt-4">
+                              <div className="space-y-6 border-t border-neutral-100 pt-5">
                                 {redditDirectConnected && !redditAutomaticDeliveryReady ? (
-                                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
-                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                    <p className="text-[12.5px] leading-relaxed text-amber-800">
+                                  <div className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 p-3.5 shadow-2xs">
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                    <p className="text-[12.5px] leading-relaxed text-amber-900">
                                       Reddit is connected for reviewed replies. Automatic replies unlock when the account reaches {connections.redditAutoSendEligibility.minimumAgeDays} days old and {connections.redditAutoSendEligibility.minimumCombinedKarma} combined karma
                                       {connections.redditAutoSendEligibility.daysRemaining > 0 || connections.redditAutoSendEligibility.karmaRemaining > 0
                                         ? ` (${connections.redditAutoSendEligibility.daysRemaining} days and ${connections.redditAutoSendEligibility.karmaRemaining} karma remaining).`
@@ -1723,106 +1804,130 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                     </p>
                                   </div>
                                 ) : redditDirectConnected ? (
-                                  <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                                  <div className="flex items-start gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-3.5 shadow-2xs">
                                     <Shield className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                                    <p className="text-[12.5px] leading-relaxed text-emerald-800">
+                                    <p className="text-[12.5px] leading-relaxed text-emerald-900">
                                       Reddit direct delivery is connected. Eligible high-intent replies can publish without individual approval after every safety and community-policy gate clears.
                                     </p>
                                   </div>
                                 ) : (
-                                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
-                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                    <p className="text-[12.5px] leading-relaxed text-amber-700">
+                                  <div className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 p-3.5 shadow-2xs">
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                    <p className="text-[12.5px] leading-relaxed text-amber-900">
                                       Reddit direct delivery is paused. Connect or reconnect Reddit above before enabling automatic Reddit replies.
                                     </p>
                                   </div>
                                 )}
 
-                                <div>
-                                  <div className="mb-2 flex items-center justify-between">
-                                    <label className="text-[13px] font-medium text-gray-700">Minimum confidence threshold</label>
-                                    <span className="text-[13px] font-bold tabular-nums text-gray-900">{profile.autoSendThreshold}</span>
-                                  </div>
-                                  <input
-                                    type="range"
+                                {/* Premium Confidence Threshold Slider */}
+                                <div className="rounded-2xl border border-neutral-200/80 bg-white p-4 sm:p-5 shadow-2xs">
+                                  <PremiumSlider
+                                    label="Minimum confidence threshold"
+                                    description="Drafts scoring below this threshold will not send automatically and require manual approval."
                                     min={instantAutopilotMode ? 90 : 70}
-                                    max="99"
+                                    max={99}
+                                    step={1}
                                     value={instantAutopilotMode ? Math.max(90, profile.autoSendThreshold) : profile.autoSendThreshold}
-                                    onChange={event => setProfile(current => ({ ...current, autoSendThreshold: Number(event.target.value) }))}
-                                    className="w-full cursor-pointer accent-gray-900"
+                                    onChange={val => setProfile(current => ({ ...current, autoSendThreshold: val }))}
+                                    minLabel={instantAutopilotMode ? '90 — Instant Autopilot floor' : '70 — Learned floor still applies'}
+                                    maxLabel="99 — Maximum strictness"
+                                    formatValue={val => `${val}/100`}
+                                    accentColor="dark"
                                   />
-                                  <div className="mt-1 flex justify-between text-[11px] text-gray-400">
-                                    <span>{instantAutopilotMode ? '90, Instant Autopilot floor' : '70, learned floor still applies'}</span>
-                                    <span>99, strict</span>
-                                  </div>
                                 </div>
 
-                                <div>
-                                  <div className="mb-2 flex items-center justify-between">
-                                    <label className="text-[13px] font-medium text-gray-700">Maximum automated replies per day</label>
-                                    <span className="text-[13px] font-bold tabular-nums text-gray-900">{profile.autoSendDailyLimit}</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="1"
-                                    max="10"
+                                {/* Premium Daily Reply Limit Slider */}
+                                <div className="rounded-2xl border border-neutral-200/80 bg-white p-4 sm:p-5 shadow-2xs">
+                                  <PremiumSlider
+                                    label="Maximum automated replies per day"
+                                    description={instantAutopilotMode ? 'Trial auto-send sends up to 1 reply.' : 'Daily pacing cap to ensure organic and safe delivery cadence across all platforms.'}
+                                    min={1}
+                                    max={10}
+                                    step={1}
                                     value={instantAutopilotMode ? 1 : profile.autoSendDailyLimit}
-                                    onChange={event => setProfile(current => ({ ...current, autoSendDailyLimit: Number(event.target.value) }))}
+                                    onChange={val => setProfile(current => ({ ...current, autoSendDailyLimit: val }))}
                                     disabled={instantAutopilotMode}
-                                    className="w-full cursor-pointer accent-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                    minLabel="1 reply / day"
+                                    maxLabel="10 replies / day"
+                                    formatValue={val => `${val} / day`}
+                                    accentColor="dark"
                                   />
                                 </div>
 
-                                <div className="space-y-2">
-                                  <p className="text-[13px] font-medium text-gray-700">Direct delivery platforms</p>
-                                  <label className={`flex items-center justify-between rounded-xl border px-3.5 py-3 ${connections.bluesky ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'}`}>
-                                    <span className="flex items-center gap-2.5 text-[12.5px] font-medium">
-                                      <BlueskyIcon className="h-4 w-4 text-[#1185FE]" />
-                                      Bluesky
-                                      <span className="font-normal text-gray-400">Direct</span>
-                                    </span>
-                                    <input
-                                      type="checkbox"
+                                {/* Direct Delivery Platforms with PlatformToggleCard */}
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[13px] font-semibold text-neutral-900">Direct delivery platforms</p>
+                                    <span className="text-[11px] text-neutral-400">Choose active platforms</span>
+                                  </div>
+
+                                  <div className="space-y-2.5">
+                                    <PlatformToggleCard
+                                      icon={<BlueskyIcon className="h-4 w-4 text-[#1185FE]" />}
+                                      name="Bluesky Direct"
+                                      statusText={connections.bluesky ? 'Direct ready' : 'Connect above'}
+                                      statusType={connections.bluesky ? 'ready' : 'disabled'}
                                       disabled={!connections.bluesky}
+                                      disabledNotice={!connections.bluesky ? 'Connect your Bluesky account in the accounts section above.' : undefined}
                                       checked={profile.autoSendPlatforms.includes('bluesky')}
-                                      onChange={event => setProfile(current => ({
+                                      onChange={checked => setProfile(current => ({
                                         ...current,
-                                        autoSendPlatforms: event.target.checked
+                                        autoSendPlatforms: checked
                                           ? [...new Set([...current.autoSendPlatforms, 'bluesky'])]
-                                          : current.autoSendPlatforms.filter(platform => platform !== 'bluesky'),
+                                          : current.autoSendPlatforms.filter(p => p !== 'bluesky'),
                                       }))}
-                                      className="h-4 w-4 accent-gray-900"
                                     />
-                                  </label>
-                                  <label className={`flex items-center justify-between rounded-xl border px-3.5 py-3 text-[12.5px] ${redditAutomaticDeliveryReady ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'}`}>
-                                    <span className="flex items-center gap-2.5 font-medium text-gray-700">
-                                      <RedditIcon className="h-4 w-4 text-[#FF4500]" />
-                                      Reddit
-                                      <span className="font-normal text-gray-400">
-                                        {redditAutomaticDeliveryReady ? 'Direct' : redditDirectConnected ? 'Reviewed only' : 'Not connected'}
-                                      </span>
-                                    </span>
-                                    {redditDirectConnected ? (
-                                      <input
-                                        type="checkbox"
-                                        disabled={!redditAutomaticDeliveryReady}
-                                        checked={redditAutomaticDeliveryReady && profile.autoSendPlatforms.includes('reddit')}
-                                        onChange={event => setProfile(current => ({
-                                          ...current,
-                                          autoSendPlatforms: event.target.checked
-                                            ? [...new Set([...current.autoSendPlatforms, 'reddit'])]
-                                            : current.autoSendPlatforms.filter(platform => platform !== 'reddit'),
-                                        }))}
-                                        className="h-4 w-4 accent-gray-900"
-                                      />
-                                    ) : (
-                                      <span className="text-[11px] font-semibold text-gray-500">Connect above</span>
-                                    )}
-                                  </label>
-                                  <label className={`flex items-center justify-between rounded-xl border px-3.5 py-3 text-[12.5px] ${connections.x && deliveryCapabilities.xDirectPosting ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'}`}>
-                                    <span className="flex items-center gap-2.5 font-medium text-gray-700"><XIcon className="h-4 w-4 text-[#0F1419]" />X <span className="font-normal text-gray-400">{connections.x && deliveryCapabilities.xDirectPosting ? 'Direct' : 'Connect above'}</span></span>
-                                    <input type="checkbox" disabled={!connections.x || !deliveryCapabilities.xDirectPosting} checked={profile.autoSendPlatforms.includes('x')} onChange={event => setProfile(current => ({ ...current, autoSendPlatforms: event.target.checked ? [...new Set([...current.autoSendPlatforms, 'x'])] : current.autoSendPlatforms.filter(platform => platform !== 'x') }))} className="h-4 w-4 accent-gray-900" />
-                                  </label>
+
+                                    <PlatformToggleCard
+                                      icon={<RedditIcon className="h-4 w-4 text-[#FF4500]" />}
+                                      name="Reddit Direct"
+                                      statusText={
+                                        redditAutomaticDeliveryReady
+                                          ? 'Direct ready'
+                                          : redditDirectConnected
+                                            ? 'Reviewed only'
+                                            : 'Not connected'
+                                      }
+                                      statusType={
+                                        redditAutomaticDeliveryReady
+                                          ? 'ready'
+                                          : redditDirectConnected
+                                            ? 'warning'
+                                            : 'disabled'
+                                      }
+                                      disabled={!redditAutomaticDeliveryReady}
+                                      disabledNotice={
+                                        !redditDirectConnected
+                                          ? 'Connect your Reddit account in the accounts section above.'
+                                          : !redditAutomaticDeliveryReady
+                                            ? `Automatic delivery unlocks after ${connections.redditAutoSendEligibility.minimumAgeDays} days and ${connections.redditAutoSendEligibility.minimumCombinedKarma} karma.`
+                                            : undefined
+                                      }
+                                      checked={redditAutomaticDeliveryReady && profile.autoSendPlatforms.includes('reddit')}
+                                      onChange={checked => setProfile(current => ({
+                                        ...current,
+                                        autoSendPlatforms: checked
+                                          ? [...new Set([...current.autoSendPlatforms, 'reddit'])]
+                                          : current.autoSendPlatforms.filter(p => p !== 'reddit'),
+                                      }))}
+                                    />
+
+                                    <PlatformToggleCard
+                                      icon={<XIcon className="h-3.5 w-3.5 text-[#0F1419]" />}
+                                      name="X (Twitter) Direct"
+                                      statusText={connections.x && deliveryCapabilities.xDirectPosting ? 'Direct ready' : 'Connect above'}
+                                      statusType={connections.x && deliveryCapabilities.xDirectPosting ? 'ready' : 'disabled'}
+                                      disabled={!connections.x || !deliveryCapabilities.xDirectPosting}
+                                      disabledNotice={!connections.x ? 'Connect your X account in the accounts section above.' : !deliveryCapabilities.xDirectPosting ? 'Direct delivery is currently in limited rollout.' : undefined}
+                                      checked={profile.autoSendPlatforms.includes('x')}
+                                      onChange={checked => setProfile(current => ({
+                                        ...current,
+                                        autoSendPlatforms: checked
+                                          ? [...new Set([...current.autoSendPlatforms, 'x'])]
+                                          : current.autoSendPlatforms.filter(p => p !== 'x'),
+                                      }))}
+                                    />
+                                  </div>
                                 </div>
 
                                 <Field label="Allowed targets" hint="Optional">
@@ -1902,35 +2007,26 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                       title="Signal focus"
                       description="Set the score that deserves your attention."
                     >
-                      <div>
-                        <div className="mb-3 flex items-center justify-between gap-4">
-                          <div>
-                            <p className="text-[14px] font-semibold text-gray-900">Minimum dashboard intent score</p>
-                            <p className="mt-1 text-[12px] leading-5 text-gray-500">
-                              This changes counts and filters only. It does not rescore opportunities or change their buying/researching classification.
-                            </p>
-                          </div>
-                          <span className="shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-[14px] font-bold tabular-nums text-white">
-                            {highIntentThreshold}%
-                          </span>
-                        </div>
-                        <input
-                          type="range"
+                      <div className="space-y-4">
+                        <PremiumSlider
+                          label="Minimum dashboard intent score"
+                          description="This changes counts and filters only. It does not rescore opportunities or change their buying/researching classification."
                           min={HIGH_INTENT_THRESHOLD_MIN}
                           max={HIGH_INTENT_THRESHOLD_MAX}
-                          step="1"
+                          step={1}
                           value={highIntentThreshold}
-                          aria-label="Minimum high-intent dashboard score"
-                          onChange={event => setHighIntentThreshold(normalizeHighIntentThreshold(event.target.value))}
-                          className="w-full cursor-pointer accent-gray-900"
+                          onChange={val => setHighIntentThreshold(normalizeHighIntentThreshold(val))}
+                          minLabel={`${HIGH_INTENT_THRESHOLD_MIN}% — Broader reach`}
+                          maxLabel={`${HIGH_INTENT_THRESHOLD_MAX}% — Strongest intent`}
+                          formatValue={val => `${val}%`}
+                          accentColor="dark"
                         />
-                        <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
-                          <span>{HIGH_INTENT_THRESHOLD_MIN} — Catch more</span>
-                          <span>{HIGH_INTENT_THRESHOLD_MAX} — Only the strongest</span>
+                        <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-[11.5px] leading-5 text-blue-900 shadow-2xs">
+                          <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                          <p>
+                            Slack keeps its own notification threshold below, so changing this slider will not alter Slack delivery.
+                          </p>
                         </div>
-                        <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11.5px] leading-5 text-blue-800">
-                          Slack keeps its own notification threshold below, so changing this slider will not alter Slack delivery.
-                        </p>
                       </div>
                     </SectionCard>
 
@@ -2005,21 +2101,20 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
 
                         {/* Threshold slider */}
                         {(slackConfigured || slack.webhookUrl) && (
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <label className="text-[13px] font-medium text-gray-700">Minimum intent score to notify</label>
-                              <span className="text-[13px] font-bold text-gray-900 tabular-nums">{slack.threshold}</span>
-                            </div>
-                            <input
-                              type="range" min="60" max="95"
+                          <div className="rounded-2xl border border-neutral-200/80 bg-neutral-50/60 p-4 shadow-2xs">
+                            <PremiumSlider
+                              label="Minimum intent score to notify"
+                              description="Only opportunities meeting or exceeding this score will trigger a Slack channel alert."
+                              min={60}
+                              max={95}
+                              step={1}
                               value={slack.threshold}
-                              onChange={e => setSlack(s => ({ ...s, threshold: parseInt(e.target.value) }))}
-                              className="w-full accent-gray-900 cursor-pointer"
+                              onChange={val => setSlack(s => ({ ...s, threshold: val }))}
+                              minLabel="60% — Catch more"
+                              maxLabel="95% — High conviction only"
+                              formatValue={val => `${val}%`}
+                              accentColor="dark"
                             />
-                            <div className="flex justify-between text-[11px] text-gray-400 mt-1">
-                              <span>60 — Catch more</span>
-                              <span>95 — Only the best</span>
-                            </div>
                           </div>
                         )}
 
@@ -2274,16 +2369,30 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                         const displayedUsed = Math.min(item.used, item.max)
                         const percentage = Math.min((item.used / item.max) * 100, 100)
                         return (
-                          <div key={item.label} className="mb-5 last:mb-0">
-                            <div className="mb-1.5 flex items-center justify-between text-[13px]">
-                              <span className="font-medium text-gray-700">{item.label}</span>
-                              <span className="tabular-nums text-gray-500">
-                                {displayedUsed} <span className="text-gray-300">/</span> {item.max}
-                              </span>
+                          <div key={item.label} className="mb-4 last:mb-0 rounded-2xl border border-neutral-200/70 bg-neutral-50/50 p-4 shadow-2xs">
+                            <div className="mb-2 flex items-center justify-between text-[13px]">
+                              <span className="font-semibold text-neutral-900">{item.label}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[12px] font-bold tabular-nums text-neutral-900">
+                                  {displayedUsed.toLocaleString()}
+                                </span>
+                                <span className="text-[11px] text-neutral-400">/ {item.max.toLocaleString()}</span>
+                                <span className={`ml-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                  atLimit ? 'bg-red-50 text-red-700 border border-red-200/70' : percentage >= 80 ? 'bg-amber-50 text-amber-700 border border-amber-200/70' : 'bg-neutral-100 text-neutral-600'
+                                }`}>
+                                  {Math.round(percentage)}%
+                                </span>
+                              </div>
                             </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200/70 border border-black/[0.04]">
                               <div
-                                className={`h-full rounded-full transition-all ${atLimit ? 'bg-[#101828]' : 'bg-[#475467]'}`}
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  atLimit
+                                    ? 'bg-gradient-to-r from-red-600 to-rose-600'
+                                    : percentage >= 80
+                                      ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                                      : 'bg-gradient-to-r from-neutral-950 via-neutral-900 to-neutral-800'
+                                }`}
                                 style={{ width: `${percentage}%` }}
                               />
                             </div>
