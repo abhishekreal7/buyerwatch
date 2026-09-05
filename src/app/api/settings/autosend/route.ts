@@ -130,8 +130,9 @@ export async function PATCH(req: Request) {
       }
     }
 
+    let effectivePlatforms: string[] = []
     if (enabled) {
-      let effectivePlatforms = platforms ?? (
+      effectivePlatforms = platforms ?? (
         Array.isArray(profile.auto_send_platforms) ? profile.auto_send_platforms : []
       )
 
