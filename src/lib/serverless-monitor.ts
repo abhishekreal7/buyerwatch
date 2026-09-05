@@ -359,8 +359,11 @@ async function runLockedMonitor(
 
   for (let index = 0; index < work.length; index += 6) {
     const batch = work.slice(index, index + 6)
-    const results = await Promise.allSettled(batch.map(async (target) => {
+    const results = await Promise.allSettled(batch.map(async (target, idx) => {
       if (target.platform === 'reddit') {
+        if (idx > 0) {
+          await new Promise(r => setTimeout(r, idx * 800))
+        }
         const result = await fetchSubredditNewWithSource(target.target, 25, {
           mode: redditCapacity.mode,
         })

@@ -360,6 +360,37 @@ export async function fetchSubredditNewWithSource(
         }
 
         console.warn(`[reddit] RSS ${rssResponse.status} via ${rssHost} for r/${normalizedSubreddit}`)
+        if (rssResponse.status === 429) {
+          // Attempt a fast 1.5s staggered retry with browser headers before backing off
+          await new Promise(r => setTimeout(r, 1500))
+          try {
+            const retryResponse = await fetchWithTimeout(rssUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+              }
+            }, 10_000)
+            if (retryResponse.ok) {
+              const xml = await readResponseText(retryResponse, MAX_REDDIT_SOURCE_BYTES)
+              if (/<feed(?:\s|>)/i.test(xml)) {
+                const feedPosts = parseRedditRss(xml, normalizedSubreddit)
+                const posts = feedPosts.slice(0, boundedLimit)
+                console.log(`[reddit] RSS retry succeeded: ${posts.length} posts from r/${normalizedSubreddit}`)
+                if (redisClient) {
+                  await Promise.all([
+                    redisClient.set(cacheKey, JSON.stringify(feedPosts), 'EX', CACHE_TTL),
+                    redisClient.del(rssBackoffKey),
+                  ]).catch(() => {})
+                }
+                return { posts, source: 'rss' }
+              }
+            }
+          } catch {
+            // Proceed to standard backoff handling
+          }
+        }
+
         if (shouldBackoffRedditRssStatus(rssResponse.status)) {
           shouldBackoff = true
           const retryAfterHeader = rssResponse.headers.get('retry-after')
