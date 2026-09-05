@@ -1376,7 +1376,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
   return (
     <AppPage>
       <div className="w-full max-w-[1280px] pb-6 font-[family-name:var(--font-sans)]">
-        <header className="mb-7 flex min-h-[56px] items-center justify-between gap-4 border-b border-[#EAECF0] px-1 pb-5">
+        <header className="sticky top-0 z-20 -mt-1 mb-7 flex min-h-[56px] items-center justify-between gap-4 border-b border-[#EAECF0] bg-white/95 px-1 py-3 backdrop-blur-md">
           <h1 className="page-title font-[family-name:var(--font-display)] font-semibold tracking-[-0.04em]">Settings</h1>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <SaveButton
@@ -1384,14 +1384,13 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
               saving={saving}
               saved={saveSuccess}
               disabled={settingsLoading || loadFailed}
-              size="sm"
             />
           </div>
         </header>
 
         <div className="flex flex-col items-stretch gap-7 md:flex-row md:items-start md:gap-8">
           {/* ── Sidebar ───────────────────────────────────────────── */}
-          <nav className="shrink-0 md:sticky md:top-6 md:w-[200px] md:border-r md:border-[#EAECF0] md:pr-5" aria-label="Settings sections">
+          <nav className="shrink-0 md:sticky md:top-20 md:w-[200px] md:border-r md:border-[#EAECF0] md:pr-5" aria-label="Settings sections">
             <ul className="grid grid-cols-2 gap-1 md:flex md:flex-col">
               {SECTIONS.map(s => (
                 <li key={s.id}>
@@ -1700,14 +1699,6 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                         </div>
                       </details>
                     </SectionCard>
-
-                    <div className="flex justify-end pt-2">
-                      <SaveButton
-                        onClick={handleSave}
-                        saving={saving}
-                        saved={saveSuccess}
-                      />
-                    </div>
                   </>
                 )}
 
@@ -2277,14 +2268,6 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                         </div>
                       )}
                     </SectionCard>
-
-                    <div className="flex justify-end pt-2">
-                      <SaveButton
-                        onClick={handleSave}
-                        saving={saving}
-                        saved={saveSuccess}
-                      />
-                    </div>
                   </>
                 )}
 
@@ -2448,14 +2431,6 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                           </div>
                         )}
                       </SectionCard>
-                    </div>
-
-                    <div className="flex justify-end pt-2">
-                      <SaveButton
-                        onClick={handleSave}
-                        saving={saving}
-                        saved={saveSuccess}
-                      />
                     </div>
                   </>
                 )}
