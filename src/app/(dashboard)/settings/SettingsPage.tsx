@@ -433,7 +433,43 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
   const [avatarUrl, setAvatarUrl] = useState<string>(initialData?.user?.avatarUrl || '')
   const [avatarUploading, setAvatarUploading] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [userName, setUserName] = useState<string>(initialData?.user?.name || '')
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState<string>(initialData?.user?.name || '')
+  const [savingName, setSavingName] = useState(false)
   const [activationAcknowledged, setActivationAcknowledged] = useState(false)
+
+  const handleSaveName = async () => {
+    const trimmed = nameInput.trim()
+    if (!trimmed) {
+      toast.error('Name cannot be empty')
+      return
+    }
+    if (trimmed === userName) {
+      setIsEditingName(false)
+      return
+    }
+    setSavingName(true)
+    try {
+      const res = await fetch('/api/account', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update name')
+      setUserName(trimmed)
+      setIsEditingName(false)
+      window.dispatchEvent(new CustomEvent('buyerwatch:name-updated', { detail: { name: trimmed } }))
+      void supabase.auth.refreshSession().catch(() => {})
+      router.refresh()
+      toast.success('Name updated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update name')
+    } finally {
+      setSavingName(false)
+    }
+  }
   const [instantAutopilot, setInstantAutopilot] = useState(initialData?.instantAutopilot ?? {
     available: false,
     used: false,
@@ -1382,7 +1418,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                 {activeSection === 'profile' && (
                   <>
                     {/* ── Account Avatar ─────────────────────────── */}
-                    <SectionCard title="Profile picture" description="Shows in your sidebar and team views.">
+                    <SectionCard title="Profile" description="Your name and photo shown in your sidebar and team views.">
                       <div className="flex items-center gap-5">
                         <div className="relative shrink-0">
                           {avatarUrl ? (
@@ -1393,7 +1429,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                             />
                           ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#101828] text-[22px] font-semibold text-white select-none">
-                              {(initialData?.user?.name || 'U').charAt(0).toUpperCase()}
+                              {(userName || 'U').charAt(0).toUpperCase()}
                             </div>
                           )}
                           <button
@@ -1434,8 +1470,72 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                             }}
                           />
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-[#101828]">{initialData?.user?.name || 'User'}</p>
+                        <div className="min-w-0 flex-1">
+                          {isEditingName ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={nameInput}
+                                onChange={(e) => setNameInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleSaveName()
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setIsEditingName(false)
+                                    setNameInput(userName)
+                                  }
+                                }}
+                                autoFocus
+                                maxLength={60}
+                                placeholder="Your name"
+                                className="h-7 w-44 sm:w-56 rounded-md border border-[#D0D5DD] bg-white px-2 text-[13px] font-medium text-[#101828] focus:border-[#0A84FF] focus:outline-none focus:ring-2 focus:ring-[#0A84FF]/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleSaveName}
+                                disabled={savingName || !nameInput.trim()}
+                                className="flex h-7 items-center rounded-md bg-[#101828] px-2.5 text-[12px] font-medium text-white hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
+                              >
+                                {savingName ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsEditingName(false)
+                                  setNameInput(userName)
+                                }}
+                                disabled={savingName}
+                                className="flex h-7 items-center rounded-md border border-[#D0D5DD] bg-white px-2 text-[12px] font-medium text-[#667085] hover:bg-[#F9FAFB] cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <p
+                                onClick={() => {
+                                  setIsEditingName(true)
+                                  setNameInput(userName)
+                                }}
+                                className="text-[13px] font-medium text-[#101828] cursor-pointer hover:text-[#0A84FF] transition-colors"
+                                title="Click to edit name"
+                              >
+                                {userName || 'User'}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsEditingName(true)
+                                  setNameInput(userName)
+                                }}
+                                className="text-[12px] font-medium text-[#0A84FF] hover:underline cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          )}
                           {initialData?.user?.email && (
                             <p className="mt-0.5 text-[12px] text-[#667085] truncate">{initialData.user.email}</p>
                           )}

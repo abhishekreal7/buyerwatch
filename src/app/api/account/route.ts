@@ -78,3 +78,58 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'account_deletion_failed' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    if (!isTrustedSameOriginMutation(request)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
+
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await readJsonBody<{ name?: unknown }>(request, 1_024)
+    const name = typeof body.name === 'string' ? body.name.trim() : ''
+
+    if (!name) {
+      return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 })
+    }
+
+    if (name.length > 60) {
+      return NextResponse.json({ error: 'Name cannot exceed 60 characters' }, { status: 400 })
+    }
+
+    const admin = getServiceRoleClient()
+    const currentMetadata = (user.user_metadata ?? {}) as Record<string, unknown>
+    const updatedMetadata = {
+      ...currentMetadata,
+      full_name: name,
+      name: name,
+    }
+
+    const { error: updateError } = await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: updatedMetadata,
+    })
+
+    if (updateError) {
+      logger.error({ error: updateError, userId: user.id }, 'Failed to update user name in auth metadata')
+      return NextResponse.json({ error: 'Failed to update name' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, name })
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    logger.error({ error }, 'Account update error')
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+

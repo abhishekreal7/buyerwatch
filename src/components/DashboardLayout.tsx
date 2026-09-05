@@ -139,6 +139,7 @@ function DashboardShell({
   const [plan, setPlan] = useState<PlanTier>(initialData.plan)
   const [credits, setCredits] = useState<{ used: number; limit: number } | null>(initialData.credits)
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | undefined>(initialData.user?.avatarUrl)
+  const [userName, setUserName] = useState<string>(initialData.user?.name || 'User')
   const [opportunityCount, setOpportunityCount] = useState<number | null>(null)
   const [keywordCount, setKeywordCount] = useState<number | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -156,13 +157,25 @@ function DashboardShell({
   }, [initialData.user?.avatarUrl])
 
   useEffect(() => {
+    setUserName(initialData.user?.name || 'User')
+  }, [initialData.user?.name])
+
+  useEffect(() => {
     const handleAvatarUpdate = (e: Event) => {
       const customEvent = e as CustomEvent<{ avatarUrl?: string }>
       setUserAvatarUrl(customEvent.detail?.avatarUrl || '')
     }
+    const handleNameUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ name?: string }>
+      if (customEvent.detail?.name) {
+        setUserName(customEvent.detail.name)
+      }
+    }
     window.addEventListener('buyerwatch:avatar-updated', handleAvatarUpdate)
+    window.addEventListener('buyerwatch:name-updated', handleNameUpdate)
     return () => {
       window.removeEventListener('buyerwatch:avatar-updated', handleAvatarUpdate)
+      window.removeEventListener('buyerwatch:name-updated', handleNameUpdate)
     }
   }, [])
 
@@ -485,17 +498,17 @@ function DashboardShell({
                     {userAvatarUrl ? (
                       <img
                         src={userAvatarUrl}
-                        alt={initialData.user?.name || 'User'}
+                        alt={userName || 'User'}
                         className="h-8 w-8 shrink-0 rounded-full object-cover border border-zinc-200"
                       />
                     ) : (
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#101828] text-[13px] font-semibold text-white select-none">
-                        {(initialData.user?.name || 'U').charAt(0).toUpperCase()}
+                        {(userName || 'U').charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium text-zinc-900 leading-tight">
-                        {initialData.user?.name || 'User'}
+                        {userName || 'User'}
                       </p>
                       <p className="truncate text-[11px] text-zinc-500 capitalize">
                         {plan} Plan
