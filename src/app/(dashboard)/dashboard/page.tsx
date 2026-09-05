@@ -89,11 +89,10 @@ function getWindowHoursLeft(createdAt: string): number | null {
 }
 
 function getDeliveryActionLabel(platform: string) {
-  if (platform === 'reddit') {
-    return 'Copy & Open Reddit'
-  }
-  if (platform === 'bluesky') return 'Post through Bluesky'
-  return 'Review delivery'
+  if (platform === 'reddit') return 'Post to Reddit'
+  if (platform === 'bluesky') return 'Post to Bluesky'
+  if (platform === 'x') return 'Post to X'
+  return 'Post reply'
 }
 
 function mapThread(thread: any): Thread {
@@ -1531,11 +1530,19 @@ export default function DashboardPage() {
                                       type="button"
                                       onClick={handleApproveAndSend}
                                       disabled={sendingThreadId === thread.id}
-                                      className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-black"
+                                      className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
                                     >
-                                      <CheckCircle className="h-3.5 w-3.5" />
+                                      {thread.platform === 'reddit' ? (
+                                        <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
+                                      ) : thread.platform === 'bluesky' ? (
+                                        <BlueskyIcon className="h-3.5 w-3.5 text-[#0A84FF]" />
+                                      ) : thread.platform === 'x' ? (
+                                        <XIcon className="h-3.5 w-3.5 text-white" />
+                                      ) : (
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                      )}
                                       {sendingThreadId === thread.id
-                                        ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                                        ? (thread.platform === 'reddit' ? 'Posting to Reddit...' : 'Posting...')
                                         : getDeliveryActionLabel(thread.platform)}
                                     </button>
                                   </div>
@@ -1714,9 +1721,17 @@ export default function DashboardPage() {
                               disabled={!thread.draft || sendingThreadId === thread.id}
                               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 py-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-black disabled:border disabled:border-gray-200/60 disabled:bg-gray-100 disabled:text-gray-400"
                             >
-                              <CheckCircle className="h-4 w-4" />
+                              {thread.platform === 'reddit' ? (
+                                <RedditIcon className="h-4 w-4 text-[#FF4500]" />
+                              ) : thread.platform === 'bluesky' ? (
+                                <BlueskyIcon className="h-4 w-4 text-[#0A84FF]" />
+                              ) : thread.platform === 'x' ? (
+                                <XIcon className="h-4 w-4 text-white" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4" />
+                              )}
                               {sendingThreadId === thread.id
-                                ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                                ? (thread.platform === 'reddit' ? 'Posting to Reddit...' : 'Posting...')
                                 : getDeliveryActionLabel(thread.platform)}
                             </button>
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1943,9 +1958,17 @@ export default function DashboardPage() {
                         disabled={!selectedThread.draft || sendingThreadId === selectedThread.id}
                         className="w-full py-3 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold text-xs disabled:bg-gray-100 disabled:text-gray-400 disabled:border disabled:border-gray-200/60 shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                       >
-                        <CheckCircle className="w-4 h-4 text-white" />
+                        {selectedThread.platform === 'reddit' ? (
+                          <RedditIcon className="w-4 h-4 text-[#FF4500]" />
+                        ) : selectedThread.platform === 'bluesky' ? (
+                          <BlueskyIcon className="w-4 h-4 text-[#0A84FF]" />
+                        ) : selectedThread.platform === 'x' ? (
+                          <XIcon className="w-4 h-4 text-white" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        )}
                         {sendingThreadId === selectedThread.id
-                          ? (selectedThread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                          ? (selectedThread.platform === 'reddit' ? 'Posting to Reddit...' : 'Posting...')
                           : getDeliveryActionLabel(selectedThread.platform)}
                       </button>
 
