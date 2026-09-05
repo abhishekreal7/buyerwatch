@@ -224,11 +224,21 @@ function DashboardShell({
 
     void loadSidebarData()
     const refreshCredits = () => void loadSidebarData()
+    const onAutoSendChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<boolean>
+      if (typeof customEvent.detail === 'boolean') {
+        setAutoSend(customEvent.detail)
+      } else {
+        void loadSidebarData()
+      }
+    }
     const refreshInterval = window.setInterval(loadSidebarData, 60_000)
     window.addEventListener('buyerwatch:credits-changed', refreshCredits)
+    window.addEventListener('buyerwatch:auto-send-changed', onAutoSendChanged)
     return () => {
       window.clearInterval(refreshInterval)
       window.removeEventListener('buyerwatch:credits-changed', refreshCredits)
+      window.removeEventListener('buyerwatch:auto-send-changed', onAutoSendChanged)
     }
   }, [supabase, userId])
 
@@ -287,28 +297,45 @@ function DashboardShell({
     if (autoSend === null || togglingAutoSend) return
     const next = !autoSend
 
-    if (next) {
-      router.push('/settings?section=connections')
-      toast.info('Review the earned automation controls before activating it.')
-      return
-    }
-
     setTogglingAutoSend(true)
-    setAutoSend(next)
 
     try {
       const res = await fetch('/api/settings/autosend', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auto_send_enabled: next }),
+        body: JSON.stringify({
+          auto_send_enabled: next,
+          activation_acknowledged: true,
+        }),
       })
-      if (!res.ok) throw new Error('autosend_update_failed')
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        if (data.error === 'auto_send_trust_gate_incomplete') {
+          const remaining = Math.max(1, (data.required ?? 10) - (data.reviewed ?? 0))
+          router.push('/settings?section=connections')
+          toast.info(`Review ${remaining} more manual draft${remaining === 1 ? '' : 's'} before activating auto-send.`)
+          return
+        }
+        if (data.error === 'auto_send_platform_required' || data.error === 'auto_send_platform_unavailable') {
+          router.push('/settings?section=connections')
+          toast.info('Connect and verify a direct-posting platform in Settings before activating auto-send.')
+          return
+        }
+        if (data.error === 'auto_send_requires_paid_plan') {
+          router.push('/pricing')
+          toast.info('Auto-send requires an active paid plan.')
+          return
+        }
+        throw new Error(data.error || 'autosend_update_failed')
+      }
+
+      setAutoSend(next)
       clearSupabaseReadCache()
       toast.success(next ? 'Auto-send enabled' : 'Auto-send paused')
       window.dispatchEvent(new CustomEvent('buyerwatch:auto-send-changed', { detail: next }))
     } catch (error) {
       console.error('[dashboard-layout] Unable to update auto-send', error)
-      setAutoSend(!next)
       toast.error('Failed to update auto-send setting')
     } finally {
       setTogglingAutoSend(false)

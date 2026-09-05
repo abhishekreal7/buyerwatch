@@ -749,6 +749,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
       setSaveSuccess(true)
       setActivationAcknowledged(false)
       toast.success('Settings saved')
+      window.dispatchEvent(new CustomEvent('buyerwatch:auto-send-changed', { detail: profile.autoSendEnabled }))
       setTimeout(() => setSaveSuccess(false), 2500)
     } catch (error) {
       console.error('[settings] Unable to save settings', error)
