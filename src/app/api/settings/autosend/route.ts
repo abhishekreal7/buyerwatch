@@ -131,9 +131,24 @@ export async function PATCH(req: Request) {
     }
 
     if (enabled) {
-      const effectivePlatforms = platforms ?? (
+      let effectivePlatforms = platforms ?? (
         Array.isArray(profile.auto_send_platforms) ? profile.auto_send_platforms : []
       )
+
+      if (platforms === undefined) {
+        const { data: allConns } = await supabase
+          .from('platform_connections')
+          .select('platform')
+          .eq('user_id', user.id)
+        const connectedPlatforms = (allConns ?? []).map(c => c.platform)
+        const validConnected = effectivePlatforms.filter(p => connectedPlatforms.includes(p))
+        if (validConnected.length > 0) {
+          effectivePlatforms = validConnected
+        } else if (connectedPlatforms.length > 0) {
+          effectivePlatforms = connectedPlatforms
+        }
+      }
+
       if (effectivePlatforms.length === 0) {
         return NextResponse.json({ error: 'auto_send_platform_required' }, { status: 409 })
       }
@@ -179,7 +194,9 @@ export async function PATCH(req: Request) {
     const update: Record<string, unknown> = { auto_send_enabled: enabled }
     if (threshold !== undefined) update.auto_send_threshold = threshold
     if (dailyLimit !== undefined) update.auto_send_daily_limit = dailyLimit
-    if (platforms !== undefined) update.auto_send_platforms = platforms
+    if (platforms !== undefined || (enabled && effectivePlatforms.length > 0)) {
+      update.auto_send_platforms = effectivePlatforms
+    }
     if (communities !== undefined) update.auto_send_communities = communities
     if (isActivating) update.auto_send_activated_at = new Date().toISOString()
     if (instantAutopilotActivation) {

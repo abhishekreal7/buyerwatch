@@ -306,6 +306,7 @@ function DashboardShell({
         body: JSON.stringify({
           auto_send_enabled: next,
           activation_acknowledged: true,
+          instant_autopilot: true,
         }),
       })
 
