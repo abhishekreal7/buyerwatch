@@ -49,6 +49,11 @@
 }
 
 @theme inline {
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-geist-mono);
+
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-secondary: var(--surface-secondary);
@@ -84,8 +89,11 @@ html.lenis body {
 
 /* ─── Base ───────────────────────────────────────────────── */
 body {
+  font-family: var(--font-sans);
   text-rendering: optimizeLegibility;
   font-feature-settings: "cv02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,

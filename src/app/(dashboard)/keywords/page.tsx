@@ -763,13 +763,35 @@ export default function KeywordsPage() {
                   </div>
 
                   {/* Email / Leads Found column */}
-                  <div className="hidden xl:block text-[13.5px] font-normal text-[#787872] truncate">
-                    {threadStats.total} {threadStats.total === 1 ? 'lead' : 'leads'}
+                  <div className="hidden xl:block text-[13.5px] text-[#787872] truncate">
+                    {threadStats.total > 0 ? (
+                      <>
+                        <span className="font-semibold text-[#1C1C1A] tabular-nums">{threadStats.total}</span>{' '}
+                        <span>{threadStats.total === 1 ? 'lead' : 'leads'}</span>
+                      </>
+                    ) : (
+                      <span className="font-normal text-[#8C8C86]">0 leads</span>
+                    )}
                   </div>
 
                   {/* Value / Reply Rate column */}
-                  <div className="hidden xl:block text-[14px] font-semibold text-[#1C1C1A] tabular-nums">
-                    {successRate}%
+                  <div className="hidden xl:flex items-center">
+                    {threadStats.total === 0 ? (
+                      <span
+                        className="inline-flex items-baseline text-[13px] font-medium text-[#8C8C86] tabular-nums"
+                        title="0% reply rate (waiting for first leads)"
+                      >
+                        0<span className="text-[11px] font-normal text-[#A8A8A2] ml-0.5">%</span>
+                      </span>
+                    ) : successRate > 0 ? (
+                      <span className="inline-flex items-baseline text-[13.5px] font-semibold text-[#1C1C1A] tabular-nums">
+                        {successRate}<span className="text-[11.5px] font-medium text-[#787872] ml-0.5">%</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-baseline text-[13px] font-medium text-[#6E6E68] tabular-nums">
+                        0<span className="text-[11px] font-normal text-[#92928C] ml-0.5">%</span>
+                      </span>
+                    )}
                   </div>
 
                   {/* Source / Status column */}

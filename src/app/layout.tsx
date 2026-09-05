@@ -88,7 +88,7 @@ export default async function RootLayout({
       className={`${inter.variable} ${plusJakarta.variable} ${playfair.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-text-primary antialiased" suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-background text-text-primary antialiased font-sans" suppressHydrationWarning>
         <script
           type="application/ld+json"
           nonce={nonce}
