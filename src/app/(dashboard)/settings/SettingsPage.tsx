@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  CircleUserRound, Bell, CreditCard, Save, Check,
+  CircleUserRound, Bell, CreditCard, Save, Check, Loader2,
   Globe, AtSign, Shield,
   Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info, ShieldCheck, ChevronDown
 } from 'lucide-react'
@@ -238,6 +238,45 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
       <span className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${checked ? 'bg-[#0A84FF]' : 'bg-[#D0D5DD]'}`}>
         <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_1px_3px_rgba(16,24,40,0.24)] transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
       </span>
+    </button>
+  )
+}function SaveButton({
+  saving,
+  saved,
+  disabled,
+  onClick,
+  className = '',
+}: {
+  saving: boolean
+  saved: boolean
+  disabled?: boolean
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || saving}
+      className={`group relative inline-flex select-none items-center justify-center gap-2 rounded-lg font-medium text-white antialiased transition-all duration-150 cursor-pointer active:scale-[0.985] disabled:pointer-events-none disabled:opacity-40 h-8.5 px-3.5 text-[12.5px] ${
+        saved
+          ? 'bg-emerald-600 hover:bg-emerald-600 text-white border border-emerald-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.12)]'
+          : 'bg-gradient-to-b from-[#22272e] to-[#12151a] hover:from-[#2d333b] hover:to-[#1c2128] border border-black/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(0,0,0,0.2),0_2px_4px_rgba(0,0,0,0.08)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/40 focus-visible:ring-offset-2'
+      } ${className}`}
+    >
+      {saved ? (
+        <>
+          <Check className="h-3.5 w-3.5 stroke-[2.5] text-emerald-100 transition-transform group-hover:scale-105" />
+          <span className="font-semibold tracking-[-0.01em]">Saved</span>
+        </>
+      ) : saving ? (
+        <>
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" />
+          <span className="font-medium tracking-[-0.01em] text-white/90">Saving…</span>
+        </>
+      ) : (
+        <span className="font-medium tracking-[-0.01em] text-white">Save changes</span>
+      )}
     </button>
   )
 }
@@ -1264,15 +1303,12 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
         <header className="mb-7 flex min-h-[56px] items-center justify-between gap-4 border-b border-[#EAECF0] px-1 pb-5">
           <h1 className="page-title font-[family-name:var(--font-display)] font-semibold tracking-[-0.04em]">Settings</h1>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <button
-              type="button"
+            <SaveButton
               onClick={handleSave}
-              disabled={saving || settingsLoading || loadFailed}
-              className="flex h-9 cursor-pointer items-center gap-2 rounded-xl bg-[#111827] px-3.5 text-xs font-semibold text-white shadow-[0_2px_4px_rgba(15,23,42,0.12)] transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
-            >
-              <Save className="h-3.5 w-3.5" />
-              <span>{saving ? 'Saving…' : 'Save changes'}</span>
-            </button>
+              saving={saving}
+              saved={saveSuccess}
+              disabled={settingsLoading || loadFailed}
+            />
           </div>
         </header>
 
@@ -1397,22 +1433,11 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                     </SectionCard>
 
                     <div className="flex justify-end pt-2">
-                      <button
+                      <SaveButton
                         onClick={handleSave}
-                        disabled={saving}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-200 cursor-pointer shadow-sm ${saveSuccess
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-gray-900 hover:bg-gray-800 text-white'
-                          }`}
-                      >
-                        {saveSuccess ? (
-                          <><Check className="w-4 h-4" strokeWidth={2.5} /> Saved</>
-                        ) : saving ? (
-                          'Saving...'
-                        ) : (
-                          <><Save className="w-4 h-4" strokeWidth={2} /> Save Changes</>
-                        )}
-                      </button>
+                        saving={saving}
+                        saved={saveSuccess}
+                      />
                     </div>
                   </>
                 )}
@@ -1987,14 +2012,11 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                     </SectionCard>
 
                     <div className="flex justify-end pt-2">
-                      <button
+                      <SaveButton
                         onClick={handleSave}
-                        disabled={saving}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-200 cursor-pointer shadow-sm ${saveSuccess ? 'bg-emerald-500 text-white' : 'bg-gray-900 hover:bg-gray-800 text-white'
-                          }`}
-                      >
-                        {saveSuccess ? <><Check className="w-4 h-4" strokeWidth={2.5} /> Saved</> : saving ? 'Saving...' : <><Save className="w-4 h-4" strokeWidth={2} /> Save Changes</>}
-                      </button>
+                        saving={saving}
+                        saved={saveSuccess}
+                      />
                     </div>
                   </>
                 )}
@@ -2228,14 +2250,11 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                     </div>
 
                     <div className="flex justify-end pt-2">
-                      <button
+                      <SaveButton
                         onClick={handleSave}
-                        disabled={saving}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-200 cursor-pointer shadow-sm ${saveSuccess ? 'bg-emerald-500 text-white' : 'bg-gray-900 hover:bg-gray-800 text-white'
-                          }`}
-                      >
-                        {saveSuccess ? <><Check className="w-4 h-4" strokeWidth={2.5} /> Saved</> : saving ? 'Saving...' : <><Save className="w-4 h-4" strokeWidth={2} /> Save Changes</>}
-                      </button>
+                        saving={saving}
+                        saved={saveSuccess}
+                      />
                     </div>
                   </>
                 )}
