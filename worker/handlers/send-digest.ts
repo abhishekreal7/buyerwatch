@@ -1,14 +1,16 @@
-﻿import { Job } from 'bullmq'
+import { Job } from 'bullmq'
 import { Resend } from 'resend'
 import { WeeklyDigest } from '../../src/emails/WeeklyDigest'
 import { logger } from '../../src/lib/logger'
 import { createClient } from '@supabase/supabase-js'
 import { withTimeout } from '../../src/lib/http'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
+  )
+}
 
 export async function sendDigestHandler(job: Job) {
   const { userId, email, items, unsubscribeUrl } = job.data
@@ -34,14 +36,15 @@ export async function sendDigestHandler(job: Job) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
     const sevenDaysAgoStr = sevenDaysAgo.toISOString()
 
+    const db = getSupabase()
     const [
       { count: threadsCount },
       { count: draftsCount },
       { count: sentCount }
     ] = await Promise.all([
-      supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr),
-      supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr).not('draft_text', 'is', null),
-      supabase.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr).eq('was_sent', true)
+      db.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr),
+      db.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr).not('draft_text', 'is', null),
+      db.from('reply_analytics').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', sevenDaysAgoStr).eq('was_sent', true)
     ])
 
     const data = await withTimeout(resend.emails.send({
