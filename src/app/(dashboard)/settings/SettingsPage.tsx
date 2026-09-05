@@ -1881,236 +1881,260 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                 {/* ── NOTIFICATIONS ────────────────────────────────── */}
                 {activeSection === 'notifications' && (
                   <>
-                    <div className="grid gap-4 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
-                    <SectionCard
-                      title="Signal focus"
-                      description="Set the score that deserves your attention."
-                    >
-                      <div>
-                        <div className="mb-3 flex items-center justify-between gap-4">
-                          <div>
-                            <p className="text-[14px] font-semibold text-gray-900">Minimum dashboard intent score</p>
-                            <p className="mt-1 text-[12px] leading-5 text-gray-500">
-                              This changes counts and filters only. It does not rescore opportunities or change their buying/researching classification.
-                            </p>
-                          </div>
-                          <span className="shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-[14px] font-bold tabular-nums text-white">
-                            {highIntentThreshold}%
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={HIGH_INTENT_THRESHOLD_MIN}
-                          max={HIGH_INTENT_THRESHOLD_MAX}
-                          step="1"
-                          value={highIntentThreshold}
-                          aria-label="Minimum high-intent dashboard score"
-                          onChange={event => setHighIntentThreshold(normalizeHighIntentThreshold(event.target.value))}
-                          className="w-full cursor-pointer accent-gray-900"
-                        />
-                        <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
-                          <span>{HIGH_INTENT_THRESHOLD_MIN} — Catch more</span>
-                          <span>{HIGH_INTENT_THRESHOLD_MAX} — Only the strongest</span>
-                        </div>
-                        <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11.5px] leading-5 text-blue-800">
-                          Slack keeps its own notification threshold below, so changing this slider will not alter Slack delivery.
-                        </p>
-                      </div>
-                    </SectionCard>
-
-                    <SectionCard title="Inbox" description="Choose exactly which updates reach you.">
-                      <div className="space-y-0 divide-y divide-gray-50">
-                        {[
-                          { key: 'emailDigest', icon: Mail, label: 'Daily digest', description: 'A morning summary of new opportunities and activity.' },
-                          { key: 'highIntentAlerts', icon: Activity, label: 'High-intent alerts', description: `Instant notification when a thread meets your ${highIntentThreshold}+ dashboard threshold.` },
-                          { key: 'weeklyReport', icon: BarChart2, label: 'Weekly report', description: 'Your posting stats, top threads, and trends each week.' },
-                        ].map(item => (
-                          <div key={item.key} className="flex items-center justify-between gap-6 py-4 first:pt-0 last:pb-0">
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 mt-0.5">
-                                <item.icon className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
-                              </div>
+                    <div className="space-y-5">
+                      {/* 1. Notification Preferences & Signal Focus */}
+                      <SectionCard
+                        title="Notification preferences"
+                        description="Choose which updates reach your inbox and tune your minimum intent sensitivity."
+                      >
+                        <div className="space-y-6">
+                          {/* Alert Sensitivity Slider */}
+                          <div className="rounded-xl border border-[#EAECF0] bg-[#F9FAFB]/70 p-4 sm:p-5">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div>
-                                <p className="text-[14px] font-semibold text-gray-900">{item.label}</p>
-                                <p className="text-[13px] text-gray-500 mt-0.5">{item.description}</p>
+                                <div className="flex items-center gap-2">
+                                  <Activity className="h-4 w-4 text-[#101828]" />
+                                  <p className="text-[13.5px] font-semibold text-[#101828]">Minimum dashboard intent score</p>
+                                </div>
+                                <p className="mt-1 text-[12px] leading-5 text-[#667085]">
+                                  Controls dashboard filters and high-intent alerts without rescoring opportunities.
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="rounded-lg bg-[#101828] px-3 py-1 font-mono text-[14px] font-bold tabular-nums text-white">
+                                  {highIntentThreshold}%
+                                </span>
+                                <span className="rounded-md border border-[#EAECF0] bg-white px-2 py-0.5 text-[11px] font-medium text-[#475467]">
+                                  {highIntentThreshold >= 85 ? 'High conviction' : highIntentThreshold >= 75 ? 'Balanced' : 'Broad reach'}
+                                </span>
                               </div>
                             </div>
-                            <Toggle
-                              label={`Toggle ${item.label}`}
-                              checked={notifications[item.key as keyof typeof notifications]}
-                              onChange={v => setNotifications(p => ({ ...p, [item.key]: v }))}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </SectionCard>
-                    </div>
 
-                    <div className="grid gap-4 xl:grid-cols-2">
-                    <SectionCard
-                      title="Slack"
-                      description="Bring high-intent opportunities into your team channel."
-                    >
-                      {!planEntitlements.slackNotifications ? (
-                        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
-                          Slack notifications are available on Professional and Growth. Your current plan can still use email alerts.
-                          <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
+                            <div className="mt-4">
+                              <input
+                                type="range"
+                                min={HIGH_INTENT_THRESHOLD_MIN}
+                                max={HIGH_INTENT_THRESHOLD_MAX}
+                                step="1"
+                                value={highIntentThreshold}
+                                aria-label="Minimum high-intent dashboard score"
+                                onChange={event => setHighIntentThreshold(normalizeHighIntentThreshold(event.target.value))}
+                                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#E4E7EC] accent-[#101828]"
+                              />
+                              <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#98A2B3]">
+                                <span>{HIGH_INTENT_THRESHOLD_MIN}% — Broader reach</span>
+                                <span>{HIGH_INTENT_THRESHOLD_MAX}% — Strongest buyer intent only</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Delivery Channels (Inbox) */}
+                          <div className="divide-y divide-[#EAECF0] border-t border-[#EAECF0] pt-2">
+                            {[
+                              { key: 'emailDigest', icon: Mail, label: 'Daily digest', description: 'A morning summary of new buyer opportunities and platform activity.' },
+                              { key: 'highIntentAlerts', icon: Activity, label: 'High-intent alerts', description: `Instant notification when a thread meets your ${highIntentThreshold}+ dashboard conviction score.` },
+                              { key: 'weeklyReport', icon: BarChart2, label: 'Weekly report', description: 'Posting statistics, top-performing threads, and conversion trends each week.' },
+                            ].map(item => (
+                              <div key={item.key} className="flex items-center justify-between gap-6 py-4 first:pt-3 last:pb-1">
+                                <div className="flex items-start gap-3.5">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#EAECF0] bg-[#F9FAFB] text-[#475467]">
+                                    <item.icon className="h-4 w-4" strokeWidth={1.75} />
+                                  </div>
+                                  <div>
+                                    <p className="text-[13.5px] font-semibold text-[#101828]">{item.label}</p>
+                                    <p className="mt-0.5 text-[12.5px] text-[#667085]">{item.description}</p>
+                                  </div>
+                                </div>
+                                <Toggle
+                                  label={`Toggle ${item.label}`}
+                                  checked={notifications[item.key as keyof typeof notifications]}
+                                  onChange={v => setNotifications(p => ({ ...p, [item.key]: v }))}
+                                />
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ) : <div className="space-y-5">
-                        {/* Webhook URL */}
-                        <Field
-                          label="Webhook URL"
-                          hint={
-                            <a
-                              href="https://api.slack.com/messaging/webhooks"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-500 hover:underline"
-                            >
-                              How to get one →
-                            </a>
-                          }
-                        >
-                          <input
-                            type="url"
-                            value={slack.webhookUrl}
-                            onChange={e => setSlack(s => ({ ...s, webhookUrl: e.target.value }))}
-                            placeholder={slackConfigured
-                              ? 'Paste a new webhook URL to replace the saved one'
-                              : 'https://hooks.slack.com/services/T.../B.../...'}
-                            className={inputCls}
-                          />
-                          {slackConfigured && !slack.webhookUrl && (
-                            <p className="mt-2 text-[12px] font-medium text-emerald-700" role="status">
-                              Connected. The saved webhook is encrypted and never displayed here.
-                            </p>
-                          )}
-                        </Field>
+                      </SectionCard>
 
-                        {/* Threshold slider */}
-                        {(slackConfigured || slack.webhookUrl) && (
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <label className="text-[13px] font-medium text-gray-700">Minimum intent score to notify</label>
-                              <span className="text-[13px] font-bold text-gray-900 tabular-nums">{slack.threshold}</span>
-                            </div>
-                            <input
-                              type="range" min="60" max="95"
-                              value={slack.threshold}
-                              onChange={e => setSlack(s => ({ ...s, threshold: parseInt(e.target.value) }))}
-                              className="w-full accent-gray-900 cursor-pointer"
-                            />
-                            <div className="flex justify-between text-[11px] text-gray-400 mt-1">
-                              <span>60 — Catch more</span>
-                              <span>95 — Only the best</span>
-                            </div>
+                      {/* 2. Slack Integration */}
+                      <SectionCard
+                        title="Slack channel delivery"
+                        description="Stream high-intent buyer opportunities directly into your team's Slack channel."
+                      >
+                        {!planEntitlements.slackNotifications ? (
+                          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
+                            Slack notifications are available on Professional and Growth. Your current plan can still use email alerts.
+                            <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
                           </div>
-                        )}
-
-                        {/* Test button */}
-                        {(slackConfigured || slack.webhookUrl) && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                setSlackTesting(true)
-                                try {
-                                  const res = await fetch('/api/settings/test-slack', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(slack.webhookUrl
-                                      ? { webhookUrl: slack.webhookUrl }
-                                      : {}),
-                                  })
-                                  if (res.ok) toast.success('Test message sent to Slack ✓')
-                                  else toast.error('Failed to send test — check your webhook URL')
-                                } catch {
-                                  toast.error('Network error sending test')
-                                } finally {
-                                  setSlackTesting(false)
-                                }
-                              }}
-                              disabled={slackTesting || slackDisconnecting}
-                              className="flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-2 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-wait disabled:opacity-50"
+                        ) : (
+                          <div className="space-y-5">
+                            {/* Webhook URL */}
+                            <Field
+                              label="Webhook URL"
+                              hint={
+                                <a
+                                  href="https://api.slack.com/messaging/webhooks"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-500 hover:underline"
+                                >
+                                  How to get one →
+                                </a>
+                              }
                             >
-                              <Send className="h-3.5 w-3.5" strokeWidth={2} />
-                              {slackTesting ? 'Sending...' : 'Send test message'}
-                            </button>
-                            {slackConfigured && (
-                              <button
-                                type="button"
-                                onClick={() => void handleDisconnectSlack()}
-                                disabled={slackTesting || slackDisconnecting}
-                                className="rounded-xl px-4 py-2 text-[13px] font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
-                              >
-                                {slackDisconnecting ? 'Disconnecting...' : 'Disconnect Slack'}
-                              </button>
+                              <input
+                                type="url"
+                                value={slack.webhookUrl}
+                                onChange={e => setSlack(s => ({ ...s, webhookUrl: e.target.value }))}
+                                placeholder={slackConfigured
+                                  ? 'Paste a new webhook URL to replace the saved one'
+                                  : 'https://hooks.slack.com/services/T.../B.../...'}
+                                className={inputCls}
+                              />
+                              {slackConfigured && !slack.webhookUrl && (
+                                <p className="mt-2 text-[12px] font-medium text-emerald-700" role="status">
+                                  Connected. The saved webhook is encrypted and never displayed here.
+                                </p>
+                              )}
+                            </Field>
+
+                            {/* Threshold slider */}
+                            {(slackConfigured || slack.webhookUrl) && (
+                              <div className="rounded-xl border border-[#EAECF0] bg-[#F9FAFB]/70 p-4">
+                                <div className="flex items-center justify-between gap-4 mb-3">
+                                  <div>
+                                    <p className="text-[13px] font-semibold text-[#101828]">Minimum intent score to notify Slack</p>
+                                    <p className="text-[11.5px] text-[#667085]">Opportunities below this score will not trigger Slack channel alerts.</p>
+                                  </div>
+                                  <span className="rounded-lg bg-[#101828] px-2.5 py-1 font-mono text-[13px] font-bold tabular-nums text-white">
+                                    {slack.threshold}%
+                                  </span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="60"
+                                  max="95"
+                                  value={slack.threshold}
+                                  onChange={e => setSlack(s => ({ ...s, threshold: parseInt(e.target.value) }))}
+                                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#E4E7EC] accent-[#101828]"
+                                />
+                                <div className="mt-1.5 flex justify-between text-[11px] font-medium text-[#98A2B3]">
+                                  <span>60% — Catch more</span>
+                                  <span>95% — High conviction only</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Actions */}
+                            {(slackConfigured || slack.webhookUrl) && (
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setSlackTesting(true)
+                                    try {
+                                      const res = await fetch('/api/settings/test-slack', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(slack.webhookUrl
+                                          ? { webhookUrl: slack.webhookUrl }
+                                          : {}),
+                                      })
+                                      if (res.ok) toast.success('Test message sent to Slack ✓')
+                                      else toast.error('Failed to send test — check your webhook URL')
+                                    } catch {
+                                      toast.error('Network error sending test')
+                                    } finally {
+                                      setSlackTesting(false)
+                                    }
+                                  }}
+                                  disabled={slackTesting || slackDisconnecting}
+                                  className="flex items-center gap-2 rounded-xl bg-[#101828] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-black disabled:cursor-wait disabled:opacity-50"
+                                >
+                                  <Send className="h-3.5 w-3.5" strokeWidth={2} />
+                                  {slackTesting ? 'Sending...' : 'Send test message'}
+                                </button>
+                                {slackConfigured && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDisconnectSlack()}
+                                    disabled={slackTesting || slackDisconnecting}
+                                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-[12.5px] font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+                                  >
+                                    {slackDisconnecting ? 'Disconnecting...' : 'Disconnect Slack'}
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
-                      </div>}
-                    </SectionCard>
+                      </SectionCard>
 
-                    <SectionCard
-                      title="Conversion events"
-                      description="Attribute revenue back to the replies that created it."
-                    >
-                      {!planEntitlements.replyAttribution ? (
-                        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
-                          Conversion attribution is available on Professional and Growth, together with tracked reply links.
-                          <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
-                        </div>
-                      ) : <div className="space-y-4">
-                        <Field
-                          label="Webhook Receiver Endpoint"
-                          hint="POST JSON payloads to this endpoint when a user who clicked a BuyerWatch link converts."
-                        >
-                          <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800 sm:flex-row sm:items-center">
-                            <span className="min-w-0 break-all">{conversionWebhookUrl}</span>
-                            <button
-                              type="button"
-                              onClick={() => void copySettingValue(conversionWebhookUrl, 'Webhook URL')}
-                              className="min-h-11 shrink-0 px-2 font-sans text-[12px] font-semibold text-blue-600 hover:underline"
+                      {/* 3. Conversion Events */}
+                      <SectionCard
+                        title="Conversion tracking & attribution"
+                        description="Attribute revenue back to the replies and channels that created it."
+                      >
+                        {!planEntitlements.replyAttribution ? (
+                          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
+                            Conversion attribution is available on Professional and Growth, together with tracked reply links.
+                            <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <Field
+                              label="Webhook Receiver Endpoint"
+                              hint="POST JSON payloads to this endpoint when a user who clicked a BuyerWatch link converts."
                             >
-                              Copy
-                            </button>
-                          </div>
-                        </Field>
+                              <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-[#EAECF0] bg-[#F9FAFB] p-3.5 font-mono text-[12px] text-[#101828] sm:flex-row sm:items-center">
+                                <span className="min-w-0 break-all">{conversionWebhookUrl}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => void copySettingValue(conversionWebhookUrl, 'Webhook URL')}
+                                  className="min-h-9 shrink-0 rounded-lg border border-[#D0D5DD] bg-white px-3 text-[12px] font-semibold text-[#344054] transition-colors hover:bg-[#F8FAFC]"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </Field>
 
-                        <Field
-                          label="Authorization Secret"
-                          hint="Send this value as a Bearer token. Keep it server-side and rotate it if it is ever exposed."
-                        >
-                          <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-[12px] text-gray-800 sm:flex-row sm:items-center">
-                            <span className="min-w-0 break-all">{webhookSecret ? `${'•'.repeat(16)}${webhookSecret.slice(-8)}` : 'Secret unavailable until migrations are applied'}</span>
-                            {webhookSecret && (
-                              <button
-                                type="button"
-                                onClick={() => void copySettingValue(webhookSecret, 'Webhook secret')}
-                                className="min-h-11 shrink-0 px-2 font-sans text-[12px] font-semibold text-blue-600 hover:underline"
-                              >
-                                Copy
-                              </button>
-                            )}
-                          </div>
-                        </Field>
+                            <Field
+                              label="Authorization Secret"
+                              hint="Send this value as a Bearer token. Keep it server-side and rotate it if it is ever exposed."
+                            >
+                              <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-[#EAECF0] bg-[#F9FAFB] p-3.5 font-mono text-[12px] text-[#101828] sm:flex-row sm:items-center">
+                                <span className="min-w-0 break-all">
+                                  {webhookSecret ? `${'•'.repeat(16)}${webhookSecret.slice(-8)}` : 'Secret unavailable until migrations are applied'}
+                                </span>
+                                {webhookSecret && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void copySettingValue(webhookSecret, 'Webhook secret')}
+                                    className="min-h-9 shrink-0 rounded-lg border border-[#D0D5DD] bg-white px-3 text-[12px] font-semibold text-[#344054] transition-colors hover:bg-[#F8FAFC]"
+                                  >
+                                    Copy
+                                  </button>
+                                )}
+                              </div>
+                            </Field>
 
-                        <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-xl text-[12px] text-blue-900 leading-relaxed space-y-1.5">
-                          <p className="font-semibold text-blue-950 flex items-center gap-1.5">
-                            <Info className="w-3.5 h-3.5 text-blue-600" />
-                            Sample POST Payload
-                          </p>
-                          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-blue-200/50 bg-white/70 p-2.5 font-mono text-[11px] text-gray-800">
+                            <div className="rounded-xl border border-[#EAECF0] bg-[#F9FAFB] p-4 text-[12px] text-[#344054] space-y-2">
+                              <p className="font-semibold text-[#101828] flex items-center gap-1.5 text-[12.5px]">
+                                <Info className="w-4 h-4 text-blue-600" />
+                                Sample POST Payload
+                              </p>
+                              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-[#E4E7EC] bg-white p-3 font-mono text-[11.5px] leading-relaxed text-[#101828]">
 {`{
   "shortcode": "aB1cD2eF",
   "revenue_usd": 99.00
 }
 
 Authorization: Bearer YOUR_WEBHOOK_SECRET`}
-                          </pre>
-                        </div>
-                      </div>}
-                    </SectionCard>
+                              </pre>
+                            </div>
+                          </div>
+                        )}
+                      </SectionCard>
                     </div>
 
                     <div className="flex justify-end pt-2">
