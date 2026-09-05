@@ -268,6 +268,16 @@ export default function KeywordsPage() {
       })
       if (firstCheck.ok) {
         toast.info('Initial monitoring check queued.')
+        setTimeout(async () => {
+          const { data: refreshedKw } = await supabase
+            .from('keywords')
+            .select('*')
+            .eq('id', data.id)
+            .maybeSingle()
+          if (refreshedKw) {
+            setKeywords(prev => prev.map(k => k.id === data.id ? refreshedKw : k))
+          }
+        }, 3500)
       } else {
         const firstCheckPayload = await firstCheck.json().catch(() => ({}))
         if (firstCheckPayload.error === 'platform_temporarily_unavailable') {
@@ -718,12 +728,16 @@ export default function KeywordsPage() {
                       }`}
                       title={!subscriptionActive && kw.is_active
                         ? 'Monitoring begins after your Starter trial is active'
+                        : !kw.last_checked_at || kw.last_check_status === 'never'
+                        ? 'Waiting for initial monitoring check'
                         : sourceDelayed
                         ? `${getKeywordPollIssueLabel(kw.last_check_error)}; retrying automatically`
                         : 'Last successful source check'}
                     >
                     {!subscriptionActive && kw.is_active
                       ? 'Trial not started'
+                      : !kw.last_checked_at || kw.last_check_status === 'never'
+                      ? 'Waiting for first check'
                       : sourceDelayed
                       ? `${getKeywordPollIssueLabel(kw.last_check_error)} · attempted ${relativeCheckTime(kw.last_checked_at).replace('Checked ', '')}`
                       : relativeCheckTime(kw.last_success_at)}
