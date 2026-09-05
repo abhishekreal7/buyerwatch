@@ -1326,7 +1326,6 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
   ) || (
     profile.autoSendPlatforms.includes('reddit') && redditAutomaticDeliveryReady
   )
-  const conversionWebhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://buyerwatch.co'}/api/webhooks/conversion`
 
   if (settingsLoading) {
     return (
@@ -2416,72 +2415,6 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                                 )}
                               </div>
                             )}
-                          </div>
-                        )}
-                      </SectionCard>
-
-                      {/* 3. Conversion Events */}
-                      <SectionCard
-                        title="Conversion tracking & attribution"
-                        description="Attribute revenue back to the replies and channels that created it."
-                      >
-                        {!planEntitlements.replyAttribution ? (
-                          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-900">
-                            Conversion attribution is available on Professional and Growth, together with tracked reply links.
-                            <a href="/pricing" className="ml-1 font-semibold text-amber-950 underline">Compare plans</a>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <Field
-                              label="Webhook Receiver Endpoint"
-                              hint="POST JSON payloads to this endpoint when a user who clicked a BuyerWatch link converts."
-                            >
-                              <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-[#EAECF0] bg-[#F9FAFB] p-3.5 font-mono text-[12px] text-[#101828] sm:flex-row sm:items-center">
-                                <span className="min-w-0 break-all">{conversionWebhookUrl}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => void copySettingValue(conversionWebhookUrl, 'Webhook URL')}
-                                  className="min-h-9 shrink-0 rounded-lg border border-[#D0D5DD] bg-white px-3 text-[12px] font-semibold text-[#344054] transition-colors hover:bg-[#F8FAFC]"
-                                >
-                                  Copy
-                                </button>
-                              </div>
-                            </Field>
-
-                            <Field
-                              label="Authorization Secret"
-                              hint="Send this value as a Bearer token. Keep it server-side and rotate it if it is ever exposed."
-                            >
-                              <div className="flex flex-col items-start justify-between gap-2 rounded-xl border border-[#EAECF0] bg-[#F9FAFB] p-3.5 font-mono text-[12px] text-[#101828] sm:flex-row sm:items-center">
-                                <span className="min-w-0 break-all">
-                                  {webhookSecret ? `${'•'.repeat(16)}${webhookSecret.slice(-8)}` : 'Secret unavailable until migrations are applied'}
-                                </span>
-                                {webhookSecret && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void copySettingValue(webhookSecret, 'Webhook secret')}
-                                    className="min-h-9 shrink-0 rounded-lg border border-[#D0D5DD] bg-white px-3 text-[12px] font-semibold text-[#344054] transition-colors hover:bg-[#F8FAFC]"
-                                  >
-                                    Copy
-                                  </button>
-                                )}
-                              </div>
-                            </Field>
-
-                            <div className="rounded-xl border border-[#EAECF0] bg-[#F9FAFB] p-4 text-[12px] text-[#344054] space-y-2">
-                              <p className="font-semibold text-[#101828] flex items-center gap-1.5 text-[12.5px]">
-                                <Info className="w-4 h-4 text-blue-600" />
-                                Sample POST Payload
-                              </p>
-                              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-[#E4E7EC] bg-white p-3 font-mono text-[11.5px] leading-relaxed text-[#101828]">
-{`{
-  "shortcode": "aB1cD2eF",
-  "revenue_usd": 99.00
-}
-
-Authorization: Bearer YOUR_WEBHOOK_SECRET`}
-                              </pre>
-                            </div>
                           </div>
                         )}
                       </SectionCard>
