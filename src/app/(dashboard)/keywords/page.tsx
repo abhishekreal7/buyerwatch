@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, MoreHorizontal, Check, X, Pause, Play,
-  Trash2, Target, Rss, Sparkles, ArrowRight, AlertTriangle
+  Trash2, Target, Rss, Sparkles, ArrowRight, AlertTriangle, Loader2
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -465,71 +465,134 @@ export default function KeywordsPage() {
               transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="overflow-hidden mb-8"
             >
-              <div className="rounded-[20px] border border-black/[0.06] bg-surface p-4 sm:p-6">
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-5 sm:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
                 {/* Header */}
-                <div className="mb-6 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-semibold text-text-primary tracking-tight">New monitoring rule</p>
-                    <p className="text-[12.5px] text-text-tertiary mt-0.5">The system polls for new posts matching this keyword in the chosen location.</p>
+                <div className="mb-5 flex items-center justify-between gap-3 pb-4 border-b border-[#F2F4F7]">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-[#101828] tracking-tight">New monitoring rule</h3>
+                    <p className="text-[12.5px] text-[#667085] mt-0.5">Track buying intent and discover active leads across social networks.</p>
                   </div>
-                  <button type="button" onClick={() => setShowAdd(false)}
-                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-black/[0.04] text-text-tertiary transition-all hover:bg-black/[0.08] hover:text-text-primary"
-                    aria-label="Close new rule form">
-                    <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdd(false)}
+                    className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[#98A2B3] transition-colors hover:bg-[#F2F4F7] hover:text-[#344054]"
+                    aria-label="Close form"
+                  >
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px_1fr] gap-3 mb-5">
-                  <div>
-                    <label className="text-[11.5px] font-semibold text-text-tertiary uppercase tracking-wider mb-1.5 block">Keyword or phrase</label>
-                    <input
-                      ref={termRef}
-                      value={newTerm}
-                      onChange={e => setNewTerm(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                      placeholder="e.g. looking for email tool"
-                      className={fieldCls}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11.5px] font-semibold text-text-tertiary uppercase tracking-wider mb-1.5 block">Platform</label>
-                    <select value={newPlatform} onChange={e => setNewPlatform(e.target.value as Platform)} className={fieldCls + ' cursor-pointer'}>
-                      {availablePlatforms.map(p => (
-                        <option key={p} value={p}>{PLATFORM_META[p].label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11.5px] font-semibold text-text-tertiary uppercase tracking-wider mb-1.5 block">
-                      {newPlatform === 'reddit' ? 'Subreddit' : 'Search query'}
-                    </label>
-                    <input
-                      value={newTarget}
-                      onChange={e => setNewTarget(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                      placeholder={newPlatform === 'reddit' ? 'e.g. entrepreneur' : 'e.g. #EmailMarketing'}
-                      className={fieldCls}
-                    />
+                {/* Platform segmented control */}
+                <div className="mb-4">
+                  <label className="text-[12px] font-medium text-[#344054] mb-1.5 block">Target platform</label>
+                  <div className="inline-flex items-center gap-1 p-1 bg-[#F4F5F6] rounded-xl border border-black/[0.06]">
+                    {availablePlatforms.map(p => {
+                      const active = newPlatform === p
+                      const Icon = p === 'reddit' ? RedditIcon : p === 'x' ? XIcon : BlueskyIcon
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setNewPlatform(p)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-all cursor-pointer ${
+                            active
+                              ? 'bg-white text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.08)] font-semibold'
+                              : 'text-[#667085] hover:text-[#101828]'
+                          }`}
+                        >
+                          <Icon className={`w-3.5 h-3.5 ${p === 'reddit' ? 'text-[#FF4500]' : p === 'bluesky' ? 'text-[#1185FE]' : 'text-[#0F1419]'}`} />
+                          <span>{PLATFORM_META[p].label}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
-                <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-                  <p className="text-[12px] text-text-tertiary">
-                    {newPlatform === 'reddit'
-                      ? 'Monitors r/{subreddit} for posts containing your keyword.'
-                      : newPlatform === 'x'
-                        ? 'Searches recent public X posts for your keyword and query.'
-                        : 'Searches Bluesky posts and replies for your keyword.'}
-                  </p>
-                  <div className="flex w-full items-center gap-2 sm:w-auto">
-                    <button onClick={() => setShowAdd(false)}
-                      className="btn-secondary min-h-11 flex-1 px-4 py-2 text-[13px] sm:min-h-0 sm:flex-none">
+                {/* Fields (balanced 2-column grid) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                  <div>
+                    <label className="text-[12px] font-medium text-[#344054] mb-1.5 block">Keyword or phrase</label>
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#98A2B3]" />
+                      <input
+                        ref={termRef}
+                        value={newTerm}
+                        onChange={e => setNewTerm(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                        placeholder="e.g. looking for email tool, recommend"
+                        className="w-full bg-white border border-[#D0D5DD] rounded-xl pl-10 pr-3.5 py-2.5 text-[13px] text-[#101828] placeholder:text-[#98A2B3] focus:outline-none focus:ring-4 focus:ring-[#0A84FF]/10 focus:border-[#0A84FF] transition-all"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11.5px] text-[#98A2B3]">Notifies you whenever posts contain this phrase or query.</p>
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-medium text-[#344054] mb-1.5 block">
+                      {newPlatform === 'reddit' ? 'Subreddit' : 'Topic or tag'}
+                    </label>
+                    <div className="relative flex items-center">
+                      {newPlatform === 'reddit' ? (
+                        <span className="absolute left-3.5 text-[13px] font-semibold text-[#98A2B3] select-none pointer-events-none">r/</span>
+                      ) : newPlatform === 'x' ? (
+                        <span className="absolute left-3.5 text-[13px] font-semibold text-[#98A2B3] select-none pointer-events-none">#</span>
+                      ) : (
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#98A2B3]" />
+                      )}
+                      <input
+                        value={newTarget}
+                        onChange={e => {
+                          const val = e.target.value
+                          setNewTarget(newPlatform === 'reddit' ? val.replace(/^r\//i, '') : val)
+                        }}
+                        onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                        placeholder={newPlatform === 'reddit' ? 'entrepreneur, saas, marketing' : 'EmailMarketing or search topic'}
+                        className={`w-full bg-white border border-[#D0D5DD] rounded-xl ${newPlatform === 'bluesky' ? 'pl-10' : 'pl-8'} pr-3.5 py-2.5 text-[13px] text-[#101828] placeholder:text-[#98A2B3] focus:outline-none focus:ring-4 focus:ring-[#0A84FF]/10 focus:border-[#0A84FF] transition-all`}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11.5px] text-[#98A2B3]">
+                      {newPlatform === 'reddit'
+                        ? 'The specific subreddit community to monitor.'
+                        : 'Keyword scope or topic query.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Footer with dynamic preview and action buttons */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-[#F2F4F7]">
+                  <div className="flex items-center gap-2 text-[12px] text-[#667085] min-w-0">
+                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#12B76A]" />
+                    <span className="truncate">
+                      {newPlatform === 'reddit'
+                        ? newTarget.trim()
+                          ? `Monitors r/${newTarget.trim()} for posts matching "${newTerm.trim() || '…'}"`
+                          : 'Enter a subreddit to begin monitoring'
+                        : `Scans ${PLATFORM_META[newPlatform].label} for "${newTerm.trim() || '…'}"`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 sm:self-auto self-end shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdd(false)}
+                      className="h-9 px-3.5 rounded-xl border border-[#D0D5DD] bg-white text-[13px] font-medium text-[#344054] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+                    >
                       Cancel
                     </button>
-                    <button onClick={handleAdd} disabled={saving}
-                      className="btn-primary min-h-11 flex flex-1 items-center gap-1.5 px-4 py-2 text-[13px] disabled:opacity-50 sm:min-h-0 sm:flex-none">
-                      {saving ? 'Saving…' : <><Check className="w-3.5 h-3.5" strokeWidth={2.5} /> Create rule</>}
+                    <button
+                      type="button"
+                      onClick={handleAdd}
+                      disabled={saving || !newTerm.trim() || !newTarget.trim()}
+                      className="h-9 px-4 rounded-xl bg-[#101828] text-[13px] font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Saving…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                          <span>Create rule</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
