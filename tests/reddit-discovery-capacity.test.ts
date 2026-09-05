@@ -14,6 +14,7 @@ describe('Reddit discovery capacity', () => {
     vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
     vi.stubEnv('REDDITAPIS_MAX_DAILY_READ_CALLS', '10')
     vi.spyOn(redis, 'mget').mockResolvedValue(['7', '0'] as never)
+    vi.spyOn(redis, 'get').mockResolvedValue('healthy' as never)
 
     await expect(getRedditDiscoveryCapacity()).resolves.toEqual({
       mode: 'auto',
@@ -28,6 +29,7 @@ describe('Reddit discovery capacity', () => {
     vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
     vi.stubEnv('REDDITAPIS_MAX_DAILY_READ_CALLS', '10')
     vi.spyOn(redis, 'mget').mockResolvedValue(['10', '0'] as never)
+    vi.spyOn(redis, 'get').mockResolvedValue('healthy' as never)
 
     await expect(getRedditDiscoveryCapacity()).resolves.toEqual({
       mode: 'rss_only',
@@ -36,11 +38,27 @@ describe('Reddit discovery capacity', () => {
     })
   })
 
+  it('switches safely to RSS when the provider account balance is depleted', async () => {
+    vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
+    vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
+    vi.stubEnv('REDDITAPIS_MAX_DAILY_READ_CALLS', '10')
+    vi.spyOn(redis, 'mget').mockResolvedValue(['2', '0'] as never)
+    vi.spyOn(redis, 'get').mockResolvedValue('depleted' as never)
+
+    await expect(getRedditDiscoveryCapacity()).resolves.toEqual({
+      mode: 'rss_only',
+      reason: 'provider_balance_depleted',
+      readBudget: { used: 2, limit: 10, remaining: 8 },
+    })
+  })
+
   it('fails closed to RSS when the paid-call safety guard cannot be read', async () => {
     vi.stubEnv('REDDITAPIS_API_KEY', 'provider-key')
     vi.stubEnv('REDDITAPIS_DISCOVERY_ENABLED', 'true')
     vi.stubEnv('REDDITAPIS_BUDGET_GUARD_ENABLED', 'true')
     vi.spyOn(redis, 'mget').mockRejectedValue(new Error('redis unavailable'))
+    vi.spyOn(redis, 'get').mockResolvedValue(null as never)
 
     await expect(getRedditDiscoveryCapacity()).resolves.toEqual({
       mode: 'rss_only',

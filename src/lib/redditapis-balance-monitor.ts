@@ -4,13 +4,14 @@ import { logger } from './logger'
 import { redis } from './redis'
 import { sendRedditDeliveryAlert } from './reddit-delivery-alerts'
 import { fetchRedditApisAccountStatus } from './redditapis-client'
+import {
+  REDDITAPIS_BALANCE_STATE_KEY,
+  type RedditApisBalanceState,
+} from './redditapis-balance-state'
 
 const CHECK_LOCK_KEY = 'monitor:redditapis:balance:check:v1'
-const STATE_KEY = 'monitor:redditapis:balance:state:v1'
 const CHECK_INTERVAL_SECONDS = 15 * 60
 const STATE_TTL_SECONDS = 90 * 24 * 60 * 60
-
-export type RedditApisBalanceState = 'healthy' | 'low' | 'depleted'
 
 export type RedditApisBalanceMonitorResult = {
   status: 'disabled' | 'skipped' | 'healthy' | 'low' | 'depleted' | 'unavailable'
@@ -83,7 +84,7 @@ export async function runRedditApisBalanceMonitor(): Promise<RedditApisBalanceMo
   try {
     const { creditsRemaining } = await fetchRedditApisAccountStatus()
     const state = classifyRedditApisBalance(creditsRemaining)
-    const previousState = await redis.get(STATE_KEY) as RedditApisBalanceState | null
+    const previousState = await redis.get(REDDITAPIS_BALANCE_STATE_KEY) as RedditApisBalanceState | null
     let alerted = false
 
     if (state === 'healthy') {
@@ -103,7 +104,7 @@ export async function runRedditApisBalanceMonitor(): Promise<RedditApisBalanceMo
       if (!alerted) return { status: state, alerted: false }
     }
 
-    await redis.set(STATE_KEY, state, 'EX', STATE_TTL_SECONDS)
+    await redis.set(REDDITAPIS_BALANCE_STATE_KEY, state, 'EX', STATE_TTL_SECONDS)
     logger.info({ state }, 'RedditAPIs balance check completed')
     return { status: state, alerted }
   } catch (error) {

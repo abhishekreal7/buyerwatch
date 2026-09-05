@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { createAnthropicClient } from './anthropic-client'
 import {
   AiUsageError,
   calculateAnthropicUsage,
@@ -150,17 +150,13 @@ export async function scoreIntent(
     }
   }
 
-  const apiKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
-  if (!apiKey) {
+  let anthropic: ReturnType<typeof createAnthropicClient>
+  try {
+    anthropic = createAnthropicClient({ maxRetries: options.maxRetries ?? 2 })
+  } catch {
     logger.warn('Anthropic is not configured; using deterministic intent scoring')
     return scoreWithoutProvider(post, userProfile, options)
   }
-
-  const anthropic = new Anthropic({
-    apiKey,
-    timeout: 30_000,
-    maxRetries: options.maxRetries ?? 2,
-  })
   const model = process.env.ANTHROPIC_INTENT_MODEL
     || process.env.ANTHROPIC_MODEL
     || 'claude-sonnet-5'
@@ -173,14 +169,7 @@ export async function scoreIntent(
       const response = await anthropic.messages.create({
         model,
         max_tokens: 1_000,
-        output_config: {
-          effort: 'high',
-          format: {
-            type: 'json_schema',
-            schema: INTENT_OUTPUT_SCHEMA,
-          },
-        },
-        system: 'You are a precise buyer-intent classifier. Return only the schema-conforming result.',
+        system: 'You are a precise buyer-intent classifier. Return only the schema-conforming JSON object matching: {"score": number, "label": "buying"|"researching"|"complaining"|"other", "reasoning": string, "flag": null|"COMPETITOR_RISK"}.',
         messages: [{
           role: 'user',
           content: attempt === 1
@@ -205,8 +194,13 @@ export async function scoreIntent(
         throw new Error('Anthropic intent scorer returned an empty response')
       }
 
+      const cleanJson = responseText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim()
+
       return {
-        ...parseIntentResult(JSON.parse(responseText)),
+        ...parseIntentResult(JSON.parse(cleanJson)),
         usage: aggregateUsage,
       }
     } catch (error) {

@@ -25,3 +25,16 @@ export function getSafeThreadUrl(thread: ThreadLink): string | null {
     return null
   }
 }
+
+export function extractSubredditFromRedditUrl(value: string | null | undefined): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    const hostname = url.hostname.toLocaleLowerCase()
+    if (!(hostname === 'reddit.com' || hostname.endsWith('.reddit.com'))) return null
+    const match = url.pathname.match(/^\/r\/([a-z0-9_]{2,50})(?:\/|$)/i)
+    return match?.[1]?.toLocaleLowerCase() ?? null
+  } catch {
+    return null
+  }
+}

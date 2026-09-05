@@ -1,14 +1,13 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.scoreWithoutProvider = scoreWithoutProvider;
 exports.buildIntentScoringPrompt = buildIntentScoringPrompt;
 exports.scoreIntent = scoreIntent;
-const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const ai_usage_1 = require("./ai-usage");
+const anthropic_client_1 = require("./anthropic-client");
 const env_1 = require("./env");
 const intent_1 = require("./intent");
+const intent_preflight_1 = require("./intent-preflight");
 const logger_1 = require("./logger");
 const INTENT_OUTPUT_SCHEMA = {
     type: 'object',
@@ -44,7 +43,21 @@ function labelForScore(score) {
         return 'complaining';
     return 'other';
 }
-function buildIntentScoringPrompt(post, userProfile) {
+function scoreWithoutProvider(post, userProfile, context = {}) {
+    const preflight = (0, intent_preflight_1.evaluateIntentPreflight)(post, userProfile, {
+        keywordTerm: context.keywordTerm,
+    });
+    return {
+        score: preflight.score,
+        label: labelForScore(preflight.score),
+        reasoning: preflight.evidenceSignals.length > 0
+            ? `Deterministic fallback matched: ${preflight.evidenceSignals.slice(0, 3).join(', ')}.`
+            : 'Deterministic fallback found only weak commercial intent.',
+        flag: preflight.flag,
+        usage: (0, ai_usage_1.emptyAiUsage)(),
+    };
+}
+function buildIntentScoringPrompt(post, userProfile, context = {}) {
     const competitors = (userProfile.competitors ?? [])
         .map(competitor => competitor.trim())
         .filter(Boolean);
@@ -60,6 +73,10 @@ Competitor watchlist: ${competitors.length > 0 ? competitors.join(', ') : '(none
 <post_context>
 Platform: ${post.platform}
 Matched target: ${post.sourceTarget || '(none)'}
+Matched keyword or rule: ${context.keywordTerm?.trim() || '(none)'}
+Author: ${post.author || '(unknown)'}
+Published at: ${post.createdAt || '(unknown)'}
+Evaluated at: ${new Date().toISOString()}
 Title: ${post.title || '(no title)'}
 Body: ${post.text || '(no body text)'}
 </post_context>
@@ -74,38 +91,38 @@ Scoring rubric:
 
 Requirements:
 - Judge the title and body together.
+- Identify the author's role before scoring: a buyer seeking help is different from a founder, agency, recruiter, educator, or vendor offering help, customers, content, jobs, or their own product.
 - Do not infer buying intent from a keyword match alone.
+- A launch, self-promotion, feedback request, case-study pitch, or request for sign-ups is not buyer intent. The author is promoting their own offer, not seeking this business's solution.
+- Score the author's actual request, not an incidental keyword. A relevant phrase inside company background does not make an unrelated payroll, engineering, hiring, academic, or content question a lead.
+- Respect negation, scope, sarcasm, and quoted language. "We do not need X," mockery of X, and a question about what other people use are not evidence that the author wants X.
+- Use recency as part of actionability. A request whose stated deadline has passed or whose publication date is stale must not remain a current buying lead.
+- Account for community context. In builder-heavy communities such as r/SaaS, describing or debugging the author's own product is usually builder activity, not buyer intent.
+- Reserve 80-100 for a current, relevant decision: seeking a solution, comparing/replacing options, requesting pricing, trialing, or choosing now. Advice-only exploration without a product decision belongs below 80.
+- Implied pain can be real when the author's own workflow, delay, loss, or repeated manual burden is clear, even without a canned phrase such as "looking for a tool."
 - Ground the reasoning in the author's actual words; do not invent needs or urgency.
 - Use COMPETITOR_RISK only when the post names an item from the competitor watchlist.
 - Keep the score and label consistent with the rubric.
 `.trim();
 }
-async function scoreIntent(post, userProfile) {
+async function scoreIntent(post, userProfile, options = {}) {
     if ((0, env_1.isDevelopmentMockEnabled)('USE_MOCK_DRAFTS')) {
-        const score = Math.floor(Math.random() * 101);
+        const result = scoreWithoutProvider(post, userProfile, options);
         return {
-            score,
-            label: labelForScore(score),
-            reasoning: 'Mock mode generated a rubric-consistent intent score.',
-            flag: (userProfile.competitors?.length ?? 0) > 0 && Math.random() > 0.8
-                ? 'COMPETITOR_RISK'
-                : undefined,
-            usage: (0, ai_usage_1.emptyAiUsage)(),
+            ...result,
+            reasoning: `Development mock used deterministic scoring. ${result.reasoning}`,
         };
     }
     const apiKey = (0, env_1.getConfiguredSecret)(process.env.ANTHROPIC_API_KEY);
     if (!apiKey) {
-        throw new Error('ANTHROPIC_API_KEY is not configured for intent scoring');
+        logger_1.logger.warn('Anthropic is not configured; using deterministic intent scoring');
+        return scoreWithoutProvider(post, userProfile, options);
     }
-    const anthropic = new sdk_1.default({
-        apiKey,
-        timeout: 30_000,
-        maxRetries: 2,
-    });
+    const anthropic = (0, anthropic_client_1.createAnthropicClient)({ maxRetries: options.maxRetries });
     const model = process.env.ANTHROPIC_INTENT_MODEL
         || process.env.ANTHROPIC_MODEL
         || 'claude-sonnet-5';
-    const prompt = buildIntentScoringPrompt(post, userProfile);
+    const prompt = buildIntentScoringPrompt(post, userProfile, options);
     let lastError;
     let aggregateUsage = (0, ai_usage_1.emptyAiUsage)();
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -147,9 +164,9 @@ async function scoreIntent(post, userProfile) {
         }
         catch (error) {
             lastError = error;
-            logger_1.logger.warn({ error, attempt, model }, 'Anthropic intent scoring attempt failed');
+            logger_1.logger.warn({ err: error, attempt, model }, 'Anthropic intent scoring attempt failed');
         }
     }
-    logger_1.logger.error({ error: lastError, model }, 'Anthropic intent scoring failed');
+    logger_1.logger.error({ err: lastError, model }, 'Anthropic intent scoring failed');
     throw new ai_usage_1.AiUsageError('Intent scoring provider failed', aggregateUsage, lastError);
 }

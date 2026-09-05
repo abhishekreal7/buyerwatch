@@ -47,6 +47,7 @@ const node_crypto_1 = require("node:crypto");
 const ioredis_1 = __importDefault(require("ioredis"));
 const http_1 = require("../src/lib/http");
 const logger_1 = require("../src/lib/logger");
+const monitoring_lock_1 = require("../src/lib/monitoring-lock");
 const queues_1 = require("../src/lib/queues");
 const redis_1 = require("../src/lib/redis");
 const fetch_bluesky_1 = require("./handlers/fetch-bluesky");
@@ -59,6 +60,7 @@ const notify_slack_1 = require("./handlers/notify-slack");
 const fetch_x_1 = require("./handlers/fetch-x");
 const backend_maintenance_1 = require("../src/lib/backend-maintenance");
 const scheduler_jobs_1 = require("../src/lib/scheduler-jobs");
+const follow_up_outbox_1 = require("../src/lib/follow-up-outbox");
 const queueEntries = [
     ['fetch-reddit', queues_1.redditFetchQueue],
     ['fetch-bluesky', queues_1.blueskyFetchQueue],
@@ -205,8 +207,11 @@ async function startWorkerRuntime() {
         const now = new Date();
         const minute = Math.floor(now.getTime() / 60_000);
         try {
-            await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:monitor:${minute}`, 55_000, () => (0, scheduler_jobs_1.enqueueDueMonitoring)(now));
-            await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:outbox:${minute}`, 55_000, () => (0, backend_maintenance_1.dispatchPendingOutbox)());
+            await (0, backend_maintenance_1.withRedisLock)(redis, monitoring_lock_1.MONITORING_RUN_LOCK_KEY, monitoring_lock_1.MONITORING_RUN_LOCK_TTL_MS, () => (0, scheduler_jobs_1.enqueueDueMonitoring)(now));
+            await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:outbox:${minute}`, 55_000, async () => {
+                await (0, backend_maintenance_1.dispatchPendingOutbox)();
+                await (0, follow_up_outbox_1.dispatchPendingFollowUps)();
+            });
             if (minute % 5 === 0) {
                 await (0, backend_maintenance_1.withRedisLock)(redis, `scheduler:send-recovery:${Math.floor(minute / 5)}`, 4 * 60_000, () => (0, backend_maintenance_1.recoverStaleSends)(now));
             }

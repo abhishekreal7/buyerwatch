@@ -1,60 +1,76 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PRICING_PLANS = void 0;
+const plan_limits_1 = require("./plan-limits");
+function featuresFor(plan) {
+    const entitlement = plan_limits_1.PLAN_ENTITLEMENTS[plan];
+    const features = [
+        `${entitlement.keywords} keyword monitoring rules`,
+        `Up to ${entitlement.monitoredTargets} monitored communities`,
+        `Up to ${entitlement.threadsPerMonth.toLocaleString('en-US')} buyer-intent signals/month`,
+        `${entitlement.aiDraftsPerMonth.toLocaleString('en-US')} AI-drafted replies/month`,
+        'Reddit & Bluesky monitoring',
+    ];
+    if (entitlement.monitoringPlatforms.includes('x'))
+        features.push('X monitoring');
+    if (entitlement.pollingIntervalMinutes <= 5)
+        features.push('5-minute polling cadence');
+    if (entitlement.autoSend)
+        features.push('Guarded auto-send');
+    if (entitlement.slackNotifications)
+        features.push('Slack notifications');
+    if (entitlement.replyAttribution)
+        features.push('Reply attribution');
+    return features;
+}
 exports.PRICING_PLANS = [
     {
-        id: 'free',
-        name: 'Free',
-        price: '$0',
-        period: 'forever',
-        description: 'Try BuyerWatch and get your first real buying signal.',
+        id: 'starter',
+        name: 'Starter',
+        price: '$39',
+        annualPrice: '$31',
+        annualTotal: '$372',
+        period: '/month',
+        description: 'Start monitoring real buying signals with enough coverage to prove the workflow.',
         features: [
-            '1 keyword monitoring rule',
-            'Up to 50 buyer-intent signals/month',
-            '40 AI-drafted replies/month',
+            '7-day free trial with Instant Autopilot',
+            ...featuresFor('starter'),
             'Manual review and send workflow',
-            'Reddit & Bluesky monitoring',
         ],
-        cta: 'Get started free',
-        href: '/signup',
+        cta: 'Start for $19',
+        href: '/signup?plan=starter&billing=monthly',
         highlight: false,
     },
     {
         id: 'pro',
         name: 'Professional',
-        price: '$49',
+        price: '$99',
+        annualPrice: '$79',
+        annualTotal: '$948',
         period: '/month',
         description: 'For founders actively working a social selling motion.',
         features: [
-            'Everything in Free',
-            '10 keyword monitoring rules',
-            'Up to 1,000 buyer-intent signals/month',
-            '400 AI-drafted replies/month',
-            'Guarded auto-send',
-            'Subreddit targeting',
-            'Slack notifications and reply attribution',
+            'Everything in Starter',
+            ...featuresFor('pro'),
         ],
         cta: 'Upgrade to Professional',
-        href: '/dashboard',
+        href: '/signup?plan=pro&billing=monthly',
         highlight: true,
     },
     {
         id: 'growth',
         name: 'Growth',
-        price: '$149',
+        price: '$249',
+        annualPrice: '$199',
+        annualTotal: '$2,388',
         period: '/month',
         description: 'For teams that need higher limits and faster monitoring.',
         features: [
             'Everything in Professional',
-            '50 keyword monitoring rules',
-            'Up to 5,000 buyer-intent signals/month',
-            '2,000 AI-drafted replies/month',
-            '15-minute polling cadence',
-            'Guarded auto-send',
-            'Reply attribution and trust analytics',
+            ...featuresFor('growth'),
         ],
         cta: 'Upgrade to Growth',
-        href: '/dashboard',
+        href: '/signup?plan=growth&billing=monthly',
         highlight: false,
     },
 ];

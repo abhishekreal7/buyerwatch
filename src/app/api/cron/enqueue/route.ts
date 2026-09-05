@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
-import { fetchWithTimeout, withTimeout } from '@/lib/http'
+import { fetchWithTimeout } from '@/lib/http'
 import { logger } from '@/lib/logger'
 import {
-  ensureMonitoringSchedule,
   hasQStashConfiguration,
   verifyQStashRequest,
 } from '@/lib/qstash'
@@ -17,6 +16,8 @@ import { runRedditDeliveryCanary } from '@/lib/reddit-delivery-canary'
 import { deliverPendingIncidentEmails } from '@/lib/incident-email'
 import { runRedditApisBalanceMonitor } from '@/lib/redditapis-balance-monitor'
 import { runRedditReplyTracker } from '@/lib/reddit-reply-tracking'
+import { reportStaleAiSettlements } from '@/lib/ai-settlement-monitor'
+import { dispatchPendingFollowUps } from '@/lib/follow-up-outbox'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -44,6 +45,14 @@ async function executeMonitor(
       logger.error({ error }, 'Reddit reply tracker crashed')
       return { status: 'unavailable' as const }
     })
+    const aiSettlementMonitorPromise = reportStaleAiSettlements().catch((error) => {
+      logger.error({ error }, 'AI settlement monitor crashed')
+      return -1
+    })
+    const followUpDispatchPromise = dispatchPendingFollowUps(50).catch((error) => {
+      logger.error({ error }, 'Follow-up outbox dispatch crashed')
+      return -1
+    })
     const result = await runServerlessMonitoring(new Date(), {
       forceUserId,
       forcePlatform,
@@ -65,10 +74,12 @@ async function executeMonitor(
       }
     }
 
-    const [canary, redditApisBalance, redditReplyTracking] = await Promise.all([
+    const [canary, redditApisBalance, redditReplyTracking, staleAiSettlements, followUpsDispatched] = await Promise.all([
       canaryPromise,
       balanceMonitorPromise,
       replyTrackingPromise,
+      aiSettlementMonitorPromise,
+      followUpDispatchPromise,
     ])
     const incidentEmail = await deliverPendingIncidentEmails(20).catch((error) => {
       logger.error({ error }, 'Customer incident email queue failed')
@@ -79,6 +90,8 @@ async function executeMonitor(
       ...(canary ? { redditDeliveryCanary: canary } : {}),
       redditApisBalance,
       redditReplyTracking,
+      staleAiSettlements,
+      followUpsDispatched,
       incidentEmail,
     })
   } catch (error) {
@@ -94,10 +107,10 @@ export async function POST(request: Request) {
   const authorization = request.headers.get('authorization')
   const isCloudflareScheduler = hasCloudflareMonitoringConfiguration()
     && isAuthorizedCloudflareMonitoringRequest(authorization)
-  const isQStashScheduler = hasQStashConfiguration()
+  const qstashConfigured = hasQStashConfiguration()
 
-  if (!isCloudflareScheduler && !isQStashScheduler) {
-    logger.error('QStash signing keys are not configured')
+  if (!isCloudflareScheduler && !qstashConfigured) {
+    logger.error('Neither Cloudflare monitoring nor QStash job delivery is configured')
     return NextResponse.json(
       { error: 'monitor_scheduler_not_configured' },
       { status: 503 },
@@ -119,19 +132,12 @@ export async function POST(request: Request) {
     }
     throw error
   }
-  if (!isCloudflareScheduler && !await verifyQStashRequest(request, body)) {
-    logger.warn('Rejected invalid QStash monitor request')
+  const isQStashJob = !isCloudflareScheduler
+    && qstashConfigured
+    && await verifyQStashRequest(request, body)
+  if (!isCloudflareScheduler && !isQStashJob) {
+    logger.warn('Rejected unauthorized monitor request')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  if (!body.trim() && !isCloudflareScheduler) {
-    await withTimeout(
-      ensureMonitoringSchedule(),
-      5_000,
-      'QStash schedule self-check',
-    ).catch((error) => {
-      logger.error({ error }, 'Unable to verify the QStash monitoring schedule')
-    })
   }
 
   let forceUserId: string | undefined
@@ -203,7 +209,30 @@ export async function POST(request: Request) {
     }
   }
 
-  return executeMonitor(forceUserId, forcePlatform, forceTarget, !body.trim())
+  // Cloudflare owns global recurring monitoring. QStash remains a durable
+  // queue for explicit per-user runs, so a retired or stray QStash schedule
+  // cannot trigger a second global scan.
+  if (isQStashJob && !forceUserId) {
+    logger.warn('Rejected QStash global monitor request; Cloudflare owns scheduling')
+    return NextResponse.json(
+      { error: 'qstash_global_monitor_disabled' },
+      {
+        status: 403,
+        headers: { 'Upstash-NonRetryable-Error': 'true' },
+      },
+    )
+  }
+
+  // Canary execution is a property of the authenticated scheduler, not its
+  // payload. Cloudflare intentionally sends `{}` for global runs; tying this
+  // to body emptiness silently disabled Hyperbrowser health verification.
+  // QStash remains scoped to per-user jobs and must not run the global canary.
+  return executeMonitor(
+    forceUserId,
+    forcePlatform,
+    forceTarget,
+    isCloudflareScheduler,
+  )
 }
 
 export async function GET(request: Request) {

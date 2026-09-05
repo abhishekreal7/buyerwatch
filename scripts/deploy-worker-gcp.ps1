@@ -6,7 +6,9 @@ Param(
     [ValidateRange(1, 10)]
     [int]$MinInstances = 1,
     [ValidateRange(1, 20)]
-    [int]$MaxInstances = 2
+    [int]$MaxInstances = 2,
+    [ValidateRange(1, 25)]
+    [int]$HyperbrowserMaxConcurrency = 1
 )
 
 if ($MaxInstances -lt $MinInstances) {
@@ -49,7 +51,7 @@ gcloud run deploy $ServiceName `
     --readiness-probe "httpGet.path=/readyz,httpGet.port=3001,initialDelaySeconds=5,timeoutSeconds=5,periodSeconds=10,failureThreshold=3" `
     --liveness-probe "httpGet.path=/healthz,httpGet.port=3001,initialDelaySeconds=30,timeoutSeconds=5,periodSeconds=30,failureThreshold=3" `
     --allow-unauthenticated `
-    --update-env-vars "NODE_ENV=production,GCP_PROJECT=$ProjectId,GCP_LOCATION=$Region"
+    --update-env-vars "NODE_ENV=production,GCP_PROJECT=$ProjectId,GCP_LOCATION=$Region,HYPERBROWSER_REDDIT_MAX_CONCURRENCY=$HyperbrowserMaxConcurrency"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Cloud Run deployment failed."

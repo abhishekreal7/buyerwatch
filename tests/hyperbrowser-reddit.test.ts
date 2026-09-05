@@ -2,8 +2,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  getHyperbrowserRedditMaxConcurrency,
+  getHyperbrowserRedditProfileLockKey,
   getHyperbrowserSessionOptions,
   isHyperbrowserProfileId,
+  parseRedditAuthenticatedAccount,
   parseRedditProfileUsername,
   parseShredditPostAttributes,
 } from '../src/lib/hyperbrowser-reddit'
@@ -18,15 +21,28 @@ describe('Hyperbrowser Reddit delivery', () => {
     expect(isHyperbrowserProfileId(`${PROFILE_ID}.evil`)).toBe(false)
   })
 
+  it('uses isolated opaque locks per Reddit profile and bounds provider concurrency', () => {
+    const secondProfileId = '223e4567-e89b-42d3-a456-426614174000'
+    const firstKey = getHyperbrowserRedditProfileLockKey(PROFILE_ID)
+    expect(firstKey).toBe(getHyperbrowserRedditProfileLockKey(PROFILE_ID))
+    expect(firstKey).not.toBe(getHyperbrowserRedditProfileLockKey(secondProfileId))
+    expect(firstKey).not.toContain(PROFILE_ID)
+    expect(getHyperbrowserRedditMaxConcurrency(undefined)).toBe(1)
+    expect(getHyperbrowserRedditMaxConcurrency('3')).toBe(3)
+    expect(getHyperbrowserRedditMaxConcurrency('0')).toBe(1)
+    expect(getHyperbrowserRedditMaxConcurrency('26')).toBe(1)
+    expect(getHyperbrowserRedditMaxConcurrency('not-a-number')).toBe(1)
+  })
+
   it('launches the least-privileged short session and persists auth rotations', () => {
     expect(getHyperbrowserSessionOptions(PROFILE_ID)).toEqual(expect.objectContaining({
       useUltraStealth: false,
       useStealth: false,
       useProxy: false,
       solveCaptchas: false,
-      enableWebRecording: false,
+      enableWebRecording: true,
       enableVideoWebRecording: false,
-      enableLogCapture: false,
+      enableLogCapture: true,
       saveDownloads: false,
       disablePasswordManager: true,
       timeoutMinutes: 5,
@@ -40,6 +56,28 @@ describe('Hyperbrowser Reddit delivery', () => {
     expect(parseRedditProfileUsername('/user/Practical_Onion7401/communities'))
       .toBeNull()
     expect(parseRedditProfileUsername('/r/test/comments/abc')).toBeNull()
+  })
+
+  it('finds Reddit\'s user-menu control by its accessible name', () => {
+    const client = read('src/lib/hyperbrowser-reddit.ts')
+    expect(client).toContain("getByRole('button', { name: /Expand user menu/i })")
+    expect(client).not.toContain(".filter({ hasText: 'Expand user menu'")
+  })
+
+  it('verifies the exact signed-in Reddit account from the authenticated identity payload', () => {
+    expect(parseRedditAuthenticatedAccount({
+      name: 'Ok_Assist_5361',
+      created_utc: 1_775_000_000,
+      link_karma: 4,
+      comment_karma: 2,
+    })).toEqual({
+      username: 'Ok_Assist_5361',
+      createdAt: new Date(1_775_000_000_000).toISOString(),
+      linkKarma: 4,
+      commentKarma: 2,
+    })
+    expect(parseRedditAuthenticatedAccount({ name: 'Ok_Assist_5361' })).toBeNull()
+    expect(read('src/lib/hyperbrowser-reddit.ts')).toContain('/api/me.json?raw_json=1')
   })
 
   it('parses the current shreddit post contract and moderation flags', () => {
@@ -87,6 +125,7 @@ describe('Hyperbrowser Reddit delivery', () => {
     expect(client).toContain("'hyperbrowser_delivery_outcome_unknown'")
     expect(client).toContain('deliveryUncertain')
     expect(sender).toContain('if (deliveryUncertain) context.discard?.()')
+    expect(client).toContain('findReplyInRecentComments')
   })
 
   it('activates Reddit\'s collapsed custom-element composer before editing', () => {

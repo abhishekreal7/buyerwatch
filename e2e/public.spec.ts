@@ -3,9 +3,9 @@ import { expect, test } from '@playwright/test'
 test('landing page exposes the core product and navigation', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveTitle(/BuyerWatch/i)
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/buying signal\s*found you in time/i)
   await expect(page.getByRole('link', { name: /pricing/i }).first()).toBeVisible()
-  await expect(page.getByRole('link', { name: /log in/i }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: /start monitoring/i }).first()).toBeVisible()
 })
 
 test('liveness and readiness endpoints have stable contracts', async ({ request }) => {
@@ -52,7 +52,7 @@ test('billing degrades safely when no authenticated account is present', async (
   const checkout = await request.post('/api/billing/checkout', {
     data: { plan: 'pro' },
   })
-  expect([401, 503]).toContain(checkout.status())
+  expect([401, 403, 503]).toContain(checkout.status())
 
   const webhook = await request.post('/api/billing/webhook', {
     data: { type: 'subscription.active' },

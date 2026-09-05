@@ -4,10 +4,11 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { getServiceRoleClient } from '@/lib/admin'
 import { logger } from '@/lib/logger'
-import { getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { getPlanLimits } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
 import { publishMonitoringRun } from '@/lib/qstash'
-import { afterAuthenticationDestination } from '@/lib/billing-selection'
+import { afterAuthenticationDestination, afterOnboardingDestination } from '@/lib/billing-selection'
 import {
   normalizeWebsiteUrl,
   validateOnboardingData,
@@ -24,7 +25,10 @@ type ProfileSnapshot = {
   business_type: string | null
   writing_style: string | null
   reddit_username: string | null
+  discovery_source: string | null
   plan: string | null
+  billing_status: string | null
+  billing_subscription_id: string | null
 }
 
 async function completeWithoutRpc(
@@ -35,7 +39,7 @@ async function completeWithoutRpc(
   const admin = getServiceRoleClient()
   const { data: existingProfile, error: profileReadError } = await admin
     .from('profiles')
-    .select('business_name, business_description, business_url, business_type, writing_style, reddit_username, plan')
+    .select('business_name, business_description, business_url, business_type, writing_style, reddit_username, discovery_source, plan, billing_status, billing_subscription_id')
     .eq('id', userId)
     .maybeSingle<ProfileSnapshot>()
 
@@ -44,7 +48,7 @@ async function completeWithoutRpc(
     return { error: 'We could not prepare your account. Please try again.' }
   }
 
-  const plan = normalizePlan(existingProfile?.plan)
+  const plan = getEntitledPlan(existingProfile)
   const limit = Number(getPlanLimits(plan).keywords)
   const { count, error: countError } = await admin
     .from('keywords')
@@ -71,6 +75,7 @@ async function completeWithoutRpc(
     business_type: data.business_type,
     writing_style: data.writing_style.trim(),
     reddit_username: data.reddit_username.trim() || null,
+    discovery_source: data.discovery_source,
   }
   const { error: profileWriteError } = await admin
     .from('profiles')
@@ -102,6 +107,7 @@ async function completeWithoutRpc(
         business_type: existingProfile.business_type,
         writing_style: existingProfile.writing_style,
         reddit_username: existingProfile.reddit_username,
+        discovery_source: existingProfile.discovery_source,
       })
       .eq('id', userId)
     if (rollbackError) {
@@ -175,9 +181,23 @@ export async function completeOnboardingAction(
     return { error: 'We could not launch monitoring. Please try again.' }
   }
 
+  // The onboarding RPC intentionally remains backwards-compatible. Persist the
+  // optional discovery answer separately so older deployed RPC signatures can
+  // still be used while the profile column is migrated.
+  const { error: discoverySourceError } = await getServiceRoleClient()
+    .from('profiles')
+    .update({ discovery_source: data.discovery_source })
+    .eq('id', user.id)
+  if (discoverySourceError) {
+    logger.error({ err: discoverySourceError, userId: user.id }, 'Unable to save onboarding discovery source')
+    return { error: 'We could not save your onboarding preferences. Please try again.' }
+  }
+
+  let initialScanQueued = false
   if (inserted.some((keyword) => keyword.platform === 'reddit')) {
     try {
       const messageId = await publishMonitoringRun(user.id)
+      initialScanQueued = Boolean(messageId)
       if (!messageId) {
         logger.warn({ userId: user.id }, 'Onboarding saved while QStash monitoring is not configured')
       }
@@ -189,7 +209,7 @@ export async function completeOnboardingAction(
   const plan = selectedPlan === 'starter' || selectedPlan === 'pro' || selectedPlan === 'growth'
     ? selectedPlan
     : null
-  redirect(afterAuthenticationDestination(plan, true, selectedBilling))
+  redirect(afterOnboardingDestination(plan, selectedBilling, initialScanQueued))
 }
 
 export async function skipOnboardingAction(

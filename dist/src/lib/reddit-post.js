@@ -1,292 +1,293 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PlatformPostError = void 0;
+exports.isRedditDirectPostingConfigured = isRedditDirectPostingConfigured;
 exports.postRedditReply = postRedditReply;
-exports.submitRedditPost = submitRedditPost;
-const supabase_js_1 = require("@supabase/supabase-js");
-const encryption_1 = require("./encryption");
-const http_1 = require("./http");
-const supabase = (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const env_1 = require("./env");
+const content_freshness_1 = require("./content-freshness");
+const redditapis_client_1 = require("./redditapis-client");
+const redditapis_contract_1 = require("./redditapis-contract");
+const hyperbrowser_reddit_1 = require("./hyperbrowser-reddit");
+const reddit_session_1 = require("./reddit-session");
+const sprinklr_client_1 = require("./sprinklr-client");
+const reddit_delivery_alerts_1 = require("./reddit-delivery-alerts");
+const reddit_service_safety_1 = require("./reddit-service-safety");
 class PlatformPostError extends Error {
     platform;
     responseBody;
     retryable;
-    constructor(platform, responseBody, retryable) {
+    deliveryUncertain;
+    reconnectRequired;
+    constructor(platform, responseBody, retryable, options = {}) {
         super(`Failed to post to ${platform}: ${responseBody}`);
         this.platform = platform;
         this.responseBody = responseBody;
         this.retryable = retryable;
         this.name = 'PlatformPostError';
+        this.deliveryUncertain = options.deliveryUncertain === true;
+        this.reconnectRequired = options.reconnectRequired === true;
     }
 }
 exports.PlatformPostError = PlatformPostError;
-async function getDecryptedRedditConnection(userId) {
-    const { data, error } = await supabase
-        .from('platform_connections')
-        .select('access_token, refresh_token')
-        .eq('user_id', userId)
-        .eq('platform', 'reddit')
-        .single();
-    if (error || !data || !data.access_token || !data.refresh_token) {
-        throw new Error('Reddit connection not found for user');
+function isRedditDirectPostingConfigured() {
+    return (0, env_1.hasRedditPostingProvider)();
+}
+function normalizeExternalPostId(value) {
+    const normalized = value.trim().replace(/^t3_/i, '').toLowerCase();
+    return /^[a-z0-9]{5,12}$/i.test(normalized) ? normalized : null;
+}
+function connectionError(error) {
+    return new PlatformPostError('reddit', error.code, false, {
+        reconnectRequired: error.code === 'reddit_reconnect_required',
+    });
+}
+function providerError(error) {
+    return new PlatformPostError('reddit', error.code, error.retryable, {
+        deliveryUncertain: error.deliveryUncertain,
+        reconnectRequired: error.reauthRequired,
+    });
+}
+function sprinklrProviderError(error) {
+    return new PlatformPostError('reddit', error.code, error.retryable, {
+        deliveryUncertain: error.deliveryUncertain,
+    });
+}
+function hyperbrowserProviderError(error) {
+    return new PlatformPostError('reddit', error.code, error.retryable, {
+        deliveryUncertain: error.deliveryUncertain,
+        reconnectRequired: error.reauthRequired,
+    });
+}
+function isHyperbrowserProviderError(error) {
+    if (!(error instanceof Error) || error.name !== 'HyperbrowserRedditError')
+        return false;
+    const candidate = error;
+    return typeof candidate.code === 'string'
+        && typeof candidate.retryable === 'boolean'
+        && typeof candidate.deliveryUncertain === 'boolean'
+        && typeof candidate.reauthRequired === 'boolean';
+}
+function boundedIntegerEnvironment(name, fallback, minimum, maximum) {
+    const parsed = Number(process.env[name]);
+    return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
+}
+async function postRedditReply(input) {
+    if (!isRedditDirectPostingConfigured()) {
+        throw new PlatformPostError('reddit', 'reddit_direct_posting_unavailable', false);
     }
-    const decryptedAccess = (0, encryption_1.decrypt)(data.access_token);
-    let accessToken = decryptedAccess;
-    let expiresAt = 0;
+    const postingProvider = (0, env_1.getRedditPostingProviderKind)();
+    if (!postingProvider) {
+        throw new PlatformPostError('reddit', 'reddit_direct_posting_unavailable', false);
+    }
     try {
-        const parsed = JSON.parse(decryptedAccess);
-        accessToken = parsed.token;
-        expiresAt = parsed.expires_at;
+        await (0, reddit_service_safety_1.assertRedditDeliveryCircuitClosed)();
     }
-    catch {
-        // Plain text legacy token fallback
-    }
-    return {
-        accessToken,
-        refreshToken: (0, encryption_1.decrypt)(data.refresh_token),
-        expiresAt
-    };
-}
-async function refreshRedditToken(userId, refreshToken) {
-    const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim();
-    const clientSecret = (process.env.REDDIT_OAUTH_SECRET || process.env.REDDIT_CLIENT_SECRET || '').trim();
-    if (process.env.NODE_ENV === 'development' && (!clientId || clientId.includes('TODO'))) {
-        return 'developer_access_token';
-    }
-    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const response = await (0, http_1.fetchWithTimeout)('https://www.reddit.com/api/v1/access_token', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-        },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: refreshToken
-        })
-    }, 10_000);
-    if (!response.ok) {
-        // If the refresh token is revoked or invalid, we clear it from DB to force reconnect
-        if (response.status === 400 || response.status === 401) {
-            await supabase
-                .from('platform_connections')
-                .delete()
-                .eq('user_id', userId)
-                .eq('platform', 'reddit');
+    catch (error) {
+        if (error instanceof reddit_service_safety_1.RedditDeliveryCircuitOpenError) {
+            throw new PlatformPostError('reddit', error.code, false);
         }
-        throw new Error(`Failed to refresh Reddit token: ${response.statusText}`);
+        throw error;
     }
-    const data = await response.json();
-    const newAccessToken = data.access_token;
-    const newRefreshToken = data.refresh_token || refreshToken;
-    const accessObj = {
-        token: newAccessToken,
-        expires_at: Date.now() + data.expires_in * 1000
-    };
-    await supabase
-        .from('platform_connections')
-        .update({
-        access_token: (0, encryption_1.encrypt)(JSON.stringify(accessObj)),
-        refresh_token: (0, encryption_1.encrypt)(newRefreshToken)
-    })
-        .eq('user_id', userId)
-        .eq('platform', 'reddit');
-    return newAccessToken;
-}
-function handleRedditRateLimits(headers) {
-    const remaining = headers.get('x-ratelimit-remaining');
-    const reset = headers.get('x-ratelimit-reset');
-    if (remaining && Number(remaining) === 0) {
-        const resetSeconds = reset ? Number(reset) : 60;
-        throw new PlatformPostError('reddit', `Rate limit exceeded. Resets in ${resetSeconds}s.`, true);
+    const target = (0, redditapis_contract_1.parseRedditPostTarget)(input.postUrl);
+    const expectedPostId = normalizeExternalPostId(input.threadExternalId);
+    if (!target || !expectedPostId || target.postId !== expectedPostId) {
+        throw new PlatformPostError('reddit', 'reddit_post_identity_mismatch', false);
     }
-}
-function parseRedditJsonError(data) {
-    if (data?.json?.errors && data.json.errors.length > 0) {
-        const errorDetails = data.json.errors.map((err) => {
-            const [code, message, field] = err;
-            return `${code}: ${message}${field ? ` (${field})` : ''}`;
+    let session;
+    try {
+        session = await (0, reddit_session_1.getActiveRedditSession)(input.userId);
+    }
+    catch (error) {
+        if (error instanceof reddit_session_1.RedditConnectionStateError)
+            throw connectionError(error);
+        throw error;
+    }
+    if (session.provider !== postingProvider) {
+        throw new PlatformPostError('reddit', 'reddit_reconnect_required', false, {
+            reconnectRequired: true,
         });
-        return errorDetails.join(', ');
     }
-    return null;
-}
-async function postRedditReply(userId, threadExternalId, text) {
-    const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim();
-    if (redditApisKey && !redditApisKey.includes('TODO')) {
-        console.log(`[reddit] Posting reply using redditapis.com proxy for thread ${threadExternalId}`);
-        const response = await (0, http_1.fetchWithTimeout)('https://api.redditapis.com/api/comment', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${redditApisKey}`,
-                'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                api_type: 'json',
-                thing_id: threadExternalId,
-                text
-            })
-        }, 10_000);
-        handleRedditRateLimits(response.headers);
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new PlatformPostError('reddit', errorText, response.status === 429 || response.status >= 500);
+    if (input.triggerType === 'auto'
+        && (session.provider === 'redditapis' || session.provider === 'hyperbrowser')) {
+        const minimumAgeDays = boundedIntegerEnvironment('REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS', 30, 7, 365);
+        const minimumKarma = boundedIntegerEnvironment('REDDIT_AUTO_MIN_COMBINED_KARMA', 50, 0, 100_000);
+        let safetyProfile = {
+            accountCreatedAt: session.accountCreatedAt,
+            linkKarma: session.linkKarma,
+            commentKarma: session.commentKarma,
+        };
+        if (!safetyProfile.accountCreatedAt
+            || safetyProfile.linkKarma === null
+            || safetyProfile.commentKarma === null) {
+            try {
+                const refreshed = session.provider === 'hyperbrowser'
+                    ? await (0, hyperbrowser_reddit_1.fetchHyperbrowserRedditAccountProfile)({
+                        username: session.username,
+                        profileId: session.profileId,
+                    })
+                    : await (0, redditapis_client_1.fetchRedditAccountProfile)(session.username);
+                safetyProfile = {
+                    accountCreatedAt: refreshed.createdAt,
+                    linkKarma: refreshed.linkKarma,
+                    commentKarma: refreshed.commentKarma,
+                };
+                await (0, reddit_session_1.updateRedditConnectionAccountProfile)(input.userId, safetyProfile);
+            }
+            catch {
+                throw new PlatformPostError('reddit', 'reddit_account_safety_profile_unavailable', false);
+            }
         }
-        const data = await response.json();
-        const errorMsg = parseRedditJsonError(data);
-        if (errorMsg) {
-            throw new PlatformPostError('reddit', errorMsg, errorMsg.includes('RATELIMIT'));
+        const accountCreatedAt = Date.parse(safetyProfile.accountCreatedAt ?? '');
+        if (!Number.isFinite(accountCreatedAt)) {
+            throw new PlatformPostError('reddit', 'reddit_account_age_unverified', false);
         }
-        const permalink = data?.json?.data?.things?.[0]?.data?.permalink;
-        return { permalink: permalink ? `https://reddit.com${permalink}` : null };
+        if (Date.now() - accountCreatedAt < minimumAgeDays * 24 * 60 * 60_000) {
+            throw new PlatformPostError('reddit', 'reddit_account_too_new_for_automation', false);
+        }
+        const combinedKarma = (safetyProfile.linkKarma ?? 0) + (safetyProfile.commentKarma ?? 0);
+        if (safetyProfile.linkKarma === null || safetyProfile.commentKarma === null || combinedKarma < minimumKarma) {
+            throw new PlatformPostError('reddit', 'reddit_account_karma_below_automation_minimum', false);
+        }
     }
-    const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim();
-    if (process.env.NODE_ENV === 'development' && (!clientId || clientId.includes('TODO'))) {
-        await getDecryptedRedditConnection(userId);
-        return { permalink: `https://reddit.com/r/developer/comments/${threadExternalId}/dev_reply` };
-    }
-    const connection = await getDecryptedRedditConnection(userId);
-    let accessToken = connection.accessToken;
-    const { refreshToken, expiresAt } = connection;
-    // Proactive Refresh: refresh if token expires in less than 5 minutes
-    if (expiresAt && Date.now() + 300_000 >= expiresAt) {
+    // A persisted Hyperbrowser profile must not be opened in two immediate,
+    // separate sessions for the same delivery. Reddit can rotate auth cookies
+    // during the inspection session and Hyperbrowser persistence is eventually
+    // consistent, making the following write session appear logged out. The
+    // provider validates the exact post and all delivery safety gates before it
+    // clicks, so inspection and posting stay atomic in one browser session.
+    if (session.provider === 'hyperbrowser') {
         try {
-            accessToken = await refreshRedditToken(userId, refreshToken);
+            const result = await (0, hyperbrowser_reddit_1.postHyperbrowserRedditReply)({
+                postUrl: target.canonicalUrl,
+                text: input.text,
+                username: session.username,
+                profileId: session.profileId,
+                triggerType: input.triggerType,
+            });
+            await (0, reddit_session_1.markRedditConnectionHealthy)(input.userId);
+            return { permalink: result.permalink };
         }
-        catch (e) {
-            throw new PlatformPostError('reddit', `Failed to proactively refresh token: ${e.message}`, false);
+        catch (error) {
+            if (isHyperbrowserProviderError(error)) {
+                let consecutiveFailures = 0;
+                if (error.reauthRequired) {
+                    await (0, reddit_session_1.markRedditConnectionReauthRequired)(input.userId, error.code).catch(() => undefined);
+                }
+                else {
+                    consecutiveFailures = await (0, reddit_session_1.recordRedditConnectionFailure)(input.userId, error.code)
+                        .catch(() => 0);
+                }
+                await (0, reddit_delivery_alerts_1.alertRedditDeliveryFailure)({
+                    userId: input.userId,
+                    code: error.code,
+                    reauthRequired: error.reauthRequired,
+                    deliveryUncertain: error.deliveryUncertain,
+                    consecutiveFailures,
+                }).catch(() => undefined);
+                throw hyperbrowserProviderError(error);
+            }
+            throw error;
         }
     }
-    const tryPost = async (token) => {
-        return await (0, http_1.fetchWithTimeout)('https://oauth.reddit.com/api/comment', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                api_type: 'json',
-                thing_id: threadExternalId,
-                text
+    let post;
+    try {
+        if (session.provider === 'sprinklr') {
+            post = await (0, sprinklr_client_1.fetchSprinklrRedditPostSnapshot)(target.canonicalUrl);
+        }
+        else {
+            post = await (0, redditapis_client_1.fetchRedditPostSnapshot)(target.canonicalUrl);
+        }
+    }
+    catch (error) {
+        if (error instanceof redditapis_client_1.RedditApisRequestError)
+            throw providerError(error);
+        if (error instanceof sprinklr_client_1.SprinklrRequestError)
+            throw sprinklrProviderError(error);
+        if (isHyperbrowserProviderError(error)) {
+            if (error.reauthRequired) {
+                await (0, reddit_session_1.markRedditConnectionReauthRequired)(input.userId, error.code).catch(() => undefined);
+            }
+            else {
+                await (0, reddit_session_1.recordRedditConnectionFailure)(input.userId, error.code).catch(() => undefined);
+            }
+            throw hyperbrowserProviderError(error);
+        }
+        throw error;
+    }
+    if (post.id !== expectedPostId || post.subreddit.toLowerCase() !== target.subreddit.toLowerCase()) {
+        throw new PlatformPostError('reddit', 'reddit_post_identity_mismatch', false);
+    }
+    if (post.locked === true) {
+        throw new PlatformPostError('reddit', 'reddit_post_locked', false);
+    }
+    if (!post.author) {
+        throw new PlatformPostError('reddit', 'reddit_post_author_unverified', false);
+    }
+    if (post.author.toLowerCase() === session.username.toLowerCase()) {
+        throw new PlatformPostError('reddit', 'reddit_self_reply_blocked', false);
+    }
+    if (post.author === '[deleted]' || post.author.toLowerCase() === 'automoderator') {
+        throw new PlatformPostError('reddit', 'reddit_non_actionable_author', false);
+    }
+    if (input.triggerType === 'auto'
+        && (post.locked === null || post.stickied === null || post.over18 === null)) {
+        throw new PlatformPostError('reddit', 'reddit_post_moderation_state_unverified', false);
+    }
+    if (input.triggerType === 'auto' && post.stickied) {
+        throw new PlatformPostError('reddit', 'reddit_stickied_post_requires_review', false);
+    }
+    if (input.triggerType === 'auto' && post.over18) {
+        throw new PlatformPostError('reddit', 'reddit_nsfw_post_requires_review', false);
+    }
+    if (input.triggerType === 'auto') {
+        const freshness = (0, content_freshness_1.evaluateContentFreshness)(post.createdAt, {
+            maxAgeMs: content_freshness_1.AUTO_REPLY_MAX_AGE_MS,
+        });
+        if (freshness.fresh === false) {
+            throw new PlatformPostError('reddit', freshness.reason === 'source_too_old'
+                ? 'reddit_post_outside_reply_window'
+                : 'reddit_post_age_unverified', false);
+        }
+    }
+    try {
+        const result = session.provider === 'sprinklr'
+            ? await (0, sprinklr_client_1.postSprinklrRedditReply)({
+                postUrl: target.canonicalUrl,
+                text: input.text,
+                accountId: session.accountId,
+                channelId: session.channelId,
             })
-        }, 10_000);
-    };
-    let response = await tryPost(accessToken);
-    // Automatic Refresh on 401
-    if (response.status === 401) {
-        try {
-            accessToken = await refreshRedditToken(userId, refreshToken);
-            response = await tryPost(accessToken);
+            : await (0, redditapis_client_1.postRedditApisComment)({
+                postUrl: target.canonicalUrl,
+                text: input.text,
+                cookies: session.cookies,
+            });
+        await (0, reddit_session_1.markRedditConnectionHealthy)(input.userId);
+        return { permalink: result.permalink };
+    }
+    catch (error) {
+        if (error instanceof redditapis_client_1.RedditApisRequestError) {
+            if (error.reauthRequired) {
+                await (0, reddit_session_1.markRedditConnectionReauthRequired)(input.userId, error.code).catch(() => undefined);
+            }
+            else {
+                await (0, reddit_session_1.recordRedditConnectionFailure)(input.userId, error.code).catch(() => undefined);
+            }
+            throw providerError(error);
         }
-        catch (e) {
-            throw new PlatformPostError('reddit', `Authentication failed after token refresh attempt: ${e.message}`, false);
+        if (error instanceof sprinklr_client_1.SprinklrRequestError) {
+            await (0, reddit_session_1.recordRedditConnectionFailure)(input.userId, error.code).catch(() => undefined);
+            throw sprinklrProviderError(error);
         }
-    }
-    handleRedditRateLimits(response.headers);
-    if (!response.ok) {
-        const errorText = await response.text();
-        const isRetryable = response.status === 429 || response.status >= 500;
-        throw new PlatformPostError('reddit', errorText, isRetryable);
-    }
-    const data = await response.json();
-    const errorMsg = parseRedditJsonError(data);
-    if (errorMsg) {
-        const isRetryable = errorMsg.includes('RATELIMIT');
-        throw new PlatformPostError('reddit', errorMsg, isRetryable);
-    }
-    const permalink = data?.json?.data?.things?.[0]?.data?.permalink;
-    return { permalink: permalink ? `https://reddit.com${permalink}` : null };
-}
-async function submitRedditPost(userId, subreddit, title, text) {
-    const redditApisKey = (process.env.REDDITAPIS_API_KEY || '').trim();
-    if (redditApisKey && !redditApisKey.includes('TODO')) {
-        console.log(`[reddit] Submitting post using redditapis.com proxy to r/${subreddit}`);
-        const response = await (0, http_1.fetchWithTimeout)('https://api.redditapis.com/api/submit', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${redditApisKey}`,
-                'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                api_type: 'json',
-                kind: 'self',
-                sr: subreddit,
-                title,
-                text
-            })
-        }, 10_000);
-        handleRedditRateLimits(response.headers);
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new PlatformPostError('reddit', errorText, response.status === 429 || response.status >= 500);
+        if (isHyperbrowserProviderError(error)) {
+            if (error.reauthRequired) {
+                await (0, reddit_session_1.markRedditConnectionReauthRequired)(input.userId, error.code).catch(() => undefined);
+            }
+            else {
+                await (0, reddit_session_1.recordRedditConnectionFailure)(input.userId, error.code).catch(() => undefined);
+            }
+            throw hyperbrowserProviderError(error);
         }
-        const data = await response.json();
-        const errorMsg = parseRedditJsonError(data);
-        if (errorMsg) {
-            throw new PlatformPostError('reddit', errorMsg, errorMsg.includes('RATELIMIT'));
-        }
-        const url = data?.json?.data?.url;
-        return { permalink: url || null };
+        throw error;
     }
-    const clientId = (process.env.REDDIT_OAUTH_CLIENT_ID || process.env.REDDIT_CLIENT_ID || '').trim();
-    if (process.env.NODE_ENV === 'development' && (!clientId || clientId.includes('TODO'))) {
-        await getDecryptedRedditConnection(userId);
-        return { permalink: `https://reddit.com/r/developer/submit_mock` };
-    }
-    const connection = await getDecryptedRedditConnection(userId);
-    let accessToken = connection.accessToken;
-    const { refreshToken, expiresAt } = connection;
-    if (expiresAt && Date.now() + 300_000 >= expiresAt) {
-        try {
-            accessToken = await refreshRedditToken(userId, refreshToken);
-        }
-        catch (e) {
-            throw new PlatformPostError('reddit', `Failed to proactively refresh token: ${e.message}`, false);
-        }
-    }
-    const trySubmit = async (token) => {
-        return await (0, http_1.fetchWithTimeout)('https://oauth.reddit.com/api/submit', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'User-Agent': process.env.REDDIT_USER_AGENT || 'BuyerWatchBot/1.0',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                api_type: 'json',
-                kind: 'self',
-                sr: subreddit,
-                title,
-                text
-            })
-        }, 10_000);
-    };
-    let response = await trySubmit(accessToken);
-    if (response.status === 401) {
-        try {
-            accessToken = await refreshRedditToken(userId, refreshToken);
-            response = await trySubmit(accessToken);
-        }
-        catch (e) {
-            throw new PlatformPostError('reddit', `Authentication failed after token refresh attempt: ${e.message}`, false);
-        }
-    }
-    handleRedditRateLimits(response.headers);
-    if (!response.ok) {
-        const errorText = await response.text();
-        const isRetryable = response.status === 429 || response.status >= 500;
-        throw new PlatformPostError('reddit', errorText, isRetryable);
-    }
-    const data = await response.json();
-    const errorMsg = parseRedditJsonError(data);
-    if (errorMsg) {
-        const isRetryable = errorMsg.includes('RATELIMIT');
-        throw new PlatformPostError('reddit', errorMsg, isRetryable);
-    }
-    const url = data?.json?.data?.url;
-    return { permalink: url || null };
 }

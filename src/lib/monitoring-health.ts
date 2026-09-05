@@ -18,6 +18,9 @@ export function isKeywordPollDelayed(
   staleAfterMs: number,
   nowMs = Date.now(),
 ): boolean {
+  if (row.last_check_status === 'never' || !row.last_checked_at) {
+    return false
+  }
   if (row.last_check_status !== 'success') return true
   const lastSuccessAt = Date.parse(row.last_success_at ?? '')
   return !Number.isFinite(lastSuccessAt) || nowMs - lastSuccessAt > staleAfterMs

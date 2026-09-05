@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { canMonitorPlatform, getPlanLimits, normalizePlan } from '@/lib/plan-limits'
+import { canMonitorPlatform, getPlanLimits } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 import { isXDiscoveryConfigured } from '@/lib/x'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
-import { readJsonBody, RequestInputError } from '@/lib/request'
+import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 
 export async function POST(req: Request) {
   try {
+    if (!isTrustedSameOriginMutation(req)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
     // Fetch plan
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan')
+      .select('plan, billing_status, billing_subscription_id')
       .eq('id', user.id)
       .single()
 
@@ -49,7 +53,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Failed to load profile' }, { status: 500 })
     }
 
-    const plan = normalizePlan(profile?.plan)
+    const plan = getEntitledPlan(profile)
     const limits = getPlanLimits(plan)
     if (!canMonitorPlatform(plan, platform)) {
       return NextResponse.json(

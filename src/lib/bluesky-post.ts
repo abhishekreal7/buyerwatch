@@ -4,13 +4,15 @@ import { decrypt } from './encryption'
 import { PlatformPostError } from './reddit-post'
 import { createTimeoutFetch } from './http'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
+  )
+}
 
 async function getDecryptedBlueskyConnection(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('platform_connections')
     .select('access_token, external_username')
     .eq('user_id', userId)

@@ -28,6 +28,8 @@ import {
 import { AUTO_REPLY_MAX_AGE_MS, evaluateContentFreshness } from './content-freshness'
 import { areRepliesNearDuplicate } from './reply-similarity'
 import { getPlanLimits } from './plan-limits'
+import { getEntitledPlan } from './billing-entitlements'
+import { scheduleRedditReplyReconciliation } from './reddit-send-reconciliation'
 
 export type SendReplyData = {
   userId: string
@@ -78,6 +80,54 @@ async function cancelQueuedAutoSend(
   }
 }
 
+async function releaseInstantAutopilotClaim(
+  supabase: ReturnType<typeof getSupabase>,
+  userId: string,
+  threadId: string,
+): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('release_instant_autopilot_send', {
+      p_user_id: userId,
+      p_thread_id: threadId,
+    })
+    if (error) throw error
+  } catch (error) {
+    // The normal send claim and rate slot still protect the provider. A stale
+    // instant claim expires in the database after fifteen minutes.
+    logger.warn({ error, userId, threadId }, 'Could not release Instant Autopilot claim')
+  }
+}
+
+async function consumeInstantAutopilotAllowance(
+  supabase: ReturnType<typeof getSupabase>,
+  userId: string,
+  threadId: string,
+): Promise<void> {
+  const { data: consumed, error: consumeError } = await supabase.rpc(
+    'consume_instant_autopilot_send',
+    { p_user_id: userId, p_thread_id: threadId },
+  )
+  if (!consumeError && consumed === true) return
+
+  // Once provider delivery may have happened, fail closed even if the state
+  // machine RPC is temporarily unavailable. This prevents a second free send.
+  const { error: fallbackError } = await supabase.from('profiles').update({
+    auto_send_enabled: false,
+    instant_autopilot_used_at: new Date().toISOString(),
+    instant_autopilot_claimed_at: null,
+    instant_autopilot_claim_thread_id: null,
+  }).eq('id', userId)
+  if (fallbackError) {
+    logger.error(
+      { consumeError, fallbackError, userId, threadId },
+      'Could not persist Instant Autopilot consumption',
+    )
+  }
+  throw new Error(
+    `Unable to consume Instant Autopilot allowance: ${consumeError?.message ?? 'claim no longer active'}`,
+  )
+}
+
 export async function processSendReply(
   data: SendReplyData,
   context: SendReplyContext,
@@ -87,14 +137,15 @@ export async function processSendReply(
 
   let maxPerDay: number | undefined
   let autoSendThreshold = 85
-  let businessProfile: { business_name: string; business_url: string | null; plan?: string | null } | null = null
+  let businessProfile: { business_name: string; business_url: string | null; plan?: string | null; billing_status?: string | null; billing_subscription_id?: string | null } | null = null
   let redditPolicyDecision: RedditReplyPolicyDecision | null = null
   let redditPostUrl: string | null = null
   let sendCommunity: string | undefined
+  let instantAutopilotClaimed = false
   if (triggerType === 'auto') {
     const { data: automationProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, business_name, business_url')
+      .select('plan, billing_status, billing_subscription_id, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, business_name, business_url')
       .eq('id', userId)
       .single()
     if (profileError || !automationProfile) {
@@ -141,6 +192,8 @@ export async function processSendReply(
       business_name: automationProfile.business_name,
       business_url: automationProfile.business_url,
       plan: automationProfile.plan,
+      billing_status: automationProfile.billing_status,
+      billing_subscription_id: automationProfile.billing_subscription_id,
     }
   }
 
@@ -148,7 +201,7 @@ export async function processSendReply(
     if (!businessProfile) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('business_name, business_url, plan')
+        .select('business_name, business_url, plan, billing_status, billing_subscription_id')
         .eq('id', userId)
         .single()
       if (profileError || !profile?.business_name) {
@@ -256,6 +309,22 @@ export async function processSendReply(
     }
   }
 
+  if (triggerType === 'auto') {
+    const { data: instantClaim, error: instantClaimError } = await supabase.rpc(
+      'claim_instant_autopilot_send',
+      { p_user_id: userId, p_thread_id: threadId },
+    )
+    if (instantClaimError) {
+      throw new Error(`Unable to verify Instant Autopilot allowance: ${instantClaimError.message}`)
+    }
+    if (instantClaim === 'unavailable') {
+      const reason = 'instant_autopilot_allowance_unavailable'
+      await cancelQueuedAutoSend(supabase, threadId, reason)
+      return { skipped: true, reason }
+    }
+    instantAutopilotClaimed = instantClaim === 'claimed'
+  }
+
   const reservation = await reserveSendSlot(userId, platform, {
     maxPerDay,
     ...(triggerType === 'auto' && platform === 'reddit'
@@ -267,6 +336,9 @@ export async function processSendReply(
       : {}),
   })
   if ('reason' in reservation) {
+    if (instantAutopilotClaimed) {
+      await releaseInstantAutopilotClaim(supabase, userId, threadId)
+    }
     throw new PlatformPostError(
       platform,
       `Rate limited until ${new Date(reservation.reset).toISOString()}: ${reservation.reason}`,
@@ -280,10 +352,16 @@ export async function processSendReply(
   })
   if (claimError) {
     await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
+    if (instantAutopilotClaimed) {
+      await releaseInstantAutopilotClaim(supabase, userId, threadId)
+    }
     throw new Error(`Unable to claim reply: ${claimError.message}`)
   }
   if (!claimToken) {
     await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
+    if (instantAutopilotClaimed) {
+      await releaseInstantAutopilotClaim(supabase, userId, threadId)
+    }
     logger.info({ jobId: context.jobId, threadId }, 'Reply already sent or no longer sendable')
     return { duplicate: true }
   }
@@ -304,13 +382,13 @@ export async function processSendReply(
       const profile = businessProfile ?? await (async () => {
         const { data, error } = await supabase
           .from('profiles')
-          .select('business_name, business_url, plan')
+          .select('business_name, business_url, plan, billing_status, billing_subscription_id')
           .eq('id', userId)
           .single()
         if (error || !data) throw new Error(`Unable to load attribution destination: ${error?.message ?? 'profile not found'}`)
         return data
       })()
-      if (getPlanLimits(profile.plan).replyAttribution) {
+      if (getPlanLimits(getEntitledPlan(profile)).replyAttribution) {
         if (!profile.business_url) throw new Error('Attribution is enabled but no business URL is configured')
         await ensureAttributionMapping(supabase, {
           userId,
@@ -334,6 +412,10 @@ export async function processSendReply(
         : await postXReply(userId, threadExternalId, text)
     externalSendSucceeded = true
     externalPermalink = result.permalink
+
+    if (instantAutopilotClaimed) {
+      await consumeInstantAutopilotAllowance(supabase, userId, threadId)
+    }
 
     await recordSuccessfulSend(userId, platform, reservation.token, { community: sendCommunity })
 
@@ -360,7 +442,9 @@ export async function processSendReply(
       eventType: 'reply_sent',
       platform,
       actorType: 'provider',
-      source: triggerType === 'auto' ? 'earned_automation' : 'manual_approval',
+      source: triggerType === 'auto'
+        ? (instantAutopilotClaimed ? 'instant_autopilot' : 'earned_automation')
+        : 'manual_approval',
       metadata: {
         triggerType,
         permalink: result.permalink,
@@ -387,7 +471,16 @@ export async function processSendReply(
         reservation.token,
         { community: sendCommunity },
       ).catch(() => undefined)
-      await supabase.rpc('mark_send_reconciliation', {
+      if (instantAutopilotClaimed && !externalSendSucceeded) {
+        await consumeInstantAutopilotAllowance(supabase, userId, threadId)
+          .catch((consumeError) => {
+            logger.warn(
+              { consumeError, userId, threadId },
+              'Uncertain delivery consumed Instant Autopilot through fail-closed fallback',
+            )
+          })
+      }
+      const { data: reconciliationRecorded, error: reconciliationError } = await supabase.rpc('mark_send_reconciliation', {
         p_thread_id: threadId,
         p_user_id: userId,
         p_claim_token: claimToken,
@@ -398,11 +491,32 @@ export async function processSendReply(
           ? error.message
           : 'Post-send persistence error',
       })
+      if (reconciliationError || reconciliationRecorded !== true) {
+        logger.error(
+          { reconciliationError, threadId },
+          'Ambiguous delivery could not enter the reconciliation state machine',
+        )
+      } else if (platform === 'reddit') {
+        const messageId = await scheduleRedditReplyReconciliation({
+          userId,
+          threadId,
+          attempt: 1,
+        }).catch((scheduleError) => {
+          logger.error({ scheduleError, threadId }, 'Could not schedule delayed Reddit verification')
+          return null
+        })
+        if (!messageId) {
+          logger.warn({ threadId }, 'Delayed Reddit verification unavailable; manual reconciliation remains active')
+        }
+      }
       if (deliveryUncertain) context.discard?.()
       throw error
     }
 
     await releaseSendSlot(userId, platform, reservation.token).catch(() => undefined)
+    if (instantAutopilotClaimed) {
+      await releaseInstantAutopilotClaim(supabase, userId, threadId)
+    }
     const retryable = isRetryableSendError(error)
     const finalAttempt = !retryable || context.attempt >= context.maxAttempts
 
@@ -436,7 +550,9 @@ export async function processSendReply(
         eventType: 'reply_failed',
         platform,
         actorType: 'provider',
-        source: triggerType === 'auto' ? 'earned_automation' : 'manual_approval',
+        source: triggerType === 'auto'
+          ? (instantAutopilotClaimed ? 'instant_autopilot' : 'earned_automation')
+          : 'manual_approval',
         metadata: {
           triggerType,
           retryable,

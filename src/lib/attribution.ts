@@ -18,11 +18,12 @@ export function buildAttributionShortUrl(appUrl: string, token: string): string 
 
 export function buildAttributionDestinationUrl(businessUrl: string, token: string): string {
   const safeToken = assertAttributionToken(token)
-  const url = new URL(businessUrl)
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+  const url = getSafeAttributionRedirectUrl(businessUrl)
+  if (!url) {
     throw new Error('Invalid attribution destination')
   }
   url.searchParams.set('ref', 'buyerwatch')
   url.searchParams.set('sid', safeToken)
   return url.toString()
 }
+import { getSafeAttributionRedirectUrl } from './security/outbound-url'

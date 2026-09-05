@@ -89,8 +89,8 @@ const NOISE_PATTERNS: Array<{ label: string; pattern: RegExp; penalty: number }>
   },
   {
     label: 'hiring_or_job_search',
-    pattern: /\b(hiring|job\s+opening|looking\s+for\s+(a\s+)?job|resume|cv|recruiter|recruiters)\b/i,
-    penalty: 35,
+    pattern: /\b(?:we(?:'re|\s+are)?\s+hiring|now\s+hiring|hiring\s+(?:for|remotely|developers?|designers?|students?)|job\s+openings?|looking\s+for\s+(?:a\s+)?job|looking\s+for\s+(?:students?|interns?|freelancers?|contractors?|workers?|candidates?)|part[-\s]?time\s+(?:tasks?|jobs?|work|role)|remote\s+(?:tasks?|work|job)|side\s+money|paid\s+tasks?|pay\s+up\s+to\s+\$?\d+|hourly\s+pay|\$?\d+\s*\/\s*(?:hr|hour|mo|month)|resume|cv|recruiter|recruiters|bounty)\b|\b(?:r\/)?\w*jobs\b/i,
+    penalty: 45,
   },
   {
     label: 'content_promo',

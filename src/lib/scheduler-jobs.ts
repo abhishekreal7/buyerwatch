@@ -12,6 +12,7 @@ import {
   normalizePlan,
 } from './plan-limits'
 import { isXDiscoveryConfigured } from './x'
+import { hasActiveSubscription } from './billing-entitlements'
 import { createUnsubscribeUrl } from './email-preferences'
 
 type KeywordRow = {
@@ -23,8 +24,8 @@ type KeywordRow = {
   last_success_at?: string | null
   next_poll_at?: string | null
   profiles:
-    | { plan?: string; last_polled_at?: string | null }
-    | Array<{ plan?: string; last_polled_at?: string | null }>
+    | { plan?: string; billing_status?: string; billing_subscription_id?: string | null; last_polled_at?: string | null }
+    | Array<{ plan?: string; billing_status?: string; billing_subscription_id?: string | null; last_polled_at?: string | null }>
 }
 
 function getSupabaseAdmin(): SupabaseClient {
@@ -60,7 +61,7 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
       .from('keywords')
-      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, last_polled_at)')
+      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, billing_status, billing_subscription_id, last_polled_at)')
       .eq('is_active', true)
       .order('id', { ascending: true })
       .range(offset, offset + pageSize - 1)
@@ -82,6 +83,7 @@ export async function enqueueDueMonitoring(now = new Date()): Promise<{
       ? keyword.profiles[0]
       : keyword.profiles
     const plan = normalizePlan(profile?.plan)
+    if (!hasActiveSubscription(profile)) continue
     const nextPollAt = Date.parse(keyword.next_poll_at ?? '')
     if (Number.isFinite(nextPollAt) && nextPollAt > now.getTime()) continue
     if (!isPollingDue(

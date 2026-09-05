@@ -27,10 +27,13 @@ export const PRICING_PLANS = [
     period: '/month',
     description: 'Start monitoring real buying signals with enough coverage to prove the workflow.',
     features: [
+      'Card-required 7-day free trial',
+      'Up to 250 buyer-intent signals during the trial',
+      'One guarded automatic reply during the trial',
       ...featuresFor('starter'),
       'Manual review and send workflow',
     ],
-    cta: 'Start 7-day free trial',
+    cta: 'Start for $19',
     href: '/signup?plan=starter&billing=monthly',
     highlight: false,
   },
@@ -43,7 +46,7 @@ export const PRICING_PLANS = [
     period: '/month',
     description: 'For founders actively working a social selling motion.',
     features: [
-      'Everything in Starter',
+      'Expanded monitoring and reply limits',
       ...featuresFor('pro'),
     ],
     cta: 'Upgrade to Professional',
@@ -59,7 +62,7 @@ export const PRICING_PLANS = [
     period: '/month',
     description: 'For teams that need higher limits and faster monitoring.',
     features: [
-      'Everything in Professional',
+      'Expanded Professional limits',
       ...featuresFor('growth'),
     ],
     cta: 'Upgrade to Growth',

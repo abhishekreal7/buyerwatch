@@ -9,14 +9,16 @@ export type DodoEnvironment = 'test_mode' | 'live_mode'
 export type BillingPlan = 'starter' | 'pro' | 'growth'
 export type BillingCadence = 'monthly' | 'annual'
 
-/** The card-required trial is a monthly Starter acquisition offer. */
-export const STARTER_TRIAL_DAYS = 7
+/** New customers enter through a card-required Starter trial. */
+export const PLAN_TRIAL_DAYS = 7
+export const STARTER_TRIAL_DAYS = PLAN_TRIAL_DAYS
 
 export function getTrialDaysForPlan(
   plan: BillingPlan,
   cadence: BillingCadence = 'monthly',
 ): number | undefined {
-  return plan === 'starter' && cadence === 'monthly' ? STARTER_TRIAL_DAYS : undefined
+  void cadence
+  return plan === 'starter' ? PLAN_TRIAL_DAYS : undefined
 }
 
 export type BillingPlanChangeStrategy = {

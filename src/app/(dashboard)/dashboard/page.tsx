@@ -17,8 +17,8 @@ import {
 } from '@/lib/billing-addons'
 import { CreditPackPicker } from '@/components/CreditPackPicker'
 import { useDashboardSession } from '@/components/DashboardContext'
-import { getIntentDisplayLabel, isLowRelevanceScore, type IntentLabel } from '@/lib/intent'
-import { getSafeThreadUrl } from '@/lib/thread-url'
+import { getIntentDisplayLabel, isLowRelevanceScore, DISMISSED_NOISE_FLOOR, type IntentLabel } from '@/lib/intent'
+import { getSafeThreadUrl, extractSubredditFromRedditUrl } from '@/lib/thread-url'
 import { IntentBadge } from '@/components/IntentBadge'
 import { waitForReplyDelivery, type ReplySendResult } from '@/lib/reply-send-client'
 import { copyAndOpenRedditReply } from '@/lib/reddit-handoff-client'
@@ -89,11 +89,10 @@ function getWindowHoursLeft(createdAt: string): number | null {
 }
 
 function getDeliveryActionLabel(platform: string) {
-  if (platform === 'reddit') {
-    return 'Copy & Open Reddit'
-  }
-  if (platform === 'bluesky') return 'Post through Bluesky'
-  return 'Review delivery'
+  if (platform === 'reddit') return 'Post to Reddit'
+  if (platform === 'bluesky') return 'Post to Bluesky'
+  if (platform === 'x') return 'Post to X'
+  return 'Post reply'
 }
 
 function mapThread(thread: any): Thread {
@@ -102,10 +101,14 @@ function mapThread(thread: any): Thread {
     ? null
     : Number(thread.intent_score)
 
+  const actualTarget = (thread.platform === 'reddit' && extractSubredditFromRedditUrl(thread.url))
+    || (thread.keywords as { target?: string } | null)?.target
+    || thread.platform
+
   return {
     id: thread.id,
     platform: thread.platform,
-    target: (thread.keywords as { target?: string } | null)?.target || thread.platform,
+    target: actualTarget,
     timeAgo: formatTimeAgo(sourceCreatedAt),
     title: thread.title || '',
     content: thread.text_content || '',
@@ -252,6 +255,7 @@ export default function DashboardPage() {
         .eq('user_id', userId)
         .eq('status', 'dismissed')
         .not('intent_score', 'is', null)
+        .gte('intent_score', DISMISSED_NOISE_FLOOR)
         .order('source_created_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(60),
@@ -717,32 +721,20 @@ export default function DashboardPage() {
     setCheckingNow(true)
     toast.info('Checking for new posts...')
     try {
-      const { data: keywords, error } = await supabase
-        .from('keywords')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .limit(1)
-      if (error) throw error
-      const keyword = keywords?.[0]
-      if (!keyword) throw new Error('no_active_keyword')
-
       const response = await fetch('/api/keywords/fetch-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywordId: keyword.id }),
+        body: JSON.stringify({}),
       })
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
         throw new Error(payload?.message || payload?.error || 'scan_request_failed')
       }
-      toast.success('Check requested. Refreshing...')
+      toast.success('Check requested for all active topics. Refreshing...')
       window.setTimeout(() => void loadData(), 3000)
     } catch (error) {
       console.error('[dashboard] Unable to request a monitoring check', error)
-      toast.error(error instanceof Error && error.message === 'no_active_keyword'
-        ? 'Activate a monitoring rule before checking now.'
-        : 'Could not request a new scan. Try again.')
+      toast.error('Could not request a new scan. Try again.')
     } finally {
       setCheckingNow(false)
     }
@@ -853,7 +845,7 @@ export default function DashboardPage() {
     : threads
 
   const filtered = filterTab === 'dismissed'
-    ? searchableThreads.filter(t => t.status === 'dismissed')
+    ? searchableThreads.filter(t => t.status === 'dismissed' && (t.score === null || t.score >= DISMISSED_NOISE_FLOOR))
     : filterTab === 'high-intent'
       ? searchableThreads.filter(t => t.status !== 'dismissed' && t.score !== null && t.score >= highIntentThreshold)
       : searchableThreads.filter(t => t.status !== 'dismissed' && t.score !== null)
@@ -902,23 +894,25 @@ export default function DashboardPage() {
             {keywordsCount > 0 && (
               <a
                 href="/keywords"
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11.5px] font-semibold sm:min-h-0 ${
+                className={
                   pollHealth.delayedRules > 0
-                    ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-[#DDE2E8] bg-white text-[#667085]'
-                }`}
+                    ? 'inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-amber-200/90 bg-amber-50 px-3 py-1.5 text-[12px] font-semibold text-amber-800 shadow-xs transition-colors hover:bg-amber-100 sm:min-h-0'
+                    : 'inline-flex items-center text-[12.5px] font-medium text-[#8C8C86] transition-colors hover:text-[#1C1C1A] sm:mr-1'
+                }
                 title={pollHealth.delayedRules > 0
-                  ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active monitoring rules failed their latest successful-source check. Last attempt ${pollHealth.lastAttemptAt ? formatTimeAgo(pollHealth.lastAttemptAt) : 'not recorded'}. Open Monitoring Rules for details.`
-                  : 'The most recent successful active-source check'}
+                  ? `${pollHealth.delayedRules} of ${pollHealth.activeRules} active monitoring rules failed their latest successful-source check. Open Monitoring Rules for details.`
+                  : 'The most recent successful active-source check. Open Monitoring Rules for details.'}
               >
-                {pollHealth.delayedRules > 0
-                  ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                  : <RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />}
-                {pollHealth.delayedRules > 0
-                  ? `${pollHealth.delayedRules} monitoring rule${pollHealth.delayedRules === 1 ? '' : 's'} failing`
-                  : pollHealth.lastSuccessfulAt
-                    ? `Sources updated ${formatTimeAgo(pollHealth.lastSuccessfulAt)}`
-                    : 'Waiting for first successful check'}
+                {pollHealth.delayedRules > 0 && (
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden="true" />
+                )}
+                <span>
+                  {pollHealth.delayedRules > 0
+                    ? `${pollHealth.delayedRules} monitoring rule${pollHealth.delayedRules === 1 ? '' : 's'} failing`
+                    : pollHealth.lastSuccessfulAt
+                      ? `Sources updated ${formatTimeAgo(pollHealth.lastSuccessfulAt)}`
+                      : 'Waiting for first check'}
+                </span>
               </a>
             )}
             <div className="relative">
@@ -963,27 +957,27 @@ export default function DashboardPage() {
       {/* ElevenLabs Style 4 Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Conversations Found */}
-        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Conversations Found</span>
-            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
+        <div className="relative rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">Conversations Found</span>
+            <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#0A84FF]">
               <MessageCircle className="w-4 h-4" strokeWidth={2} />
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.threadsFound}
             </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
+            <span className="text-[11px] font-medium text-[#667085]">{metricPeriodLabel}</span>
           </div>
         </div>
 
         {/* Metric 2: High Intent */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">High Intent</span>
-            <div className="w-8 h-8 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">High Intent</span>
+            <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-emerald-600">
+              <svg width="18" height="18" className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
                 <path d="M12 7a5 5 0 1 0 5 5" />
                 <path d="M13 3.055a9 9 0 1 0 7.941 7.945" />
@@ -992,65 +986,65 @@ export default function DashboardPage() {
               </svg>
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.highIntent}
             </span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold ${
               stats.highIntentToday > 0
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-[#F1F2F3] text-[#667085]'
             }`}>
-              {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-3 w-3" strokeWidth={2.25} />}
+              {stats.highIntentToday > 0 && <ArrowUp className="mr-0.5 h-2.5 w-2.5" strokeWidth={2.25} />}
               {metricsAreLoading
                 ? 'Updating'
                 : stats.highIntentToday > 0
-                  ? `${stats.highIntentToday} new today`
+                  ? `+${stats.highIntentToday} new today`
                   : 'No new today'}
             </span>
           </div>
         </div>
 
         {/* Metric 3: Drafts Ready */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">
               Drafts Ready <span className="font-medium text-[#98A2B3]">Live</span>
             </span>
-            <div className="w-8 h-8 rounded-xl text-[#0A84FF] flex items-center justify-center shrink-0">
-              <FileText className="w-4 h-4" strokeWidth={2} />
+            <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#0A84FF]">
+              <FileText className="w-[18px] h-[18px]" strokeWidth={2} />
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.draftsReady}
             </span>
             {stats.draftsReady > 0 ? (
               <a
                 href="/opportunities/replies"
-                className="text-[11.5px] font-semibold text-[#0A84FF] hover:underline underline-offset-2 transition-colors"
+                className="text-[11px] font-semibold text-[#0A84FF] hover:underline underline-offset-2 transition-colors"
               >
                 Review Now →
               </a>
             ) : (
-              <span className="text-[11.5px] font-medium text-[#667085]">Up to date</span>
+              <span className="text-[11px] font-medium text-[#667085]">Up to date</span>
             )}
           </div>
         </div>
 
         {/* Metric 4: Replies sent in the selected period */}
-        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12.5px] font-semibold text-[#4F5865]">Replies Sent</span>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[#F06A22]">
-              <Send className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+        <div className="rounded-2xl border border-[#E3E3E0] bg-white px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.055)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12px] font-semibold text-[#4F5865]">Replies Sent</span>
+            <div className="flex h-7 w-7 items-center justify-center shrink-0 rounded-lg text-[#F06A22]">
+              <Send className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
             </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex items-baseline justify-between leading-tight">
+            <span className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
               {metricsAreLoading ? '—' : stats.repliesSent}
             </span>
-            <span className="text-[11.5px] font-medium text-[#667085]">{metricPeriodLabel}</span>
+            <span className="text-[11px] font-medium text-[#667085]">{metricPeriodLabel}</span>
           </div>
         </div>
       </div>
@@ -1481,9 +1475,9 @@ export default function DashboardPage() {
                                     Done
                                   </button>
                                 </div>
-                                <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                                <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xs transition-colors focus-within:border-gray-300">
                                   <textarea
-                                    className="min-h-[190px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                                    className="min-h-[190px] w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
                                     value={thread.draft || ''}
                                     placeholder="Write your reply..."
                                     onChange={(event) => {
@@ -1536,11 +1530,19 @@ export default function DashboardPage() {
                                       type="button"
                                       onClick={handleApproveAndSend}
                                       disabled={sendingThreadId === thread.id}
-                                      className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-black"
+                                      className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
                                     >
-                                      <CheckCircle className="h-3.5 w-3.5" />
+                                      {thread.platform === 'reddit' ? (
+                                        <RedditIcon className="h-3.5 w-3.5 text-[#FF4500]" />
+                                      ) : thread.platform === 'bluesky' ? (
+                                        <BlueskyIcon className="h-3.5 w-3.5 text-[#0A84FF]" />
+                                      ) : thread.platform === 'x' ? (
+                                        <XIcon className="h-3.5 w-3.5 text-white" />
+                                      ) : (
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                      )}
                                       {sendingThreadId === thread.id
-                                        ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                                        ? (thread.platform === 'reddit' ? 'Posting to Reddit...' : 'Posting...')
                                         : getDeliveryActionLabel(thread.platform)}
                                     </button>
                                   </div>
@@ -1664,9 +1666,9 @@ export default function DashboardPage() {
                                     Done
                                   </button>
                                 </div>
-                                <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                                <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xs transition-colors focus-within:border-gray-300">
                                   <textarea
-                                    className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                                    className="min-h-[220px] w-full resize-none bg-transparent p-4 text-[13px] leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
                                     value={thread.draft || ''}
                                     placeholder="Write your reply..."
                                     onChange={(event) => {
@@ -1719,9 +1721,17 @@ export default function DashboardPage() {
                               disabled={!thread.draft || sendingThreadId === thread.id}
                               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 py-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-black disabled:border disabled:border-gray-200/60 disabled:bg-gray-100 disabled:text-gray-400"
                             >
-                              <CheckCircle className="h-4 w-4" />
+                              {thread.platform === 'reddit' ? (
+                                <RedditIcon className="h-4 w-4 text-[#FF4500]" />
+                              ) : thread.platform === 'bluesky' ? (
+                                <BlueskyIcon className="h-4 w-4 text-[#0A84FF]" />
+                              ) : thread.platform === 'x' ? (
+                                <XIcon className="h-4 w-4 text-white" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4" />
+                              )}
                               {sendingThreadId === thread.id
-                                ? (thread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                                ? (thread.platform === 'reddit' ? 'Posting to Reddit...' : 'Posting...')
                                 : getDeliveryActionLabel(thread.platform)}
                             </button>
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1893,9 +1903,9 @@ export default function DashboardPage() {
                               Done
                             </button>
                           </div>
-                          <div className="rounded-[20px] rounded-br-md bg-[#0A84FF] p-1 shadow-[0_4px_18px_rgba(10,132,255,0.16)]">
+                          <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-xs transition-colors focus-within:border-gray-300">
                             <textarea
-                              className="min-h-[220px] w-full resize-none rounded-[16px] bg-white p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/60"
+                              className="min-h-[220px] w-full resize-none bg-transparent p-4 text-[13px] font-normal leading-relaxed text-gray-900 outline-none placeholder:text-gray-400"
                               value={selectedThread.draft || ''}
                               placeholder="Write your reply..."
                               onChange={(e) => {
@@ -1948,9 +1958,17 @@ export default function DashboardPage() {
                         disabled={!selectedThread.draft || sendingThreadId === selectedThread.id}
                         className="w-full py-3 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold text-xs disabled:bg-gray-100 disabled:text-gray-400 disabled:border disabled:border-gray-200/60 shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                       >
-                        <CheckCircle className="w-4 h-4 text-white" />
+                        {selectedThread.platform === 'reddit' ? (
+                          <RedditIcon className="w-4 h-4 text-[#FF4500]" />
+                        ) : selectedThread.platform === 'bluesky' ? (
+                          <BlueskyIcon className="w-4 h-4 text-[#0A84FF]" />
+                        ) : selectedThread.platform === 'x' ? (
+                          <XIcon className="w-4 h-4 text-white" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        )}
                         {sendingThreadId === selectedThread.id
-                          ? (selectedThread.platform === 'reddit' ? 'Preparing...' : 'Posting...')
+                          ? (selectedThread.platform === 'reddit' ? 'Posting to Reddit...' : 'Posting...')
                           : getDeliveryActionLabel(selectedThread.platform)}
                       </button>
 

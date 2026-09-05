@@ -37,89 +37,78 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.redditFetchHandler = redditFetchHandler;
-const logger_1 = require("../../src/lib/logger");
-const reddit_1 = require("../../src/lib/reddit");
-const queues_1 = require("../../src/lib/queues");
-const buying_signal_filter_1 = require("../../src/lib/buying-signal-filter");
 const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
+const logger_1 = require("../../src/lib/logger");
+const queues_1 = require("../../src/lib/queues");
+const reddit_candidates_1 = require("../../src/lib/reddit-candidates");
+const reddit_1 = require("../../src/lib/reddit");
+const reddit_discovery_capacity_1 = require("../../src/lib/reddit-discovery-capacity");
+const keyword_poll_health_1 = require("../../src/lib/keyword-poll-health");
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 async function redditFetchHandler(job) {
     const { target, keywordMappings: preloadedMappings } = job.data;
-    if (process.env.REDDIT_API_APPROVED !== 'true') {
-        logger_1.logger.info({ job: job.id, subreddit: target }, 'Reddit fetch using public-feed fallbacks — OAuth API approval pending');
-    }
+    let keywordMappings = preloadedMappings;
+    let keywordIds = preloadedMappings?.map(({ id }) => id) ?? [];
+    let sourceFetchRecorded = false;
     try {
-        const posts = await (0, reddit_1.fetchSubredditNew)(target);
-        if (!posts || posts.length === 0)
-            return;
-        // Resolve keyword mappings (pre-supplied by fetch-now, or queried from DB)
-        let keywordMappings = preloadedMappings;
         if (!keywordMappings) {
             const { data, error } = await supabase_1.supabaseWorker
                 .from('keywords')
-                .select('id, user_id, term')
+                .select('id, user_id, term, profiles!inner(competitors)')
                 .eq('platform', 'reddit')
                 .eq('target', target)
                 .eq('is_active', true);
             if (error) {
                 throw new Error(`Failed to load Reddit keyword mappings: ${error.message}`);
             }
-            keywordMappings = data;
+            keywordMappings = (0, reddit_candidates_1.withProfileCompetitors)(data ?? []);
         }
         else if (keywordMappings.length > 0) {
-            const ids = keywordMappings.map((m) => m.id);
-            const { data: kwData, error: kwError } = await supabase_1.supabaseWorker
+            const ids = keywordMappings.map(({ id }) => id);
+            const { data, error } = await supabase_1.supabaseWorker
                 .from('keywords')
-                .select('id, user_id, term')
+                .select('id, user_id, term, profiles!inner(competitors)')
                 .in('id', ids);
-            if (kwError)
-                throw new Error(`Failed to validate Reddit keyword mappings: ${kwError.message}`);
-            if (kwData)
-                keywordMappings = kwData;
-        }
-        if (!keywordMappings || keywordMappings.length === 0)
-            return;
-        // Group keywords by user — one user may have multiple keywords on the same subreddit.
-        // We score each post once per user (not once per keyword) to avoid duplicate work.
-        // The keyword chosen is whichever of the user's terms appears in the post; if none
-        // match textually we still score because the subreddit subscription itself implies intent.
-        const userKeywords = new Map();
-        for (const m of keywordMappings) {
-            if (!userKeywords.has(m.user_id))
-                userKeywords.set(m.user_id, []);
-            userKeywords.get(m.user_id).push({ id: m.id, term: m.term });
-        }
-        let skipped = 0;
-        let enqueued = 0;
-        for (const post of posts) {
-            const searchable = `${post.title || ''} ${post.text || ''}`.toLowerCase();
-            for (const [userId, keywords] of userKeywords) {
-                // Determine if this post has explicit keyword match in title+body
-                const matched = keywords.find(k => searchable.includes(k.term.toLowerCase()));
-                const keywordId = (matched ?? keywords[0]).id;
-                // Gate: keyword match always passes. No keyword match requires a buying signal.
-                // This eliminates ~60-70% of noise before any intent-model call.
-                if (!matched && !(0, buying_signal_filter_1.hasBuyingSignal)(searchable)) {
-                    skipped++;
-                    continue;
-                }
-                // Deduplicate: one score job per user per post, regardless of keyword count
-                await queues_1.scorePostQueue.add('score', {
-                    userId,
-                    keywordId,
-                    post,
-                }, {
-                    jobId: `score-${userId}-${post.externalId}`,
-                });
-                enqueued++;
+            if (error) {
+                throw new Error(`Failed to validate Reddit keyword mappings: ${error.message}`);
             }
+            keywordMappings = (0, reddit_candidates_1.withProfileCompetitors)(data ?? []);
         }
-        logger_1.logger.info({ subreddit: target, posts: posts.length, enqueued, skipped, users: userKeywords.size }, `r/${target}: ${enqueued} enqueued, ${skipped} skipped (no buying signal)`);
+        if (keywordMappings.length === 0)
+            return;
+        keywordIds = keywordMappings.map(({ id }) => id);
+        const capacity = await (0, reddit_discovery_capacity_1.getRedditDiscoveryCapacity)();
+        const result = await (0, reddit_1.fetchSubredditNewWithSource)(target, 25, { mode: capacity.mode });
+        const posts = result.posts;
+        await (0, keyword_poll_health_1.recordKeywordPollSuccess)(keywordIds, new Date(), result.source === 'rss' ? 'reddit_rss' : undefined);
+        sourceFetchRecorded = true;
+        if (!posts || posts.length === 0) {
+            logger_1.logger.info({ subreddit: target }, `r/${target}: source checked; no posts returned`);
+            return;
+        }
+        const discovery = (0, reddit_candidates_1.buildRedditScoreCandidates)(posts, keywordMappings);
+        for (const candidate of discovery.candidates) {
+            await queues_1.scorePostQueue.add('score', candidate, {
+                jobId: `score-${candidate.userId}-${candidate.post.externalId}`,
+            });
+        }
+        logger_1.logger.info({
+            subreddit: target,
+            posts: posts.length,
+            enqueued: discovery.candidates.length,
+            skipped: discovery.skipped,
+            users: discovery.users,
+        }, `r/${target}: ${discovery.candidates.length} enqueued, ${discovery.skipped} skipped`);
     }
     catch (error) {
-        logger_1.logger.error({ error }, `Failed to fetch reddit target r/${target}:`);
+        if (!sourceFetchRecorded) {
+            await (0, keyword_poll_health_1.recordKeywordPollFailure)(keywordIds, error).catch((healthError) => {
+                logger_1.logger.error({ healthError, target }, 'Failed to record Reddit keyword poll failure');
+            });
+        }
+        logger_1.logger.error({ error }, `Failed to fetch reddit target r/${target}`);
         throw error;
     }
 }

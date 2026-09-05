@@ -51,6 +51,7 @@ function stubProductionCore() {
     'REDDIT_AUTO_MIN_COMBINED_KARMA',
     'HYPERBROWSER_API_KEY',
     'HYPERBROWSER_POSTING_ENABLED',
+    'HYPERBROWSER_REDDIT_MAX_CONCURRENCY',
     'SPRINKLR_API_BASE_URL',
     'SPRINKLR_API_KEY',
     'SPRINKLR_ACCESS_TOKEN',
@@ -74,12 +75,11 @@ afterEach(() => {
 })
 
 describe('production capability configuration', () => {
-  it('boots the web runtime without unrelated backend integrations', () => {
+  it('boots the web runtime without unrelated backend integrations but requires distributed rate limiting', () => {
     stubProductionCore()
     for (const name of [
       'NEXT_PUBLIC_SUPPORT_EMAIL',
       'SUPABASE_SERVICE_ROLE_KEY',
-      'UPSTASH_REDIS_URL',
       'CRON_SECRET',
       'ENCRYPTION_KEY',
       'ANTHROPIC_API_KEY',
@@ -88,6 +88,13 @@ describe('production capability configuration', () => {
     }
 
     expect(() => validateWebRuntimeEnvironment()).not.toThrow()
+  })
+
+  it('fails web startup when distributed rate limiting is unavailable', () => {
+    stubProductionCore()
+    vi.stubEnv('UPSTASH_REDIS_URL', '')
+
+    expect(() => validateWebRuntimeEnvironment()).toThrow(/UPSTASH_REDIS_URL/)
   })
 
   it('requires public Supabase credentials to boot the web runtime', () => {
@@ -281,6 +288,13 @@ describe('production capability configuration', () => {
     vi.stubEnv('HYPERBROWSER_POSTING_ENABLED', 'true')
 
     expect(() => validateAppEnvironment()).toThrow(/HYPERBROWSER_API_KEY is missing/)
+  })
+
+  it('rejects unsafe Hyperbrowser Reddit concurrency limits', () => {
+    stubProductionCore()
+    vi.stubEnv('HYPERBROWSER_REDDIT_MAX_CONCURRENCY', '26')
+
+    expect(() => validateAppEnvironment()).toThrow(/HYPERBROWSER_REDDIT_MAX_CONCURRENCY/)
   })
 
   it('accepts a completely configured official Sprinklr Reddit provider', () => {

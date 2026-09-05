@@ -8,9 +8,15 @@ import {
   type SocialKeywordMapping,
   type SocialScoreCandidate,
 } from './reddit-candidates'
+import type { NormalizedPost } from './types'
 import { searchBlueskyPosts } from './bluesky'
 import { fetchXPosts, isXDiscoveryConfigured } from './x'
-import { fetchSubredditNewWithSource, type RedditDiscoverySource } from './reddit'
+import {
+  fetchSubredditNewWithSource,
+  fetchSubredditSearchWithSource,
+  prefetchRedditSubreddits,
+  type RedditDiscoverySource,
+} from './reddit'
 import { getRedditDiscoveryCapacity } from './reddit-discovery-capacity'
 import { dispatchPendingOutbox, recoverStaleSends, withRedisLock } from './backend-maintenance'
 import {
@@ -25,6 +31,8 @@ import {
   recordKeywordPollSuccess,
 } from './keyword-poll-health'
 import { DISCOVERY_MAX_AGE_MS } from './content-freshness'
+import { getEntitledPlan, hasActiveSubscription } from './billing-entitlements'
+import { extractCoreSearchPhrase } from './phrase-match'
 
 type MonitorPlatform = 'reddit' | 'bluesky' | 'x'
 
@@ -34,8 +42,8 @@ type KeywordRow = SocialKeywordMapping & {
   last_success_at?: string | null
   next_poll_at?: string | null
   profiles:
-    | { plan?: string; last_polled_at?: string | null; competitors?: string[] | null }
-    | Array<{ plan?: string; last_polled_at?: string | null; competitors?: string[] | null }>
+    | { plan?: string; billing_status?: string; billing_subscription_id?: string | null; last_polled_at?: string | null; competitors?: string[] | null }
+    | Array<{ plan?: string; billing_status?: string; billing_subscription_id?: string | null; last_polled_at?: string | null; competitors?: string[] | null }>
 }
 
 type TargetWork = {
@@ -84,11 +92,11 @@ async function reserveXCapacity(
   for (const userId of new Set(mappings.map(mapping => mapping.user_id))) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan')
+      .select('plan, billing_status, billing_subscription_id')
       .eq('id', userId)
       .single()
     if (profileError) throw new Error(`Unable to load X plan: ${profileError.message}`)
-    const dailyLimit = getPlanLimits((profile as { plan?: string } | null)?.plan).xDailySpendLimitCents
+    const dailyLimit = getPlanLimits(getEntitledPlan(profile)).xDailySpendLimitCents
     if (dailyLimit === 0) continue
     const { data: reserved, error: reserveError } = await (supabase.rpc as unknown as (
       functionName: string,
@@ -123,7 +131,7 @@ async function loadDueSocialWork(
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
       .from('keywords')
-      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, last_polled_at, competitors)')
+      .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, billing_status, billing_subscription_id, last_polled_at, competitors)')
       .in('platform', ['reddit', 'bluesky', 'x'])
       .eq('is_active', true)
       .order('id', { ascending: true })
@@ -137,6 +145,7 @@ async function loadDueSocialWork(
   const relevantRows = rows.filter((row) =>
     (!forceUserId || row.user_id === forceUserId)
     && (!forcePlatform || row.platform === forcePlatform)
+    && hasActiveSubscription(profileFor(row))
     && canMonitorPlatform(normalizePlan(profileFor(row)?.plan), row.platform)
     && (row.platform !== 'x' || isXDiscoveryConfigured()),
   )
@@ -191,10 +200,13 @@ async function loadPendingSocialCheckpoints(
   )
   let query = supabase
     .from('monitored_threads')
-    .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, source_created_at, created_at, keywords!inner(target)')
+    .select('user_id, keyword_id, platform, external_id, author, title, text_content, url, source_created_at, created_at, keywords!inner(target), profiles!monitored_threads_user_id_fkey!inner(plan, billing_status, billing_subscription_id)')
     .in('platform', ['reddit', 'bluesky', 'x'])
     .eq('status', 'pending')
     .gte('source_created_at', new Date(Date.now() - DISCOVERY_MAX_AGE_MS).toISOString())
+    .eq('profiles.billing_status', 'active')
+    .not('profiles.billing_subscription_id', 'is', null)
+    .neq('profiles.plan', 'free')
     .order('created_at', { ascending: true })
     .limit(25)
   if (forceUserId) query = query.eq('user_id', forceUserId)
@@ -202,7 +214,11 @@ async function loadPendingSocialCheckpoints(
   const { data, error } = await query
   if (error) throw error
 
-  return (data ?? []).map((row) => {
+  return (data ?? []).filter((row) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+    return hasActiveSubscription(profile)
+      && canMonitorPlatform(getEntitledPlan(profile), row.platform)
+  }).map((row) => {
     const keyword = Array.isArray(row.keywords) ? row.keywords[0] : row.keywords
     return {
       userId: row.user_id,
@@ -314,11 +330,13 @@ async function runLockedMonitor(
     throw new Error(`Unable to quarantine stale discovery checkpoints: ${staleCheckpointError.message}`)
   }
 
-  const maxScores = positiveInteger(
-    process.env.SERVERLESS_MONITOR_MAX_SCORES,
-    getConfiguredSecret(process.env.ANTHROPIC_API_KEY) ? 1 : 5,
-    5,
-  )
+  const maxScores = forceUserId
+    ? 15
+    : positiveInteger(
+        process.env.SERVERLESS_MONITOR_MAX_SCORES,
+        getConfiguredSecret(process.env.ANTHROPIC_API_KEY) ? 1 : 5,
+        5,
+      )
   const maxTargets = positiveInteger(
     process.env.SERVERLESS_MONITOR_MAX_TARGETS,
     50,
@@ -348,16 +366,83 @@ async function runLockedMonitor(
     }, 'Reddit discovery is using the RSS fallback; paid provider reads are paused safely')
   }
 
+  const redditTargets = work
+    .filter(t => t.platform === 'reddit')
+    .map(t => t.target.trim().toLowerCase())
+  const uniqueRedditSubs = [...new Set(redditTargets)]
+  if (uniqueRedditSubs.length > 0) {
+    await prefetchRedditSubreddits(uniqueRedditSubs).catch(err => {
+      logger.warn({ err }, 'Reddit multi-target prefetch failed, continuing with direct fetches')
+    })
+  }
+
   for (let index = 0; index < work.length; index += 6) {
     const batch = work.slice(index, index + 6)
-    const results = await Promise.allSettled(batch.map(async (target) => {
+    const results = await Promise.allSettled(batch.map(async (target, idx) => {
       if (target.platform === 'reddit') {
+        if (idx > 0) {
+          await new Promise(r => setTimeout(r, idx * 800))
+        }
         const result = await fetchSubredditNewWithSource(target.target, 25, {
           mode: redditCapacity.mode,
         })
+        let candidates = buildSocialScoreCandidates(result.posts, target.mappings).candidates
+        const redditSource = result.source
+
+        // If this is a targeted user run (subscription activation, onboarding, or check-now)
+        // and newest stream found 0 candidates, search Reddit directly for the user's keywords to backfill.
+        if (candidates.length === 0 && forceUserId) {
+          const searchTerms = [...new Set(target.mappings.map(m => m.term.trim()).filter(Boolean))]
+          const searchPosts: NormalizedPost[] = []
+          const BACKFILL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days matching dashboard default
+
+          for (const term of searchTerms.slice(0, 3)) {
+            const coreTerm = extractCoreSearchPhrase(term)
+            try {
+              const searchResult = await fetchSubredditSearchWithSource(target.target, coreTerm, 25, {
+                mode: redditCapacity.mode,
+              })
+              searchPosts.push(...searchResult.posts)
+            } catch (err) {
+              logger.warn({ err, target: target.target, term: coreTerm }, 'Backfill search failed for subreddit target')
+            }
+          }
+          if (searchPosts.length > 0) {
+            const searchDiscovery = buildSocialScoreCandidates(searchPosts, target.mappings, {
+              maxAgeMs: BACKFILL_MAX_AGE_MS,
+            })
+            if (searchDiscovery.candidates.length > 0) {
+              candidates = searchDiscovery.candidates
+            }
+          }
+
+          // If still 0 candidates from this specific subreddit, search globally across Reddit
+          if (candidates.length === 0) {
+            for (const term of searchTerms.slice(0, 2)) {
+              const coreTerm = extractCoreSearchPhrase(term)
+              try {
+                const globalResult = await fetchSubredditSearchWithSource('all', coreTerm, 25, {
+                  mode: redditCapacity.mode,
+                })
+                if (globalResult.posts.length > 0) {
+                  const globalDiscovery = buildSocialScoreCandidates(globalResult.posts, target.mappings, {
+                    maxAgeMs: BACKFILL_MAX_AGE_MS,
+                  })
+                  if (globalDiscovery.candidates.length > 0) {
+                    candidates = globalDiscovery.candidates
+                    break
+                  }
+                }
+              } catch (err) {
+                logger.warn({ err, term: coreTerm }, 'Global backfill search failed')
+              }
+            }
+          }
+        }
+
         return {
-          candidates: buildSocialScoreCandidates(result.posts, target.mappings).candidates,
-          redditSource: result.source,
+          candidates,
+          redditSource,
         }
       }
       if (target.platform === 'x') {

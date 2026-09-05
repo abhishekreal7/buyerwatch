@@ -89,6 +89,31 @@ export function getSafeHttpUrl(value: string): URL | null {
   }
 }
 
+/**
+ * Redirect-only trust boundary for BuyerWatch-branded attribution links.
+ * Unlike generic HTTP parsing, branded redirects require HTTPS and reject
+ * private/reserved literals and local hostnames.
+ */
+export function getSafeAttributionRedirectUrl(value: string): URL | null {
+  try {
+    const url = new URL(value)
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '')
+    if (
+      url.protocol !== 'https:'
+      || url.username
+      || url.password
+      || BLOCKED_HOSTNAMES.has(hostname)
+      || hostname.endsWith('.localhost')
+      || (isIP(hostname) !== 0 && isPrivateOrReservedIp(hostname))
+    ) {
+      return null
+    }
+    return url
+  } catch {
+    return null
+  }
+}
+
 type PublicTarget = {
   url: URL
   address: string

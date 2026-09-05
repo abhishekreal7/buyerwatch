@@ -1,17 +1,40 @@
 import Link from 'next/link'
 import { getProviderCapabilities } from '@/lib/env'
 import { BrandLogo } from '@/components/BrandLogo'
+import type { PlanTier } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
+import { getDodoBillingSelectionFromProductId } from '@/lib/dodo'
+import { createClient } from '@/utils/supabase/server'
 import { PricingClient } from './PricingClient'
 
 export const metadata = {
-  title: 'Pricing — BuyerWatch',
-  description: 'Simple, transparent pricing. Start with 5 keyword rules and upgrade when you need more signal coverage.',
+  title: 'Pricing',
+  description: 'Compare BuyerWatch plans. Starter begins with a card-required 7-day free trial, limited intent scoring, and one guarded automatic reply.',
+  alternates: { canonical: '/pricing' },
 }
 
 export const dynamic = 'force-dynamic'
 
-export default function PricingPage() {
+export default async function PricingPage() {
   const billingEnabled = getProviderCapabilities().billing
+  const supabase = await createClient()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = typeof claimsData?.claims?.sub === 'string' ? claimsData.claims.sub : null
+  let currentPlan: PlanTier | null = null
+  let currentCadence: 'monthly' | 'annual' | null = null
+
+  if (userId) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, billing_status, billing_subscription_id, billing_product_id')
+      .eq('id', userId)
+      .maybeSingle()
+
+    const entitledPlan = getEntitledPlan(profile)
+    if (entitledPlan !== 'free') currentPlan = entitledPlan
+    const currentSelection = getDodoBillingSelectionFromProductId(profile?.billing_product_id)
+    if (currentSelection?.plan === currentPlan) currentCadence = currentSelection.cadence
+  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans selection:bg-black selection:text-white">
@@ -22,16 +45,16 @@ export default function PricingPage() {
         </Link>
         <div className="flex items-center gap-4">
           <Link
-            href="/login"
+            href={userId ? '/dashboard' : '/login'}
             className="inline-flex min-h-11 items-center px-1 text-[13px] font-medium text-[#666666] hover:text-[#0A0A0A] transition-colors"
           >
-            Log in
+            {userId ? 'Dashboard' : 'Log in'}
           </Link>
           <Link
-            href="/signup?plan=starter&billing=monthly"
+            href={userId ? '/settings?section=plan' : '/signup?plan=starter&billing=monthly'}
             className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white bg-[#0A0A0A] hover:bg-[#1C1C1E] px-4 py-2 rounded-xl transition-colors"
           >
-            Start for $19
+            {userId ? 'Manage plan' : 'Get started'}
           </Link>
         </div>
       </nav>
@@ -45,12 +68,17 @@ export default function PricingPage() {
           Simple plans that<br className="hidden sm:block" /> scale with you
         </h1>
         <p className="text-[17px] text-[#666666] max-w-[440px] mx-auto leading-relaxed">
-          Start with 5 keyword rules. Upgrade when you need more coverage.
+          Start with a card-required 7-day trial. Score real buyer intent and test one guarded automatic reply.
         </p>
       </div>
 
       {/* Toggle + Plans (client) */}
-      <PricingClient billingEnabled={billingEnabled} />
+      <PricingClient
+        billingEnabled={billingEnabled}
+        currentPlan={currentPlan}
+        currentCadence={currentCadence}
+        isAuthenticated={Boolean(userId)}
+      />
 
       {/* Footer */}
       <div className="text-center pb-12 text-[13px] text-[#888888]">

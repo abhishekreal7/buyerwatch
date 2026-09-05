@@ -3,14 +3,58 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
+import { toast } from 'sonner'
 import { PRICING_PLANS } from '@/lib/pricing-plans'
+import type { PlanTier } from '@/lib/plan-limits'
+import { isStarterPromotionActive, STARTER_PROMOTION } from '@/lib/starter-promotion'
 
 interface PricingClientProps {
   billingEnabled: boolean
+  currentPlan: PlanTier | null
+  currentCadence: 'monthly' | 'annual' | null
+  isAuthenticated: boolean
 }
 
-export function PricingClient({ billingEnabled }: PricingClientProps) {
-  const [annual, setAnnual] = useState(false)
+type PaidPlan = (typeof PRICING_PLANS)[number]['id']
+
+export function PricingClient({ billingEnabled, currentPlan, currentCadence, isAuthenticated }: PricingClientProps) {
+  const [annual, setAnnual] = useState(currentCadence === 'annual')
+  const [openingPlan, setOpeningPlan] = useState<PaidPlan | null>(null)
+  const starterPromotionActive = isStarterPromotionActive()
+
+  async function openCheckout(plan: PaidPlan) {
+    if (openingPlan) return
+    setOpeningPlan(plan)
+
+    try {
+      const response = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify({ plan, billing: annual ? 'annual' : 'monthly' }),
+      })
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok || !payload?.url) {
+        const messages: Record<string, string> = {
+          Unauthorized: 'Your session could not be verified. Refresh the page and try again.',
+          plan_already_active: 'That plan is already active.',
+          billing_subscription_requires_attention: 'Resolve the existing subscription in billing settings before changing plans.',
+          billing_subscription_product_unknown: 'Your current subscription needs support review before it can be changed.',
+          billing_not_configured: 'Billing is temporarily unavailable.',
+        }
+        throw new Error(messages[payload?.error] || 'Could not open checkout. Please try again.')
+      }
+
+      window.location.assign(payload.url)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not open checkout. Please try again.')
+      setOpeningPlan(null)
+    }
+  }
 
   return (
     <>
@@ -33,15 +77,25 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
       {/* Plans grid */}
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 px-4 pb-20 sm:px-6 md:grid-cols-2 md:pb-24 lg:grid-cols-3">
         {PRICING_PLANS.map((plan) => {
-          const price: string = annual ? plan.annualPrice : plan.price
-          const paidPlan = price !== '$0' && price !== 'Custom'
-          const checkoutAvailable = !paidPlan || billingEnabled
+          const hasStarterPromotion = plan.id === 'starter' && !annual && starterPromotionActive
+          const price: string = hasStarterPromotion
+            ? `$${STARTER_PROMOTION.introductoryMonthlyPriceUsd}`
+            : annual ? plan.annualPrice : plan.price
+          const checkoutAvailable = billingEnabled
           const isHighlighted = plan.highlight
-          const hasTrial = plan.id === 'starter' && !annual
-          const features = hasTrial
-            ? ['7-day full Starter trial', ...plan.features]
-            : plan.features
-          const cta = plan.id === 'starter' && annual ? 'Choose Starter' : plan.cta
+          const selectedCadence = annual ? 'annual' : 'monthly'
+          const isCurrentPlan = currentPlan === plan.id
+            && (currentCadence === null || currentCadence === selectedCadence)
+          const isOpening = openingPlan === plan.id
+          const features = plan.features
+          const acquisitionCta = plan.id === 'starter' && annual
+            ? 'Choose Starter'
+            : hasStarterPromotion ? 'Start for $19' : plan.cta
+          const cta = currentPlan
+            ? currentPlan === plan.id
+              ? `Switch to ${annual ? 'annual' : 'monthly'} billing`
+              : `Switch to ${plan.name}`
+            : acquisitionCta
 
           return (
             <div
@@ -52,6 +106,15 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                   : 'bg-white border border-[#E8E8E8] text-[#0A0A0A] shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.1)]'
               } ${plan.id === 'growth' ? 'md:col-span-2 md:w-[calc(50%-0.625rem)] md:justify-self-center lg:col-span-1 lg:w-auto' : ''}`}
             >
+              {isCurrentPlan && (
+                <span
+                  className={`absolute right-5 top-5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                    isHighlighted ? 'bg-white text-black' : 'bg-black text-white'
+                  }`}
+                >
+                  Current plan
+                </span>
+              )}
               {/* Card header */}
               <div className="mb-5">
                 <p
@@ -76,6 +139,11 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
 
               {/* Price */}
               <div className="mb-4 flex items-baseline gap-1">
+                {hasStarterPromotion && (
+                  <span className={`mr-1 text-[20px] font-semibold line-through ${isHighlighted ? 'text-white/45' : 'text-[#999]'}`}>
+                    ${STARTER_PROMOTION.standardMonthlyPriceUsd}
+                  </span>
+                )}
                 <span className="text-[46px] font-bold tracking-tight leading-none">
                   {price}
                 </span>
@@ -88,22 +156,17 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
                     {plan.period}
                   </span>
                 )}
-                {price === '$0' && (
-                  <span
-                    className={`text-[14px] font-medium ${
-                      isHighlighted ? 'text-white/50' : 'text-[#888]'
-                    }`}
-                  >
-                    forever
-                  </span>
-                )}
               </div>
               <p className={`-mt-2 mb-4 min-h-5 text-[12px] ${isHighlighted ? 'text-white/50' : 'text-[#777]'}`}>
                 {plan.id === 'starter'
                   ? annual
+                    ? `Card required · 7-day free trial · Then billed ${plan.annualTotal} once per year`
+                    : hasStarterPromotion
+                      ? 'Card required · 7-day free trial · Then $19 for the first month, then $39/month'
+                      : 'Card required · 7-day free trial · Then billed monthly'
+                  : annual
                     ? `Billed ${plan.annualTotal} once per year`
-                    : '7-day full Starter trial, then billed monthly'
-                  : annual ? `Billed ${plan.annualTotal} once per year` : 'Billed monthly'}
+                    : 'Billed monthly'}
               </p>
 
               {/* Description */}
@@ -116,22 +179,43 @@ export function PricingClient({ billingEnabled }: PricingClientProps) {
               </p>
 
               {/* CTA */}
-              <Link
-                href={checkoutAvailable
-                  ? annual
-                    ? `/signup?plan=${plan.id}&billing=annual`
-                    : plan.href
-                  : '/contact'}
-                id={`pricing-cta-${plan.id}`}
-                className={`mb-6 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-semibold transition-all duration-200 ${
-                  isHighlighted
-                    ? 'bg-white text-[#0A0A0A] hover:bg-white/90'
-                    : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
-                }`}
-              >
-                {checkoutAvailable ? cta : `Contact us about ${plan.name}`}
-                <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
-              </Link>
+              {isAuthenticated && checkoutAvailable && !isCurrentPlan ? (
+                <button
+                  type="button"
+                  id={`pricing-cta-${plan.id}`}
+                  onClick={() => void openCheckout(plan.id)}
+                  disabled={Boolean(openingPlan)}
+                  className={`mb-6 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-semibold transition-all duration-200 disabled:cursor-wait disabled:opacity-65 ${
+                    isHighlighted
+                      ? 'bg-white text-[#0A0A0A] hover:bg-white/90'
+                      : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
+                  }`}
+                >
+                  {isOpening ? 'Opening secure checkout…' : cta}
+                  {!isOpening && <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />}
+                </button>
+              ) : (
+                <Link
+                  href={isCurrentPlan
+                    ? '/settings?section=plan'
+                    : checkoutAvailable
+                      ? annual
+                        ? `/signup?plan=${plan.id}&billing=annual`
+                        : plan.href
+                      : '/contact'}
+                  id={`pricing-cta-${plan.id}`}
+                  className={`mb-6 flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-semibold transition-all duration-200 ${
+                    isHighlighted
+                      ? 'bg-white text-[#0A0A0A] hover:bg-white/90'
+                      : 'bg-[#0A0A0A] text-white hover:bg-[#1C1C1E]'
+                  }`}
+                >
+                  {isCurrentPlan
+                    ? `Current plan${currentCadence ? ` · ${currentCadence === 'annual' ? 'Annual' : 'Monthly'}` : ''}`
+                    : checkoutAvailable ? cta : `Contact us about ${plan.name}`}
+                  {!isCurrentPlan && <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />}
+                </Link>
+              )}
 
               {/* Divider */}
               <div

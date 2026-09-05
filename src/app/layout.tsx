@@ -39,7 +39,6 @@ export const metadata: Metadata = {
     template: '%s | BuyerWatch',
   },
   description: 'Find high-intent Reddit and Bluesky conversations, score buyer signals, and prepare helpful replies for human review with BuyerWatch.',
-  alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
     url: 'https://www.buyerwatch.co/',
@@ -57,9 +56,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   icons: {
     icon: [
-      { url: '/buyerwatch-favicon.svg?v=7', type: 'image/svg+xml', sizes: 'any' },
+      { url: '/buyerwatch-favicon.svg?v=8', type: 'image/svg+xml', sizes: 'any' },
     ],
-    shortcut: [{ url: '/buyerwatch-favicon.svg?v=7', type: 'image/svg+xml' }],
+    shortcut: [{ url: '/buyerwatch-favicon.svg?v=8', type: 'image/svg+xml' }],
     apple: [{ url: '/buyerwatch-icon.png?v=3', type: 'image/png', sizes: '128x128' }],
   },
 };
@@ -81,13 +80,6 @@ export default async function RootLayout({
     operatingSystem: 'Web',
     url: 'https://www.buyerwatch.co/',
     description: 'A social intent monitoring and reply-drafting platform for finding relevant Reddit and Bluesky conversations.',
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'USD',
-      category: 'Free plan',
-      url: 'https://www.buyerwatch.co/pricing',
-    },
   }
 
   return (
@@ -96,10 +88,11 @@ export default async function RootLayout({
       className={`${inter.variable} ${plusJakarta.variable} ${playfair.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-text-primary antialiased" suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-background text-text-primary antialiased font-sans" suppressHydrationWarning>
         <script
           type="application/ld+json"
           nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplication) }}
         />
         <MotionProvider>

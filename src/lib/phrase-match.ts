@@ -36,6 +36,8 @@ export function containsConfiguredPhrase(
   return ` ${normalizedText} `.includes(` ${normalizedPhrase} `)
 }
 
+const INTENT_PREFIX_REGEX = /^(?:looking\s+(?:for|to)|need\s+(?:a|an|help\s+with|help\s+to)?|recommend\s+(?:a|an)?|recommendations?\s+for|help\s+with|search(?:ing)?\s+for|seeking)\s+/i
+
 /**
  * Expand only a reviewed, deliberately small alias list. The downstream
  * buying-signal and promotional-noise gates still have to pass, so aliases do
@@ -49,5 +51,27 @@ export function containsConfiguredPhraseOrAlias(
 
   const normalizedPhrase = normalize(phrase)
   const aliases = CONTROLLED_PHRASE_ALIASES[normalizedPhrase] ?? []
-  return aliases.some(alias => containsConfiguredPhrase(text, alias))
+  if (aliases.some(alias => containsConfiguredPhrase(text, alias))) return true
+
+  // Strip conversational intent wrappers and articles so users who enter
+  // "looking for digital marketing agency" or "recommend a marketing agency"
+  // match the underlying service phrase (downstream hasBuyingSignal still guarantees commercial intent).
+  const corePhrase = extractCoreSearchPhrase(phrase)
+  if (corePhrase && corePhrase !== normalizedPhrase && corePhrase.length >= 3) {
+    if (containsConfiguredPhrase(text, corePhrase)) return true
+    const coreAliases = CONTROLLED_PHRASE_ALIASES[corePhrase] ?? []
+    if (coreAliases.some(alias => containsConfiguredPhrase(text, alias))) return true
+  }
+
+  return false
 }
+
+export function extractCoreSearchPhrase(phrase: string | null | undefined): string {
+  const normalized = normalize(phrase)
+  const core = normalized
+    .replace(INTENT_PREFIX_REGEX, '')
+    .replace(/\b(?:our|my|the|a|an)\s+/g, '')
+    .trim()
+  return core && core.length >= 3 ? core : normalized
+}
+

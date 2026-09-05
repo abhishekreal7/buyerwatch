@@ -39,6 +39,7 @@ export type SocialScoreCandidate = {
 export function buildSocialScoreCandidates(
   posts: NormalizedPost[],
   keywordMappings: SocialKeywordMapping[],
+  options: { maxAgeMs?: number } = {},
 ): { candidates: SocialScoreCandidate[]; skipped: number; users: number } {
   const userKeywords = new Map<string, SocialKeywordMapping[]>()
   for (const mapping of keywordMappings) {
@@ -51,7 +52,7 @@ export function buildSocialScoreCandidates(
   let skipped = 0
 
   for (const post of posts) {
-    if (!evaluateContentFreshness(post.createdAt).fresh) {
+    if (!evaluateContentFreshness(post.createdAt, { maxAgeMs: options.maxAgeMs }).fresh) {
       skipped += userKeywords.size
       continue
     }

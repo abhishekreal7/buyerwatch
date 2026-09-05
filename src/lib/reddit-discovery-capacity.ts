@@ -1,11 +1,16 @@
 import { getRedditDiscoveryProviderKind } from './env'
 import { getRedditApisDailyBudgetStatus } from './redditapis-client'
+import { redis } from './redis'
+import {
+  REDDITAPIS_BALANCE_STATE_KEY,
+  type RedditApisBalanceState,
+} from './redditapis-balance-state'
 
 export type RedditDiscoveryFetchMode = 'auto' | 'rss_only'
 
 export type RedditDiscoveryCapacity = {
   mode: RedditDiscoveryFetchMode
-  reason: 'provider_budget_exhausted' | 'provider_budget_guard_unavailable' | null
+  reason: 'provider_balance_depleted' | 'provider_budget_exhausted' | 'provider_budget_guard_unavailable' | null
   readBudget: { used: number; limit: number; remaining: number } | null
 }
 
@@ -21,8 +26,18 @@ export async function getRedditDiscoveryCapacity(): Promise<RedditDiscoveryCapac
   }
 
   try {
-    const budget = await getRedditApisDailyBudgetStatus()
+    const [budget, balanceState] = await Promise.all([
+      getRedditApisDailyBudgetStatus(),
+      redis.get(REDDITAPIS_BALANCE_STATE_KEY) as Promise<RedditApisBalanceState | null>,
+    ])
     const remaining = Math.max(0, budget.read.limit - budget.read.used)
+    if (balanceState === 'depleted') {
+      return {
+        mode: 'rss_only',
+        reason: 'provider_balance_depleted',
+        readBudget: { ...budget.read, remaining },
+      }
+    }
     return remaining > 0
       ? {
           mode: 'auto',

@@ -1,5 +1,5 @@
 import OnboardingWizard from '@/components/OnboardingWizard'
-import { normalizePlan } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { BrandLogo } from '@/components/BrandLogo'
@@ -8,6 +8,7 @@ import {
   afterAuthenticationDestination,
   normalizeSelectedBillingCadence,
   normalizeSelectedBillingPlan,
+  selectedPlanForSignup,
 } from '@/lib/billing-selection'
 
 export default async function OnboardingPage({
@@ -16,7 +17,7 @@ export default async function OnboardingPage({
   searchParams: Promise<{ plan?: string; billing?: string }>
 }) {
   const query = await searchParams
-  const selectedPlan = normalizeSelectedBillingPlan(query.plan)
+  const explicitPlan = normalizeSelectedBillingPlan(query.plan)
   const selectedBilling = normalizeSelectedBillingCadence(query.billing)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -28,13 +29,15 @@ export default async function OnboardingPage({
   // Check if they already finished onboarding
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, business_name, plan')
+    .select('id, business_name, plan, billing_status, billing_subscription_id')
     .eq('id', user.id)
     .single()
 
   if (profile?.business_name) {
-    redirect(afterAuthenticationDestination(selectedPlan, true, selectedBilling))
+    redirect(afterAuthenticationDestination(explicitPlan, true, selectedBilling))
   }
+
+  const selectedPlan = selectedPlanForSignup(explicitPlan)
 
   return (
     <div className="min-h-dvh overflow-y-auto bg-background px-4 pb-8 pt-5 md:pb-10 md:pt-6">
@@ -43,7 +46,7 @@ export default async function OnboardingPage({
         <OnboardingHeaderActions selectedPlan={selectedPlan} selectedBilling={selectedBilling} />
       </header>
       <OnboardingWizard
-        plan={normalizePlan(profile?.plan)}
+        plan={getEntitledPlan(profile)}
         selectedPlan={selectedPlan}
         selectedBilling={selectedBilling}
       />

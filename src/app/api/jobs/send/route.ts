@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
 import { verifyQStashRequest } from '@/lib/qstash'
-import { isUuid } from '@/lib/request'
+import { isUuid, readTextBody, RequestInputError } from '@/lib/request'
 import {
   isRetryableSendError,
   processSendReply,
@@ -43,7 +43,21 @@ function isSendReplyData(value: unknown): value is SendReplyData {
 }
 
 export async function POST(request: Request) {
-  const rawBody = await request.text()
+  let rawBody: string
+  try {
+    rawBody = await readTextBody(request, 16_384)
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json(
+        { error: error.message },
+        {
+          status: error.message === 'request_too_large' ? 413 : 400,
+          headers: { 'Upstash-NonRetryable-Error': 'true' },
+        },
+      )
+    }
+    return invalidPayload()
+  }
   if (!await verifyQStashRequest(request, rawBody)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

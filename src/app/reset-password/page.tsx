@@ -116,7 +116,7 @@ export default function ResetPasswordPage() {
                   <Lock className="w-4 h-4 text-[#0A84FF]" strokeWidth={2} />
                 </div>
                 <p className="text-[12.5px] text-[#555555] leading-snug">
-                  Choose a strong password with at least 6 characters.
+                  Choose a strong password with at least 12 characters.
                 </p>
               </div>
 
@@ -141,9 +141,9 @@ export default function ResetPasswordPage() {
                       id="reset-password"
                       name="password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Min 6 characters"
+                      placeholder="Min 12 characters"
                       required
-                      minLength={6}
+                      minLength={12}
                       className="w-full h-11 bg-[#F7F7F8] border border-black/[0.08] rounded-xl px-3.5 pr-10 text-[13.5px] text-[#0A0A0A] placeholder-[#888888] focus:bg-white focus:outline-none focus:border-black/30 focus:ring-2 focus:ring-black/[0.04] transition-all duration-200"
                     />
                     <button

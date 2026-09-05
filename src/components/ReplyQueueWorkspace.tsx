@@ -6,12 +6,14 @@ import {
   Copy,
   Check,
   CheckCircle,
+  CheckCircle2,
   X,
   RefreshCcw,
   ExternalLink,
   Search,
   MessageCircle,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react'
 import { RedditIcon, BlueskyIcon, XIcon } from '@/components/Icons'
 import { AppPage } from '@/components/AppPage'
@@ -31,6 +33,12 @@ import { OpportunityStageNav } from '@/components/OpportunityStageNav'
 import { trackEvent } from '@/lib/analytics'
 
 const PAGE_SIZE = 40
+
+const PLATFORM_CHAR_LIMITS: Record<string, number> = {
+  bluesky: 300,
+  x: 280,
+  reddit: 10000,
+}
 
 const MANUAL_DRAFT_REASON_LABELS: Record<string, string> = {
   ai_provider_unavailable: 'AI drafting is unavailable right now. You can still write and send this reply manually.',
@@ -104,17 +112,6 @@ function parseDrafts(data: any[]) {
   })
 }
 
-function ActiveOpportunityCount({ count }: { count: number }) {
-  return (
-    <div className="flex items-center gap-2 rounded-full bg-gray-900 px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm ring-1 ring-black/5">
-      <span className="relative flex h-2 w-2 items-center justify-center">
-        <span className="absolute inset-0 animate-ping rounded-full bg-[#0A84FF] opacity-50" />
-        <span className="h-1.5 w-1.5 rounded-full bg-[#0A84FF]" aria-hidden="true" />
-      </span>
-      {count} active
-    </div>
-  )
-}
 
 type ReplyQueueWorkspaceProps = {
   initialThreadId?: string
@@ -530,10 +527,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
     return (
       <AppPage>
         <div className="flex w-full flex-col">
-          <PageHeader
-            title="Opportunities"
-            action={<ActiveOpportunityCount count={reviewCount + totalCount} />}
-          />
+          <PageHeader title="Opportunities" />
           <DataLoadError
             title="Couldn’t load the reply queue"
             description="Your saved replies are still safe. Check your connection and try loading them again."
@@ -548,10 +542,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
   return (
     <AppPage>
       <div className="flex w-full flex-col">
-        <PageHeader
-          title="Opportunities"
-          action={<ActiveOpportunityCount count={reviewCount + totalCount} />}
-        />
+        <PageHeader title="Opportunities" />
 
         <OpportunityStageNav activeStage="replies" reviewCount={reviewCount} replyCount={totalCount} />
 
@@ -585,7 +576,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
               <span className="text-[13px] font-semibold text-gray-900">
                 Replies <span className="text-gray-400 font-normal text-xs">({searchQuery.trim() ? filteredDrafts.length : totalCount})</span>
               </span>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
@@ -593,15 +584,25 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   onChange={(e) => setSearchQuery(e.target.value)}
                   aria-label="Search drafts"
                   placeholder="Filter..."
-                  className="h-7 w-28 rounded-md border border-gray-200 bg-white pl-7 pr-2 text-[12px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none transition-colors"
+                  className="h-7 w-32 rounded-lg border border-gray-200 bg-white pl-7 pr-6 text-[12px] text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/5 transition-all"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                    title="Clear filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto divide-y divide-gray-100" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1" style={{ scrollbarWidth: 'thin' }}>
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="p-3.5 space-y-2 animate-pulse">
+                  <div key={i} className="p-3 space-y-2 animate-pulse rounded-xl bg-gray-100/50">
                     <div className="h-3.5 bg-gray-200 rounded w-1/3" />
                     <div className="h-4 bg-gray-100 rounded w-3/4" />
                   </div>
@@ -619,26 +620,28 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                       key={d.id}
                       type="button"
                       onClick={() => handleSelect(d)}
-                      className={`w-full text-left px-3.5 py-3 transition-colors ${
+                      className={`group w-full text-left p-3 rounded-xl transition-all duration-150 cursor-pointer ${
                         isSelected
-                          ? 'bg-white shadow-2xs relative z-10 border-l-[3px] border-gray-900'
-                          : 'hover:bg-gray-100/60 border-l-[3px] border-transparent'
+                          ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] border border-gray-200/90 ring-1 ring-black/[0.04] text-gray-900'
+                          : 'hover:bg-white/80 border border-transparent hover:border-gray-200/60 text-gray-700'
                       }`}
                     >
                       {/* Top meta row */}
-                      <div className="flex items-center justify-between text-[11px] mb-1">
-                        <div className="flex items-center gap-1.5 font-medium text-gray-700">
-                          <PlatformIcon platform={d.platform} />
-                          <span>{d.platform === 'reddit' ? `r/${d.community}` : d.community}</span>
+                      <div className="flex items-center justify-between text-[11px] mb-1.5">
+                        <div className="flex items-center gap-1.5 font-medium text-gray-600">
+                          <PlatformIcon platform={d.platform} size="sm" />
+                          <span className="truncate max-w-[130px] font-semibold text-gray-700">{d.platform === 'reddit' ? `r/${d.community}` : d.community}</span>
                           <span className="text-gray-300">·</span>
                           <span className="text-gray-400 font-normal">{d.timeAgo}</span>
                         </div>
 
                         {d.score > 0 && (
-                          <span className={`text-[10.5px] font-semibold px-1.5 py-0.2 rounded ${
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
                             d.score >= 80
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-gray-100 text-gray-600'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
+                              : d.score >= 65
+                              ? 'bg-blue-50 text-blue-700 border-blue-200/60'
+                              : 'bg-gray-100 text-gray-600 border-gray-200/60'
                           }`}>
                             {d.score}%
                           </span>
@@ -646,8 +649,8 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                       </div>
 
                       {/* Title */}
-                      <p className={`text-[12.5px] leading-snug line-clamp-1 ${
-                        isSelected ? 'font-semibold text-gray-900' : 'text-gray-800'
+                      <p className={`text-[12.5px] leading-snug line-clamp-2 ${
+                        isSelected ? 'font-semibold text-gray-900' : 'font-medium text-gray-700 group-hover:text-gray-900'
                       }`}>
                         {d.title || d.matchedKeyword || 'Draft reply'}
                       </p>
@@ -675,25 +678,30 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
           {selected ? (
             <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
               {/* Header */}
-              <div className="shrink-0 flex items-center justify-between gap-4 border-b border-gray-200 px-6 py-3">
-                <div className="flex items-center gap-2">
+              <div className="shrink-0 flex items-center justify-between gap-4 border-b border-gray-200 px-6 py-2.5 bg-white">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <PlatformIcon platform={selected.platform} size="md" />
-                  <span className="text-[14px] font-semibold text-gray-900">
+                  <span className="text-[13.5px] font-semibold text-gray-900">
                     {selected.platform === 'reddit' ? `r/${selected.community}` : selected.community}
                   </span>
                   <span className="text-gray-300">·</span>
                   <span className="text-[12px] text-gray-500">
-                    by <strong className="font-medium text-gray-700">{selected.target}</strong> · {selected.timeAgo}
+                    by <strong className="font-medium text-gray-700">{selected.target}</strong>
                   </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-[12px] text-gray-400">{selected.timeAgo}</span>
+                  {selected.platform === 'reddit' && (
+                    <RedditCommunityPolicyNotice subreddit={selected.community} compact />
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {selected.url && (
                     <a
                       href={selected.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[12px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11.5px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs"
                     >
                       Open post <ExternalLink className="h-3 w-3 text-gray-400" />
                     </a>
@@ -701,8 +709,8 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   <button
                     type="button"
                     onClick={handleDismiss}
-                    className="grid h-7 w-7 place-items-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-                    title="Dismiss"
+                    className="grid h-7 w-7 place-items-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+                    title="Dismiss from queue"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -710,10 +718,10 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
               </div>
 
               {/* Body */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4 sm:space-y-5" style={{ scrollbarWidth: 'thin' }}>
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-3.5" style={{ scrollbarWidth: 'thin' }}>
                 {/* Original Post */}
-                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="rounded-xl border border-gray-200/90 bg-white shadow-2xs p-4">
+                  <div className="flex items-center justify-between mb-1.5">
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-gray-400">
                       <span className="uppercase">Original post</span>
                       <span className="text-gray-300" aria-hidden="true">·</span>
@@ -722,7 +730,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                     <button
                       type="button"
                       onClick={handleCopyPost}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 hover:text-gray-900"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
                     >
                       {copiedPost ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
                       <span>{copiedPost ? 'Copied' : 'Copy'}</span>
@@ -730,20 +738,20 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   </div>
 
                   {selected.title && (
-                    <h4 className="text-[14px] font-bold text-gray-900 mb-2">
+                    <h4 className="text-[14.5px] font-semibold text-gray-900 leading-snug tracking-tight mb-2">
                       {selected.title}
                     </h4>
                   )}
 
-                  <div className="text-[13px] leading-relaxed text-gray-700 whitespace-pre-line">
-                    <p className={!isPostExpanded && (selected.content?.length > 280) ? 'line-clamp-4' : ''}>
+                  <div className="text-[13px] leading-relaxed text-gray-600 whitespace-pre-line">
+                    <p className={!isPostExpanded && (selected.content?.length > 240) ? 'line-clamp-3' : ''}>
                       {postBody || 'No post text available.'}
                     </p>
-                    {selected.content?.length > 280 && (
+                    {selected.content?.length > 240 && (
                       <button
                         type="button"
                         onClick={() => setIsPostExpanded(v => !v)}
-                        className="mt-1.5 text-[12px] font-semibold text-blue-600 hover:underline"
+                        className="mt-1 text-[11.5px] font-semibold text-blue-600 hover:underline cursor-pointer"
                       >
                         {isPostExpanded ? 'Show less' : 'Show full post'}
                       </button>
@@ -751,73 +759,169 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                   </div>
 
                   {selected.matchedKeyword && (
-                    <div className="mt-3 pt-2 border-t border-gray-200/60 text-[11px] text-gray-500">
-                      Matched monitoring rule: <strong className="text-gray-700 font-medium">&ldquo;{selected.matchedKeyword}&rdquo;</strong>
+                    <div className="mt-2.5 flex items-center">
+                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200/60 font-normal">
+                        Rule match: <strong className="text-gray-700 font-medium">&ldquo;{selected.matchedKeyword}&rdquo;</strong>
+                      </span>
                     </div>
                   )}
                 </div>
 
-                {/* Subreddit Policy Check if Reddit */}
-                {selected.platform === 'reddit' && (
-                  <RedditCommunityPolicyNotice subreddit={selected.community} />
-                )}
+                {/* Draft Reply Composition Surface */}
+                {(() => {
+                  const charCount = draftContent.length
+                  const wordCount = draftContent.trim() ? draftContent.trim().split(/\s+/).length : 0
+                  const readTimeSeconds = Math.max(1, Math.round((wordCount / 200) * 60))
+                  const platformLimit = PLATFORM_CHAR_LIMITS[selected.platform?.toLowerCase() || '']
+                  const isOverLimit = Boolean(platformLimit && charCount > platformLimit)
+                  const isEdited = draftContent !== originalDraftRef.current && Boolean(originalDraftRef.current)
 
-                {!draftContent && MANUAL_DRAFT_REASON_LABELS[selected.automationReason] && (
-                  <div role="status" className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-                    <span>{MANUAL_DRAFT_REASON_LABELS[selected.automationReason]}</span>
-                  </div>
-                )}
+                  return (
+                    <div className="rounded-2xl border border-gray-200/90 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden transition-all duration-200 focus-within:border-gray-900/30 focus-within:ring-4 focus-within:ring-gray-900/[0.04]">
+                      {/* Card Header Bar */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-gray-50/70 border-b border-gray-100">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-[13px] font-semibold text-gray-900 tracking-tight">
+                            Draft response
+                          </span>
 
-                {/* AI Draft Reply Area */}
-                <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-semibold text-gray-700 flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-                      Your reply
-                    </span>
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200/60">
+                            <PlatformIcon platform={selected.platform} size="sm" />
+                            <span className="capitalize">{selected.platform}</span>
+                          </span>
 
-                    <button
-                      type="button"
-                      onClick={handleRegenerate}
-                      disabled={isRegenerating || isSending}
-                      className="inline-flex items-center gap-1 text-[11.5px] font-medium text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-40"
-                    >
-                      <RefreshCcw className={`h-3 w-3 ${isRegenerating ? 'animate-spin text-blue-600' : ''}`} />
-                      {isRegenerating ? 'Regenerating…' : 'Regenerate'}
-                    </button>
-                  </div>
-
-                  <textarea
-                    value={draftContent}
-                    onChange={e => setDraftContent(e.target.value)}
-                    aria-label="Reply draft"
-                    className="w-full rounded-lg border border-gray-200 bg-white p-3 text-[13px] leading-relaxed text-gray-900 resize-none focus:border-gray-400 focus:outline-none transition-colors"
-                    rows={5}
-                    spellCheck
-                    placeholder="Write your reply, or regenerate when AI drafting is available."
-                  />
-
-                  <div className="flex items-center justify-between text-[11px] text-gray-400">
-                    <span>Edit before posting</span>
-                    <span>{draftContent.length} chars</span>
-                  </div>
-
-                  {draftContent && currentQuality?.blocksAutomation && (
-                    <div className="space-y-1 pt-1">
-                      {currentQuality.issues.map(issue => (
-                        <div key={issue.code} className="flex items-start gap-1.5 text-[11.5px] text-amber-800 bg-amber-50 p-2 rounded-md">
-                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" />
-                          <span>{issue.message}</span>
+                          {isEdited ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                              Edited
+                            </span>
+                          ) : draftContent ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              AI drafted
+                            </span>
+                          ) : null}
                         </div>
-                      ))}
+
+                        <div className="flex items-center gap-1.5">
+                          {isEdited && originalDraftRef.current && (
+                            <button
+                              type="button"
+                              onClick={() => setDraftContent(originalDraftRef.current)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11.5px] font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                              title="Revert to original AI draft"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span>Revert</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleRegenerate}
+                            disabled={isRegenerating || isSending}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium text-gray-700 bg-white hover:bg-gray-100 border border-gray-200/80 transition-all cursor-pointer disabled:opacity-40 shadow-2xs active:scale-[0.98]"
+                          >
+                            <RefreshCcw className={`h-3 w-3 text-gray-500 ${isRegenerating ? 'animate-spin text-gray-900' : ''}`} />
+                            <span>{isRegenerating ? 'Regenerating…' : 'Regenerate'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Notice banner if manual drafting is needed */}
+                      {!draftContent && MANUAL_DRAFT_REASON_LABELS[selected.automationReason] && (
+                        <div className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-50/80 border-b border-amber-200/50 text-[11.5px] text-amber-900">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                            <span className="truncate">{MANUAL_DRAFT_REASON_LABELS[selected.automationReason]}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRegenerate}
+                            disabled={isRegenerating || isSending}
+                            className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white hover:bg-amber-100/80 border border-amber-200 text-[11px] font-semibold text-amber-900 transition-colors shadow-2xs cursor-pointer"
+                          >
+                            <RefreshCcw className={`h-2.5 w-2.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+                            Generate draft
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Seamless Textarea without inner borders */}
+                      <div className="p-4 sm:p-5">
+                        <textarea
+                          value={draftContent}
+                          onChange={e => setDraftContent(e.target.value)}
+                          onKeyDown={e => {
+                            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                              e.preventDefault()
+                              if (draftContent && !isSending && !currentQuality?.blocksAutomation) {
+                                void handleApproveAndSend()
+                              }
+                            }
+                          }}
+                          aria-label="Reply draft"
+                          className="w-full bg-transparent p-0 text-[14px] sm:text-[14.5px] leading-[1.68] text-gray-900 placeholder:text-gray-400 resize-y focus:outline-none transition-colors min-h-[130px] font-normal tracking-[-0.01em]"
+                          rows={5}
+                          spellCheck
+                          placeholder="Write your reply, or regenerate when AI drafting is available."
+                        />
+                      </div>
+
+                      {/* Card Footer with stats, quality, and shortcut */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-gray-50/50 border-t border-gray-100 text-[11.5px] text-gray-500">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className={`tabular-nums font-medium ${isOverLimit ? 'text-rose-600 font-semibold' : 'text-gray-700'}`}>
+                            {charCount} chars{platformLimit ? ` / ${platformLimit}` : ''}
+                          </span>
+                          <span className="text-gray-300">·</span>
+                          <span className="tabular-nums text-gray-500">
+                            {wordCount} words
+                          </span>
+                          <span className="text-gray-300">·</span>
+                          <span className="tabular-nums text-gray-400">
+                            ~{readTimeSeconds}s read
+                          </span>
+                          {isOverLimit && (
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                              Over limit
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {currentQuality && !currentQuality.blocksAutomation ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                              Quality checked
+                            </span>
+                          ) : null}
+
+                          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-gray-400 font-normal">
+                            <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-gray-100 border border-gray-200 rounded text-gray-600">⌘↵</kbd>
+                            <span>to post</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quality Issues warning banner */}
+                      {draftContent && currentQuality?.blocksAutomation && (
+                        <div className="border-t border-amber-200/80 bg-amber-50/80 px-4 py-2.5 space-y-1">
+                          {currentQuality.issues.map(issue => (
+                            <div key={issue.code} className="flex items-start gap-2 text-[11.5px] text-amber-900">
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" />
+                              <span>{issue.message}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  )
+                })()}
               </div>
 
               {/* Bottom Action Footer */}
-              <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-between gap-4">
+              <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-2.5 flex items-center justify-between gap-4">
                 <div className="hidden min-w-0 flex-1 truncate text-[12px] text-gray-400 font-normal sm:block">
                   {selected?.platform === 'reddit'
                     ? 'Your reply is copied and the Reddit post opens in a new tab.'
@@ -834,7 +938,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                       <button
                         type="button"
                         onClick={handleDismiss}
-                        className="h-8.5 px-3 text-[12.5px] font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                        className="h-8.5 px-3 text-[12px] font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                       >
                         Dismiss
                       </button>
@@ -843,7 +947,7 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         type="button"
                         onClick={handleCopy}
                         disabled={!draftContent}
-                        className="h-8.5 px-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 transition-colors shadow-2xs"
+                        className="h-8.5 px-3 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white text-[12px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 transition-colors shadow-2xs cursor-pointer disabled:cursor-not-allowed"
                       >
                         {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-gray-400" />}
                         <span>{copied ? 'Copied' : 'Copy reply'}</span>
@@ -853,20 +957,22 @@ export function ReplyQueueWorkspace({ initialThreadId }: ReplyQueueWorkspaceProp
                         type="button"
                         onClick={handleApproveAndSend}
                         disabled={isDisabled}
-                        className={`h-8.5 px-4 inline-flex items-center gap-1.5 rounded-md text-[12.5px] font-medium transition-colors shadow-xs ${
+                        className={`h-8.5 px-4 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-semibold transition-all shadow-xs cursor-pointer ${
                           isDisabled
                             ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none'
                             : isMarkAsPosted
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                            ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99]'
                             : isReddit
-                            ? 'bg-[#FF4500] text-white hover:bg-[#E03D00]'
-                            : 'bg-gray-900 text-white hover:bg-black'
+                            ? 'bg-[#FF4500] text-white hover:bg-[#E03D00] active:scale-[0.99]'
+                            : 'bg-gray-900 text-white hover:bg-black active:scale-[0.99]'
                         }`}
                       >
                         {isSending ? (
                           <><RefreshCcw className="h-3.5 w-3.5 animate-spin" /> Preparing...</>
                         ) : isMarkAsPosted ? (
                           <><CheckCircle className="h-3.5 w-3.5" /> Mark as Posted</>
+                        ) : !draftContent ? (
+                          <>Write reply to post</>
                         ) : isReddit ? (
                           <><RedditIcon className="h-3.5 w-3.5" /> Copy &amp; open Reddit</>
                         ) : (

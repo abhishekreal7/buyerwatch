@@ -3,26 +3,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.withRedisLock = void 0;
 exports.dispatchPendingOutbox = dispatchPendingOutbox;
 exports.recoverStaleSends = recoverStaleSends;
 exports.cleanupOperationalData = cleanupOperationalData;
 exports.reconcileBillingSubscriptions = reconcileBillingSubscriptions;
-exports.withRedisLock = withRedisLock;
-const node_crypto_1 = require("node:crypto");
 const dodopayments_1 = __importDefault(require("dodopayments"));
 const supabase_js_1 = require("@supabase/supabase-js");
-const queues_1 = require("./queues");
-const reply_jobs_1 = require("./reply-jobs");
 const logger_1 = require("./logger");
+const qstash_1 = require("./qstash");
+const reddit_delivery_concurrency_1 = require("./reddit-delivery-concurrency");
+const dodo_1 = require("./dodo");
+var redis_lock_1 = require("./redis-lock");
+Object.defineProperty(exports, "withRedisLock", { enumerable: true, get: function () { return redis_lock_1.withRedisLock; } });
 function getSupabaseAdmin() {
     return (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-}
-function planForProduct(productId) {
-    if (productId === process.env.DODO_PAYMENTS_PRO_PRODUCT_ID)
-        return 'pro';
-    if (productId === process.env.DODO_PAYMENTS_GROWTH_PRODUCT_ID)
-        return 'growth';
-    return null;
 }
 async function dispatchPendingOutbox(limit = 100, threadId) {
     const supabase = getSupabaseAdmin();
@@ -41,19 +36,21 @@ async function dispatchPendingOutbox(limit = 100, threadId) {
     for (const entry of data ?? []) {
         const payload = entry.payload;
         try {
-            const jobId = (0, reply_jobs_1.getSendReplyJobId)(entry.thread_id);
-            const existingJob = await queues_1.sendReplyQueue.getJob(jobId);
-            if (existingJob && await existingJob.isFailed()) {
-                await existingJob.remove();
-            }
-            await queues_1.sendReplyQueue.add('send', payload, {
-                jobId,
+            const messageId = await (0, qstash_1.publishQStashJson)('/api/jobs/send', payload, {
+                retries: 4,
+                timeout: '4m',
+                flowControl: (0, reddit_delivery_concurrency_1.getRedditDeliveryFlowControl)(payload.platform),
             });
+            if (!messageId)
+                throw new Error('QStash reply delivery is not configured');
             const { error: updateError } = await supabase
                 .from('job_outbox')
                 .update({
                 status: 'dispatched',
                 dispatched_at: new Date().toISOString(),
+                qstash_message_id: messageId,
+                completed_at: null,
+                permalink: null,
                 attempts: entry.attempts + 1,
                 last_error: null,
             })
@@ -79,13 +76,21 @@ async function dispatchPendingOutbox(limit = 100, threadId) {
     return dispatched;
 }
 async function recoverStaleSends(now = new Date()) {
+    const supabase = getSupabaseAdmin();
     const staleBefore = new Date(now.getTime() - 15 * 60_000).toISOString();
-    const { data, error } = await getSupabaseAdmin().rpc('recover_stale_send_claims', {
+    const { data: recoveredClaims, error: claimsError } = await supabase.rpc('recover_stale_send_claims', {
         p_stale_before: staleBefore,
     });
-    if (error)
-        throw error;
-    return Number(data ?? 0);
+    if (claimsError)
+        throw claimsError;
+    const staleOutboxBefore = new Date(now.getTime() - 20 * 60_000).toISOString();
+    const { data: requeuedOutbox, error: outboxError } = await supabase.rpc('requeue_stale_auto_send_outbox', {
+        p_stale_before: staleOutboxBefore,
+        p_max_dispatch_attempts: 3,
+    });
+    if (outboxError)
+        throw outboxError;
+    return Number(recoveredClaims ?? 0) + Number(requeuedOutbox ?? 0);
 }
 async function cleanupOperationalData() {
     const { data, error } = await getSupabaseAdmin().rpc('cleanup_operational_data');
@@ -111,9 +116,7 @@ async function reconcileBillingSubscriptions(limit = 100) {
         throw error;
     const dodo = new dodopayments_1.default({
         bearerToken: apiKey,
-        environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'test_mode'
-            ? 'test_mode'
-            : 'live_mode',
+        environment: (0, dodo_1.getDodoEnvironment)(),
         timeout: 15_000,
         maxRetries: 2,
     });
@@ -123,7 +126,7 @@ async function reconcileBillingSubscriptions(limit = 100) {
             continue;
         try {
             const subscription = await dodo.subscriptions.retrieve(profile.billing_subscription_id);
-            const plan = planForProduct(subscription.product_id);
+            const plan = (0, dodo_1.getDodoPlanFromProductId)(subscription.product_id);
             if (!plan) {
                 logger_1.logger.error({ subscriptionId: subscription.subscription_id }, 'Billing reconciliation found an unknown product');
                 continue;
@@ -159,16 +162,4 @@ async function reconcileBillingSubscriptions(limit = 100) {
         }
     }
     return reconciled;
-}
-async function withRedisLock(redis, key, ttlMs, operation) {
-    const token = (0, node_crypto_1.randomUUID)();
-    const acquired = await redis.set(key, token, 'PX', ttlMs, 'NX');
-    if (acquired !== 'OK')
-        return null;
-    try {
-        return await operation();
-    }
-    finally {
-        await redis.eval(`if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0`, 1, key, token).catch(() => undefined);
-    }
 }

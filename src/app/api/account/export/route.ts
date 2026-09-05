@@ -1,25 +1,29 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
+import { fetchAllByKey } from '@/lib/supabase-pagination'
 
 async function allRows(
   client: Awaited<ReturnType<typeof createClient>>,
   table: string,
   userId: string,
+  cursorColumn = 'id',
 ) {
-  const rows: unknown[] = []
-  const pageSize = 500
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await client
-      .from(table)
-      .select('*')
-      .eq('user_id', userId)
-      .range(offset, offset + pageSize - 1)
-    if (error) throw error
-    rows.push(...(data ?? []))
-    if ((data?.length ?? 0) < pageSize) break
-  }
-  return rows
+  const result = await fetchAllByKey<Record<string, unknown>>(
+    (afterKey, limit) => {
+      let query = client
+        .from(table)
+        .select('*')
+        .eq('user_id', userId)
+        .order(cursorColumn, { ascending: true })
+        .limit(limit)
+      if (afterKey) query = query.gt(cursorColumn, afterKey)
+      return query
+    },
+    row => String(row[cursorColumn] ?? ''),
+  )
+  if (result.error) throw result.error
+  return result.data ?? []
 }
 
 export async function GET() {
@@ -32,7 +36,7 @@ export async function GET() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, notification_preferences, plan, created_at')
+      .select('id, business_name, business_description, business_url, business_type, writing_style, discovery_source, tone_archetype, style_guardrails, competitors, tone_examples, notification_preferences, plan, created_at')
       .eq('id', user.id)
       .single()
     if (profileError) throw profileError
@@ -43,7 +47,7 @@ export async function GET() {
       allRows(supabase, 'reply_analytics', user.id),
       allRows(supabase, 'draft_feedback', user.id),
       allRows(supabase, 'reply_attribution', user.id),
-      allRows(supabase, 'usage_logs', user.id),
+      allRows(supabase, 'usage_logs', user.id, 'date'),
     ])
 
     return NextResponse.json({

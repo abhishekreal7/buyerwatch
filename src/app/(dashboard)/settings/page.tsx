@@ -5,7 +5,10 @@
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { redirect } from 'next/navigation'
-import { normalizePlan, getPlanLimits } from '@/lib/plan-limits'
+import { getPlanLimits } from '@/lib/plan-limits'
+import { getBillingDisplayState, getEntitledPlan } from '@/lib/billing-entitlements'
+import { getCurrentUsageMonth } from '@/lib/billing-addons'
+import { getDodoBillingSelectionFromProductId } from '@/lib/dodo'
 import {
   isToneArchetype,
   normalizeStyleGuardrails,
@@ -19,6 +22,7 @@ import {
 import { getRedditConnectionSummary } from '@/lib/reddit-session'
 import { isXDiscoveryConfigured } from '@/lib/x'
 import { isXPostingConfigured } from '@/lib/x-post'
+import { evaluateRedditAutoSendEligibility } from '@/lib/reddit-auto-send-eligibility'
 import SettingsPage, { type SettingsInitialData } from './SettingsPage'
 
 export default async function SettingsServerPage() {
@@ -82,10 +86,17 @@ export default async function SettingsServerPage() {
     redditUsername: redditConn?.external_username || '',
     redditStatus: redditSummary.status ?? 'missing',
     redditProvider: redditSummary.provider ?? null,
+    redditAutoSendEligibility: evaluateRedditAutoSendEligibility({
+      accountCreatedAt: redditSummary.accountCreatedAt,
+      linkKarma: redditSummary.linkKarma,
+      commentKarma: redditSummary.commentKarma,
+    }),
   }
 
-  const plan = normalizePlan(p.plan)
+  const plan = getEntitledPlan(p)
   const limits = getPlanLimits(plan)
+  const billingSelection = getDodoBillingSelectionFromProductId(p.billing_product_id)
+  const usageMonth = getCurrentUsageMonth()
 
   const initialData: SettingsInitialData = {
     profile: {
@@ -125,21 +136,40 @@ export default async function SettingsServerPage() {
       redditDirectPosting: hasRedditPostingProvider(),
       redditScheduledDiscovery: hasRedditDiscoveryProvider(),
       redditConnectionProvider: getRedditPostingProviderKind(),
-      redditBrowserConnection: true,
+      // Browser relay and assistant/MCP connections are not enabled in this
+      // deployment. Keep them out of the customer UI until they are actually
+      // provisioned and supported end to end.
+      redditBrowserConnection: false,
+      mcpConnection: false,
     },
     usageStats: {
-      threads: threadsCountResult.count || 0,
-      drafts: draftsCountResult.count || 0,
+      threads: p.signal_month === usageMonth ? Math.max(p.signal_count ?? 0, 0) : 0,
+      drafts: p.draft_month === usageMonth ? Math.max(p.draft_count ?? 0, 0) : 0,
       replies: sentCountResult.count || 0,
       keywords: keywordsCountResult.count || 0,
     },
     planState: {
       plan,
+      billingState: getBillingDisplayState(p),
+      currentCadence: billingSelection?.plan === plan ? billingSelection.cadence : null,
+      hasBillingPortal: Boolean(p.billing_customer_id && p.billing_subscription_id),
       keywordsMax: limits.keywords,
       threadsMax: limits.threadsPerMonth,
       draftsMax: limits.aiDraftsPerMonth,
     },
     draftsReviewed: Math.min(trustResult.data?.total_drafts_reviewed ?? 0, 10),
+    instantAutopilot: {
+      available: Boolean(p.instant_autopilot_granted_at)
+        && Date.parse(p.instant_autopilot_expires_at ?? '') > now.getTime()
+        && !p.instant_autopilot_used_at,
+      used: Boolean(p.instant_autopilot_used_at),
+      expiresAt: p.instant_autopilot_expires_at ?? null,
+    },
+    user: {
+      name: (user.user_metadata?.custom_name || user.user_metadata?.full_name || user.user_metadata?.name || p.business_name || (user.email ? user.email.split('@')[0] : 'User')) as string,
+      email: user.email,
+      avatarUrl: ((user.user_metadata?.custom_avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture) as string) || '',
+    },
   }
 
   return <SettingsPage initialData={initialData} />
@@ -163,7 +193,7 @@ async function loadSettingsPrefetch(
   ] = await Promise.all([
     supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, high_intent_threshold, webhook_secret, plan')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, reddit_username, auto_send_enabled, auto_send_threshold, auto_send_daily_limit, auto_send_platforms, auto_send_communities, referral_tracking_enabled, notification_preferences, high_intent_threshold, webhook_secret, plan, billing_status, billing_subscription_id, billing_customer_id, billing_product_id, signal_count, signal_month, draft_count, draft_month, instant_autopilot_granted_at, instant_autopilot_expires_at, instant_autopilot_used_at')
       .eq('id', userId)
       .single(),
     supabase.from('monitored_threads').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', firstDay),

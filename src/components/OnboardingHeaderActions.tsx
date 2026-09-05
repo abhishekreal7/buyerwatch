@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { skipOnboardingAction } from '@/app/actions/onboarding'
 import { Loader2 } from 'lucide-react'
@@ -21,6 +22,7 @@ export function OnboardingHeaderActions({
   const [skipping, setSkipping] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [supabase] = useState(createClient)
+  const router = useRouter()
 
   const handleSkip = async () => {
     if (skipping || signingOut) return
@@ -29,11 +31,10 @@ export function OnboardingHeaderActions({
     try {
       await skipOnboardingAction(selectedPlan, selectedBilling)
     } catch {
-      // Fallback hard redirect if server action redirect didn't trigger
-      window.location.href = afterAuthenticationDestination(selectedPlan, true, selectedBilling)
+      router.replace(afterAuthenticationDestination(selectedPlan, true, selectedBilling))
       return
     }
-    window.location.href = afterAuthenticationDestination(selectedPlan, true, selectedBilling)
+    router.replace(afterAuthenticationDestination(selectedPlan, true, selectedBilling))
   }
 
   const handleSignOut = async () => {
@@ -45,7 +46,8 @@ export function OnboardingHeaderActions({
     } catch {
       // Ignore errors and force redirect
     }
-    window.location.href = '/login'
+    router.replace('/login')
+    router.refresh()
   }
 
   return (

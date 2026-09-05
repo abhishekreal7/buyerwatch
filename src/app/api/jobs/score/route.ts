@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { logger } from '@/lib/logger'
 import { verifyQStashRequest } from '@/lib/qstash'
-import { isUuid } from '@/lib/request'
+import { isUuid, readTextBody, RequestInputError } from '@/lib/request'
 import { withScoreLock } from '@/lib/score-lock'
 import type { NormalizedPost } from '@/lib/types'
 import { processScorePost } from '../../../../../worker/handlers/score-post'
@@ -51,7 +51,21 @@ function isScoreMessage(value: unknown): value is ScoreMessage {
 }
 
 export async function POST(request: Request) {
-  const rawBody = await request.text()
+  let rawBody: string
+  try {
+    rawBody = await readTextBody(request, 128_000)
+  } catch (error) {
+    if (error instanceof RequestInputError) {
+      return NextResponse.json(
+        { error: error.message },
+        {
+          status: error.message === 'request_too_large' ? 413 : 400,
+          headers: { 'Upstash-NonRetryable-Error': 'true' },
+        },
+      )
+    }
+    return invalidPayload()
+  }
   if (!await verifyQStashRequest(request, rawBody)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

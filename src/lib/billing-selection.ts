@@ -5,6 +5,14 @@ export function normalizeSelectedBillingPlan(value: unknown): SelectedBillingPla
   return value === 'starter' || value === 'pro' || value === 'growth' ? value : null
 }
 
+/**
+ * BuyerWatch has no public free plan. A signup without an explicit pricing
+ * selection therefore enters the card-verified Starter trial by default.
+ */
+export function selectedPlanForSignup(value: unknown): SelectedBillingPlan {
+  return normalizeSelectedBillingPlan(value) ?? 'starter'
+}
+
 export function normalizeSelectedBillingCadence(value: unknown): SelectedBillingCadence {
   return value === 'annual' ? 'annual' : 'monthly'
 }
@@ -37,4 +45,28 @@ export function afterAuthenticationDestination(
     billing: normalizeSelectedBillingCadence(cadence),
   })
   return `/settings?${params}`
+}
+
+export function afterOnboardingDestination(
+  value: unknown,
+  cadence?: unknown,
+  initialScanQueued = false,
+): string {
+  const plan = normalizeSelectedBillingPlan(value)
+  if (plan) {
+    const params = new URLSearchParams({
+      section: 'plan',
+      upgrade: plan,
+      billing: normalizeSelectedBillingCadence(cadence),
+      activation: 'complete',
+      scan: initialScanQueued ? 'queued' : 'scheduled',
+    })
+    return `/settings?${params}`
+  }
+
+  const params = new URLSearchParams({
+    activation: 'complete',
+    scan: initialScanQueued ? 'queued' : 'scheduled',
+  })
+  return `/opportunities?${params}`
 }

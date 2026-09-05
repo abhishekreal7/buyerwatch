@@ -4,7 +4,7 @@ import DodoPayments from 'dodopayments'
 import { createHash } from 'node:crypto'
 import { getAppUrl } from '@/lib/app-url'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
-import { readJsonBody, RequestInputError } from '@/lib/request'
+import { isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 import { getBillingAddonPack } from '@/lib/billing-addons'
 import { getAddonProductId } from '@/lib/billing-addons-server'
 import {
@@ -15,6 +15,8 @@ import {
   getTrialDaysForPlan,
   parseBillingCheckoutIntent,
 } from '@/lib/dodo'
+import { logger } from '@/lib/logger'
+import { getStarterPromotionDiscountCode } from '@/lib/starter-promotion'
 
 /**
  * POST /api/billing/checkout
@@ -33,6 +35,10 @@ import {
  */
 export async function POST(req: Request) {
   try {
+    if (!isTrustedSameOriginMutation(req)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -63,7 +69,7 @@ export async function POST(req: Request) {
     try {
       environment = getDodoEnvironment()
     } catch {
-      console.error('[billing/checkout] DODO_PAYMENTS_ENVIRONMENT is invalid')
+      logger.error({ code: 'invalid_dodo_environment' }, 'Billing checkout configuration is invalid')
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
     }
 
@@ -110,7 +116,7 @@ export async function POST(req: Request) {
 
       const checkoutUrl = (session as any).checkout_url ?? (session as any).url
       if (!checkoutUrl) {
-        console.error('[billing/checkout] Dodo add-on session did not include a checkout URL')
+        logger.error({ code: 'missing_addon_checkout_url' }, 'Billing provider response was incomplete')
         return NextResponse.json({ error: 'checkout_url_not_found' }, { status: 500 })
       }
 
@@ -119,6 +125,10 @@ export async function POST(req: Request) {
 
     const requestedPlan = intent.plan
     const requestedCadence = intent.cadence
+    const starterPromotionCode = getStarterPromotionDiscountCode(
+      requestedPlan,
+      requestedCadence,
+    )
     const productId = getDodoProductIdForPlan(requestedPlan, requestedCadence)
     if (!productId) {
       return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 })
@@ -137,7 +147,7 @@ export async function POST(req: Request) {
       .eq('id', user.id)
       .maybeSingle()
     if (profileError) {
-      console.error('[billing/checkout] Could not load billing profile:', profileError)
+      logger.error({ code: profileError.code }, 'Could not load billing profile')
       return NextResponse.json({ error: 'billing_profile_unavailable' }, { status: 503 })
     }
 
@@ -208,10 +218,19 @@ export async function POST(req: Request) {
         email: user.email,
       },
       // Dodo applies this to the subscription itself, overriding any product
-      // default. Only monthly Starter uses the acquisition trial; annual
-      // subscriptions are paid upfront.
+      // default. Every new plan and cadence receives the same card-required
+      // acquisition trial before its selected billing cycle begins.
       subscription_data: {
         trial_period_days: getTrialDaysForPlan(requestedPlan, requestedCadence) ?? null,
+      },
+      // The introductory Starter price is provider-enforced for the first paid
+      // cycle, after the card-required seven-day trial completes.
+      discount_code: starterPromotionCode ?? null,
+      feature_flags: {
+        // Dodo rejects a pre-applied discount when this flag is false. Keep
+        // manual code entry disabled for regular checkouts, but allow the
+        // provider to accept BuyerWatch's server-selected Starter promotion.
+        allow_discount_code: Boolean(starterPromotionCode),
       },
       // metadata is returned verbatim in every webhook event —
       // the webhook handler reads metadata.user_id and metadata.plan
@@ -220,26 +239,45 @@ export async function POST(req: Request) {
         plan: requestedPlan,
         billing_cadence: requestedCadence,
         trial_days: String(getTrialDaysForPlan(requestedPlan, requestedCadence) ?? 0),
+        starter_promotion: starterPromotionCode ? 'first_month_19' : 'none',
       },
-      return_url: `${getAppUrl()}/dashboard`,
+      return_url: `${getAppUrl()}/dashboard?billing=checkout_return&plan=${requestedPlan}`,
     }, { idempotencyKey })
 
     const checkoutUrl = (session as any).checkout_url ?? (session as any).url
 
     if (!checkoutUrl) {
-      console.error('[billing/checkout] Dodo session did not include a checkout URL')
+      logger.error({ code: 'missing_plan_checkout_url' }, 'Billing provider response was incomplete')
       return NextResponse.json({ error: 'checkout_url_not_found' }, { status: 500 })
     }
 
+    logger.info({
+      userId: user.id,
+      plan: requestedPlan,
+      cadence: requestedCadence,
+      trialDays: getTrialDaysForPlan(requestedPlan, requestedCadence) ?? 0,
+    }, 'Billing checkout created')
     return NextResponse.json({ url: checkoutUrl })
 
   } catch (error) {
     if (error instanceof RequestInputError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
-    console.error('[billing/checkout] Error:', error)
-    const errObj = error as Record<string, any>
-    if (errObj?.status === 401 || errObj?.statusCode === 401 || String(errObj?.message).includes('401')) {
+    const errObj = error && typeof error === 'object'
+      ? error as Record<string, unknown>
+      : {}
+    const providerStatus = typeof errObj.status === 'number'
+      ? errObj.status
+      : typeof errObj.statusCode === 'number'
+        ? errObj.statusCode
+        : undefined
+    const providerCode = typeof errObj.code === 'string'
+      ? errObj.code.slice(0, 100)
+      : error instanceof Error
+        ? error.name
+        : 'unknown'
+    logger.error({ providerStatus, providerCode }, 'Billing checkout failed')
+    if (providerStatus === 401 || String(errObj.message).includes('401')) {
       return NextResponse.json({ error: 'billing_provider_unauthorized' }, { status: 502 })
     }
     return NextResponse.json({ error: 'checkout_failed' }, { status: 500 })

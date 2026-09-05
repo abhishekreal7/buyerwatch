@@ -15,6 +15,14 @@ function uniqueKeywordIds(keywordIds: string[]): string[] {
 
 export function keywordPollErrorCode(error: unknown): string {
   const message = error instanceof Error ? error.message.toLocaleLowerCase() : ''
+  if (
+    message.includes('x_search_402')
+    || message.includes('creditsdepleted')
+    || message.includes('credits depleted')
+  ) return 'x_credits_exhausted'
+  if (message.includes('x_search_400')) return 'x_query_invalid'
+  if (message.includes('x_search_401')) return 'provider_auth_failed'
+  if (message.includes('x_search_403')) return 'x_access_denied'
   if (message.includes('daily_read_budget_exhausted')) return 'provider_budget_exhausted'
   if (message.includes('budget_guard_unavailable')) return 'provider_budget_guard_unavailable'
   if (message.includes('circuit_open')) return 'provider_circuit_open'

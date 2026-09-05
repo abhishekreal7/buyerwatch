@@ -37,6 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scorePostHandler = scorePostHandler;
+exports.processScorePost = processScorePost;
 const logger_1 = require("../../src/lib/logger");
 const intent_scorer_1 = require("../../src/lib/intent-scorer");
 const draft_reply_1 = require("../../src/lib/draft-reply");
@@ -45,18 +46,39 @@ const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 const crypto_1 = require("crypto");
 const attribution_1 = require("../../src/lib/attribution");
-const buying_signal_filter_1 = require("../../src/lib/buying-signal-filter");
 const app_url_1 = require("../../src/lib/app-url");
+const intent_1 = require("../../src/lib/intent");
+const intent_preflight_1 = require("../../src/lib/intent-preflight");
 const plan_limits_1 = require("../../src/lib/plan-limits");
+const env_1 = require("../../src/lib/env");
 const ai_usage_1 = require("../../src/lib/ai-usage");
+const ai_settlement_1 = require("../../src/lib/ai-settlement");
 const backend_maintenance_1 = require("../../src/lib/backend-maintenance");
+const follow_up_outbox_1 = require("../../src/lib/follow-up-outbox");
+const automation_audit_1 = require("../../src/lib/automation-audit");
+const platform_capabilities_1 = require("../../src/lib/platform-capabilities");
+const x_post_1 = require("../../src/lib/x-post");
+const score_lock_1 = require("../../src/lib/score-lock");
+const reddit_community_policy_1 = require("../../src/lib/reddit-community-policy");
+const content_freshness_1 = require("../../src/lib/content-freshness");
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
-const INTENT_THRESHOLD = 60;
 async function scorePostHandler(job) {
-    const { userId, keywordId, post } = job.data;
+    const payload = job.data;
+    const result = await (0, score_lock_1.withScoreLock)(payload.userId, payload.post.externalId, () => processScorePost(payload));
+    if (result === null) {
+        logger_1.logger.info({ jobId: job.id, userId: payload.userId, externalId: payload.post.externalId }, 'Skipped duplicate score job while another worker owns the score lease');
+    }
+    return result;
+}
+async function processScorePost(payload, options = {}) {
+    const { userId, keywordId, post } = payload;
+    const allowAutoSend = options.allowAutoSend !== false;
+    const enqueueFollowUpJobs = options.enqueueFollowUpJobs !== false;
+    const providerRetries = options.providerRetries;
     let signalReserved = false;
     let draftReserved = false;
+    let draftSpendReservationId = null;
     try {
         // 1. Resume a checkpointed high-intent thread after a worker/provider
         // failure. Completed rows only need their durable outbox dispatched.
@@ -70,7 +92,27 @@ async function scorePostHandler(job) {
         if (existingError)
             throw existingError;
         if (existing && existing.status !== 'pending') {
-            await (0, backend_maintenance_1.dispatchPendingOutbox)(1, existing.id);
+            if (enqueueFollowUpJobs)
+                await (0, backend_maintenance_1.dispatchPendingOutbox)(1, existing.id);
+            return;
+        }
+        const freshness = (0, content_freshness_1.evaluateContentFreshness)(post.createdAt);
+        if (freshness.fresh === false) {
+            if (existing?.id) {
+                const { error: staleDeleteError } = await supabase_1.supabaseWorker
+                    .from('monitored_threads')
+                    .delete()
+                    .eq('id', existing.id)
+                    .eq('status', 'pending');
+                if (staleDeleteError)
+                    throw staleDeleteError;
+            }
+            logger_1.logger.info({
+                userId,
+                platform: post.platform,
+                externalId: post.externalId,
+                reason: freshness.reason,
+            }, 'Dropped stale source post before scoring');
             return;
         }
         const hasScoringCheckpoint = Boolean(existing
@@ -79,28 +121,49 @@ async function scorePostHandler(job) {
         // 2. Fetch user profile for context and plan
         const { data: extendedProfile } = await supabase_1.supabaseWorker
             .from('profiles')
-            .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+            .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, high_intent_threshold, auto_send_platforms, auto_send_communities, auto_send_daily_limit, referral_tracking_enabled, instant_autopilot_activated_at, instant_autopilot_expires_at, instant_autopilot_used_at')
             .eq('id', userId)
             .single();
         let profile = extendedProfile;
         if (!profile) {
             const legacyResult = await supabase_1.supabaseWorker
                 .from('profiles')
-                .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, referral_tracking_enabled')
+                .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, high_intent_threshold, referral_tracking_enabled')
                 .eq('id', userId)
                 .single();
             if (legacyResult.error)
                 throw legacyResult.error;
             profile = legacyResult.data
-                ? { ...legacyResult.data, tone_archetype: null, style_guardrails: [] }
+                ? {
+                    ...legacyResult.data,
+                    tone_archetype: null,
+                    style_guardrails: [],
+                    auto_send_platforms: ['bluesky'],
+                    auto_send_communities: [],
+                    auto_send_daily_limit: 3,
+                    high_intent_threshold: 80,
+                    instant_autopilot_activated_at: null,
+                    instant_autopilot_expires_at: null,
+                    instant_autopilot_used_at: null,
+                }
                 : null;
         }
         if (!profile)
             throw new Error('Profile not found for scoring job');
+        const { data: keyword, error: keywordError } = await supabase_1.supabaseWorker
+            .from('keywords')
+            .select('term')
+            .eq('id', keywordId)
+            .maybeSingle();
+        if (keywordError)
+            throw keywordError;
         const plan = (0, plan_limits_1.normalizePlan)(profile.plan);
         const planLimits = (0, plan_limits_1.getPlanLimits)(plan);
+        const hasAnthropic = Boolean((0, env_1.getConfiguredSecret)(process.env.ANTHROPIC_API_KEY));
         let scoreResult;
         let evidenceSignals;
+        let paidIntentGatePassed = true;
+        let intentManualReviewReason = 'preflight_ai_bypassed';
         if (hasScoringCheckpoint && existing) {
             scoreResult = {
                 score: Number(existing.intent_score ?? 0),
@@ -112,59 +175,147 @@ async function scorePostHandler(job) {
             evidenceSignals = existing.matched_signals ?? [];
         }
         else {
-            // 3. Reserve one monthly signal slot before paid AI work.
+            // 3. Reject irrelevant/promotional posts before reserving a paid signal.
+            // A raw keyword hit must never consume a customer's monthly allowance.
+            const preflight = (0, intent_preflight_1.evaluateIntentPreflight)(post, profile, {
+                keywordTerm: keyword?.term,
+            });
+            evidenceSignals = preflight.evidenceSignals;
+            if (!preflight.isQualifiedCandidate) {
+                await saveThread({
+                    userId,
+                    keywordId,
+                    post,
+                    intentScore: preflight.score,
+                    intentLabel: preflight.label,
+                    status: 'dismissed',
+                    flag: preflight.flag,
+                    reasoning: preflight.reasoning,
+                    evidenceSignals,
+                    automationReason: 'preflight_rejected',
+                });
+                logger_1.logger.info({
+                    userId,
+                    platform: post.platform,
+                    externalId: post.externalId,
+                    evidenceSignals: evidenceSignals.slice(0, 6),
+                }, 'Intent preflight rejected an unqualified candidate');
+                return;
+            }
             const canProcessSignal = await reserveMonthlySignal(userId, planLimits.threadsPerMonth);
             if (!canProcessSignal) {
-                logger_1.logger.info({ userId, plan }, 'Monthly signal limit reached');
+                // Make this terminal. Leaving an unscored row pending causes it to sit
+                // at the head of the global queue and starve every later candidate.
+                const dismissedThread = await saveThread({
+                    userId,
+                    keywordId,
+                    post,
+                    intentScore: 0,
+                    intentLabel: 'other',
+                    status: 'dismissed',
+                    reasoning: 'Skipped because the monthly signal allowance is exhausted; this post was not analyzed.',
+                    evidenceSignals,
+                    automationReason: 'signal_limit_reached',
+                });
+                await clearUnscoredIntent(dismissedThread.id);
+                logger_1.logger.info({ userId, plan }, 'Monthly signal limit reached; candidate dismissed from the scoring queue');
                 return;
             }
             signalReserved = true;
-            // 4. Reserve provider spend and the daily intent allowance atomically.
-            const intentSpend = await (0, ai_usage_1.reserveAiSpend)(supabase_1.supabaseWorker, {
-                userId,
-                purpose: 'intent',
-                plan,
-            });
-            if (!intentSpend) {
-                logger_1.logger.warn({ userId, plan }, 'AI spend cap blocked intent scoring');
-                await safelyReleaseMonthlySignal(userId);
-                signalReserved = false;
-                return;
-            }
-            let canScore;
-            try {
-                canScore = await checkBudget(userId, profile.plan, 'intent');
-            }
-            catch (error) {
-                await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' });
-                throw error;
-            }
-            if (!canScore) {
-                await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' });
-                logger_1.logger.info({ userId }, 'Daily intent-scoring limit reached');
-                await safelyReleaseMonthlySignal(userId);
-                signalReserved = false;
-                return;
-            }
-            // 5. Score intent and reconcile the reservation with actual usage.
-            try {
-                scoreResult = await (0, intent_scorer_1.scoreIntent)(post, profile);
-                await safelyRecordAiUsage(intentSpend.id, scoreResult.usage, {
+            paidIntentGatePassed = !hasAnthropic || preflight.shouldUseAi;
+            if (hasAnthropic && preflight.shouldUseAi) {
+                // Reserve provider spend and the daily intent allowance atomically.
+                const intentSpend = await (0, ai_usage_1.reserveAiSpend)(supabase_1.supabaseWorker, {
                     userId,
                     purpose: 'intent',
+                    plan,
                 });
+                if (!intentSpend) {
+                    logger_1.logger.warn({ userId, plan }, 'AI spend cap blocked intent scoring');
+                    scoreResult = {
+                        score: preflight.score,
+                        label: preflight.label,
+                        flag: preflight.flag,
+                        reasoning: preflight.reasoning,
+                        usage: (0, ai_usage_1.emptyAiUsage)(),
+                    };
+                    paidIntentGatePassed = false;
+                    intentManualReviewReason = 'intent_spend_limit_reached';
+                }
+                else {
+                    let canScore;
+                    try {
+                        canScore = await checkBudget(userId, profile.plan, 'intent');
+                    }
+                    catch (error) {
+                        await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' });
+                        throw error;
+                    }
+                    if (!canScore) {
+                        await safelyReleaseAiSpend(intentSpend.id, { userId, purpose: 'intent' });
+                        logger_1.logger.info({ userId }, 'Daily intent-scoring limit reached; preserving deterministic result');
+                        scoreResult = {
+                            score: preflight.score,
+                            label: preflight.label,
+                            flag: preflight.flag,
+                            reasoning: preflight.reasoning,
+                            usage: (0, ai_usage_1.emptyAiUsage)(),
+                        };
+                        paidIntentGatePassed = false;
+                        intentManualReviewReason = 'intent_plan_limit_reached';
+                    }
+                    else {
+                        // Score intent and reconcile the reservation with actual usage.
+                        try {
+                            scoreResult = await (0, intent_scorer_1.scoreIntent)(post, profile, {
+                                maxRetries: providerRetries,
+                                keywordTerm: keyword?.term,
+                            });
+                            await safelyRecordAiUsage(intentSpend.id, scoreResult.usage, {
+                                userId,
+                                purpose: 'intent',
+                            });
+                        }
+                        catch (error) {
+                            await settleFailedAiSpend(intentSpend.id, error, {
+                                userId,
+                                purpose: 'intent',
+                            });
+                            logger_1.logger.warn({ err: error, userId }, 'AI intent scoring failed; preserving deterministic result for manual review');
+                            scoreResult = {
+                                score: preflight.score,
+                                label: preflight.label,
+                                flag: preflight.flag,
+                                reasoning: preflight.reasoning,
+                                usage: (0, ai_usage_1.emptyAiUsage)(),
+                            };
+                            paidIntentGatePassed = false;
+                            intentManualReviewReason = 'intent_provider_failed';
+                        }
+                    }
+                }
             }
-            catch (error) {
-                await settleFailedAiSpend(intentSpend.id, error, {
+            else {
+                scoreResult = {
+                    score: preflight.score,
+                    label: preflight.label,
+                    flag: preflight.flag,
+                    reasoning: preflight.reasoning,
+                    usage: (0, ai_usage_1.emptyAiUsage)(),
+                };
+                logger_1.logger.info({
                     userId,
-                    purpose: 'intent',
-                });
-                throw error;
+                    platform: post.platform,
+                    externalId: post.externalId,
+                    score: scoreResult.score,
+                    label: scoreResult.label,
+                    shouldUseAi: preflight.shouldUseAi,
+                    evidenceSignals: evidenceSignals.slice(0, 6),
+                }, hasAnthropic ? 'Intent preflight skipped paid AI scoring' : 'Intent preflight used deterministic scoring');
             }
-            evidenceSignals = (0, buying_signal_filter_1.matchedSignals)(`${post.title ?? ''} ${post.text ?? ''}`);
         }
         // Save thread early if score is low
-        if (scoreResult.score < INTENT_THRESHOLD) {
+        if (scoreResult.score < intent_1.ACTIONABLE_INTENT_THRESHOLD) {
             await saveThread({
                 userId,
                 keywordId,
@@ -176,6 +327,22 @@ async function scorePostHandler(job) {
                 reasoning: scoreResult.reasoning,
                 evidenceSignals,
                 automationReason: 'low_intent',
+            });
+            signalReserved = false;
+            return;
+        }
+        if (!paidIntentGatePassed) {
+            await saveThread({
+                userId,
+                keywordId,
+                post,
+                intentScore: scoreResult.score,
+                intentLabel: scoreResult.label,
+                status: 'needs_manual_reply',
+                flag: scoreResult.flag,
+                reasoning: scoreResult.reasoning,
+                evidenceSignals,
+                automationReason: intentManualReviewReason,
             });
             signalReserved = false;
             return;
@@ -196,6 +363,22 @@ async function scorePostHandler(job) {
                 automationReason: 'draft_pending',
             });
             signalReserved = false;
+        }
+        if (!hasAnthropic) {
+            await saveThread({
+                userId,
+                keywordId,
+                post,
+                intentScore: scoreResult.score,
+                intentLabel: scoreResult.label,
+                status: 'needs_manual_reply',
+                flag: scoreResult.flag,
+                reasoning: scoreResult.reasoning,
+                evidenceSignals,
+                automationReason: 'ai_provider_unavailable',
+            });
+            signalReserved = false;
+            return;
         }
         // 5. Atomic budget check for reply drafting
         const draftSpend = await (0, ai_usage_1.reserveAiSpend)(supabase_1.supabaseWorker, {
@@ -220,6 +403,7 @@ async function scorePostHandler(job) {
             signalReserved = false;
             return;
         }
+        draftSpendReservationId = draftSpend.id;
         let canDraft;
         try {
             canDraft = await checkBudget(userId, profile.plan, 'draft');
@@ -256,7 +440,7 @@ async function scorePostHandler(job) {
             : undefined;
         let draftResult;
         try {
-            draftResult = await (0, draft_reply_1.draftReply)(post, profile, scoreResult.score, trackingUrl);
+            draftResult = await (0, draft_reply_1.draftReply)(post, profile, scoreResult.score, trackingUrl, { maxRetries: providerRetries });
             await safelyRecordAiUsage(draftSpend.id, draftResult.usage, {
                 userId,
                 purpose: 'draft',
@@ -267,20 +451,93 @@ async function scorePostHandler(job) {
                 userId,
                 purpose: 'draft',
             });
-            await safelyReleaseMonthlyDraft(userId);
+            await safelyReleaseMonthlyDraft(userId, draftSpend.id);
             draftReserved = false;
-            throw error;
+            logger_1.logger.warn({ err: error, userId }, 'AI drafting failed; routing scored conversation to manual reply');
+            await saveThread({
+                userId,
+                keywordId,
+                post,
+                intentScore: scoreResult.score,
+                intentLabel: scoreResult.label,
+                status: 'needs_manual_reply',
+                flag: scoreResult.flag,
+                reasoning: scoreResult.reasoning,
+                evidenceSignals,
+                automationReason: 'draft_provider_failed',
+            });
+            signalReserved = false;
+            return;
         }
         const draftText = draftResult.text;
         // 7. Auto-send decision — routed through the single unified gatekeeper.
         //    All safeguards (disclosure, tone, cold-start, confidence threshold)
         //    are enforced inside evaluateAutoSend(). DO NOT inline duplicate logic here.
-        const evaluation = await (0, confidence_engine_1.evaluateAutoSend)(userId, post.platform, draftResult, {
+        const trustEvaluation = await (0, confidence_engine_1.evaluateAutoSend)(userId, post.platform, draftResult, {
             auto_send_enabled: profile.auto_send_enabled,
             auto_send_threshold: profile.auto_send_threshold,
+            high_intent_threshold: profile.high_intent_threshold,
             plan: profile.plan ?? 'free',
-        }, post.sourceTarget ?? null);
-        if (evaluation.approved && ['reddit', 'bluesky'].includes(post.platform)) {
+            instant_autopilot_activated_at: profile.instant_autopilot_activated_at,
+            instant_autopilot_expires_at: profile.instant_autopilot_expires_at,
+            instant_autopilot_used_at: profile.instant_autopilot_used_at,
+        }, post.sourceTarget ?? null, scoreResult.score);
+        const capabilities = (0, platform_capabilities_1.getPlatformCapabilities)(post.platform, {
+            redditDirectPosting: (0, env_1.hasRedditPostingProvider)(),
+            xDirectPosting: (0, x_post_1.isXPostingConfigured)(),
+        });
+        const platformConnected = post.platform === 'reddit'
+            ? Boolean((await supabase_1.supabaseWorker
+                .from('reddit_connection_secrets')
+                .select('connection_id')
+                .eq('user_id', userId)
+                .eq('status', 'active')
+                .maybeSingle()).data)
+            : post.platform === 'bluesky' || post.platform === 'x'
+                ? Boolean((await supabase_1.supabaseWorker
+                    .from('platform_connections')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('platform', post.platform)
+                    .maybeSingle()).data)
+                : false;
+        const enabledPlatforms = Array.isArray(profile.auto_send_platforms)
+            ? profile.auto_send_platforms
+            : ['bluesky'];
+        const allowedCommunities = Array.isArray(profile.auto_send_communities)
+            ? profile.auto_send_communities.map(value => value.trim().toLocaleLowerCase()).filter(Boolean)
+            : [];
+        const normalizedTarget = (post.sourceTarget ?? '').trim().toLocaleLowerCase();
+        let evaluation = trustEvaluation;
+        let redditCommunityPolicyDecision = null;
+        if (evaluation.approved && !enabledPlatforms.includes(post.platform)) {
+            evaluation = blockAutomation(evaluation, 'auto_send_platform_disabled');
+        }
+        else if (evaluation.approved && capabilities.delivery === 'direct' && !platformConnected) {
+            evaluation = blockAutomation(evaluation, 'platform_connection_required');
+        }
+        else if (evaluation.approved
+            && allowedCommunities.length > 0
+            && !allowedCommunities.includes(normalizedTarget)) {
+            evaluation = blockAutomation(evaluation, 'auto_send_target_out_of_scope');
+        }
+        else if (evaluation.approved && (!allowAutoSend || capabilities.delivery !== 'direct')) {
+            evaluation = blockAutomation(evaluation, 'assisted_delivery_required');
+        }
+        if (evaluation.approved && post.platform === 'reddit') {
+            const communityPolicy = await (0, reddit_community_policy_1.getSubredditCommunityPolicy)(userId, (0, reddit_community_policy_1.extractSubredditFromRedditUrl)(post.url) || post.sourceTarget || '');
+            redditCommunityPolicyDecision = (0, reddit_community_policy_1.evaluateRedditReplyPolicy)(communityPolicy, {
+                text: draftText,
+                businessName: profile.business_name,
+                businessUrl: profile.business_url,
+            });
+            if (redditCommunityPolicyDecision.outcome !== 'auto_send_allowed') {
+                evaluation = blockAutomation(evaluation, redditCommunityPolicyDecision.reason);
+            }
+        }
+        if (evaluation.approved
+            && capabilities.delivery === 'direct'
+            && ['reddit', 'bluesky', 'x'].includes(post.platform)) {
             // All gates cleared — save and enqueue for auto-send
             const autoSendPayload = {
                 userId,
@@ -288,6 +545,7 @@ async function scorePostHandler(job) {
                 text: draftText,
                 platform: post.platform,
                 triggerType: 'auto',
+                sourceTarget: post.sourceTarget || undefined,
             };
             const thread = await saveThread({
                 userId,
@@ -308,22 +566,35 @@ async function scorePostHandler(job) {
             signalReserved = false;
             draftReserved = false;
             if (thread) {
-                const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js');
-                await (0, backend_maintenance_1.dispatchPendingOutbox)(1, thread.id);
-                // Fire-and-forget: check if thread URL ranks on Google for this keyword (Feature 5)
-                if (post.url) {
-                    checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url, matchedKeyword: post.sourceTarget }).catch(() => { });
-                }
-                // Fire-and-forget Slack notification
-                notifySlackQueue.add(`slack-${thread.id}`, {
+                await recordInitialAutomationAudit({
                     userId,
-                    postUrl: post.url,
-                    postTitle: post.title || post.text?.slice(0, 100),
-                    postAuthor: post.author,
-                    intentScore: scoreResult.score,
-                    draftText,
-                    subreddit: post.sourceTarget || 'reddit',
-                }).catch(() => { }); // never block on Slack
+                    threadId: thread.id,
+                    post,
+                    scoreResult,
+                    draftResult,
+                    evaluation,
+                    deliveryMode: capabilities.delivery,
+                    hasAnthropic,
+                    redditCommunityPolicyDecision,
+                });
+            }
+            if (thread && enqueueFollowUpJobs) {
+                await (0, backend_maintenance_1.dispatchPendingOutbox)(1, thread.id);
+                await (0, follow_up_outbox_1.persistAndDispatchFollowUps)({
+                    userId,
+                    threadId: thread.id,
+                    rank: post.url
+                        ? { url: post.url, matchedKeyword: post.sourceTarget }
+                        : undefined,
+                    slack: {
+                        postUrl: post.url,
+                        postTitle: post.title || post.text?.slice(0, 100),
+                        postAuthor: post.author,
+                        intentScore: scoreResult.score,
+                        draftText,
+                        subreddit: post.sourceTarget || 'reddit',
+                    },
+                });
                 logger_1.logger.info({ userId, threadId: thread.id, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Enqueued auto-send');
             }
         }
@@ -347,21 +618,32 @@ async function scorePostHandler(job) {
             signalReserved = false;
             draftReserved = false;
             if (thread) {
-                const { notifySlackQueue, checkGoogleRankQueue } = await import('../../src/lib/queues/index.js');
-                // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
-                if (post.url) {
-                    checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url }).catch(() => { });
-                }
-                // Fire-and-forget Slack notification
-                notifySlackQueue.add(`slack-${thread.id}`, {
+                await recordInitialAutomationAudit({
                     userId,
-                    postUrl: post.url,
-                    postTitle: post.title || post.text?.slice(0, 100),
-                    postAuthor: post.author,
-                    intentScore: scoreResult.score,
-                    draftText,
-                    subreddit: post.sourceTarget || 'reddit',
-                }).catch(() => { }); // never block on Slack
+                    threadId: thread.id,
+                    post,
+                    scoreResult,
+                    draftResult,
+                    evaluation,
+                    deliveryMode: capabilities.delivery,
+                    hasAnthropic,
+                    redditCommunityPolicyDecision,
+                });
+            }
+            if (thread && enqueueFollowUpJobs) {
+                await (0, follow_up_outbox_1.persistAndDispatchFollowUps)({
+                    userId,
+                    threadId: thread.id,
+                    rank: post.url ? { url: post.url } : undefined,
+                    slack: {
+                        postUrl: post.url,
+                        postTitle: post.title || post.text?.slice(0, 100),
+                        postAuthor: post.author,
+                        intentScore: scoreResult.score,
+                        draftText,
+                        subreddit: post.sourceTarget || 'reddit',
+                    },
+                });
             }
             logger_1.logger.info({ userId, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Routed to manual review');
         }
@@ -371,11 +653,106 @@ async function scorePostHandler(job) {
             await safelyReleaseMonthlySignal(userId);
         }
         if (draftReserved) {
-            await safelyReleaseMonthlyDraft(userId);
+            if (draftSpendReservationId) {
+                await safelyReleaseMonthlyDraft(userId, draftSpendReservationId);
+            }
+            else {
+                logger_1.logger.error({ userId }, 'Draft allowance was reserved without a spend reservation id');
+            }
         }
-        logger_1.logger.error({ error }, `Failed to score post ${post.externalId} for user ${userId}:`);
+        logger_1.logger.error({ err: error }, `Failed to score post ${post.externalId} for user ${userId}:`);
         throw error;
     }
+}
+function blockAutomation(evaluation, reason) {
+    return { ...evaluation, approved: false, reason };
+}
+async function recordInitialAutomationAudit(input) {
+    const { userId, threadId, post, scoreResult, draftResult, evaluation, deliveryMode, hasAnthropic, redditCommunityPolicyDecision, } = input;
+    const source = 'scheduled_monitor';
+    await Promise.all([
+        (0, automation_audit_1.recordEngagementEvent)(supabase_1.supabaseWorker, {
+            userId,
+            threadId,
+            eventType: 'signal_discovered',
+            platform: post.platform,
+            source,
+            metadata: {
+                externalId: post.externalId,
+                sourceTarget: post.sourceTarget,
+                sourceCreatedAt: post.createdAt,
+            },
+            idempotencyKey: `${threadId}:signal-discovered`,
+            occurredAt: post.createdAt,
+        }),
+        (0, automation_audit_1.recordEngagementEvent)(supabase_1.supabaseWorker, {
+            userId,
+            threadId,
+            eventType: 'intent_scored',
+            platform: post.platform,
+            metadata: {
+                score: scoreResult.score,
+                label: scoreResult.label,
+                reasoning: scoreResult.reasoning,
+                provider: hasAnthropic ? 'anthropic' : 'deterministic',
+            },
+            idempotencyKey: `${threadId}:intent-scored`,
+        }),
+        (0, automation_audit_1.recordEngagementEvent)(supabase_1.supabaseWorker, {
+            userId,
+            threadId,
+            eventType: 'draft_generated',
+            platform: post.platform,
+            metadata: {
+                provider: 'anthropic',
+                model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+                qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
+                mentionedProduct: draftResult.mentionedProduct,
+                hasDisclosure: draftResult.hasDisclosure,
+            },
+            idempotencyKey: `${threadId}:initial-draft-generated`,
+        }),
+        (0, automation_audit_1.recordEngagementEvent)(supabase_1.supabaseWorker, {
+            userId,
+            threadId,
+            eventType: 'automation_evaluated',
+            platform: post.platform,
+            metadata: {
+                approved: evaluation.approved,
+                reason: evaluation.reason,
+                confidence: evaluation.automationConfidence,
+                threshold: evaluation.dynamicThreshold,
+                deliveryMode,
+                communityPolicy: (0, reddit_community_policy_1.toCommunityPolicyAudit)(redditCommunityPolicyDecision),
+            },
+            idempotencyKey: `${threadId}:initial-automation-evaluated`,
+        }),
+        (0, automation_audit_1.recordAutomationDecision)(supabase_1.supabaseWorker, {
+            userId,
+            threadId,
+            platform: post.platform,
+            deliveryMode,
+            evaluation,
+            idempotencyKey: `${threadId}:initial-automation-decision`,
+            contentPolicy: {
+                flagged: draftResult.flagged,
+                qualityIssues: draftResult.qualityIssues.map(issue => issue.code),
+                mentionedProduct: draftResult.mentionedProduct,
+                hasDisclosure: draftResult.hasDisclosure,
+                hasCommercialLink: draftResult.hasCommercialLink,
+                ...((0, reddit_community_policy_1.toCommunityPolicyAudit)(redditCommunityPolicyDecision)
+                    ? { communityPolicy: (0, reddit_community_policy_1.toCommunityPolicyAudit)(redditCommunityPolicyDecision) }
+                    : {}),
+            },
+            modelContext: {
+                intentProvider: hasAnthropic ? 'anthropic' : 'deterministic',
+                intentModel: process.env.ANTHROPIC_INTENT_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+                draftProvider: 'anthropic',
+                draftModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+                policyVersion: 'earned-automation-v1',
+            },
+        }),
+    ]);
 }
 async function reserveMonthlySignal(userId, limit) {
     const { data, error } = await supabase_1.supabaseWorker.rpc('reserve_monthly_signal', {
@@ -395,17 +772,21 @@ async function safelyReleaseMonthlySignal(userId) {
         logger_1.logger.error({ error, userId }, 'Failed to release monthly signal reservation');
     }
 }
-async function safelyReleaseMonthlyDraft(userId) {
-    const { error } = await supabase_1.supabaseWorker.rpc('release_monthly_draft', {
-        p_user_id: userId,
-    });
-    if (error) {
-        logger_1.logger.error({ error, userId }, 'Failed to release monthly draft reservation');
+async function safelyReleaseMonthlyDraft(userId, reservationId) {
+    try {
+        await (0, ai_settlement_1.releaseMonthlyDraftDurably)(supabase_1.supabaseWorker, { userId, reservationId });
+    }
+    catch (error) {
+        logger_1.logger.error({ error, userId, reservationId }, 'Failed to release monthly draft reservation');
     }
 }
 async function safelyRecordAiUsage(reservationId, usage, context) {
     try {
-        await (0, ai_usage_1.recordAiUsage)(supabase_1.supabaseWorker, { reservationId, usage });
+        await (0, ai_settlement_1.settleAiUsageDurably)(supabase_1.supabaseWorker, {
+            reservationId,
+            userId: context.userId,
+            usage,
+        });
     }
     catch (error) {
         logger_1.logger.error({ error, reservationId, ...context }, 'Failed to reconcile AI usage reservation');
@@ -413,7 +794,10 @@ async function safelyRecordAiUsage(reservationId, usage, context) {
 }
 async function safelyReleaseAiSpend(reservationId, context) {
     try {
-        await (0, ai_usage_1.releaseAiSpend)(supabase_1.supabaseWorker, reservationId);
+        await (0, ai_settlement_1.releaseAiSpendDurably)(supabase_1.supabaseWorker, {
+            reservationId,
+            userId: context.userId,
+        });
     }
     catch (error) {
         logger_1.logger.error({ error, reservationId, ...context }, 'Failed to release AI spend reservation');
@@ -440,13 +824,7 @@ async function checkBudget(userId, plan, service) {
         }
         return data;
     }
-    const limits = {
-        free: 50,
-        pro: 500,
-        growth: 2000,
-    };
-    const userPlan = limits[plan] ? plan : 'free';
-    const limit = limits[userPlan];
+    const limit = (0, plan_limits_1.getIntentDailyLimit)(plan);
     const { data, error } = await supabase_1.supabaseWorker.rpc('increment_usage_if_under_limit', {
         p_user_id: userId,
         p_service: 'intent',
@@ -459,7 +837,7 @@ async function checkBudget(userId, plan, service) {
 }
 async function saveThread(input) {
     const { userId, keywordId, post, intentScore, intentLabel, status, draftText, flag, reasoning, trackingSid, evidenceSignals, qualityIssues, automationReason, autoSendPayload, } = input;
-    const { data: threadId, error } = await supabase_1.supabaseWorker.rpc('persist_scored_thread', {
+    const { data: threadId, error } = await supabase_1.supabaseWorker.rpc('persist_scored_thread_v2', {
         p_user_id: userId,
         p_keyword_id: keywordId,
         p_platform: post.platform,
@@ -468,6 +846,7 @@ async function saveThread(input) {
         p_title: post.title || null,
         p_text_content: post.text,
         p_url: post.url,
+        p_source_created_at: post.createdAt,
         p_intent_score: intentScore,
         p_intent_label: intentLabel,
         p_status: status,
@@ -486,4 +865,15 @@ async function saveThread(input) {
     if (!threadId)
         throw new Error('Failed to persist monitored thread: missing id');
     return { id: threadId };
+}
+/** Keep unanalysed plan-limited captures out of every customer-facing queue. */
+async function clearUnscoredIntent(threadId) {
+    const { error } = await supabase_1.supabaseWorker
+        .from('monitored_threads')
+        .update({ intent_score: null, intent_label: null })
+        .eq('id', threadId)
+        .eq('status', 'dismissed');
+    if (error) {
+        throw new Error(`Failed to clear unscored intent state: ${error.message}`);
+    }
 }

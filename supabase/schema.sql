@@ -31,6 +31,7 @@ create table profiles (
     ]::text[]
   ),
   reddit_username text,
+  discovery_source text check (discovery_source in ('search', 'social', 'recommendation', 'community', 'content', 'other', 'prefer_not_to_say')),
   plan text not null default 'free' check (plan in ('free', 'starter', 'pro', 'growth')),
   auto_send_enabled boolean default false,
   auto_send_threshold integer default 85 check (auto_send_threshold between 70 and 100),
@@ -138,13 +139,15 @@ create policy "profiles update own" on profiles for update
 revoke update on profiles from authenticated;
 grant update (
   business_name, business_description, business_url, business_type,
-  writing_style, tone_archetype, style_guardrails, reddit_username, notification_preferences,
+  writing_style, tone_archetype, style_guardrails, reddit_username, discovery_source, notification_preferences,
   high_intent_threshold
 ) on profiles to authenticated;
 create policy "own keywords" on keywords for all using (auth.uid() = user_id);
 create policy "own threads" on monitored_threads for all using (auth.uid() = user_id);
 create policy "own analytics" on reply_analytics for all using (auth.uid() = user_id);
-create policy "own usage" on usage_logs for all using (auth.uid() = user_id);
+create policy "own usage" on usage_logs for select using (auth.uid() = user_id);
+revoke all on table usage_logs from public, anon, authenticated;
+grant select on table usage_logs to authenticated;
 revoke all on table ai_spend_reservations from public, anon, authenticated;
 
 create or replace function mark_thread_reviewed(
@@ -214,9 +217,15 @@ create or replace function increment_x_spend_if_under_limit(
   p_user_id uuid, p_cost_cents int, p_daily_limit_cents int
 ) returns boolean
 language plpgsql
+security definer
+set search_path = public, pg_temp
 as $$
 declare current_spend int;
 begin
+  if auth.role() <> 'service_role' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
   insert into usage_logs (user_id, date) values (p_user_id, current_date)
     on conflict (user_id, date) do nothing;
 
@@ -232,6 +241,11 @@ begin
   return true;
 end;
 $$;
+
+revoke all on function increment_x_spend_if_under_limit(uuid, int, int)
+  from public, anon, authenticated;
+grant execute on function increment_x_spend_if_under_limit(uuid, int, int)
+  to service_role;
 
 -- Platform Connections (OAuth & App Passwords)
 create table platform_connections (

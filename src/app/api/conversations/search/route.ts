@@ -2,33 +2,24 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getIp, searchRateLimit } from '@/lib/ratelimit'
 import { normalizeHighIntentThreshold } from '@/lib/high-intent-threshold'
+import { logger } from '@/lib/logger'
 
-const PAGE_SIZE = 500
+const MAX_RESULTS = 50
 const ACTIVE_STATUSES = ['pending', 'drafted', 'needs_manual_reply']
-const SELECT_THREADS = '*, reply_analytics(draft_text), keywords(term, target)'
-
-function matchesSearch(thread: Record<string, unknown>, query: string) {
-  const keyword = Array.isArray(thread.keywords)
-    ? thread.keywords[0] as Record<string, unknown> | undefined
-    : thread.keywords as Record<string, unknown> | null
-  const searchableFields = [
-    thread.title,
-    thread.text_content,
-    thread.platform,
-    keyword?.term,
-    keyword?.target,
-  ]
-
-  return searchableFields.some(value =>
-    typeof value === 'string' && value.toLocaleLowerCase().includes(query),
-  )
-}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const query = (searchParams.get('q') ?? '').trim().toLocaleLowerCase()
+  const query = (searchParams.get('q') ?? '').trim()
   const tab = searchParams.get('tab') ?? 'all'
   const threshold = normalizeHighIntentThreshold(searchParams.get('threshold'))
+  const requestedLimit = Number(searchParams.get('limit') ?? MAX_RESULTS)
+  const requestedOffset = Number(searchParams.get('cursor') ?? 0)
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.max(1, Math.min(requestedLimit, MAX_RESULTS))
+    : MAX_RESULTS
+  const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0
+    ? Math.min(requestedOffset, 10_000_000)
+    : 0
 
   if (!query || query.length > 100 || !['all', 'high-intent', 'dismissed'].includes(tab)) {
     return NextResponse.json({ error: 'invalid_search' }, { status: 400 })
@@ -42,41 +33,31 @@ export async function GET(request: NextRequest) {
     const rate = await searchRateLimit.limit(`conversation-search:${user.id}:${await getIp()}`)
     if (!rate.success) return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
 
-    const threads: Record<string, unknown>[] = []
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      let threadsQuery: any = supabase
-        .from('monitored_threads')
-        .select(SELECT_THREADS)
-        .eq('user_id', user.id)
-        .not('intent_score', 'is', null)
-
-      if (tab === 'dismissed') {
-        threadsQuery = threadsQuery.eq('status', 'dismissed')
-      } else {
-        threadsQuery = threadsQuery.in('status', ACTIVE_STATUSES)
-        if (tab === 'high-intent') {
-          threadsQuery = threadsQuery.gte('intent_score', threshold)
-        }
-      }
-
-      const { data, error } = await threadsQuery
-        .order('source_created_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1)
-      if (error) throw error
-
-      const page = (data ?? []) as Record<string, unknown>[]
-      threads.push(...page)
-      if (page.length < PAGE_SIZE) break
-    }
-
-    const matchingThreads = threads.filter(thread => matchesSearch(thread, query))
+    const statuses = tab === 'dismissed' ? ['dismissed'] : ACTIVE_STATUSES
+    const { data, error } = await supabase.rpc('search_monitored_threads_v1', {
+      p_query: query,
+      p_statuses: statuses,
+      p_min_intent: tab === 'high-intent' ? threshold : null,
+      p_limit: limit,
+      p_offset: offset,
+    })
+    if (error) throw error
+    const rows = (data ?? []) as Array<{ thread: Record<string, unknown>; total_count: number }>
+    const total = Number(rows[0]?.total_count ?? 0)
+    const threads = rows.map(row => row.thread)
     return NextResponse.json(
-      { threads: matchingThreads, total: matchingThreads.length },
+      {
+        threads,
+        total,
+        nextCursor: offset + threads.length < total ? offset + threads.length : null,
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
-    console.error('[conversations/search] Search failed', error)
+    logger.error(
+      { code: error instanceof Error ? error.name : 'unknown' },
+      'Conversation search failed',
+    )
     return NextResponse.json({ error: 'search_failed' }, { status: 500 })
   }
 }

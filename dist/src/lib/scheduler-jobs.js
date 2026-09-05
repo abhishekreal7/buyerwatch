@@ -1,17 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.monitoringJobBucket = monitoringJobBucket;
 exports.enqueueDueMonitoring = enqueueDueMonitoring;
 exports.enqueueWeeklyDigests = enqueueWeeklyDigests;
 const node_crypto_1 = require("node:crypto");
 const supabase_js_1 = require("@supabase/supabase-js");
 const queues_1 = require("./queues");
 const plan_limits_1 = require("./plan-limits");
+const x_1 = require("./x");
 const email_preferences_1 = require("./email-preferences");
 function getSupabaseAdmin() {
     return (0, supabase_js_1.createClient)(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
-function jobBucket(now) {
-    return `${now.toISOString().slice(0, 14)}${Math.floor(now.getUTCMinutes() / 15)}`;
+function monitoringJobBucket(now) {
+    // The fastest paid cadence is five minutes. A 15-minute job-id bucket would
+    // silently deduplicate two out of every three Pro/Growth polling jobs.
+    return `${now.toISOString().slice(0, 14)}${Math.floor(now.getUTCMinutes() / 5)}`;
 }
 function targetId(platform, target, bucket) {
     const digest = (0, node_crypto_1.createHash)('sha256')
@@ -20,13 +24,6 @@ function targetId(platform, target, bucket) {
         .slice(0, 20);
     return `${platform}-${digest}-${bucket}`;
 }
-function chunks(values, size) {
-    const result = [];
-    for (let index = 0; index < values.length; index += size) {
-        result.push(values.slice(index, index + size));
-    }
-    return result;
-}
 async function enqueueDueMonitoring(now = new Date()) {
     const supabase = getSupabaseAdmin();
     const pageSize = 500;
@@ -34,7 +31,7 @@ async function enqueueDueMonitoring(now = new Date()) {
     for (let offset = 0;; offset += pageSize) {
         const { data, error } = await supabase
             .from('keywords')
-            .select('id, platform, target, term, user_id, profiles!inner(plan, last_polled_at)')
+            .select('id, platform, target, term, user_id, last_success_at, next_poll_at, profiles!inner(plan, last_polled_at)')
             .eq('is_active', true)
             .order('id', { ascending: true })
             .range(offset, offset + pageSize - 1);
@@ -44,7 +41,7 @@ async function enqueueDueMonitoring(now = new Date()) {
         if ((data?.length ?? 0) < pageSize)
             break;
     }
-    const xEnabled = process.env.ENABLE_X_DISCOVERY === 'true';
+    const xEnabled = (0, x_1.isXDiscoveryConfigured)();
     const dueUsers = new Set();
     const jobs = new Map();
     for (const keyword of rows) {
@@ -52,12 +49,15 @@ async function enqueueDueMonitoring(now = new Date()) {
             ? keyword.profiles[0]
             : keyword.profiles;
         const plan = (0, plan_limits_1.normalizePlan)(profile?.plan);
-        if (!(0, plan_limits_1.isPollingDue)(plan, profile?.last_polled_at, now.getTime()))
+        const nextPollAt = Date.parse(keyword.next_poll_at ?? '');
+        if (Number.isFinite(nextPollAt) && nextPollAt > now.getTime())
             continue;
-        if (keyword.platform === 'threads')
+        if (!(0, plan_limits_1.isPollingDue)(plan, keyword.last_success_at, now.getTime()))
+            continue;
+        if (!(0, plan_limits_1.canMonitorPlatform)(plan, keyword.platform))
             continue;
         if (keyword.platform === 'x'
-            && (!xEnabled || plan_limits_1.X_DAILY_SPEND_LIMIT_CENTS[plan] === 0)) {
+            && !xEnabled) {
             continue;
         }
         dueUsers.add(keyword.user_id);
@@ -77,7 +77,7 @@ async function enqueueDueMonitoring(now = new Date()) {
         });
         jobs.set(key, job);
     }
-    const bucket = jobBucket(now);
+    const bucket = monitoringJobBucket(now);
     for (const job of jobs.values()) {
         const queue = job.platform === 'reddit'
             ? queues_1.redditFetchQueue
@@ -86,16 +86,9 @@ async function enqueueDueMonitoring(now = new Date()) {
                 : queues_1.xFetchQueue;
         await queue.add('fetch', { target: job.target, keywordMappings: job.mappings }, { jobId: targetId(job.platform, job.target, bucket) });
     }
-    const userIds = [...dueUsers];
-    for (const userIdChunk of chunks(userIds, 200)) {
-        const { error } = await supabase
-            .from('profiles')
-            .update({ last_polled_at: now.toISOString() })
-            .in('id', userIdChunk);
-        if (error)
-            throw error;
-    }
-    return { jobs: jobs.size, usersPolled: userIds.length };
+    // A queued job is not a successful source poll. Fetch handlers advance the
+    // per-keyword and profile heartbeat only after the source responds.
+    return { jobs: jobs.size, usersPolled: dueUsers.size };
 }
 function isoWeekKey(date) {
     const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));

@@ -11,8 +11,18 @@ export type OnboardingData = {
   business_type: string
   writing_style: string
   reddit_username: string
+  discovery_source: DiscoverySource
   keywords: OnboardingKeyword[]
 }
+
+export type DiscoverySource =
+  | 'search'
+  | 'social'
+  | 'recommendation'
+  | 'community'
+  | 'content'
+  | 'other'
+  | 'prefer_not_to_say'
 
 const BUSINESS_TYPES = new Set([
   'saas',
@@ -26,6 +36,9 @@ const BUSINESS_TYPES = new Set([
 ])
 
 const ALLOWED_PLATFORMS = new Set(['reddit', 'bluesky', 'x'])
+const DISCOVERY_SOURCES = new Set<DiscoverySource>([
+  'search', 'social', 'recommendation', 'community', 'content', 'other', 'prefer_not_to_say',
+])
 
 export function normalizeWebsiteUrl(value: string): string {
   const trimmed = value.trim()
@@ -72,6 +85,7 @@ export function validateOnboardingData(data: OnboardingData): string | null {
   if (websiteError) return websiteError
   if (data.writing_style?.trim().length > 2000) return 'Writing style is too long.'
   if (data.reddit_username?.trim().length > 100) return 'Reddit username is too long.'
+  if (!DISCOVERY_SOURCES.has(data.discovery_source)) return 'Select how you found BuyerWatch or choose “Prefer not to say.”'
   if (!BUSINESS_TYPES.has(data.business_type)) return 'Select a valid business category.'
   if (!Array.isArray(data.keywords) || data.keywords.length === 0) {
     return 'Add at least one monitoring rule before launching.'

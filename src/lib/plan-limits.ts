@@ -8,7 +8,7 @@ export type MonitoringPlatform = 'reddit' | 'bluesky' | 'x'
  */
 export const PLAN_ENTITLEMENTS = {
   free: {
-    keywords: 1, monitoredTargets: 1, threadsPerMonth: 50, aiDraftsPerMonth: 10,
+    keywords: 1, monitoredTargets: 1, threadsPerMonth: 50, aiDraftsPerMonth: 0,
     pollingIntervalMinutes: 60, monitoringPlatforms: ['reddit', 'bluesky'],
     autoSend: false, slackNotifications: false, replyAttribution: false,
     trustAnalytics: false, xDailySpendLimitCents: 0, workspaces: 1,
@@ -16,17 +16,17 @@ export const PLAN_ENTITLEMENTS = {
   starter: {
     keywords: 5, monitoredTargets: 2, threadsPerMonth: 250, aiDraftsPerMonth: 30,
     pollingIntervalMinutes: 60, monitoringPlatforms: ['reddit', 'bluesky'],
-    autoSend: false, slackNotifications: false, replyAttribution: false,
+    autoSend: true, slackNotifications: false, replyAttribution: false,
     trustAnalytics: false, xDailySpendLimitCents: 0, workspaces: 1,
   },
   pro: {
-    keywords: 10, monitoredTargets: 3, threadsPerMonth: 1000, aiDraftsPerMonth: 200,
+    keywords: 10, monitoredTargets: 3, threadsPerMonth: 1000, aiDraftsPerMonth: 100,
     pollingIntervalMinutes: 5, monitoringPlatforms: ['reddit', 'bluesky', 'x'],
     autoSend: true, slackNotifications: true, replyAttribution: true,
     trustAnalytics: true, xDailySpendLimitCents: 25, workspaces: 1,
   },
   growth: {
-    keywords: 50, monitoredTargets: 6, threadsPerMonth: 5000, aiDraftsPerMonth: 750,
+    keywords: 50, monitoredTargets: 6, threadsPerMonth: 5000, aiDraftsPerMonth: 500,
     pollingIntervalMinutes: 5, monitoringPlatforms: ['reddit', 'bluesky', 'x'],
     autoSend: true, slackNotifications: true, replyAttribution: true,
     trustAnalytics: true, xDailySpendLimitCents: 75, workspaces: 1,
@@ -65,7 +65,7 @@ export const X_DAILY_SPEND_LIMIT_CENTS: Record<PlanTier, number> = {
 }
 
 export const PLAN_INTENT_DAILY_LIMITS: Record<PlanTier, number> = {
-  free: 50, starter: 250, pro: 500, growth: 2000,
+  free: 0, starter: 250, pro: 500, growth: 2000,
 }
 
 /** Normalize any stored plan string to a supported tier. Unknown/legacy tiers fall back to free. */

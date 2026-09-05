@@ -40,51 +40,75 @@ exports.blueskyFetchHandler = blueskyFetchHandler;
 const logger_1 = require("../../src/lib/logger");
 const bluesky_1 = require("../../src/lib/bluesky");
 const queues_1 = require("../../src/lib/queues");
+const keyword_poll_health_1 = require("../../src/lib/keyword-poll-health");
+const reddit_candidates_1 = require("../../src/lib/reddit-candidates");
 const dotenv = __importStar(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 dotenv.config({ path: path_1.default.resolve(process.cwd(), '.env.local') });
 const supabase_1 = require("../lib/supabase");
 async function blueskyFetchHandler(job) {
     const { target, keywordMappings: preloadedMappings } = job.data;
+    // Find all users watching this specific Bluesky query.
+    let keywordMappings = preloadedMappings;
+    let keywordIds = preloadedMappings?.map(({ id }) => id) ?? [];
+    let sourceFetchRecorded = false;
     try {
-        const posts = await (0, bluesky_1.searchBlueskyPosts)(target);
-        if (!posts || posts.length === 0)
-            return;
-        // Find all users watching this specific bluesky query
-        let keywordMappings = preloadedMappings;
-        let error = null;
         if (!keywordMappings) {
-            const result = await supabase_1.supabaseWorker
+            const { data, error } = await supabase_1.supabaseWorker
                 .from('keywords')
-                .select('id, user_id, term')
+                .select('id, user_id, term, profiles!inner(competitors)')
                 .eq('platform', 'bluesky')
                 .eq('target', target)
                 .eq('is_active', true);
-            keywordMappings = result.data;
-            error = result.error;
-        }
-        if (error) {
-            throw new Error(`Failed to load Bluesky keyword mappings: ${error.message}`);
-        }
-        if (!keywordMappings || keywordMappings.length === 0)
-            return;
-        for (const post of posts) {
-            const postText = `${post.text || ''}`.toLowerCase();
-            for (const mapping of keywordMappings) {
-                if (postText.includes(mapping.term.toLowerCase())) {
-                    const safeJobId = post.externalId.replace(/:/g, '_');
-                    await queues_1.scorePostQueue.add('score', {
-                        userId: mapping.user_id,
-                        keywordId: mapping.id,
-                        post,
-                    }, {
-                        jobId: `score-${mapping.user_id}-${safeJobId}`
-                    });
-                }
+            if (error) {
+                throw new Error(`Failed to load Bluesky keyword mappings: ${error.message}`);
             }
+            keywordMappings = (0, reddit_candidates_1.withProfileCompetitors)(data ?? []);
         }
+        else if (keywordMappings.length > 0) {
+            const { data, error } = await supabase_1.supabaseWorker
+                .from('keywords')
+                .select('id, user_id, term, profiles!inner(competitors)')
+                .eq('platform', 'bluesky')
+                .eq('target', target)
+                .eq('is_active', true)
+                .in('id', keywordMappings.map(({ id }) => id));
+            if (error) {
+                throw new Error(`Failed to validate Bluesky keyword mappings: ${error.message}`);
+            }
+            keywordMappings = (0, reddit_candidates_1.withProfileCompetitors)(data ?? []);
+        }
+        if (keywordMappings.length === 0)
+            return;
+        keywordIds = keywordMappings.map(({ id }) => id);
+        const posts = await (0, bluesky_1.searchBlueskyPosts)(target);
+        await (0, keyword_poll_health_1.recordKeywordPollSuccess)(keywordIds);
+        sourceFetchRecorded = true;
+        if (!posts || posts.length === 0) {
+            logger_1.logger.info({ query: target }, 'Bluesky source checked; no posts returned');
+            return;
+        }
+        const discovery = (0, reddit_candidates_1.buildSocialScoreCandidates)(posts, keywordMappings);
+        for (const candidate of discovery.candidates) {
+            const safeJobId = candidate.post.externalId.replace(/:/g, '_');
+            await queues_1.scorePostQueue.add('score', candidate, {
+                jobId: `score-${candidate.userId}-${safeJobId}`,
+            });
+        }
+        logger_1.logger.info({
+            query: target,
+            posts: posts.length,
+            enqueued: discovery.candidates.length,
+            skipped: discovery.skipped,
+            users: discovery.users,
+        }, `Bluesky query ${target}: ${discovery.candidates.length} enqueued`);
     }
     catch (error) {
+        if (!sourceFetchRecorded) {
+            await (0, keyword_poll_health_1.recordKeywordPollFailure)(keywordIds, error).catch((healthError) => {
+                logger_1.logger.error({ healthError, target }, 'Failed to record Bluesky keyword poll failure');
+            });
+        }
         logger_1.logger.error({ error }, `Failed to fetch bluesky target: ${target}:`);
         throw error;
     }

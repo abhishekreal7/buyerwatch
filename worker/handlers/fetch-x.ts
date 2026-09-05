@@ -3,6 +3,7 @@ import { Job } from 'bullmq'
 import { fetchXPosts } from '../../src/lib/x'
 import { scorePostQueue } from '../../src/lib/queues'
 import { getPlanLimits } from '../../src/lib/plan-limits'
+import { getEntitledPlan } from '../../src/lib/billing-entitlements'
 import {
   recordKeywordPollFailure,
   recordKeywordPollSuccess,
@@ -109,13 +110,13 @@ export async function xFetchHandler(job: Job) {
 async function checkXSpendBudget(userId: string) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('plan')
+    .select('plan, billing_status, billing_subscription_id')
     .eq('id', userId)
     .single()
 
   if (profileError) throw new Error(`Failed to load X budget profile: ${profileError.message}`)
   if (!profile) return false
-  const limit = getPlanLimits(profile.plan).xDailySpendLimitCents
+  const limit = getPlanLimits(getEntitledPlan(profile)).xDailySpendLimitCents
   if (limit === 0) return false
 
   // Cost per search in cents. Live value is ~5 cents depending on operation.

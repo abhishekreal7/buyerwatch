@@ -1,10 +1,5 @@
-import { Client, Receiver } from '@upstash/qstash'
+import { Client, Receiver, type FlowControl } from '@upstash/qstash'
 import { getAppUrl } from './app-url'
-import { redis } from './redis'
-
-const MONITORING_SCHEDULE_ID = 'buyerwatch-reddit-monitor'
-const MONITORING_SCHEDULE_CHECK_KEY = 'maintenance:qstash-monitor-schedule:v1'
-const MONITORING_SCHEDULE_CHECK_TTL_SECONDS = 24 * 60 * 60
 
 export function hasQStashConfiguration(): boolean {
   return Boolean(
@@ -42,6 +37,8 @@ export async function publishQStashJson<T>(
   options: {
     retries?: number
     timeout?: number | `${bigint}s` | `${bigint}m` | `${bigint}h` | `${bigint}d`
+    delay?: number | `${bigint}s` | `${bigint}m` | `${bigint}h` | `${bigint}d`
+    flowControl?: FlowControl
   } = {},
 ): Promise<string | null> {
   const token = process.env.QSTASH_TOKEN?.trim()
@@ -52,6 +49,8 @@ export async function publishQStashJson<T>(
     body,
     retries: options.retries ?? 2,
     timeout: options.timeout ?? '4m',
+    delay: options.delay,
+    flowControl: options.flowControl,
   })
   return 'messageId' in result ? result.messageId : null
 }
@@ -78,60 +77,4 @@ export function publishMonitoringRun(
         }
       : {},
   )
-}
-
-/**
- * Idempotently repair the production monitoring schedule from inside the
- * signed cron path. Sensitive QStash tokens cannot be pulled back out of
- * Vercel, so this lets the trusted runtime verify its own schedule without an
- * operator copying the token to a laptop.
- */
-export async function ensureMonitoringSchedule(): Promise<'updated' | 'recently_verified' | 'disabled'> {
-  const token = process.env.QSTASH_TOKEN?.trim()
-  if (!token) return 'disabled'
-
-  const lease = await redis.set(
-    MONITORING_SCHEDULE_CHECK_KEY,
-    'checking',
-    'EX',
-    5 * 60,
-    'NX',
-  )
-  if (lease !== 'OK') return 'recently_verified'
-
-  const appUrl = getAppUrl()
-  const destination = `${appUrl}/api/cron/enqueue`
-  const failureCallback = `${appUrl}/api/cron/failure`
-  const client = new Client({ token })
-  try {
-    await client.schedules.create({
-      destination,
-      scheduleId: MONITORING_SCHEDULE_ID,
-      cron: '*/5 * * * *',
-      method: 'POST',
-      retries: 2,
-      timeout: '4m',
-      failureCallback,
-      label: MONITORING_SCHEDULE_ID,
-    })
-    const schedule = await client.schedules.get(MONITORING_SCHEDULE_ID)
-    if (
-      schedule.destination !== destination
-      || schedule.cron !== '*/5 * * * *'
-      || schedule.failureCallback !== failureCallback
-      || schedule.isPaused
-    ) {
-      throw new Error('QStash monitoring schedule verification failed')
-    }
-    await redis.set(
-      MONITORING_SCHEDULE_CHECK_KEY,
-      'verified',
-      'EX',
-      MONITORING_SCHEDULE_CHECK_TTL_SECONDS,
-    )
-    return 'updated'
-  } catch (error) {
-    await redis.del(MONITORING_SCHEDULE_CHECK_KEY).catch(() => undefined)
-    throw error
-  }
 }

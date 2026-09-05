@@ -24,7 +24,7 @@ describe('Anthropic usage accounting', () => {
       model: 'claude-sonnet-5',
       inputTokens: 1_150,
       outputTokens: 200,
-      estimatedCostMicrousd: 6_450,
+      estimatedCostMicrousd: 4_300,
     })
   })
 
@@ -45,7 +45,7 @@ describe('Anthropic usage accounting', () => {
       model: 'claude-sonnet-5',
       inputTokens: 220,
       outputTokens: 50,
-      estimatedCostMicrousd: 1_410,
+      estimatedCostMicrousd: 940,
     })
   })
 

@@ -19,7 +19,7 @@ describe('intent quality recovery', () => {
 
     expect(dashboard).toContain('thread.intent_score === null')
     expect(dashboard).toContain(".not('intent_score', 'is', null)")
-    expect(searchRoute).toContain(".not('intent_score', 'is', null)")
+    expect(searchRoute).toContain("supabase.rpc('search_monitored_threads_v1'")
   })
 
   it('rejects before reserving a signal and terminally dismisses exhausted-limit candidates', () => {

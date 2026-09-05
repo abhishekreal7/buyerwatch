@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { canMonitorPlatform } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
 import { redis } from '@/lib/redis'
 import { getIp, settingsRateLimit } from '@/lib/ratelimit'
 
@@ -13,8 +14,8 @@ export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(new URL('/login', callbackUrl()))
-  const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).single()
-  if (!canMonitorPlatform(profile?.plan, 'x')) return NextResponse.redirect(new URL('/settings?section=connections&x=plan_required', callbackUrl()))
+  const { data: profile } = await supabase.from('profiles').select('plan, billing_status, billing_subscription_id').eq('id', user.id).single()
+  if (!canMonitorPlatform(getEntitledPlan(profile), 'x')) return NextResponse.redirect(new URL('/settings?section=connections&x=plan_required', callbackUrl()))
   if (!process.env.X_OAUTH_CLIENT_ID || !process.env.X_OAUTH_STATE_SECRET) return NextResponse.redirect(new URL('/settings?section=connections&x=unavailable', callbackUrl()))
   const rate = await settingsRateLimit.limit(`x-connect:${user.id}:${await getIp()}`)
   if (!rate.success) return NextResponse.redirect(new URL('/settings?section=connections&x=rate_limited', callbackUrl()))

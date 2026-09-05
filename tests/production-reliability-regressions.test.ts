@@ -15,8 +15,9 @@ describe('production reliability regressions', () => {
       /if \(saveError\) \{([\s\S]*?)return NextResponse\.json\(\{ error: 'draft_save_failed' \}/,
     )?.[1] ?? ''
 
-    expect(saveFailureBlock).toContain("admin.rpc('release_monthly_draft'")
-    expect(saveFailureBlock).toContain('p_user_id: user.id')
+    expect(saveFailureBlock).toContain('releaseMonthlyDraftDurably(admin')
+    expect(saveFailureBlock).toContain('reservationId: aiSpend.id')
+    expect(saveFailureBlock).toContain('userId: user.id')
   })
 
   it('gives authenticated type-ahead search a dedicated rate limit', () => {

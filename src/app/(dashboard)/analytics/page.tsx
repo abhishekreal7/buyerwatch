@@ -12,12 +12,14 @@ import { AppPage } from '@/components/AppPage'
 import { RadialGauge } from '@/components/RadialGauge'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
-import { formatDistanceToNow, subDays, startOfDay, isAfter, format } from 'date-fns'
+import { formatDistanceToNow, subDays, format } from 'date-fns'
 import { useDashboardSession } from '@/components/DashboardContext'
-import { fetchAllPages } from '@/lib/supabase-pagination'
+import { fetchAllByKey } from '@/lib/supabase-pagination'
 import { normalizeHighIntentThreshold } from '@/lib/high-intent-threshold'
 import { DataLoadError } from '@/components/DataLoadError'
 import { canMonitorPlatform } from '@/lib/plan-limits'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
+import { buildRollingTrendBuckets, compareTrendCounts, type TrendComparison } from '@/lib/analytics-trends'
 
 type DeliveryActivity = {
   threadId: string
@@ -85,6 +87,24 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 const LEAD_DISCOVERY_RANGES = [7, 14, 30] as const
 type LeadDiscoveryRange = typeof LEAD_DISCOVERY_RANGES[number]
+
+function TrendComparisonBadge({ metric, comparison }: { metric: string; comparison: TrendComparison }) {
+  const tone = comparison.direction === 'higher' || comparison.direction === 'new'
+    ? 'bg-emerald-50 text-emerald-700'
+    : comparison.direction === 'lower'
+      ? 'bg-rose-50 text-rose-700'
+      : 'bg-black/[0.04] text-text-tertiary'
+
+  return (
+    <span
+      className={`whitespace-nowrap rounded-full px-2 py-1 text-[10.5px] font-semibold ${tone}`}
+      title={`${metric}: ${comparison.current.toLocaleString('en-US')} in the current period; ${comparison.preceding.toLocaleString('en-US')} in the preceding period.`}
+      aria-label={`${metric}. ${comparison.label}`}
+    >
+      {comparison.label}
+    </span>
+  )
+}
 
 function normalizePlatform(value: unknown) {
   const platform = String(value || '').trim().toLowerCase()
@@ -185,9 +205,22 @@ export default function AnalyticsPage() {
         deliveryActivityRes,
         replyOutcomesRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('plan, auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
+        supabase.from('profiles').select('plan, billing_status, billing_subscription_id, auto_send_enabled, high_intent_threshold').eq('id', userId).single(),
         supabase.from('platform_connections').select('platform').eq('user_id', userId),
-        fetchAllPages((from, to) => supabase.from('monitored_threads').select('id, status, platform, intent_score, created_at, author, keywords(term)').eq('user_id', userId).not('intent_score', 'is', null).range(from, to)),
+        fetchAllByKey(
+          (afterId, limit) => {
+            let query = supabase
+              .from('monitored_threads')
+              .select('id, status, platform, intent_score, created_at, author, keywords(term)')
+              .eq('user_id', userId)
+              .not('intent_score', 'is', null)
+              .order('id', { ascending: true })
+              .limit(limit)
+            if (afterId) query = query.gt('id', afterId)
+            return query
+          },
+          row => row.id,
+        ),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).not('sent_at', 'is', null),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('draft_text', 'is', null),
         supabase.from('reply_analytics').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('was_sent', true).gte('sent_at', thirtyDaysAgoIso),
@@ -216,7 +249,7 @@ export default function AnalyticsPage() {
       const conns = connsRes.data || []
       const profile = profileRes.data
       const highIntentThreshold = normalizeHighIntentThreshold(profile?.high_intent_threshold)
-      const xAllowed = canMonitorPlatform(profile?.plan, 'x')
+      const xAllowed = canMonitorPlatform(getEntitledPlan(profile), 'x')
 
       // --- STATS ---
       const found = threads.length
@@ -229,32 +262,17 @@ export default function AnalyticsPage() {
       const sentLastMonth = sentLastMonthRes.count ?? 0
       const highIntentCount = threads.filter(thread => Number(thread.intent_score) >= highIntentThreshold).length
 
-      // --- TREND DATA (Last 60 Days: selected range + prior comparison period) ---
-      const discoveredMap: Record<string, number> = {}
-      const qualifiedMap: Record<string, number> = {}
-      for (let i = 59; i >= 0; i--) {
-        const d = subDays(startOfDay(now), i)
-        const key = format(d, 'MMM d')
-        discoveredMap[key] = 0
-        qualifiedMap[key] = 0
-      }
-
-      threads.forEach(t => {
-        const d = new Date(t.created_at)
-        if (isAfter(d, sixtyDaysAgo)) {
-          const dateStr = format(d, 'MMM d')
-          if (discoveredMap[dateStr] !== undefined) {
-            discoveredMap[dateStr]++
-            if (Number(t.intent_score) >= highIntentThreshold) {
-              qualifiedMap[dateStr]++
-            }
-          }
-        }
-      })
-      const trendData = Object.keys(discoveredMap).map(date => ({
-        date,
-        discovered: discoveredMap[date],
-        qualified: qualifiedMap[date],
+      // Exact rolling 24-hour buckets keep current and preceding periods equal in duration.
+      const trendData = buildRollingTrendBuckets(
+        threads.map(thread => ({
+          createdAt: thread.created_at,
+          qualified: Number(thread.intent_score) >= highIntentThreshold,
+        })),
+        now,
+      ).map(bucket => ({
+        date: format(bucket.end, 'MMM d'),
+        discovered: bucket.discovered,
+        qualified: bucket.qualified,
       }))
 
       // --- ACTIVITY FEED ---
@@ -501,15 +519,18 @@ export default function AnalyticsPage() {
     { discovered: 0, qualified: 0 },
   )
   const previousLeadDiscoveryData = data.trendData.slice(-(leadDiscoveryRange * 2), -leadDiscoveryRange)
-  const currentTrendTotal = leadDiscoveryTotals.discovered
-  const previousTrendTotal = previousLeadDiscoveryData.reduce((total, point) => total + point.discovered, 0)
-  const trendDifference = currentTrendTotal - previousTrendTotal
-  const hasPreviousTrend = previousLeadDiscoveryData.length === leadDiscoveryRange
-  const trendComparisonLabel = !hasPreviousTrend
-    ? null
-    : previousTrendTotal === 0
-      ? currentTrendTotal > 0 ? 'New this period' : 'No change'
-      : `${trendDifference >= 0 ? '+' : ''}${Math.round((trendDifference / previousTrendTotal) * 100)}% vs previous ${leadDiscoveryRange} days`
+  const previousLeadDiscoveryTotals = previousLeadDiscoveryData.reduce(
+    (totals, point) => ({
+      discovered: totals.discovered + point.discovered,
+      qualified: totals.qualified + point.qualified,
+    }),
+    { discovered: 0, qualified: 0 },
+  )
+  const leadDiscoveryComparison = compareTrendCounts(
+    leadDiscoveryTotals.discovered + leadDiscoveryTotals.qualified,
+    previousLeadDiscoveryTotals.discovered + previousLeadDiscoveryTotals.qualified,
+    leadDiscoveryRange,
+  )
   return (
     <AppPage>
       <div className="w-full max-w-[1200px] pb-12">
@@ -524,59 +545,49 @@ export default function AnalyticsPage() {
 
             {/* Left Card: Lead Discovery */}
             <div className="relative flex flex-col overflow-hidden border border-black/[0.04] p-5 surface-ceramic sm:p-6 lg:col-span-2 lg:p-8">
-              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <h3 className="text-[16px] font-semibold text-text-primary tracking-tight">Lead Discovery</h3>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-medium text-text-secondary">
-                    <span className="flex items-center gap-1.5 whitespace-nowrap">
-                      <span className="h-2 w-2 rounded-full bg-[#171717]" />
-                      Discovered <span className="font-bold text-text-primary">{leadDiscoveryTotals.discovered}</span>
-                    </span>
-                    <span className="flex items-center gap-1.5 whitespace-nowrap">
-                      <span className="h-2 w-2 rounded-full bg-[#0A84FF]" />
-                      High-intent <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
-                    </span>
-                    {trendComparisonLabel && (
-                      <span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${
-                        trendDifference > 0
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : trendDifference < 0
-                            ? 'bg-rose-50 text-rose-700'
-                            : 'bg-black/[0.04] text-text-tertiary'
-                      }`}>
-                        {trendComparisonLabel}
-                      </span>
-                    )}
+              <div className="mb-6">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-[16px] font-semibold tracking-tight text-text-primary">Lead Discovery</h3>
+                  <div className="inline-flex shrink-0 rounded-full bg-black/[0.04] p-0.5" aria-label="Lead discovery date range">
+                    {LEAD_DISCOVERY_RANGES.map((range) => {
+                      const active = leadDiscoveryRange === range
+                      return (
+                        <button
+                          key={range}
+                          type="button"
+                          onClick={() => setLeadDiscoveryRange(range)}
+                          aria-pressed={active}
+                          className={
+                            active
+                              ? 'rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-colors'
+                              : 'rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-tertiary transition-colors hover:text-text-secondary'
+                          }
+                        >
+                          {range}D
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
-                <div className="inline-flex shrink-0 self-start rounded-full bg-black/[0.04] p-0.5" aria-label="Lead discovery date range">
-                  {LEAD_DISCOVERY_RANGES.map((range) => {
-                    const active = leadDiscoveryRange === range
-                    return (
-                      <button
-                        key={range}
-                        type="button"
-                        onClick={() => setLeadDiscoveryRange(range)}
-                        aria-pressed={active}
-                        className={
-                          active
-                            ? 'rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-colors'
-                            : 'rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-tertiary transition-colors hover:text-text-secondary'
-                        }
-                      >
-                        {range}D
-                      </button>
-                    )
-                  })}
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-medium text-text-secondary">
+                  <span className="flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#171717]" />
+                    Discovered <span className="font-bold text-text-primary">{leadDiscoveryTotals.discovered}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#0A84FF]" />
+                    High-intent <span className="font-bold text-[#0A84FF]">{leadDiscoveryTotals.qualified}</span>
+                  </span>
+                  <TrendComparisonBadge metric="Lead discovery" comparison={leadDiscoveryComparison} />
                 </div>
               </div>
 
               <div className="flex-1 mt-2 h-[176px] -ml-2 relative z-10">
                 {data.stats.found === 0 && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 backdrop-blur-[0.5px] z-20">
-                    <p className="text-[13.5px] font-bold text-text-primary mb-1">No leads discovered yet</p>
-                    <p className="text-[12px] text-text-tertiary max-w-[280px] text-center leading-relaxed font-medium">
-                      Create a keyword rule in <Link href="/keywords" className="text-[#0A84FF] hover:underline font-bold">Keywords</Link> to start monitoring.
+                    <p className="mb-1.5 text-[15px] font-semibold leading-5 tracking-[-0.01em] text-text-primary">No leads discovered yet</p>
+                    <p className="max-w-[320px] text-center text-[13px] font-normal leading-5 text-text-secondary">
+                      Create your first keyword rule in <Link href="/keywords" className="font-semibold text-[#0A84FF] underline-offset-2 hover:underline">Keywords</Link> to start monitoring.
                     </p>
                   </div>
                 )}

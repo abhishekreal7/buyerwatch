@@ -11,7 +11,11 @@
 /** Known error codes used by our own routes (google oauth, reddit, etc.) */
 const ERROR_CODE_MAP: Record<string, string> = {
   google_oauth_unavailable:
-    'Google sign-in is temporarily unavailable. Please try email/password or try again later.',
+    'Google sign-in is temporarily unavailable. Please try signing in with email.',
+  github_oauth_unavailable:
+    'GitHub sign-in is temporarily unavailable. Please try signing in with email.',
+  x_oauth_unavailable:
+    'X sign-in is temporarily unavailable. Please try signing in with email.',
 }
 
 /** Pattern-based fallback for Supabase / OAuth technical strings */

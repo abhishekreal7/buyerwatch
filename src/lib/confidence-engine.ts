@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { normalizeHighIntentThreshold } from './high-intent-threshold'
+import { getPlanLimits } from './plan-limits'
+import { getEntitledPlan, type BillingIdentity } from './billing-entitlements'
 
 const MIN_FEEDBACK_FOR_TRUST = 10
 const MIN_COMMUNITY_SAMPLE = 10
+export const INSTANT_AUTOPILOT_THRESHOLD = 90
 
 export interface AutoSendEvaluation {
   approved: boolean
@@ -51,9 +54,9 @@ function blockedDecision(reason: string): AutoSendEvaluation {
 
 export function evaluateAutoSendContentPolicy(
   draftResult: DraftSafetyResult,
-  profile: { auto_send_enabled: boolean; plan: string },
+  profile: BillingIdentity & { auto_send_enabled: boolean },
 ): AutoSendEvaluation | null {
-  if (profile.plan === 'free' || profile.plan === 'starter') {
+  if (!getPlanLimits(getEntitledPlan(profile)).autoSend) {
     return blockedDecision('auto_send_requires_paid_plan')
   }
   if (!profile.auto_send_enabled) {
@@ -108,10 +111,51 @@ export function calculateAutomationDecision(input: {
   }
 }
 
+export function evaluateInstantAutopilot(input: {
+  plan: string
+  activatedAt?: string | null
+  expiresAt?: string | null
+  usedAt?: string | null
+  intentScore?: number
+  totalDraftsReviewed: number
+  now?: number
+}): AutoSendEvaluation | null {
+  const expiry = Date.parse(input.expiresAt ?? '')
+  if (
+    input.totalDraftsReviewed >= MIN_FEEDBACK_FOR_TRUST
+    || !['starter', 'pro', 'growth'].includes(input.plan)
+    || !input.activatedAt
+    || !Number.isFinite(expiry)
+    || expiry <= (input.now ?? Date.now())
+    || input.usedAt
+  ) return null
+
+  const instantScore = Number(input.intentScore)
+  if (Number.isFinite(instantScore) && instantScore >= INSTANT_AUTOPILOT_THRESHOLD) {
+    return {
+      approved: true,
+      reason: 'instant_autopilot_eligible',
+      dynamicThreshold: INSTANT_AUTOPILOT_THRESHOLD,
+      automationConfidence: instantScore,
+      configuredThreshold: INSTANT_AUTOPILOT_THRESHOLD,
+      userTrust: 0,
+      communityTrust: 80,
+      totalDraftsReviewed: input.totalDraftsReviewed,
+    }
+  }
+  return {
+    ...blockedDecision('instant_autopilot_below_threshold'),
+    configuredThreshold: INSTANT_AUTOPILOT_THRESHOLD,
+    totalDraftsReviewed: input.totalDraftsReviewed,
+  }
+}
+
 function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    url && url.startsWith('http') ? url : 'https://placeholder.supabase.co',
+    key || 'placeholder-key',
   )
 }
 
@@ -154,6 +198,9 @@ export async function evaluateAutoSend(
     auto_send_threshold?: number
     high_intent_threshold?: number
     plan: string
+    instant_autopilot_activated_at?: string | null
+    instant_autopilot_expires_at?: string | null
+    instant_autopilot_used_at?: string | null
   },
   targetCommunity?: string | null,
   intentScore?: number,
@@ -175,6 +222,15 @@ export async function evaluateAutoSend(
   // Community performance can make an earned decision stricter, but it can
   // never replace the user's first ten explicit reviews.
   if (totalReviewed < MIN_FEEDBACK_FOR_TRUST) {
+    const instantDecision = evaluateInstantAutopilot({
+      plan: profile.plan,
+      activatedAt: profile.instant_autopilot_activated_at,
+      expiresAt: profile.instant_autopilot_expires_at,
+      usedAt: profile.instant_autopilot_used_at,
+      intentScore,
+      totalDraftsReviewed: totalReviewed,
+    })
+    if (instantDecision) return instantDecision
     return {
       ...blockedDecision('cold_start_insufficient_data'),
       configuredThreshold: Math.min(100, Math.max(70, profile.auto_send_threshold ?? 85)),

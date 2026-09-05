@@ -1,7 +1,7 @@
 import { getPlanLimits } from './plan-limits'
+import { getEntitledPlan, type BillingIdentity } from './billing-entitlements'
 
-export type AutoSendPolicySnapshot = {
-  plan: string | null
+export type AutoSendPolicySnapshot = BillingIdentity & {
   auto_send_enabled: boolean | null
   auto_send_daily_limit: number | null
   auto_send_platforms: string[] | null
@@ -15,7 +15,7 @@ export function queuedAutoSendBlockReason(
   options: { redditDirectPostingEnabled: boolean; xDirectPostingEnabled?: boolean },
 ): string | null {
   if (!profile.auto_send_enabled) return 'auto_send_disabled'
-  if (!getPlanLimits(profile.plan).autoSend) return 'auto_send_plan_ineligible'
+  if (!getPlanLimits(getEntitledPlan(profile)).autoSend) return 'auto_send_plan_ineligible'
 
   const enabledPlatforms = Array.isArray(profile.auto_send_platforms)
     ? profile.auto_send_platforms

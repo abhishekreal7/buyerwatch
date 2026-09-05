@@ -146,8 +146,8 @@ function LeadRow({
       onClick={onClick}
       className={`w-full text-left rounded-xl p-3.5 transition-all duration-150 relative group ${
         isActive
-          ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-black/[0.08] border-l-[3.5px] border-l-[#0A84FF]'
-          : 'bg-white/60 hover:bg-white hover:shadow-xs ring-1 ring-black/[0.04] border-l-[3.5px] border-l-transparent'
+          ? 'bg-white shadow-[0_4px_14px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] ring-2 ring-neutral-900'
+          : 'bg-white/70 hover:bg-white hover:shadow-xs ring-1 ring-black/[0.05]'
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -563,18 +563,7 @@ export default function OpportunitiesPage() {
       <div className="flex w-full flex-col">
 
         {/* ── Top Bar ─────────────────────────────────────────────── */}
-        <PageHeader
-          title="Opportunities"
-          action={(
-            <div className="flex items-center gap-2 rounded-full bg-gray-900 px-3.5 py-1 text-[12px] font-semibold text-white shadow-sm ring-1 ring-black/5">
-              <span className="relative flex h-2 w-2 items-center justify-center">
-                {opportunities.length > 0 && <span className="absolute inset-0 animate-ping rounded-full bg-[#0A84FF] opacity-50" />}
-                <span className={`h-1.5 w-1.5 rounded-full ${opportunities.length > 0 ? 'bg-[#0A84FF]' : 'bg-white/40'}`} />
-              </span>
-              {totalCount + replyQueueCount} active
-            </div>
-          )}
-        />
+        <PageHeader title="Opportunities" />
 
         <OpportunityStageNav activeStage="review" reviewCount={totalCount} replyCount={replyQueueCount} />
 

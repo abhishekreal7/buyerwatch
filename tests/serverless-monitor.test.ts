@@ -109,7 +109,7 @@ describe('serverless social candidate selection', () => {
   })
 })
 
-describe('QStash monitoring route contract', () => {
+describe('hybrid monitoring route contract', () => {
   const route = readFileSync(
     join(process.cwd(), 'src/app/api/cron/enqueue/route.ts'),
     'utf8',
@@ -122,14 +122,6 @@ describe('QStash monitoring route contract', () => {
     join(process.cwd(), 'src/app/api/cron/cancel-message/route.ts'),
     'utf8',
   )
-  const failureRoute = readFileSync(
-    join(process.cwd(), 'src/app/api/cron/failure/route.ts'),
-    'utf8',
-  )
-  const setup = readFileSync(
-    join(process.cwd(), 'scripts/setup-qstash-schedule.mjs'),
-    'utf8',
-  ).replace(/\r\n/g, '\n')
   const monitor = readFileSync(
     join(process.cwd(), 'src/lib/serverless-monitor.ts'),
     'utf8',
@@ -155,11 +147,14 @@ describe('QStash monitoring route contract', () => {
     'utf8',
   ).replace(/\r\n/g, '\n')
 
-  it('verifies signed QStash requests and runs direct monitoring', () => {
+  it('accepts signed jobs while reserving global monitoring for Cloudflare', () => {
     expect(route).toContain('verifyQStashRequest')
     expect(route).toContain('readTextBody(request, 4_096)')
     expect(route).toContain('runServerlessMonitoring')
+    expect(route).toContain('qstash_global_monitor_disabled')
+    expect(route).toContain('isQStashJob && !forceUserId')
     expect(route).not.toContain('enqueueDueMonitoring')
+    expect(route).not.toContain('ensureMonitoringSchedule')
   })
 
   it('dispatches one exact pending outbox job through a protected repair route', () => {
@@ -175,27 +170,22 @@ describe('QStash monitoring route contract', () => {
     expect(cancelMessageRoute).toContain('cancelQStashMessage(messageId)')
   })
 
-  it('creates an economical five-minute schedule with retries', () => {
-    expect(setup).toContain("cron: '*/5 * * * *'")
-    expect(setup).toContain('retries: 2')
-    expect(setup).toContain("scheduleId: 'buyerwatch-reddit-monitor'")
-    expect(setup).toContain('failureCallback,')
-    expect(setup).toContain('schedule.failureCallback !== failureCallback')
-  })
-
-  it('authenticates, deduplicates, and alerts after scheduler retries are exhausted', () => {
-    expect(failureRoute).toContain('verifyQStashRequest')
-    expect(failureRoute).toContain('readTextBody(request, MAX_CALLBACK_BYTES)')
-    expect(failureRoute).toContain("'NX'")
-    expect(failureRoute).toContain('new Resend(apiKey).emails.send')
-    expect(failureRoute).not.toContain('sourceBody')
-  })
-
   it('recovers durable checkpoints before fetching newly discovered candidates', () => {
     expect(monitor).toContain('loadPendingSocialCheckpoints')
     expect(monitor).toContain('persistPendingCandidates(discoveredCandidates)')
     expect(monitor).toContain(".eq('status', 'pending')")
+    expect(monitor).toContain(".neq('profiles.plan', 'free')")
+    expect(monitor).toContain('hasActiveSubscription(profile)')
+    expect(monitor).toContain('canMonitorPlatform(getEntitledPlan(profile), row.platform)')
     expect(monitor).toContain('for (const candidate of [...checkpoints, ...discoveredCandidates])')
+  })
+
+  it('rechecks billing inside the scoring worker before any paid work resumes', () => {
+    expect(workerScorer).toContain('hasActiveSubscription(profile)')
+    expect(workerScorer).toContain(".eq('user_id', userId)\n          .eq('status', 'pending')")
+    expect(workerScorer).toContain('Dropped pending score work because the subscription is not active')
+    expect(workerScorer.indexOf('if (!hasActiveSubscription(profile))'))
+      .toBeLessThan(workerScorer.indexOf('reserveMonthlySignal('))
   })
 
   it('bounds provider work and gates serverless auto-send by platform support', () => {
@@ -222,12 +212,13 @@ describe('QStash monitoring route contract', () => {
     expect(monitor).toContain('recordKeywordPollFailure')
   })
 
-  it('keeps managed Reddit discovery strictly opt-in and provider-first', () => {
+  it('keeps managed Reddit discovery strictly opt-in and RSS-first', () => {
     expect(reddit).toContain('hasRedditDiscoveryProvider')
-    expect(reddit).toContain('RedditAPIs primary discovery')
-    expect(reddit.indexOf('RedditAPIs primary discovery')).toBeLessThan(
-      reddit.indexOf('FALLBACK: Reddit public RSS feed'),
+    expect(reddit).toContain('${providerKind} fallback discovery')
+    expect(reddit.indexOf('PRIMARY: Reddit public RSS feed')).toBeLessThan(
+      reddit.indexOf('FALLBACK: managed discovery provider'),
     )
+    expect(reddit).toContain('buildSubredditRssUrls(normalizedSubreddit)')
   })
 
   it('dispatches manual fetches for the exact selected social target', () => {

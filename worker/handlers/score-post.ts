@@ -9,20 +9,24 @@ import path from 'path'
 import { randomBytes } from 'crypto'
 import { buildAttributionShortUrl } from '../../src/lib/attribution'
 import { getAppUrl } from '../../src/lib/app-url'
-import { ACTIONABLE_INTENT_THRESHOLD, type IntentLabel } from '../../src/lib/intent'
+import { ACTIONABLE_INTENT_THRESHOLD, DISMISSED_NOISE_FLOOR, type IntentLabel } from '../../src/lib/intent'
 import { evaluateIntentPreflight } from '../../src/lib/intent-preflight'
 import { getIntentDailyLimit, getPlanLimits, normalizePlan } from '../../src/lib/plan-limits'
+import { getEntitledPlan, hasActiveSubscription } from '../../src/lib/billing-entitlements'
 import { getConfiguredSecret, hasRedditPostingProvider } from '../../src/lib/env'
 import {
   emptyAiUsage,
   getAiUsageFromError,
-  recordAiUsage,
-  releaseAiSpend,
   reserveAiSpend,
   type AiUsage,
 } from '../../src/lib/ai-usage'
+import {
+  releaseAiSpendDurably,
+  releaseMonthlyDraftDurably,
+  settleAiUsageDurably,
+} from '../../src/lib/ai-settlement'
 import { dispatchPendingOutbox } from '../../src/lib/backend-maintenance'
-import { checkGoogleRankQueue, notifySlackQueue } from '../../src/lib/queues'
+import { persistAndDispatchFollowUps } from '../../src/lib/follow-up-outbox'
 import { recordAutomationDecision, recordEngagementEvent } from '../../src/lib/automation-audit'
 import { getPlatformCapabilities } from '../../src/lib/platform-capabilities'
 import { isXPostingConfigured } from '../../src/lib/x-post'
@@ -78,6 +82,7 @@ export async function processScorePost(
   const providerRetries = options.providerRetries
   let signalReserved = false
   let draftReserved = false
+  let draftSpendReservationId: string | null = null
 
   try {
     // 1. Resume a checkpointed high-intent thread after a worker/provider
@@ -123,14 +128,14 @@ export async function processScorePost(
     // 2. Fetch user profile for context and plan
     const { data: extendedProfile } = await supabase
       .from('profiles')
-      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, high_intent_threshold, auto_send_platforms, auto_send_communities, auto_send_daily_limit, referral_tracking_enabled')
+      .select('business_name, business_description, business_url, business_type, writing_style, tone_archetype, style_guardrails, competitors, tone_examples, plan, billing_status, billing_subscription_id, auto_send_enabled, auto_send_threshold, high_intent_threshold, auto_send_platforms, auto_send_communities, auto_send_daily_limit, referral_tracking_enabled, instant_autopilot_activated_at, instant_autopilot_expires_at, instant_autopilot_used_at')
       .eq('id', userId)
       .single()
     let profile = extendedProfile
     if (!profile) {
       const legacyResult = await supabase
         .from('profiles')
-        .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, plan, auto_send_enabled, auto_send_threshold, high_intent_threshold, referral_tracking_enabled')
+        .select('business_name, business_description, business_url, business_type, writing_style, competitors, tone_examples, plan, billing_status, billing_subscription_id, auto_send_enabled, auto_send_threshold, high_intent_threshold, referral_tracking_enabled')
         .eq('id', userId)
         .single()
       if (legacyResult.error) throw legacyResult.error
@@ -143,11 +148,31 @@ export async function processScorePost(
             auto_send_communities: [],
             auto_send_daily_limit: 3,
             high_intent_threshold: 80,
+            instant_autopilot_activated_at: null,
+            instant_autopilot_expires_at: null,
+            instant_autopilot_used_at: null,
           }
         : null
     }
 
     if (!profile) throw new Error('Profile not found for scoring job')
+    if (!hasActiveSubscription(profile)) {
+      if (existing?.id) {
+        const { error: pendingDeleteError } = await supabase
+          .from('monitored_threads')
+          .delete()
+          .eq('id', existing.id)
+          .eq('user_id', userId)
+          .eq('status', 'pending')
+        if (pendingDeleteError) throw pendingDeleteError
+      }
+      logger.info({
+        userId,
+        platform: post.platform,
+        externalId: post.externalId,
+      }, 'Dropped pending score work because the subscription is not active')
+      return
+    }
     const { data: keyword, error: keywordError } = await supabase
       .from('keywords')
       .select('term')
@@ -155,7 +180,7 @@ export async function processScorePost(
       .maybeSingle()
     if (keywordError) throw keywordError
 
-    const plan = normalizePlan(profile.plan)
+    const plan = getEntitledPlan(profile)
     const planLimits = getPlanLimits(plan)
     const hasAnthropic = Boolean(getConfiguredSecret(process.env.ANTHROPIC_API_KEY))
 
@@ -180,24 +205,33 @@ export async function processScorePost(
       })
       evidenceSignals = preflight.evidenceSignals
       if (!preflight.isQualifiedCandidate) {
+        // If rejected for lack of direct commercial shape or first-party demand, but has a genuine
+        // keyword match and no spam/disqualifying noise, preserve it as a low-relevance conversation
+        // so the user can see proof of activity on their dashboard instead of a blank screen.
+        const hasDisqualifyingNoise = preflight.noiseSignals.some(s =>
+          s.includes('disqualifying') || s.includes('spam') || s.includes('hiring') || s.includes('job')
+        )
+        const isPreservableLowRelevance = preflight.matchedKeywords.length > 0 && !hasDisqualifyingNoise && preflight.score >= 15
+
         await saveThread({
           userId,
           keywordId,
           post,
           intentScore: preflight.score,
           intentLabel: preflight.label,
-          status: 'dismissed',
+          status: isPreservableLowRelevance ? 'needs_manual_reply' : 'dismissed',
           flag: preflight.flag,
           reasoning: preflight.reasoning,
           evidenceSignals,
-          automationReason: 'preflight_rejected',
+          automationReason: isPreservableLowRelevance ? 'preflight_low_intent_preserved' : 'preflight_rejected',
         })
         logger.info({
           userId,
           platform: post.platform,
           externalId: post.externalId,
+          preserved: isPreservableLowRelevance,
           evidenceSignals: evidenceSignals.slice(0, 6),
-        }, 'Intent preflight rejected an unqualified candidate')
+        }, isPreservableLowRelevance ? 'Preserved low-intent keyword conversation for user review' : 'Intent preflight rejected an unqualified candidate')
         return
       }
 
@@ -227,7 +261,17 @@ export async function processScorePost(
 
       paidIntentGatePassed = !hasAnthropic || preflight.shouldUseAi
 
-      if (hasAnthropic && preflight.shouldUseAi) {
+      if (plan === 'free') {
+        scoreResult = {
+          score: preflight.score,
+          label: preflight.label,
+          flag: preflight.flag,
+          reasoning: preflight.reasoning,
+          usage: emptyAiUsage(),
+        }
+        paidIntentGatePassed = false
+        intentManualReviewReason = 'trial_required'
+      } else if (hasAnthropic && preflight.shouldUseAi) {
         // Reserve provider spend and the daily intent allowance atomically.
         const intentSpend = await reserveAiSpend(supabase, {
           userId,
@@ -316,19 +360,36 @@ export async function processScorePost(
     
     // Save thread early if score is low
     if (scoreResult.score < ACTIONABLE_INTENT_THRESHOLD) {
+      if (signalReserved) {
+        await safelyReleaseMonthlySignal(userId)
+        signalReserved = false
+      }
+
+      // Completely drop posts below the noise floor (e.g. < 25) so they never pollute any feed
+      if (scoreResult.score < DISMISSED_NOISE_FLOOR) {
+        logger.info({ userId, score: scoreResult.score, externalId: post.externalId }, 'Discarded low-relevance post below noise floor')
+        await supabase
+          .from('monitored_threads')
+          .delete()
+          .eq('user_id', userId)
+          .eq('platform', post.platform)
+          .eq('external_id', post.externalId)
+        return
+      }
+
+      const isPreservable = scoreResult.score >= 40
       await saveThread({
         userId,
         keywordId,
         post,
         intentScore: scoreResult.score,
         intentLabel: scoreResult.label,
-        status: 'dismissed',
+        status: isPreservable ? 'needs_manual_reply' : 'dismissed',
         flag: scoreResult.flag,
         reasoning: scoreResult.reasoning,
         evidenceSignals,
-        automationReason: 'low_intent',
+        automationReason: isPreservable ? 'low_intent_manual_review' : 'low_intent',
       })
-      signalReserved = false
       return
     }
 
@@ -407,6 +468,7 @@ export async function processScorePost(
       signalReserved = false
       return
     }
+    draftSpendReservationId = draftSpend.id
 
     let canDraft: boolean
     try {
@@ -461,7 +523,7 @@ export async function processScorePost(
         userId,
         purpose: 'draft',
       })
-      await safelyReleaseMonthlyDraft(userId)
+      await safelyReleaseMonthlyDraft(userId, draftSpend.id)
       draftReserved = false
       logger.warn({ err: error, userId }, 'AI drafting failed; routing scored conversation to manual reply')
       await saveThread({
@@ -493,6 +555,9 @@ export async function processScorePost(
         auto_send_threshold: profile.auto_send_threshold,
         high_intent_threshold: profile.high_intent_threshold,
         plan: profile.plan ?? 'free',
+        instant_autopilot_activated_at: profile.instant_autopilot_activated_at,
+        instant_autopilot_expires_at: profile.instant_autopilot_expires_at,
+        instant_autopilot_used_at: profile.instant_autopilot_used_at,
       },
       post.sourceTarget ?? null,
       scoreResult.score,
@@ -602,20 +667,21 @@ export async function processScorePost(
       }
       if (thread && enqueueFollowUpJobs) {
         await dispatchPendingOutbox(1, thread.id)
-        // Fire-and-forget: check if thread URL ranks on Google for this keyword (Feature 5)
-        if (post.url) {
-          checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url, matchedKeyword: post.sourceTarget }).catch(() => {})
-        }
-        // Fire-and-forget Slack notification
-        notifySlackQueue.add(`slack-${thread.id}`, {
+        await persistAndDispatchFollowUps({
           userId,
-          postUrl: post.url,
-          postTitle: post.title || post.text?.slice(0, 100),
-          postAuthor: post.author,
-          intentScore: scoreResult.score,
-          draftText,
-          subreddit: post.sourceTarget || 'reddit',
-        }).catch(() => {}) // never block on Slack
+          threadId: thread.id,
+          rank: post.url
+            ? { url: post.url, matchedKeyword: post.sourceTarget }
+            : undefined,
+          slack: {
+            postUrl: post.url,
+            postTitle: post.title || post.text?.slice(0, 100),
+            postAuthor: post.author,
+            intentScore: scoreResult.score,
+            draftText,
+            subreddit: post.sourceTarget || 'reddit',
+          },
+        })
         logger.info({ userId, threadId: thread.id, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Enqueued auto-send')
       }
     } else {
@@ -651,20 +717,19 @@ export async function processScorePost(
         })
       }
       if (thread && enqueueFollowUpJobs) {
-        // Fire-and-forget: check if thread URL ranks on Google (Feature 5)
-        if (post.url) {
-          checkGoogleRankQueue.add(`rank-${thread.id}`, { threadId: thread.id, url: post.url }).catch(() => {})
-        }
-        // Fire-and-forget Slack notification
-        notifySlackQueue.add(`slack-${thread.id}`, {
+        await persistAndDispatchFollowUps({
           userId,
-          postUrl: post.url,
-          postTitle: post.title || post.text?.slice(0, 100),
-          postAuthor: post.author,
-          intentScore: scoreResult.score,
-          draftText,
-          subreddit: post.sourceTarget || 'reddit',
-        }).catch(() => {}) // never block on Slack
+          threadId: thread.id,
+          rank: post.url ? { url: post.url } : undefined,
+          slack: {
+            postUrl: post.url,
+            postTitle: post.title || post.text?.slice(0, 100),
+            postAuthor: post.author,
+            intentScore: scoreResult.score,
+            draftText,
+            subreddit: post.sourceTarget || 'reddit',
+          },
+        })
       }
       logger.info({ userId, reason: evaluation.reason, confidence: evaluation.automationConfidence, threshold: evaluation.dynamicThreshold }, 'Routed to manual review')
     }
@@ -674,7 +739,11 @@ export async function processScorePost(
       await safelyReleaseMonthlySignal(userId)
     }
     if (draftReserved) {
-      await safelyReleaseMonthlyDraft(userId)
+      if (draftSpendReservationId) {
+        await safelyReleaseMonthlyDraft(userId, draftSpendReservationId)
+      } else {
+        logger.error({ userId }, 'Draft allowance was reserved without a spend reservation id')
+      }
     }
     logger.error({ err: error }, `Failed to score post ${post.externalId} for user ${userId}:`)
     throw error
@@ -817,12 +886,14 @@ async function safelyReleaseMonthlySignal(userId: string): Promise<void> {
   }
 }
 
-async function safelyReleaseMonthlyDraft(userId: string): Promise<void> {
-  const { error } = await supabase.rpc('release_monthly_draft', {
-    p_user_id: userId,
-  })
-  if (error) {
-    logger.error({ error, userId }, 'Failed to release monthly draft reservation')
+async function safelyReleaseMonthlyDraft(
+  userId: string,
+  reservationId: string,
+): Promise<void> {
+  try {
+    await releaseMonthlyDraftDurably(supabase, { userId, reservationId })
+  } catch (error) {
+    logger.error({ error, userId, reservationId }, 'Failed to release monthly draft reservation')
   }
 }
 
@@ -832,7 +903,11 @@ async function safelyRecordAiUsage(
   context: { userId: string; purpose: 'intent' | 'draft' },
 ): Promise<void> {
   try {
-    await recordAiUsage(supabase, { reservationId, usage })
+    await settleAiUsageDurably(supabase, {
+      reservationId,
+      userId: context.userId,
+      usage,
+    })
   } catch (error) {
     logger.error(
       { error, reservationId, ...context },
@@ -846,7 +921,10 @@ async function safelyReleaseAiSpend(
   context: { userId: string; purpose: 'intent' | 'draft' },
 ): Promise<void> {
   try {
-    await releaseAiSpend(supabase, reservationId)
+    await releaseAiSpendDurably(supabase, {
+      reservationId,
+      userId: context.userId,
+    })
   } catch (error) {
     logger.error(
       { error, reservationId, ...context },

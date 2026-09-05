@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { fetchPublicText } from '@/lib/security/outbound-url'
 import { getConfiguredSecret } from '@/lib/env'
+import { getEntitledPlan } from '@/lib/billing-entitlements'
+import { createAnthropicClient } from '@/lib/anthropic-client'
 import {
   buildFallbackSuggestions,
   sanitizeOnboardingSuggestions,
@@ -10,7 +11,7 @@ import {
 } from '@/lib/onboarding-intelligence'
 import { normalizeWebsiteUrl } from '@/lib/onboarding-validation'
 import { aiRateLimit, getIp } from '@/lib/ratelimit'
-import { boundedString, readJsonBody, RequestInputError } from '@/lib/request'
+import { boundedString, isTrustedSameOriginMutation, readJsonBody, RequestInputError } from '@/lib/request'
 import { getServiceRoleClient } from '@/lib/admin'
 import {
   calculateAnthropicUsage,
@@ -87,6 +88,9 @@ const ONBOARDING_OUTPUT_SCHEMA = {
 } as const
 
 export async function POST(req: NextRequest) {
+  if (!isTrustedSameOriginMutation(req)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  }
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -164,11 +168,34 @@ Rules:
     const anthropicKey = getConfiguredSecret(process.env.ANTHROPIC_API_KEY)
     let aiResponse = ''
     const admin = getServiceRoleClient()
-    const { data: profile } = await admin
+    const { data: existingProfile, error: profileReadError } = await admin
       .from('profiles')
-      .select('plan')
+      .select('plan, billing_status, billing_subscription_id')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (profileReadError) {
+      throw new Error(`Unable to read onboarding profile: ${profileReadError.message}`)
+    }
+
+    // Email-confirmed users can reach onboarding before complete_onboarding has
+    // created their profile. Establish the free, provisional row here so the
+    // first AI analysis remains rate-limited and spend-accounted instead of
+    // failing with "profile not found". The final onboarding transaction
+    // replaces the nullable product fields with the user's reviewed values.
+    let profile = existingProfile
+    if (!profile) {
+      const { data: provisionalProfile, error: profileCreateError } = await admin
+        .from('profiles')
+        .upsert({ id: user.id }, { onConflict: 'id' })
+        .select('plan, billing_status, billing_subscription_id')
+        .single()
+
+      if (profileCreateError) {
+        throw new Error(`Unable to initialize onboarding profile: ${profileCreateError.message}`)
+      }
+      profile = provisionalProfile
+    }
 
     if (anthropicKey) {
       const reservation = await reserveAiSpend(admin, {
@@ -176,17 +203,13 @@ Rules:
         // Onboarding is bounded and accounted within the same generative-AI
         // budget as drafts, without consuming a monthly draft allowance.
         purpose: 'draft',
-        plan: profile?.plan,
+        plan: getEntitledPlan(profile),
       })
       if (!reservation) {
         return NextResponse.json({ error: 'ai_spend_limit_reached' }, { status: 429 })
       }
       try {
-        const anthropic = new Anthropic({
-          apiKey: anthropicKey,
-          timeout: 30_000,
-          maxRetries: 2,
-        })
+        const anthropic = createAnthropicClient()
         const response = await anthropic.messages.create({
           model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
           max_tokens: 800,

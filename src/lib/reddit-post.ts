@@ -30,6 +30,7 @@ import {
   assertRedditDeliveryCircuitClosed,
   RedditDeliveryCircuitOpenError,
 } from './reddit-service-safety'
+import { evaluateRedditAutoSendEligibility } from './reddit-auto-send-eligibility'
 
 export class PlatformPostError extends Error {
   public readonly deliveryUncertain: boolean
@@ -92,11 +93,6 @@ function isHyperbrowserProviderError(error: unknown): error is HyperbrowserReddi
     && typeof candidate.reauthRequired === 'boolean'
 }
 
-function boundedIntegerEnvironment(name: string, fallback: number, minimum: number, maximum: number) {
-  const parsed = Number(process.env[name])
-  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback
-}
-
 export async function postRedditReply(input: {
   userId: string
   threadExternalId: string
@@ -144,8 +140,6 @@ export async function postRedditReply(input: {
     input.triggerType === 'auto'
     && (session.provider === 'redditapis' || session.provider === 'hyperbrowser')
   ) {
-    const minimumAgeDays = boundedIntegerEnvironment('REDDIT_AUTO_MIN_ACCOUNT_AGE_DAYS', 30, 7, 365)
-    const minimumKarma = boundedIntegerEnvironment('REDDIT_AUTO_MIN_COMBINED_KARMA', 50, 0, 100_000)
     let safetyProfile = {
       accountCreatedAt: session.accountCreatedAt,
       linkKarma: session.linkKarma,
@@ -174,15 +168,17 @@ export async function postRedditReply(input: {
       }
     }
 
-    const accountCreatedAt = Date.parse(safetyProfile.accountCreatedAt ?? '')
-    if (!Number.isFinite(accountCreatedAt)) {
+    const eligibility = evaluateRedditAutoSendEligibility(safetyProfile)
+    if (eligibility.code === 'profile_unavailable') {
+      throw new PlatformPostError('reddit', 'reddit_account_safety_profile_unavailable', false)
+    }
+    if (eligibility.code === 'account_age_unverified') {
       throw new PlatformPostError('reddit', 'reddit_account_age_unverified', false)
     }
-    if (Date.now() - accountCreatedAt < minimumAgeDays * 24 * 60 * 60_000) {
+    if (eligibility.code === 'account_too_new') {
       throw new PlatformPostError('reddit', 'reddit_account_too_new_for_automation', false)
     }
-    const combinedKarma = (safetyProfile.linkKarma ?? 0) + (safetyProfile.commentKarma ?? 0)
-    if (safetyProfile.linkKarma === null || safetyProfile.commentKarma === null || combinedKarma < minimumKarma) {
+    if (eligibility.code === 'karma_below_minimum') {
       throw new PlatformPostError('reddit', 'reddit_account_karma_below_automation_minimum', false)
     }
   }

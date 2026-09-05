@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getServiceRoleClient } from '@/lib/admin'
 import { actionRateLimit, getIp } from '@/lib/ratelimit'
-import { boundedString, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
+import { boundedString, isTrustedSameOriginMutation, isUuid, readJsonBody, RequestInputError } from '@/lib/request'
 import { recordEngagementEvent } from '@/lib/automation-audit'
 
 function readOriginalDraft(value: unknown): string {
@@ -48,6 +48,9 @@ async function recordManualConfirmation(input: {
 
 export async function POST(request: Request) {
   try {
+    if (!isTrustedSameOriginMutation(request)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -15,6 +15,9 @@ const BUSINESS_TYPES = new Set([
     'other',
 ]);
 const ALLOWED_PLATFORMS = new Set(['reddit', 'bluesky', 'x']);
+const DISCOVERY_SOURCES = new Set([
+    'search', 'social', 'recommendation', 'community', 'content', 'other', 'prefer_not_to_say',
+]);
 function normalizeWebsiteUrl(value) {
     const trimmed = value.trim();
     if (!trimmed)
@@ -65,6 +68,8 @@ function validateOnboardingData(data) {
         return 'Writing style is too long.';
     if (data.reddit_username?.trim().length > 100)
         return 'Reddit username is too long.';
+    if (!DISCOVERY_SOURCES.has(data.discovery_source))
+        return 'Select how you found BuyerWatch or choose “Prefer not to say.”';
     if (!BUSINESS_TYPES.has(data.business_type))
         return 'Select a valid business category.';
     if (!Array.isArray(data.keywords) || data.keywords.length === 0) {

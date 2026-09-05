@@ -53,6 +53,21 @@ describe('dashboard data reliability contracts', () => {
     expect(posted).toContain('label="Conversations"')
   })
 
+  it('renders posted replies as an exact, numbered activity timeline', () => {
+    expect(posted).toContain('sentAtIso')
+    expect(posted).toContain('formatExactSentDate')
+    expect(posted).toContain('const sequenceNumber = Math.max(1, totalCount - chronologicalIndex)')
+    expect(posted).toContain('Newest posted reply first')
+    expect(posted).toContain('Showing {filtered.length} of {totalCount}')
+    expect(posted.match(/\.order\('id', \{ ascending: false \}\)/g)).toHaveLength(2)
+  })
+
+  it('keeps timeline numbering outside reply cards without nested step nodes', () => {
+    expect(posted).not.toContain('aria-hidden="true">1</span>')
+    expect(posted).not.toContain('aria-hidden="true">2</span>')
+    expect(posted).not.toContain('after:-bottom-[31px]')
+  })
+
   it('loads active and dismissed dashboard windows independently', () => {
     expect(dashboard).toContain('activeThreadsResult')
     expect(dashboard).toContain('dismissedThreadsResult')

@@ -41,7 +41,27 @@ describe('production readiness synthetic', () => {
     })).resolves.toEqual({ degraded: true })
   })
 
-  it('fails for Bluesky staleness or a connected Reddit account', async () => {
+  it('accepts Reddit-only staleness when the required provider is healthy', async () => {
+    const response = readinessResponse(503, {
+      status: 'degraded',
+      checks: {
+        ...healthyCore,
+        monitoring: {
+          status: 'error',
+          code: 'monitoring_stale',
+          affectedPlatforms: ['reddit'],
+        },
+        redditProvider: { status: 'ok' },
+      },
+      dependencies: { redditProviderRequired: true },
+    })
+
+    await expect(validateReadinessResponse(response, {
+      allowRedditOnlyDegraded: true,
+    })).resolves.toEqual({ degraded: true })
+  })
+
+  it('fails for Bluesky staleness or an unhealthy required Reddit provider', async () => {
     const bluesky = readinessResponse(503, {
       status: 'degraded',
       checks: {
@@ -67,6 +87,7 @@ describe('production readiness synthetic', () => {
           code: 'monitoring_stale',
           affectedPlatforms: ['reddit'],
         },
+        redditProvider: { status: 'error' },
       },
       dependencies: { redditProviderRequired: true },
     })

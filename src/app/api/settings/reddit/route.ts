@@ -25,6 +25,10 @@ import {
 } from '@/lib/reddit-session'
 import { fetchHyperbrowserRedditAccountProfile, HyperbrowserRedditError } from '@/lib/hyperbrowser-reddit'
 import {
+  finishHyperbrowserRedditSignInSession,
+  HyperbrowserRedditProvisioningError,
+} from '@/lib/hyperbrowser-reddit-provisioning'
+import {
   fetchSprinklrRedditAccount,
   SprinklrRequestError,
 } from '@/lib/sprinklr-client'
@@ -96,7 +100,16 @@ export async function POST(request: Request) {
     }
 
     if (provider === 'hyperbrowser') {
+      const body = await readJsonBody<Record<string, unknown>>(request, 1_024)
+      const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
+      if (!sessionId) {
+        return NextResponse.json({ error: 'hyperbrowser_sign_in_session_required' }, { status: 409 })
+      }
       const session = await getHyperbrowserRedditConnectionForVerification(user.id)
+      await finishHyperbrowserRedditSignInSession({
+        sessionId,
+        profileId: session.profileId,
+      })
       const profile = await fetchHyperbrowserRedditAccountProfile({
         username: session.username,
         profileId: session.profileId,
@@ -175,6 +188,11 @@ export async function POST(request: Request) {
         status: error.code === 'hyperbrowser_authentication_failed'
           ? 503
           : error.reauthRequired ? 401 : error.retryable ? 503 : 409,
+      })
+    }
+    if (error instanceof HyperbrowserRedditProvisioningError) {
+      return NextResponse.json({ error: error.code }, {
+        status: error.retryable ? 503 : 409,
       })
     }
     if (error instanceof RedditConnectionStateError) {

@@ -8,7 +8,8 @@ import {
   type RedditKeywordMapping,
   withProfileCompetitors,
 } from '../../src/lib/reddit-candidates'
-import { fetchSubredditNewWithSource } from '../../src/lib/reddit'
+import { fetchSubredditNewWithSource, fetchSubredditSearchWithSource } from '../../src/lib/reddit'
+import type { NormalizedPost } from '../../src/lib/types'
 import { getRedditDiscoveryCapacity } from '../../src/lib/reddit-discovery-capacity'
 import {
   recordKeywordPollFailure,
@@ -32,10 +33,12 @@ export async function redditFetchHandler(job: Job) {
     if (!keywordMappings) {
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term, profiles!inner(competitors)')
+        .select('id, user_id, term, profiles!inner(competitors, billing_status, billing_subscription_id)')
         .eq('platform', 'reddit')
         .eq('target', target)
         .eq('is_active', true)
+        .eq('profiles.billing_status', 'active')
+        .not('profiles.billing_subscription_id', 'is', null)
 
       if (error) {
         throw new Error(`Failed to load Reddit keyword mappings: ${error.message}`)
@@ -45,8 +48,10 @@ export async function redditFetchHandler(job: Job) {
       const ids = keywordMappings.map(({ id }) => id)
       const { data, error } = await supabase
         .from('keywords')
-        .select('id, user_id, term, profiles!inner(competitors)')
+        .select('id, user_id, term, profiles!inner(competitors, billing_status, billing_subscription_id)')
         .in('id', ids)
+        .eq('profiles.billing_status', 'active')
+        .not('profiles.billing_subscription_id', 'is', null)
       if (error) {
         throw new Error(`Failed to validate Reddit keyword mappings: ${error.message}`)
       }
@@ -71,7 +76,24 @@ export async function redditFetchHandler(job: Job) {
     }
 
     const discovery = buildRedditScoreCandidates(posts, keywordMappings)
-    for (const candidate of discovery.candidates) {
+    let candidates = discovery.candidates
+    if (candidates.length === 0 && keywordMappings.length > 0) {
+      const searchTerms = [...new Set(keywordMappings.map(m => m.term.trim()).filter(Boolean))]
+      const searchPosts: NormalizedPost[] = []
+      for (const term of searchTerms.slice(0, 3)) {
+        try {
+          const searchResult = await fetchSubredditSearchWithSource(target, term, 25, { mode: capacity.mode })
+          searchPosts.push(...searchResult.posts)
+        } catch {
+          // ignore search failure
+        }
+      }
+      if (searchPosts.length > 0) {
+        const searchDiscovery = buildRedditScoreCandidates(searchPosts, keywordMappings)
+        candidates = searchDiscovery.candidates
+      }
+    }
+    for (const candidate of candidates) {
       await scorePostQueue.add('score', candidate, {
         jobId: `score-${candidate.userId}-${candidate.post.externalId}`,
       })

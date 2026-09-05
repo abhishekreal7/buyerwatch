@@ -1,0 +1,37 @@
+
+> buyerwatch@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.2.11 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.20.10.2:3000
+- Environments: .env.local
+✓ Ready in 516ms
+
+ GET /pricing 200 in 851ms (next.js: 378ms, proxy.ts: 7ms, application-code: 466ms)
+ GET /api/health/live 200 in 352ms (next.js: 298ms, application-code: 54ms)
+ POST /api/billing/checkout 401 in 699ms (next.js: 602ms, application-code: 98ms)
+ POST /api/billing/webhook 401 in 424ms (next.js: 402ms, application-code: 23ms)
+◇ injected env (0) from .env.local // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+ GET /api/cron/enqueue 401 in 4.1s (next.js: 4.1s, application-code: 15ms)
+ GET /login 200 in 6.9s (next.js: 1082ms, proxy.ts: 46ms, application-code: 5.8s)
+ GET /api/health/ready 503 in 9.4s (next.js: 844ms, application-code: 8.6s)
+ GET /api/health/live 200 in 30ms (next.js: 14ms, application-code: 16ms)
+ POST /api/billing/checkout 401 in 146ms (next.js: 113ms, application-code: 33ms)
+ POST /api/billing/webhook 401 in 84ms (next.js: 71ms, application-code: 13ms)
+ GET /api/cron/enqueue 401 in 163ms (next.js: 154ms, application-code: 9ms)
+ GET /login 200 in 1298ms (next.js: 49ms, proxy.ts: 20ms, application-code: 1229ms)
+ GET /api/health/ready 503 in 4.9s (next.js: 35ms, application-code: 4.9s)
+ GET /api/health/live 200 in 66ms (next.js: 29ms, application-code: 37ms)
+ POST /api/billing/checkout 401 in 92ms (next.js: 19ms, application-code: 73ms)
+ GET /api/cron/enqueue 401 in 111ms (next.js: 100ms, application-code: 10ms)
+ POST /api/billing/webhook 401 in 203ms (next.js: 182ms, application-code: 21ms)
+ GET /login 200 in 1339ms (next.js: 21ms, proxy.ts: 140ms, application-code: 1178ms)
+ GET /api/health/ready 503 in 4.7s (next.js: 10ms, application-code: 4.7s)
+✓ Compiled in 998ms
+○ Compiling /signup ...
+ GET /signup 200 in 3.8s (next.js: 3.4s, proxy.ts: 17ms, application-code: 328ms)
+ GET /signup 200 in 50ms (next.js: 6ms, proxy.ts: 5ms, application-code: 38ms)
+ GET /signup 200 in 43ms (next.js: 3ms, proxy.ts: 4ms, application-code: 36ms)
+ GET /homepage-prototype 404 in 722ms (next.js: 660ms, proxy.ts: 4ms, application-code: 58ms)
+ GET /homepage-prototype 404 in 68ms (next.js: 10ms, proxy.ts: 4ms, application-code: 54ms)
