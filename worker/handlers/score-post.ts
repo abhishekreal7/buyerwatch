@@ -205,24 +205,33 @@ export async function processScorePost(
       })
       evidenceSignals = preflight.evidenceSignals
       if (!preflight.isQualifiedCandidate) {
+        // If rejected for lack of direct commercial shape or first-party demand, but has a genuine
+        // keyword match and no spam/disqualifying noise, preserve it as a low-relevance conversation
+        // so the user can see proof of activity on their dashboard instead of a blank screen.
+        const hasDisqualifyingNoise = preflight.noiseSignals.some(s =>
+          s.includes('disqualifying') || s.includes('spam') || s.includes('hiring') || s.includes('job')
+        )
+        const isPreservableLowRelevance = preflight.matchedKeywords.length > 0 && !hasDisqualifyingNoise && preflight.score >= 15
+
         await saveThread({
           userId,
           keywordId,
           post,
           intentScore: preflight.score,
           intentLabel: preflight.label,
-          status: 'dismissed',
+          status: isPreservableLowRelevance ? 'needs_manual_reply' : 'dismissed',
           flag: preflight.flag,
           reasoning: preflight.reasoning,
           evidenceSignals,
-          automationReason: 'preflight_rejected',
+          automationReason: isPreservableLowRelevance ? 'preflight_low_intent_preserved' : 'preflight_rejected',
         })
         logger.info({
           userId,
           platform: post.platform,
           externalId: post.externalId,
+          preserved: isPreservableLowRelevance,
           evidenceSignals: evidenceSignals.slice(0, 6),
-        }, 'Intent preflight rejected an unqualified candidate')
+        }, isPreservableLowRelevance ? 'Preserved low-intent keyword conversation for user review' : 'Intent preflight rejected an unqualified candidate')
         return
       }
 
@@ -351,19 +360,23 @@ export async function processScorePost(
     
     // Save thread early if score is low
     if (scoreResult.score < ACTIONABLE_INTENT_THRESHOLD) {
+      if (signalReserved) {
+        await safelyReleaseMonthlySignal(userId)
+        signalReserved = false
+      }
+      const isPreservable = scoreResult.score >= 20
       await saveThread({
         userId,
         keywordId,
         post,
         intentScore: scoreResult.score,
         intentLabel: scoreResult.label,
-        status: 'dismissed',
+        status: isPreservable ? 'needs_manual_reply' : 'dismissed',
         flag: scoreResult.flag,
         reasoning: scoreResult.reasoning,
         evidenceSignals,
-        automationReason: 'low_intent',
+        automationReason: isPreservable ? 'low_intent_manual_review' : 'low_intent',
       })
-      signalReserved = false
       return
     }
 

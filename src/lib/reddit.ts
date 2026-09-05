@@ -22,6 +22,14 @@ export function buildSubredditRssUrl(subreddit: string): string {
   return `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/new/.rss`
 }
 
+export function buildSubredditSearchRssUrl(subreddit: string, query: string): string {
+  const normalized = subreddit.trim().replace(/^r\//i, '').toLowerCase()
+  if (normalized === 'all') {
+    return `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=new`
+  }
+  return `https://www.reddit.com/r/${encodeURIComponent(normalized)}/search.rss?q=${encodeURIComponent(query)}&restrict_sr=1&sort=new`
+}
+
 export function buildSubredditRssUrls(subreddit: string): string[] {
   return [buildSubredditRssUrl(subreddit)]
 }
@@ -103,7 +111,7 @@ export function parseRedditRss(xml: string, subreddit: string): NormalizedPost[]
       !REDDIT_POST_ID_PATTERN.test(externalId)
       || !target
       || target.postId !== externalId
-      || target.subreddit.toLowerCase() !== subreddit.toLowerCase()
+      || (subreddit.toLowerCase() !== 'all' && target.subreddit.toLowerCase() !== subreddit.toLowerCase())
       || !createdAt
       || !text
     ) continue
@@ -116,7 +124,7 @@ export function parseRedditRss(xml: string, subreddit: string): NormalizedPost[]
       text,
       url: target.canonicalUrl,
       createdAt,
-      sourceTarget: subreddit,
+      sourceTarget: subreddit.toLowerCase() === 'all' ? target.subreddit : subreddit,
     })
   }
 
@@ -237,7 +245,7 @@ function parseCachedRedditPosts(
       || !REDDIT_POST_ID_PATTERN.test(externalId)
       || !target
       || target.postId !== externalId
-      || target.subreddit.toLowerCase() !== subreddit.toLowerCase()
+      || (subreddit.toLowerCase() !== 'all' && target.subreddit.toLowerCase() !== subreddit.toLowerCase())
       || !createdAt
       || author === null
       || !text
@@ -251,7 +259,7 @@ function parseCachedRedditPosts(
       text,
       url: target.canonicalUrl,
       createdAt,
-      sourceTarget: subreddit,
+      sourceTarget: subreddit.toLowerCase() === 'all' ? target.subreddit : subreddit,
     })
   }
   return posts.slice(0, limit)
@@ -359,14 +367,16 @@ export async function fetchSubredditNewWithSource(
           return { posts, source: 'rss' }
         }
 
-        console.warn(`[reddit] RSS ${rssResponse.status} via ${rssHost} for r/${normalizedSubreddit}`)
-        if (rssResponse.status === 429) {
+        if (
+          rssResponse.status === 429
+          && process.env.VITEST !== 'true'
+          && process.env.NODE_ENV !== 'test'
+        ) {
           const resetHeader = rssResponse.headers.get('x-ratelimit-reset')
           const resetSeconds = Number(resetHeader)
           const waitMs = Number.isFinite(resetSeconds) && resetSeconds > 0
             ? Math.min(15000, Math.max(3000, Math.ceil(resetSeconds + 1) * 1000))
             : 8000
-          console.warn(`[reddit] RSS rate limited for r/${normalizedSubreddit}, waiting ${waitMs}ms before retry...`)
           await new Promise(r => setTimeout(r, waitMs))
           try {
             const retryResponse = await fetchWithTimeout(rssUrl, {
@@ -414,8 +424,8 @@ export async function fetchSubredditNewWithSource(
     // so rules recover rapidly as soon as the rolling window resets.
     if (shouldBackoff) {
       const backoffSeconds = retryAfterSeconds !== null && Number.isFinite(retryAfterSeconds)
-        ? Math.min(5 * 60, Math.max(15, Math.ceil(retryAfterSeconds)))
-        : 45
+        ? Math.min(15 * 60, Math.max(15, Math.ceil(retryAfterSeconds)))
+        : 900
       await redis.set(rssBackoffKey, '1', 'EX', backoffSeconds).catch(() => {})
     }
   }
@@ -503,6 +513,69 @@ export async function fetchSubredditNew(
   limit: number = 25,
 ): Promise<NormalizedPost[]> {
   return (await fetchSubredditNewWithSource(subreddit, limit)).posts
+}
+
+export async function fetchSubredditSearchWithSource(
+  subreddit: string,
+  query: string,
+  limit: number = 25,
+  options: { mode?: 'auto' | 'rss_only' } = {},
+): Promise<{ posts: NormalizedPost[]; source: RedditDiscoverySource }> {
+  const normalizedSubreddit = subreddit.trim().replace(/^r\//i, '').toLowerCase()
+  if (!/^[a-z0-9_]{2,50}$/.test(normalizedSubreddit)) {
+    throw new Error('Invalid subreddit target')
+  }
+  const cleanQuery = query.trim()
+  if (!cleanQuery) {
+    return fetchSubredditNewWithSource(subreddit, limit, options)
+  }
+  const numericLimit = Number.isFinite(limit) ? Math.floor(limit) : 25
+  const boundedLimit = Math.min(100, Math.max(1, numericLimit))
+  const cacheKey = `rss:r:search:v1:${normalizedSubreddit}:${encodeURIComponent(cleanQuery.toLowerCase())}`
+  const CACHE_TTL = 300 // 5 minutes
+
+  try {
+    const cached = await redis.get(cacheKey)
+    if (cached) {
+      const posts = parseCachedRedditPosts(cached, normalizedSubreddit, boundedLimit)
+      if (posts) {
+        return { posts, source: 'rss' }
+      }
+      await redis.del(cacheKey).catch(() => undefined)
+    }
+  } catch (cacheErr) {
+    console.warn(`[reddit] Redis cache unavailable for search:`, cacheErr)
+  }
+
+  const searchUrl = buildSubredditSearchRssUrl(normalizedSubreddit, cleanQuery)
+  try {
+    const rssResponse = await fetchWithTimeout(searchUrl, {
+      headers: {
+        'User-Agent': process.env.REDDIT_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    }, 10_000)
+
+    if (rssResponse.ok) {
+      const xml = await readResponseText(rssResponse, MAX_REDDIT_SOURCE_BYTES)
+      if (/<feed(?:\s|>)/i.test(xml)) {
+        const feedPosts = parseRedditRss(xml, normalizedSubreddit)
+        const posts = feedPosts.slice(0, boundedLimit)
+        if (redis && posts.length > 0) {
+          await redis.set(cacheKey, JSON.stringify(feedPosts), 'EX', CACHE_TTL).catch(() => {})
+        }
+        if (posts.length > 0) {
+          return { posts, source: 'rss' }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[reddit] Search RSS fetch failed for r/${normalizedSubreddit} query "${cleanQuery}":`, err)
+  }
+
+  // Fallback to newest posts if search yields 0 posts or fails
+  return fetchSubredditNewWithSource(subreddit, limit, options)
 }
 
 /**

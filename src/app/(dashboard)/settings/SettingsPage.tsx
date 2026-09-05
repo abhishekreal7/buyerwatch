@@ -1639,7 +1639,16 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                         {(Object.entries(TONE_ARCHETYPES) as [ToneArchetype, (typeof TONE_ARCHETYPES)[ToneArchetype]][]).map(([id, archetype]) => {
                           const selected = profile.toneArchetype === id
                           return (
-                            <button key={id} type="button" onClick={() => setProfile(p => ({ ...p, toneArchetype: p.toneArchetype === id ? null : id }))} className={`min-h-[88px] cursor-pointer rounded-2xl border p-3.5 text-left transition-all ${selected ? 'border-[#101828] bg-[#101828] shadow-[0_4px_12px_rgba(16,24,40,0.14)]' : 'border-[#E4E7EC] bg-[#FBFCFD] hover:border-[#C9D0D8] hover:bg-white'}`}>
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => setProfile(p => ({ ...p, toneArchetype: p.toneArchetype === id ? null : id }))}
+                              className={`min-h-[88px] cursor-pointer select-none rounded-2xl border bg-clip-padding p-3.5 text-left outline-none transition-[background-color,border-color,box-shadow,color] duration-150 focus-visible:ring-2 focus-visible:ring-neutral-400/40 ${
+                                selected
+                                  ? 'border-[#101828] bg-[#101828] shadow-[0_4px_12px_rgba(16,24,40,0.14)]'
+                                  : 'border-[#E4E7EC] bg-[#FBFCFD] hover:border-[#C9D0D8] hover:bg-white'
+                              }`}
+                            >
                               <span className={`block text-[12px] font-semibold ${selected ? 'text-white' : 'text-[#101828]'}`}>{archetype.label}</span>
                               <span className={`mt-1 block text-[10.5px] leading-4 ${selected ? 'text-white/65' : 'text-[#667085]'}`}>{archetype.description}</span>
                             </button>
@@ -1651,7 +1660,28 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
                         <div className="flex flex-wrap gap-2">
                           {(Object.entries(STYLE_GUARDRAILS) as [StyleGuardrail, (typeof STYLE_GUARDRAILS)[StyleGuardrail]][]).map(([id, guardrail]) => {
                             const active = profile.styleGuardrails.includes(id)
-                            return <button key={id} type="button" onClick={() => setProfile(p => ({ ...p, styleGuardrails: p.styleGuardrails.includes(id) ? p.styleGuardrails.filter(item => item !== id) : [...p.styleGuardrails, id] }))} className={`min-h-8 cursor-pointer rounded-lg border px-3 py-1 text-[11px] font-semibold transition-all ${active ? 'border-[#101828] bg-[#101828] text-white' : 'border-[#E4E7EC] bg-white text-[#475467] hover:border-[#C9D0D8]'}`}>{active ? `✓ ${guardrail.label}` : guardrail.label}</button>
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() =>
+                                  setProfile(p => ({
+                                    ...p,
+                                    styleGuardrails: p.styleGuardrails.includes(id)
+                                      ? p.styleGuardrails.filter(item => item !== id)
+                                      : [...p.styleGuardrails, id],
+                                  }))
+                                }
+                                className={`inline-flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-lg border bg-clip-padding px-3 text-[11px] font-semibold outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-neutral-400/40 ${
+                                  active
+                                    ? 'border-[#101828] bg-[#101828] text-white'
+                                    : 'border-[#E4E7EC] bg-white text-[#475467] hover:border-[#C9D0D8] hover:bg-[#F9FAFB]'
+                                }`}
+                              >
+                                {active && <Check className="h-3 w-3 shrink-0 stroke-[2.5]" />}
+                                <span>{guardrail.label}</span>
+                              </button>
+                            )
                           })}
                         </div>
                       </div>

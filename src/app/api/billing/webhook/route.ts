@@ -11,6 +11,7 @@ import {
   getDodoProductId,
   hasPendingDodoScheduledChange,
 } from '@/lib/dodo'
+import { publishMonitoringRun } from '@/lib/qstash'
 
 type BillingPlan = 'starter' | 'pro' | 'growth'
 type BillingStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired'
@@ -296,6 +297,17 @@ export async function POST(req: Request) {
         code: instantAutopilotError.code,
       })
       return NextResponse.json({ error: 'instant_autopilot_grant_failed' }, { status: 500 })
+    }
+  }
+
+  if (['starter', 'pro', 'growth'].includes(plan) && providerStatus === 'active') {
+    try {
+      await publishMonitoringRun(userId)
+    } catch (dispatchError) {
+      console.error('[billing/webhook] Failed to enqueue immediate monitoring run for subscriber', {
+        userId,
+        error: dispatchError,
+      })
     }
   }
 

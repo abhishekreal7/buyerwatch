@@ -8,10 +8,12 @@ import {
   type SocialKeywordMapping,
   type SocialScoreCandidate,
 } from './reddit-candidates'
+import type { NormalizedPost } from './types'
 import { searchBlueskyPosts } from './bluesky'
 import { fetchXPosts, isXDiscoveryConfigured } from './x'
 import {
   fetchSubredditNewWithSource,
+  fetchSubredditSearchWithSource,
   prefetchRedditSubreddits,
   type RedditDiscoverySource,
 } from './reddit'
@@ -327,11 +329,13 @@ async function runLockedMonitor(
     throw new Error(`Unable to quarantine stale discovery checkpoints: ${staleCheckpointError.message}`)
   }
 
-  const maxScores = positiveInteger(
-    process.env.SERVERLESS_MONITOR_MAX_SCORES,
-    getConfiguredSecret(process.env.ANTHROPIC_API_KEY) ? 1 : 5,
-    5,
-  )
+  const maxScores = forceUserId
+    ? 15
+    : positiveInteger(
+        process.env.SERVERLESS_MONITOR_MAX_SCORES,
+        getConfiguredSecret(process.env.ANTHROPIC_API_KEY) ? 1 : 5,
+        5,
+      )
   const maxTargets = positiveInteger(
     process.env.SERVERLESS_MONITOR_MAX_TARGETS,
     50,
@@ -381,9 +385,35 @@ async function runLockedMonitor(
         const result = await fetchSubredditNewWithSource(target.target, 25, {
           mode: redditCapacity.mode,
         })
+        let candidates = buildSocialScoreCandidates(result.posts, target.mappings).candidates
+        const redditSource = result.source
+
+        // If this is a targeted user run (subscription activation, onboarding, or check-now)
+        // and newest stream found 0 candidates, search Reddit directly for the user's keywords to backfill.
+        if (candidates.length === 0 && forceUserId) {
+          const searchTerms = [...new Set(target.mappings.map(m => m.term.trim()).filter(Boolean))]
+          const searchPosts: NormalizedPost[] = []
+          for (const term of searchTerms.slice(0, 3)) {
+            try {
+              const searchResult = await fetchSubredditSearchWithSource(target.target, term, 25, {
+                mode: redditCapacity.mode,
+              })
+              searchPosts.push(...searchResult.posts)
+            } catch (err) {
+              logger.warn({ err, target: target.target, term }, 'Backfill search failed for subreddit target')
+            }
+          }
+          if (searchPosts.length > 0) {
+            const searchDiscovery = buildSocialScoreCandidates(searchPosts, target.mappings)
+            if (searchDiscovery.candidates.length > 0) {
+              candidates = searchDiscovery.candidates
+            }
+          }
+        }
+
         return {
-          candidates: buildSocialScoreCandidates(result.posts, target.mappings).candidates,
-          redditSource: result.source,
+          candidates,
+          redditSource,
         }
       }
       if (target.platform === 'x') {

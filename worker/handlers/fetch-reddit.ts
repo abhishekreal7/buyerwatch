@@ -8,7 +8,8 @@ import {
   type RedditKeywordMapping,
   withProfileCompetitors,
 } from '../../src/lib/reddit-candidates'
-import { fetchSubredditNewWithSource } from '../../src/lib/reddit'
+import { fetchSubredditNewWithSource, fetchSubredditSearchWithSource } from '../../src/lib/reddit'
+import type { NormalizedPost } from '../../src/lib/types'
 import { getRedditDiscoveryCapacity } from '../../src/lib/reddit-discovery-capacity'
 import {
   recordKeywordPollFailure,
@@ -75,7 +76,24 @@ export async function redditFetchHandler(job: Job) {
     }
 
     const discovery = buildRedditScoreCandidates(posts, keywordMappings)
-    for (const candidate of discovery.candidates) {
+    let candidates = discovery.candidates
+    if (candidates.length === 0 && keywordMappings.length > 0) {
+      const searchTerms = [...new Set(keywordMappings.map(m => m.term.trim()).filter(Boolean))]
+      const searchPosts: NormalizedPost[] = []
+      for (const term of searchTerms.slice(0, 3)) {
+        try {
+          const searchResult = await fetchSubredditSearchWithSource(target, term, 25, { mode: capacity.mode })
+          searchPosts.push(...searchResult.posts)
+        } catch {
+          // ignore search failure
+        }
+      }
+      if (searchPosts.length > 0) {
+        const searchDiscovery = buildRedditScoreCandidates(searchPosts, keywordMappings)
+        candidates = searchDiscovery.candidates
+      }
+    }
+    for (const candidate of candidates) {
       await scorePostQueue.add('score', candidate, {
         jobId: `score-${candidate.userId}-${candidate.post.externalId}`,
       })
