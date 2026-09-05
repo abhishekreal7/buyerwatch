@@ -2237,14 +2237,28 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                       )}
                     </section>
 
-                    <SectionCard
-                      title="Monthly usage"
-                      description={planState.billingState === 'active'
-                        ? 'Included capacity for the current billing cycle.'
-                        : 'Nothing is counted until monitoring is active.'}
-                    >
+                    <section className="h-full overflow-hidden rounded-[22px] border border-[#E4E7EC] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.025),0_12px_30px_rgba(16,24,40,0.035)] sm:p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#667085]">Monthly usage</p>
+                          <div className="mt-2 flex items-center gap-2.5">
+                            <span className="font-[family-name:var(--font-display)] text-[28px] font-semibold tracking-[-0.035em] text-[#101828]">
+                              Capacity
+                            </span>
+                            <span className="rounded-full border border-[#E4E7EC] bg-[#F8FAFC] px-2.5 py-1 text-[10px] font-semibold text-[#667085]">
+                              Current cycle
+                            </span>
+                          </div>
+                          <p className="mt-2 text-[12.5px] leading-5 text-[#667085]">
+                            {planState.billingState === 'active'
+                              ? 'Included allowance for the current billing cycle.'
+                              : 'Usage tracking activates once your subscription begins.'}
+                          </p>
+                        </div>
+                      </div>
+
                       {planState.billingState !== 'active' ? (
-                        <div className="border-t border-[#EAECF0] pt-5">
+                        <div className="my-6 border-t border-[#EAECF0] pt-5">
                           <div className="flex items-center justify-between gap-4">
                             <p className="text-[12.5px] font-semibold text-[#344054]">Monitoring status</p>
                             <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${planState.billingState === 'attention_required' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-[#E4E7EC] bg-[#F8FAFC] text-[#667085]'}`}>
@@ -2257,107 +2271,75 @@ Authorization: Bearer YOUR_WEBHOOK_SECRET`}
                               : 'Your allowance remains untouched. Usage appears here once the trial begins.'}
                           </p>
                         </div>
-                      ) : <>
-                      {(usageCapacityNotice || usageCapacityAtLimit) && (
-                        <div className="mb-5 flex flex-col gap-3 border-b border-[#EAECF0] pb-5 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="text-[13px] font-semibold text-[#101828]">
-                              {usageCapacityAtLimit ? 'Monthly capacity reached' : 'Capacity running low'}
-                            </p>
-                            <p className="mt-0.5 text-[12px] leading-5 text-[#667085]">
-                              {usageCapacityAtLimit
-                                ? 'Your included allowance is fully used. Add capacity to continue this month.'
-                                : `${usageCapacityNotice?.remaining} ${usageCapacityNotice?.resource === 'signals' ? 'signal' : 'AI draft'}${usageCapacityNotice?.remaining === 1 ? '' : 's'} left this month.`}
-                            </p>
-                          </div>
-                          <CreditPackPicker
-                            initialType={capacityPickerInitialType}
-                            triggerLabel="Add capacity"
-                            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-[#101828] px-3.5 text-[12px] font-semibold text-white transition-colors hover:bg-black"
-                          />
-                        </div>
-                      )}
-                      <div className="space-y-3">
-                        {usageItems.filter(item => item.max > 0).map(item => {
-                          const atLimit = item.used >= item.max
-                          const displayedUsed = Math.min(item.used, item.max)
-                          const percentage = Math.min((item.used / item.max) * 100, 100)
-                          const Icon = item.label.includes('Threads')
-                            ? Activity
-                            : item.label.includes('Drafts')
-                              ? Sparkles
-                              : Send
-
-                          return (
-                            <div
-                              key={item.label}
-                              className="group rounded-xl border border-[#EAECF0] bg-white p-3.5 transition-all duration-150 hover:border-[#D0D5DD] hover:shadow-[0_2px_8px_rgba(16,24,40,0.04)]"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#EAECF0] bg-[#F9FAFB] text-[#475467] group-hover:text-[#101828]">
-                                    <Icon className="h-4 w-4" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="truncate text-[13px] font-semibold text-[#101828]">{item.label}</p>
-                                    <p className="text-[11px] text-[#667085]">
-                                      {item.max - displayedUsed > 0
-                                        ? `${(item.max - displayedUsed).toLocaleString()} remaining`
-                                        : 'Monthly limit reached'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <div className="text-right">
-                                    <span className="font-mono text-[13px] font-bold tabular-nums text-[#101828]">
-                                      {displayedUsed.toLocaleString()}
-                                    </span>
-                                    <span className="text-[11.5px] font-medium text-[#98A2B3]">
-                                      {' '}/ {item.max.toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <span
-                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
-                                      atLimit
-                                        ? 'border border-red-200 bg-red-50 text-red-700'
-                                        : percentage >= 80
-                                          ? 'border border-amber-200 bg-amber-50 text-amber-700'
-                                          : 'border border-[#EAECF0] bg-[#F8FAFC] text-[#475467]'
-                                    }`}
-                                  >
-                                    {Math.round(percentage)}%
-                                  </span>
-                                </div>
+                      ) : (
+                        <>
+                          {(usageCapacityNotice || usageCapacityAtLimit) && (
+                            <div className="my-5 flex flex-col gap-3 border-b border-[#EAECF0] pb-5 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-[13px] font-semibold text-[#101828]">
+                                  {usageCapacityAtLimit ? 'Monthly capacity reached' : 'Capacity running low'}
+                                </p>
+                                <p className="mt-0.5 text-[12px] leading-5 text-[#667085]">
+                                  {usageCapacityAtLimit
+                                    ? 'Your included allowance is fully used. Add capacity to continue this month.'
+                                    : `${usageCapacityNotice?.remaining} ${usageCapacityNotice?.resource === 'signals' ? 'signal' : 'AI draft'}${usageCapacityNotice?.remaining === 1 ? '' : 's'} left this month.`}
+                                </p>
                               </div>
-
-                              <div className="mt-2.5">
-                                <div className="h-2 w-full overflow-hidden rounded-full bg-[#F2F4F7]">
-                                  <div
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                      atLimit
-                                        ? 'bg-red-600'
-                                        : percentage >= 80
-                                          ? 'bg-amber-500'
-                                          : 'bg-[#101828]'
-                                    }`}
-                                    style={{ width: `${Math.max(percentage, percentage > 0 ? 3 : 0)}%` }}
-                                  />
-                                </div>
-                              </div>
+                              <CreditPackPicker
+                                initialType={capacityPickerInitialType}
+                                triggerLabel="Add capacity"
+                                className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-[#101828] px-3.5 text-[12px] font-semibold text-white transition-colors hover:bg-black"
+                              />
                             </div>
-                          )
-                        })}
-                      </div>
-                      {usageItems.every(item => item.max <= 0) && (
-                        <p className="text-[12.5px] leading-5 text-[#667085]">Monthly capacity becomes available when your trial or subscription starts.</p>
+                          )}
+
+                          <div className="my-6 space-y-4 border-y border-[#EAECF0] py-5">
+                            {usageItems.filter(item => item.max > 0).map(item => {
+                              const atLimit = item.used >= item.max
+                              const displayedUsed = Math.min(item.used, item.max)
+                              const percentage = Math.min((item.used / item.max) * 100, 100)
+
+                              return (
+                                <div key={item.label} className="space-y-1.5">
+                                  <div className="flex items-center justify-between text-[13px]">
+                                    <span className="font-medium text-[#344054]">{item.label}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono text-[12.5px] font-bold tabular-nums text-[#101828]">
+                                        {displayedUsed.toLocaleString()}
+                                      </span>
+                                      <span className="text-[12px] text-[#98A2B3]">
+                                        / {item.max.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F2F4F7]">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-300 ${
+                                        atLimit
+                                          ? 'bg-red-600'
+                                          : percentage >= 80
+                                            ? 'bg-amber-500'
+                                            : 'bg-[#101828]'
+                                      }`}
+                                      style={{ width: `${Math.max(percentage, percentage > 0 ? 2 : 0)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {usageItems.every(item => item.max <= 0) && (
+                            <p className="text-[12.5px] leading-5 text-[#667085]">Monthly capacity becomes available when your trial or subscription starts.</p>
+                          )}
+                          {usageItems.some(item => item.max <= 0) && usageItems.some(item => item.max > 0) && (
+                            <p className="mt-2 text-[11.5px] text-[#98A2B3]">
+                              AI drafts and replies are not included in this plan.
+                            </p>
+                          )}
+                        </>
                       )}
-                      {usageItems.some(item => item.max <= 0) && usageItems.some(item => item.max > 0) && (
-                        <p className="mt-5 border-t border-[#EAECF0] pt-4 text-[11.5px] text-[#98A2B3]">
-                          AI drafts and replies are not included in this plan.
-                        </p>
-                      )}
-                      </>}
-                    </SectionCard>
+                    </section>
                     </div>
                   </>
                 )}
