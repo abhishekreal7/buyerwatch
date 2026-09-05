@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  CircleUserRound, Bell, CreditCard, Save, Check, Loader2,
+  CircleUserRound, Bell, CreditCard, Check, Loader2,
   Globe, AtSign, Shield,
   Link, AlertTriangle, Sparkles, Mail, Activity, BarChart2, Send, Info, ShieldCheck, ChevronDown
 } from 'lucide-react'
@@ -240,33 +240,47 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
       </span>
     </button>
   )
-}function SaveButton({
+}
+
+function SaveButton({
   saving,
   saved,
   disabled,
   onClick,
+  size = 'md',
+  showShortcut = true,
   className = '',
 }: {
   saving: boolean
   saved: boolean
   disabled?: boolean
   onClick: () => void
+  size?: 'sm' | 'md'
+  showShortcut?: boolean
   className?: string
 }) {
+  const [isMac, setIsMac] = useState(false)
+  useEffect(() => {
+    setIsMac(/Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent))
+  }, [])
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled || saving}
-      className={`group relative inline-flex select-none items-center justify-center gap-2 rounded-lg font-medium text-white antialiased transition-all duration-150 cursor-pointer active:scale-[0.985] disabled:pointer-events-none disabled:opacity-40 h-8.5 px-3.5 text-[12.5px] ${
+      aria-label="Save changes"
+      className={`group relative inline-flex select-none items-center justify-center font-medium text-white antialiased transition-all duration-150 cursor-pointer active:scale-[0.985] disabled:pointer-events-none disabled:opacity-40 rounded-lg ${
+        size === 'sm' ? 'h-8 px-3 text-[12px] gap-1.5' : 'h-9 px-3.5 sm:px-4 text-[13px] gap-2'
+      } ${
         saved
-          ? 'bg-emerald-600 hover:bg-emerald-600 text-white border border-emerald-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.12)]'
-          : 'bg-gradient-to-b from-[#22272e] to-[#12151a] hover:from-[#2d333b] hover:to-[#1c2128] border border-black/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_1px_2px_rgba(0,0,0,0.2),0_2px_4px_rgba(0,0,0,0.08)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/40 focus-visible:ring-offset-2'
+          ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 hover:from-emerald-600 hover:to-emerald-700 text-white border border-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_1px_2px_rgba(0,0,0,0.12),0_2px_8px_rgba(16,185,129,0.3)]'
+          : 'bg-gradient-to-b from-[#1c2026] via-[#131519] to-[#0a0c0e] hover:from-[#272d36] hover:via-[#181b20] hover:to-[#0d0f12] border border-[#262b34]/90 hover:border-[#323945] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18),inset_0_-1px_0_0_rgba(0,0,0,0.4),0_1px_2px_0_rgba(0,0,0,0.24),0_2px_6px_0_rgba(0,0,0,0.12)] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.26),0_2px_4px_0_rgba(0,0,0,0.25),0_6px_16px_0_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/40 focus-visible:ring-offset-2'
       } ${className}`}
     >
       {saved ? (
         <>
-          <Check className="h-3.5 w-3.5 stroke-[2.5] text-emerald-100 transition-transform group-hover:scale-105" />
+          <Check className="h-3.5 w-3.5 stroke-[2.5] text-emerald-100 transition-transform duration-200 scale-105" />
           <span className="font-semibold tracking-[-0.01em]">Saved</span>
         </>
       ) : saving ? (
@@ -275,7 +289,14 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
           <span className="font-medium tracking-[-0.01em] text-white/90">Saving…</span>
         </>
       ) : (
-        <span className="font-medium tracking-[-0.01em] text-white">Save changes</span>
+        <>
+          <span className="font-medium tracking-[-0.01em] text-white">Save changes</span>
+          {showShortcut && (
+            <kbd className="hidden sm:inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[9.5px] font-sans font-medium text-white/45 bg-white/[0.08] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] group-hover:text-white/70 group-hover:bg-white/[0.12] transition-colors">
+              {isMac ? '⌘S' : 'Ctrl S'}
+            </kbd>
+          )}
+        </>
       )}
     </button>
   )
@@ -798,6 +819,20 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
     }
   }
 
+  const handleSaveRef = useRef(handleSave)
+  handleSaveRef.current = handleSave
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void handleSaveRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   const handleUpgrade = async (
     plan: 'starter' | 'pro' | 'growth' = 'pro',
     billing: 'monthly' | 'annual' = 'monthly',
@@ -1308,6 +1343,7 @@ export default function SettingsPage({ initialData }: { initialData?: SettingsIn
               saving={saving}
               saved={saveSuccess}
               disabled={settingsLoading || loadFailed}
+              size="sm"
             />
           </div>
         </header>
